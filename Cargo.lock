@@ -849,16 +849,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bevy_polyline"
-version = "0.8.1"
-source = "git+https://github.com/nsabovic/bevy_polyline.git?branch=bevy-13#dda18091108e1caf951a537a6b6ec5c9cd2524e9"
-dependencies = [
- "bevy",
- "bitflags 2.4.2",
- "naga",
-]
-
-[[package]]
 name = "bevy_ptr"
 version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1628,7 +1618,6 @@ dependencies = [
  "bevy_normal_material",
  "bevy_panorbit_camera",
  "bevy_points",
- "bevy_polyline",
  "nalgebra",
  "num-traits",
  "rand",

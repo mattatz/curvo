@@ -18,7 +18,6 @@ use bevy_points::{
     plugin::PointsPlugin,
     prelude::{PointsMaterial, PointsMesh},
 };
-use bevy_polyline::prelude::*;
 use nalgebra::Point3;
 
 use curvo::prelude::*;
@@ -27,7 +26,6 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugins(MaterialPlugin::<LineMaterial>::default())
-        .add_plugins(PolylinePlugin)
         .add_plugins(InfiniteGridPlugin)
         .add_plugins(PanOrbitCameraPlugin)
         .add_plugins(PointsPlugin)
@@ -47,15 +45,11 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut line_materials: ResMut<Assets<LineMaterial>>,
-    mut polylines: ResMut<Assets<Polyline>>,
-    mut polyline_materials: ResMut<Assets<PolylineMaterial>>,
     mut points_materials: ResMut<Assets<PointsMaterial>>,
 ) {
     let add_curve =
         |curve: &NurbsCurve3D<f64>,
          commands: &mut Commands<'_, '_>,
-         polylines: &mut ResMut<'_, Assets<Polyline>>,
-         polyline_materials: &mut ResMut<'_, Assets<PolylineMaterial>>,
          meshes: &mut ResMut<'_, Assets<Mesh>>,
          line_materials: &mut ResMut<'_, Assets<LineMaterial>>,
          _points_materials: &mut ResMut<'_, Assets<PointsMaterial>>| {
@@ -71,7 +65,7 @@ fn setup(
             let mut t = min;
             let mut vertices: Vec<Vec3> = vec![];
             let mut tangents: Vec<Vec3> = vec![];
-            let len = 0.25;
+            let len = 0.15;
 
             while t <= max {
                 let pt = curve.point_at(t).cast::<f32>();
@@ -83,24 +77,24 @@ fn setup(
                 t += step;
             }
 
-            let mut line_list =
-                Mesh::new(bevy::render::mesh::PrimitiveTopology::LineList, default());
-            let line_vertices = vertices
+            let mut line = Mesh::new(bevy::render::mesh::PrimitiveTopology::LineList, default());
+            let line_list_vertices = vertices
                 .iter()
                 .enumerate()
                 .flat_map(|(i, pt)| {
-                    let normal: Vec3 = tangents[i];
+                    let tangent: Vec3 = tangents[i];
+                    let normal = Vec3::new(-tangent.y, tangent.x, tangent.z);
                     [*pt, *pt + normal * len]
                 })
                 .map(|p| p.to_array())
                 .collect();
-            line_list.insert_attribute(
+            line.insert_attribute(
                 Mesh::ATTRIBUTE_POSITION,
-                VertexAttributeValues::Float32x3(line_vertices),
+                VertexAttributeValues::Float32x3(line_list_vertices),
             );
             commands
                 .spawn(MaterialMeshBundle {
-                    mesh: meshes.add(line_list),
+                    mesh: meshes.add(line),
                     material: line_materials.add(LineMaterial {
                         color: Color::AQUAMARINE,
                     }),
@@ -110,6 +104,28 @@ fn setup(
                 .insert(Name::new("normal"));
 
             let samples = curve.tessellate(Some(1e-8));
+            let mut line = Mesh::new(bevy::render::mesh::PrimitiveTopology::LineStrip, default());
+            let line_vertices = samples
+                .iter()
+                .map(|p| p.cast::<f32>())
+                .map(|p| [p.x, p.y, p.z])
+                .collect();
+            line.insert_attribute(
+                Mesh::ATTRIBUTE_POSITION,
+                VertexAttributeValues::Float32x3(line_vertices),
+            );
+            commands
+                .spawn(MaterialMeshBundle {
+                    mesh: meshes.add(line),
+                    material: line_materials.add(LineMaterial {
+                        color: Color::TOMATO,
+                    }),
+                    // visibility: Visibility::Hidden,
+                    ..Default::default()
+                })
+                .insert(Name::new("curve"));
+
+            /*
             let polyline = Polyline {
                 vertices: samples.iter().map(|p| p.cast::<f32>().into()).collect(),
             };
@@ -125,6 +141,7 @@ fn setup(
                     ..Default::default()
                 })
                 .insert(Name::new("polyline"));
+            */
 
             vertices
         };
@@ -165,8 +182,6 @@ fn setup(
     let vertices = add_curve(
         &interpolated,
         &mut commands,
-        &mut polylines,
-        &mut polyline_materials,
         &mut meshes,
         &mut line_materials,
         &mut points_materials,

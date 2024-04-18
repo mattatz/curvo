@@ -23,7 +23,6 @@ bevy_infinite_grid = { version = "0.12", optional = true }
 bevy_normal_material = { version = "0.5.0", optional = true }
 bevy_panorbit_camera = { version = "0.17.0", optional = true }
 bevy_points = { version = "0.5.1", optional = true }
-bevy_polyline = { git = "https://github.com/nsabovic/bevy_polyline.git", branch = "bevy-13", optional = true }
 
 [dev-dependencies]
 approx = { version = "0.5", default-features = false }
@@ -35,8 +34,7 @@ bevy = [
   "dep:bevy_infinite_grid",
   "dep:bevy_normal_material",
   "dep:bevy_panorbit_camera",
-  "dep:bevy_points",
-  "dep:bevy_polyline",
+  "dep:bevy_points"
 ]
 
 [[example]]

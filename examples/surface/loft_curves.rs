@@ -18,7 +18,6 @@ use bevy_infinite_grid::InfiniteGridPlugin;
 use bevy_normal_material::{material::NormalMaterial, plugin::NormalMaterialPlugin};
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use bevy_points::{plugin::PointsPlugin, prelude::PointsMaterial};
-use bevy_polyline::prelude::*;
 use nalgebra::{Point3, Rotation3, Translation3, Vector3};
 
 use curvo::prelude::*;
@@ -27,7 +26,6 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugins(MaterialPlugin::<LineMaterial>::default())
-        .add_plugins(PolylinePlugin)
         .add_plugins(InfiniteGridPlugin)
         .add_plugins(PanOrbitCameraPlugin)
         .add_plugins(PointsPlugin)
@@ -48,8 +46,6 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut line_materials: ResMut<Assets<LineMaterial>>,
-    _polylines: ResMut<Assets<Polyline>>,
-    _polyline_materials: ResMut<Assets<PolylineMaterial>>,
     mut points_materials: ResMut<Assets<PointsMaterial>>,
     mut normal_materials: ResMut<'_, Assets<NormalMaterial>>,
 ) {
