@@ -1,6 +1,6 @@
 [package]
 name = "curvo"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Masatatsu Nakamura <masatatsu.nakamura@gmail.com"]
 edition = "2021"
 keywords = ["nurbs", "modeling", "graphics", "3d"]
@@ -30,6 +30,7 @@ bevy_points = { version = "0.5.1", optional = true }
 approx = { version = "0.5", default-features = false }
 
 [features]
+default = []
 bevy = [
   "dep:bevy",
   "dep:bevy-inspector-egui",
