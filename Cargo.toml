@@ -1,0 +1,50 @@
+[package]
+name = "curvo"
+version = "0.1.0"
+authors = ["Masatatsu Nakamura <masatatsu@detor.co>"]
+edition = "2021"
+keywords = ["nurbs", "modeling", "graphics", "3d"]
+categories = ["graphics", "modeling"]
+homepage = "https://github.com/mattatz/curvo"
+repository = "https://github.com/mattatz/curvo"
+license = "MIT"
+
+[dependencies]
+anyhow = "1.0.81"
+nalgebra = { version = "0.32.5", features = [
+  "serde-serialize",
+  "convert-glam025",
+] }
+num-traits = "0.2.18"
+rand = "0.8.5"
+bevy = { version = "0.13.2", optional = true }
+bevy-inspector-egui = { version = "0.23.1", optional = true }
+bevy_infinite_grid = { version = "0.12", optional = true }
+bevy_normal_material = { version = "0.5.0", optional = true }
+bevy_panorbit_camera = { version = "0.17.0", optional = true }
+bevy_points = { version = "0.5.1", optional = true }
+bevy_polyline = { git = "https://github.com/nsabovic/bevy_polyline.git", branch = "bevy-13", optional = true }
+
+[dev-dependencies]
+approx = { version = "0.5", default-features = false }
+
+[features]
+bevy = [
+  "dep:bevy",
+  "dep:bevy-inspector-egui",
+  "dep:bevy_infinite_grid",
+  "dep:bevy_normal_material",
+  "dep:bevy_panorbit_camera",
+  "dep:bevy_points",
+  "dep:bevy_polyline",
+]
+
+[[example]]
+name = "interpolate_curve"
+path = "examples/curve/interpolate_curve.rs"
+required-features = ["bevy"]
+
+[[example]]
+name = "loft_curves"
+path = "examples/surface/loft_curves.rs"
+required-features = ["bevy"]

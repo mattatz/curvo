@@ -1,0 +1,38 @@
+name: Fmt, Clippy, Test
+
+on:
+  push:
+    branches:
+    - main
+  pull_request:
+    branches:
+    - main
+
+jobs:
+  test:
+    name: fmt + clippy + test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node_index: [clippy, fmt, test]
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - uses: actions-rs/install@v0.1
+        with:
+          crate: cargo-audit
+          version: latest
+
+      - name: Run cargo fmt
+        if: ${{ matrix.node_index == 'fmt' }}
+        run: cargo fmt --all -- --check
+
+      - name: Run cargo clippy
+        if: ${{ matrix.node_index == 'clippy' }}
+        run: cargo clippy -- -D warnings
+
+      - name: Run cargo test
+        run: cargo test
