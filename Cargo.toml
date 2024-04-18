@@ -1,13 +1,15 @@
 [package]
 name = "curvo"
 version = "0.1.0"
-authors = ["Masatatsu Nakamura <masatatsu@detor.co>"]
+authors = ["Masatatsu Nakamura <masatatsu.nakamura@gmail.com"]
 edition = "2021"
 keywords = ["nurbs", "modeling", "graphics", "3d"]
 categories = ["graphics", "modeling"]
+description = "NURBS modeling library"
 homepage = "https://github.com/mattatz/curvo"
 repository = "https://github.com/mattatz/curvo"
 license = "MIT"
+readme = "README.md"
 
 [dependencies]
 anyhow = "1.0.81"
