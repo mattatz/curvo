@@ -3,7 +3,7 @@
 [![License](https://img.shields.io/badge/license-MIT%2FApache-blue.svg)](https://github.com/mattatz/curvo#license)
 [![Crates.io](https://img.shields.io/crates/v/curvo.svg)](https://crates.io/crates/curvo)
 [![Docs](https://docs.rs/curvo/badge.svg)](https://docs.rs/curvo/latest/curvo/)
-[![CI](https://github.com/bevyengine/curvo/workflows/CI/badge.svg)](https://github.com/mattatz/curvo/actions)
+[![CI](https://github.com/mattatz/curvo/workflows/CI/badge.svg)](https://github.com/mattatz/curvo/actions)
 
 Curvo is a NURBS curve / surface modeling library for Rust.
 
