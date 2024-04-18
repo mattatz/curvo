@@ -10,7 +10,7 @@ on:
 
 jobs:
   test:
-    name: fmt + clippy + test
+    name: test
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -35,4 +35,5 @@ jobs:
         run: cargo clippy -- -D warnings
 
       - name: Run cargo test
+        if: ${{ matrix.node_index == 'test' }}
         run: cargo test
