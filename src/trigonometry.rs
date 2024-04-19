@@ -19,3 +19,40 @@ where
         area < tolerance
     }
 }
+
+/// Find the closest point on a segment
+/// * `pt` - point to project
+/// * `start` - start point of segment
+/// * `end` - end point of segment
+/// * `u0` - first param of segment
+/// * `u1` - second param of segment
+pub fn segment_closest_point<T: RealField + Copy, D: DimName>(
+    pt: &OPoint<T, D>,
+    start: &OPoint<T, D>,
+    end: &OPoint<T, D>,
+    u0: T,
+    u1: T,
+) -> (T, OPoint<T, D>)
+where
+    DefaultAllocator: Allocator<T, D>,
+{
+    let dif = end - start;
+    let l = dif.norm();
+
+    if l < T::default_epsilon() {
+        return (u0, start.clone());
+    }
+
+    let o = start.clone();
+    let r = dif / l;
+    let o2pt = pt - &o;
+    let do2ptr = o2pt.dot(&r);
+
+    if do2ptr < T::zero() {
+        (u0, start.clone())
+    } else if do2ptr > l {
+        return (u1, end.clone());
+    } else {
+        return (u0 + (u1 - u0) * do2ptr / l, (r * do2ptr + o.coords).into());
+    }
+}

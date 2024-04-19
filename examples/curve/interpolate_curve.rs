@@ -1,4 +1,5 @@
 use bevy::{
+    core::Zeroable,
     pbr::{MaterialPipeline, MaterialPipelineKey},
     prelude::*,
     render::{
@@ -34,10 +35,13 @@ fn main() {
 }
 struct AppPlugin;
 
+#[derive(Component)]
+struct CurveContainer(NurbsCurve3D<f64>);
+
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.add_systems(Startup, setup)
-            .add_systems(Update, close_on_esc);
+            .add_systems(Update, (close_on_esc, find_closest_point));
     }
 }
 
@@ -53,12 +57,6 @@ fn setup(
          meshes: &mut ResMut<'_, Assets<Mesh>>,
          line_materials: &mut ResMut<'_, Assets<LineMaterial>>,
          _points_materials: &mut ResMut<'_, Assets<PointsMaterial>>| {
-            let _vertices: Vec<Vec3> = curve
-                .dehomogenized_control_points()
-                .iter()
-                .map(|p| p.cast::<f32>().into())
-                .collect();
-
             let (min, max) = curve.knots_domain();
             let interval = max - min;
             let step = interval / 32.;
@@ -125,24 +123,6 @@ fn setup(
                 })
                 .insert(Name::new("curve"));
 
-            /*
-            let polyline = Polyline {
-                vertices: samples.iter().map(|p| p.cast::<f32>().into()).collect(),
-            };
-            commands
-                .spawn(PolylineBundle {
-                    polyline: polylines.add(polyline),
-                    material: polyline_materials.add(PolylineMaterial {
-                        color: Color::TOMATO,
-                        width: 2.5,
-                        ..Default::default()
-                    }),
-                    // visibility: Visibility::Hidden,
-                    ..Default::default()
-                })
-                .insert(Name::new("polyline"));
-            */
-
             vertices
         };
 
@@ -187,6 +167,8 @@ fn setup(
         &mut points_materials,
     );
 
+    commands.spawn((CurveContainer(interpolated),));
+
     let center = if vertices.is_empty() {
         Vec3::ZERO
     } else {
@@ -208,6 +190,32 @@ fn setup(
         ..Default::default()
     };
     commands.spawn((orth, PanOrbitCamera::default()));
+}
+
+fn find_closest_point(
+    curves: Query<&CurveContainer>,
+    window: Query<&Window>,
+    camera: Query<(&Camera, &GlobalTransform)>,
+    mut gizmos: Gizmos,
+) {
+    let w = window.single();
+    let (camera, camera_transform) = camera.single();
+    if let Some(ray) = w
+        .cursor_position()
+        .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor))
+    {
+        if let Some(d) = ray.intersect_plane(Vec3::zeroed(), Plane3d::new(Vec3::Z)) {
+            let pt = ray.get_point(d);
+            gizmos.circle(pt, Direction3d::Z, 0.1, Color::GRAY);
+            let curve = curves.single();
+            let p = Point3::from(pt).cast();
+            let closest = curve.0.closest_point(&p);
+            let center = closest.cast::<f32>().into();
+            gizmos.circle(center, Direction3d::Z, 0.05, Color::WHITE);
+
+            gizmos.line(pt, center, Color::WHITE);
+        }
+    }
 }
 
 #[derive(Asset, TypePath, Default, AsBindGroup, Debug, Clone)]
