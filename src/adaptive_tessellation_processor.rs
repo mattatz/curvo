@@ -2,14 +2,22 @@ use nalgebra::{
     allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, RealField, U1,
 };
 
-use crate::{adaptive_tessellation_node::AdaptiveTessellationNode, prelude::NurbsSurface, Float};
+use crate::{
+    adaptive_tessellation_node::AdaptiveTessellationNode, prelude::NurbsSurface, FloatingPoint,
+};
 
+/// Options for adaptive tessellation of a surface
 #[derive(Clone, Debug)]
 pub struct AdaptiveTessellationOptions<T: RealField> {
+    /// Tolerance for the normal vector: if the L2 norm of the normal vectors is below this value, the edge is considered flat
     pub norm_tolerance: T,
+    /// Minimum number of divisions in u direction
     pub min_divs_u: usize,
+    /// Minimum number of divisions in v direction
     pub min_divs_v: usize,
+    /// Minimum depth for division
     pub min_depth: usize,
+    /// Maximum depth for division
     pub max_depth: usize,
 }
 
@@ -25,17 +33,20 @@ impl<T: RealField> Default for AdaptiveTessellationOptions<T> {
     }
 }
 
-pub struct AdaptiveTessellationProcessor<'a, T: Float, D: DimName>
+/// Processor for adaptive tessellation of a surface
+pub struct AdaptiveTessellationProcessor<'a, T: FloatingPoint, D: DimName>
 where
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<T, D>,
     DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
 {
+    /// The surface to tessellate
     pub(crate) surface: &'a NurbsSurface<T, D>,
+    /// The created nodes for the tessellation
     pub(crate) nodes: Vec<AdaptiveTessellationNode<T, D>>,
 }
 
-impl<'a, T: Float, D: DimName> AdaptiveTessellationProcessor<'a, T, D>
+impl<'a, T: FloatingPoint, D: DimName> AdaptiveTessellationProcessor<'a, T, D>
 where
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<T, D>,

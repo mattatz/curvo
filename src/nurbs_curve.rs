@@ -10,12 +10,12 @@ use crate::binomial::Binomial;
 use crate::prelude::{Invertible, KnotVector};
 use crate::transformable::Transformable;
 use crate::trigonometry::three_points_are_flat;
-use crate::Float;
+use crate::FloatingPoint;
 
 /// NURBS curve representation
 /// By generics, it can be used for 2D or 3D curves with f32 or f64 scalar types
 #[derive(Clone, Debug)]
-pub struct NurbsCurve<T: Float, D: DimName>
+pub struct NurbsCurve<T: FloatingPoint, D: DimName>
 where
     DefaultAllocator: Allocator<T, D>,
 {
@@ -24,11 +24,12 @@ where
     knots: KnotVector<T>,
 }
 
-/// 2D / 3D NURBS curve aliases
+/// 2D NURBS curve aliases
 pub type NurbsCurve2D<T> = NurbsCurve<T, Const<3>>;
+/// 3D NURBS curve aliases
 pub type NurbsCurve3D<T> = NurbsCurve<T, Const<4>>;
 
-impl<T: Float, D: DimName> NurbsCurve<T, D>
+impl<T: FloatingPoint, D: DimName> NurbsCurve<T, D>
 where
     DefaultAllocator: Allocator<T, D>,
 {
@@ -802,7 +803,7 @@ where
 }
 
 /// Enable to transform a NURBS curve by 3x3 matrix
-impl<T: Float> Transformable<&Matrix3<T>> for NurbsCurve2D<T> {
+impl<T: FloatingPoint> Transformable<&Matrix3<T>> for NurbsCurve2D<T> {
     fn transform(&mut self, transform: &Matrix3<T>) {
         self.control_points.iter_mut().for_each(|p| {
             let hom = Point2::new(p.x, p.y).to_homogeneous();
@@ -814,7 +815,7 @@ impl<T: Float> Transformable<&Matrix3<T>> for NurbsCurve2D<T> {
 }
 
 /// Enable to transform a NURBS curve by 4x4 matrix
-impl<T: Float> Transformable<&Matrix4<T>> for NurbsCurve3D<T> {
+impl<T: FloatingPoint> Transformable<&Matrix4<T>> for NurbsCurve3D<T> {
     fn transform(&mut self, transform: &Matrix4<T>) {
         self.control_points.iter_mut().for_each(|p| {
             let hom = Point3::new(p.x, p.y, p.z).to_homogeneous();
@@ -826,7 +827,7 @@ impl<T: Float> Transformable<&Matrix4<T>> for NurbsCurve3D<T> {
     }
 }
 
-impl<T: Float, D: DimName> Invertible for NurbsCurve<T, D>
+impl<T: FloatingPoint, D: DimName> Invertible for NurbsCurve<T, D>
 where
     DefaultAllocator: Allocator<T, D>,
 {
@@ -855,7 +856,7 @@ where
 }
 
 /// Dehomogenize a point
-pub fn dehomogenize<T: Float, D: DimName>(
+pub fn dehomogenize<T: FloatingPoint, D: DimName>(
     point: &OPoint<T, D>,
 ) -> Option<OPoint<T, DimNameDiff<D, U1>>>
 where

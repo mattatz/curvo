@@ -2,7 +2,7 @@ use std::ops::Index;
 
 use nalgebra::RealField;
 
-use crate::{prelude::Invertible, Float};
+use crate::{prelude::Invertible, FloatingPoint};
 
 /// Knot vector representation
 #[derive(Clone, Debug)]
@@ -225,7 +225,7 @@ impl<T> FromIterator<T> for KnotVector<T> {
     }
 }
 
-impl<T: Float> Invertible for KnotVector<T> {
+impl<T: FloatingPoint> Invertible for KnotVector<T> {
     /// Reverses the knot vector
     /// # Example
     /// ```

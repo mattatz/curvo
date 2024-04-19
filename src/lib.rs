@@ -3,7 +3,7 @@
 mod adaptive_tessellation_node;
 mod adaptive_tessellation_processor;
 mod binomial;
-mod float;
+mod floating_point;
 mod invertible;
 mod knot_vector;
 mod nurbs_curve;
@@ -12,11 +12,12 @@ mod surface_point;
 mod surface_tessellation;
 mod transformable;
 mod trigonometry;
-use float::*;
+use floating_point::*;
 use surface_point::*;
 
 pub mod prelude {
     pub use crate::adaptive_tessellation_processor::AdaptiveTessellationOptions;
+    pub use crate::floating_point::*;
     pub use crate::invertible::*;
     pub use crate::knot_vector::*;
     pub use crate::nurbs_curve::*;

@@ -4,10 +4,11 @@ use nalgebra::{
 };
 
 use crate::{
-    adaptive_tessellation_processor::AdaptiveTessellationOptions, prelude::NurbsSurface, Float,
-    SurfacePoint,
+    adaptive_tessellation_processor::AdaptiveTessellationOptions, prelude::NurbsSurface,
+    FloatingPoint, SurfacePoint,
 };
 
+/// Node for adaptive tessellation of a surface
 pub struct AdaptiveTessellationNode<T: RealField, D: DimName>
 where
     D: DimNameSub<U1>,
@@ -26,7 +27,7 @@ where
     pub(crate) v05: T,
 }
 
-impl<T: Float, D: DimName> AdaptiveTessellationNode<T, D>
+impl<T: FloatingPoint, D: DimName> AdaptiveTessellationNode<T, D>
 where
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<T, D>,

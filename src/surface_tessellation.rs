@@ -3,12 +3,14 @@ use nalgebra::{
     Vector2, U1,
 };
 
-use crate::{adaptive_tessellation_node::AdaptiveTessellationNode, prelude::NurbsSurface, Float};
+use crate::{
+    adaptive_tessellation_node::AdaptiveTessellationNode, prelude::NurbsSurface, FloatingPoint,
+};
 
 /// Surface tessellation representation
 /// This struct is used to create a mesh data from surface
 #[derive(Clone, Debug)]
-pub struct SurfaceTessellation<T: Float, D: DimName>
+pub struct SurfaceTessellation<T: FloatingPoint, D: DimName>
 where
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<T, D>,
@@ -20,7 +22,7 @@ where
     uvs: Vec<Vector2<T>>,
 }
 
-impl<T: Float, D: DimName> SurfaceTessellation<T, D>
+impl<T: FloatingPoint, D: DimName> SurfaceTessellation<T, D>
 where
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<T, D>,

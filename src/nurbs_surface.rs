@@ -10,13 +10,13 @@ use crate::{
     nurbs_curve::{dehomogenize, NurbsCurve},
     prelude::{KnotVector, SurfaceTessellation},
     transformable::Transformable,
-    Float, SurfacePoint,
+    FloatingPoint, SurfacePoint,
 };
 
 /// NURBS surface representation
 /// by generics, it can be used for 2D or 3D curves with f32 or f64 scalar types
 #[derive(Clone, Debug)]
-pub struct NurbsSurface<T: Float, D: DimName>
+pub struct NurbsSurface<T: FloatingPoint, D: DimName>
 where
     DefaultAllocator: Allocator<T, D>,
 {
@@ -27,11 +27,12 @@ where
     v_knots: KnotVector<T>,
 }
 
-/// 2D / 3D NURBS surface aliases
+/// 2D NURBS surface aliases
 pub type NurbsSurface2D<T> = NurbsSurface<T, Const<3>>;
+/// 3D NURBS surface aliases
 pub type NurbsSurface3D<T> = NurbsSurface<T, Const<4>>;
 
-impl<T: Float, D: DimName> NurbsSurface<T, D>
+impl<T: FloatingPoint, D: DimName> NurbsSurface<T, D>
 where
     DefaultAllocator: Allocator<T, D>,
     D: DimNameSub<U1>,
@@ -430,7 +431,7 @@ fn unify_curve_knot_vectors<T, D>(
     curves: &[NurbsCurve<T, D>],
 ) -> anyhow::Result<Vec<NurbsCurve<T, D>>>
 where
-    T: Float,
+    T: FloatingPoint,
     D: DimName,
     DefaultAllocator: Allocator<T, D>,
 {
@@ -558,7 +559,7 @@ fn sorted_set_sub<T: RealField + Copy>(a: &[T], b: &[T]) -> Vec<T> {
 }
 
 /// Enable to transform a NURBS surface by a given 3x3 matrix
-impl<T: Float> Transformable<&Matrix3<T>> for NurbsSurface2D<T> {
+impl<T: FloatingPoint> Transformable<&Matrix3<T>> for NurbsSurface2D<T> {
     fn transform(&mut self, transform: &Matrix3<T>) {
         self.control_points.iter_mut().for_each(|rows| {
             rows.iter_mut().for_each(|p| {
@@ -572,7 +573,7 @@ impl<T: Float> Transformable<&Matrix3<T>> for NurbsSurface2D<T> {
 }
 
 /// Enable to transform a NURBS surface by a given 4x4 matrix
-impl<T: Float> Transformable<&Matrix4<T>> for NurbsSurface3D<T> {
+impl<T: FloatingPoint> Transformable<&Matrix4<T>> for NurbsSurface3D<T> {
     fn transform(&mut self, transform: &Matrix4<T>) {
         self.control_points.iter_mut().for_each(|rows| {
             rows.iter_mut().for_each(|p| {
