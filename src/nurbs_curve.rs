@@ -9,7 +9,7 @@ use rand::Rng;
 use crate::binomial::Binomial;
 use crate::prelude::{Invertible, KnotVector};
 use crate::transformable::Transformable;
-use crate::trigonometry::three_points_are_flat;
+use crate::trigonometry::{segment_closest_point, three_points_are_flat};
 use crate::FloatingPoint;
 
 /// NURBS curve representation
@@ -144,6 +144,29 @@ where
         for i in 0..samples {
             let t = start + T::from_usize(i).unwrap() * step;
             points.push(self.point_at(t));
+        }
+        points
+    }
+
+    #[allow(clippy::type_complexity)]
+    /// Sample the curve at a given number of points between the start and end
+    /// Return the vector of tuples of parameter and point
+    pub fn sample_regular_range_with_parameter(
+        &self,
+        start: T,
+        end: T,
+        samples: usize,
+    ) -> Vec<(T, OPoint<T, DimNameDiff<D, U1>>)>
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+    {
+        let mut points = vec![];
+        let us = T::from_usize(samples).unwrap();
+        let step = (end - start) / (us - T::one());
+        for i in 0..samples {
+            let t = start + T::from_usize(i).unwrap() * step;
+            points.push((t, self.point_at(t)));
         }
         points
     }
@@ -799,6 +822,96 @@ where
 
         self.knots = KnotVector::new(knots_post);
         self.control_points = control_points_post;
+    }
+
+    /// Find the closest point on the curve to a given point
+    pub fn closest_point(
+        &self,
+        point: &OPoint<T, DimNameDiff<D, U1>>,
+    ) -> OPoint<T, DimNameDiff<D, U1>>
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+    {
+        let u = self.closest_parameter(point);
+        self.point_at(u)
+    }
+
+    /// Find the closest parameter on the curve to a given point with Newton's method
+    pub fn closest_parameter(&self, point: &OPoint<T, DimNameDiff<D, U1>>) -> T
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+    {
+        let (min_u, max_u) = self.knots_domain();
+        let samples = self.control_points.len() * self.degree;
+        let pts = self.sample_regular_range_with_parameter(min_u, max_u, samples);
+
+        let mut min = T::max_value().unwrap();
+        let mut u = min_u;
+
+        let closed =
+            (&self.control_points[0] - &self.control_points[self.control_points.len() - 1]).norm()
+                < T::default_epsilon();
+
+        for i in 0..pts.len() - 1 {
+            let u0 = pts[i].0;
+            let u1 = pts[i + 1].0;
+
+            let p0 = &pts[i].1;
+            let p1 = &pts[i + 1].1;
+
+            let (proj_u, proj_pt) = segment_closest_point(point, p0, p1, u0, u1);
+            let d = (point - proj_pt).norm();
+
+            if d < min {
+                min = d;
+                u = proj_u;
+            }
+        }
+
+        let mut cu = u;
+
+        let max_iterations = 5;
+        for _ in 0..max_iterations {
+            let e = self.rational_derivatives(cu, 2);
+            let dif = &e[0] - &point.coords;
+
+            let c1v = dif.norm();
+
+            let c2n = e[1].dot(&dif);
+            let c2d = e[1].norm() * c1v;
+
+            let c2v = c2n / c2d;
+
+            let c1 = c1v < T::default_epsilon();
+            let c2 = c2v.abs() < T::default_epsilon();
+
+            if c1 && c2 {
+                return cu;
+            }
+
+            let f = e[1].dot(&dif);
+            let s0 = e[2].dot(&dif);
+            let s1 = e[1].dot(&e[1]);
+            let df = s0 + s1;
+            let mut ct = cu - f / df;
+
+            if ct < min_u {
+                ct = if closed { max_u - (ct - min_u) } else { min_u };
+            } else if ct > max_u {
+                ct = if closed { min_u + (ct - max_u) } else { max_u };
+            }
+
+            let c3v = (&e[1] * (ct - cu)).norm();
+            if c3v < T::default_epsilon() {
+                return cu;
+            }
+
+            cu = ct;
+        }
+
+        cu
     }
 }
 
