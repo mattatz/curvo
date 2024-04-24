@@ -24,9 +24,9 @@ where
     knots: KnotVector<T>,
 }
 
-/// 2D NURBS curve aliases
+/// 2D NURBS curve alias
 pub type NurbsCurve2D<T> = NurbsCurve<T, Const<3>>;
-/// 3D NURBS curve aliases
+/// 3D NURBS curve alias
 pub type NurbsCurve3D<T> = NurbsCurve<T, Const<4>>;
 
 impl<T: FloatingPoint, D: DimName> NurbsCurve<T, D>
@@ -324,6 +324,14 @@ where
 
     pub fn control_points(&self) -> &Vec<OPoint<T, D>> {
         &self.control_points
+    }
+
+    pub fn control_points_iter(&self) -> impl Iterator<Item = &OPoint<T, D>> {
+        self.control_points.iter()
+    }
+
+    pub fn control_points_iter_mut(&mut self) -> impl Iterator<Item = &mut OPoint<T, D>> {
+        self.control_points.iter_mut()
     }
 
     pub fn knots_domain(&self) -> (T, T) {

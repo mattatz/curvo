@@ -27,9 +27,9 @@ where
     v_knots: KnotVector<T>,
 }
 
-/// 2D NURBS surface aliases
+/// 2D NURBS surface alias
 pub type NurbsSurface2D<T> = NurbsSurface<T, Const<3>>;
-/// 3D NURBS surface aliases
+/// 3D NURBS surface alias
 pub type NurbsSurface3D<T> = NurbsSurface<T, Const<4>>;
 
 impl<T: FloatingPoint, D: DimName> NurbsSurface<T, D>
