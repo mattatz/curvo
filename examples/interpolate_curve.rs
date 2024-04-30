@@ -1,15 +1,7 @@
 use bevy::{
     core::Zeroable,
-    pbr::{MaterialPipeline, MaterialPipelineKey},
     prelude::*,
-    render::{
-        camera::ScalingMode,
-        mesh::{MeshVertexBufferLayout, VertexAttributeValues},
-        render_resource::{
-            AsBindGroup, PolygonMode, RenderPipelineDescriptor, ShaderRef,
-            SpecializedMeshPipelineError,
-        },
-    },
+    render::{camera::ScalingMode, mesh::VertexAttributeValues},
     window::close_on_esc,
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
@@ -23,10 +15,14 @@ use nalgebra::Point3;
 
 use curvo::prelude::*;
 
+mod materials;
+
+use materials::*;
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_plugins(MaterialPlugin::<LineMaterial>::default())
+        .add_plugins(LineMaterialPlugin)
         .add_plugins(InfiniteGridPlugin)
         .add_plugins(PanOrbitCameraPlugin)
         .add_plugins(PointsPlugin)
@@ -215,28 +211,5 @@ fn find_closest_point(
 
             gizmos.line(pt, center, Color::WHITE);
         }
-    }
-}
-
-#[derive(Asset, TypePath, Default, AsBindGroup, Debug, Clone)]
-struct LineMaterial {
-    #[uniform(0)]
-    color: Color,
-}
-
-impl Material for LineMaterial {
-    fn fragment_shader() -> ShaderRef {
-        "shaders/line_material.wgsl".into()
-    }
-
-    fn specialize(
-        _pipeline: &MaterialPipeline<Self>,
-        descriptor: &mut RenderPipelineDescriptor,
-        _layout: &MeshVertexBufferLayout,
-        _key: MaterialPipelineKey<Self>,
-    ) -> Result<(), SpecializedMeshPipelineError> {
-        // This is the important part to tell bevy to render this material as a line between vertices
-        descriptor.primitive.polygon_mode = PolygonMode::Line;
-        Ok(())
     }
 }

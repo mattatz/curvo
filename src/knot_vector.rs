@@ -208,6 +208,68 @@ impl<T: RealField + Copy> KnotVector<T> {
         }
         ders
     }
+
+    /// Compute a regularly spaced basis functions
+    /// Returns a tuple of knot spans and basis functions
+    pub fn regulary_spaced_basis_functions(
+        &self,
+        degree: usize,
+        divs: usize,
+    ) -> (Vec<usize>, Vec<Vec<T>>) {
+        let (start, _end, span, n) = self.regularly_spaced_span(degree, divs);
+
+        let mut bases = vec![];
+        let mut knot_spans = vec![];
+        let mut u = start;
+        let mut knot_index = self.find_knot_span_index(n, degree, u);
+
+        // compute all of the basis functions
+        for _i in 0..=divs {
+            while u >= self.knots[knot_index + 1] && knot_index < n {
+                knot_index += 1;
+            }
+            knot_spans.push(knot_index);
+            bases.push(self.basis_functions(knot_index, u, degree));
+            u += span;
+        }
+
+        (knot_spans, bases)
+    }
+
+    /// Compute a regularly spaced basis functions and their derivatives
+    /// Returns a tuple of knot spans and basis functions
+    pub fn regularly_spaced_derivative_basis_functions(
+        &self,
+        degree: usize,
+        divs: usize,
+    ) -> (Vec<usize>, Vec<Vec<Vec<T>>>) {
+        let (start, _end, span, n) = self.regularly_spaced_span(degree, divs);
+
+        let mut bases = vec![];
+        let mut knot_spans = vec![];
+        let mut u = start;
+        let mut knot_index = self.find_knot_span_index(n, degree, u);
+
+        // compute all of the basis functions
+        for _i in 0..=divs {
+            while u >= self.knots[knot_index + 1] && knot_index < n {
+                knot_index += 1;
+            }
+            knot_spans.push(knot_index);
+            bases.push(self.derivative_basis_functions(knot_index, u, degree, n));
+            u += span;
+        }
+
+        (knot_spans, bases)
+    }
+
+    /// Compute a regularly spaced span & domain with a given degree and number of divisions
+    pub fn regularly_spaced_span(&self, degree: usize, divs: usize) -> (T, T, T, usize) {
+        let n = self.knots.len() - degree - 2;
+        let (start, end) = self.domain(degree);
+        let span = (end - start) / T::from_usize(divs).unwrap();
+        (start, end, span, n)
+    }
 }
 
 impl<T> Index<usize> for KnotVector<T> {

@@ -1,15 +1,10 @@
 use std::f64::consts::FRAC_PI_2;
 
 use bevy::{
-    pbr::{MaterialPipeline, MaterialPipelineKey},
     prelude::*,
     render::{
         camera::ScalingMode,
-        mesh::{Indices, MeshVertexBufferLayout, PrimitiveTopology, VertexAttributeValues},
-        render_resource::{
-            AsBindGroup, PolygonMode, RenderPipelineDescriptor, ShaderRef,
-            SpecializedMeshPipelineError,
-        },
+        mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
     },
     window::close_on_esc,
 };
@@ -17,15 +12,19 @@ use bevy_infinite_grid::InfiniteGridPlugin;
 
 use bevy_normal_material::{material::NormalMaterial, plugin::NormalMaterialPlugin};
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
-use bevy_points::{plugin::PointsPlugin, prelude::PointsMaterial};
+use bevy_points::{
+    material::PointsShaderSettings, mesh::PointsMesh, plugin::PointsPlugin, prelude::PointsMaterial,
+};
+use materials::*;
 use nalgebra::{Point3, Rotation3, Translation3, Vector3};
 
 use curvo::prelude::*;
+mod materials;
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_plugins(MaterialPlugin::<LineMaterial>::default())
+        .add_plugins(LineMaterialPlugin)
         .add_plugins(InfiniteGridPlugin)
         .add_plugins(PanOrbitCameraPlugin)
         .add_plugins(PointsPlugin)
@@ -55,7 +54,7 @@ fn setup(
          meshes: &mut ResMut<'_, Assets<Mesh>>,
          line_materials: &mut ResMut<'_, Assets<LineMaterial>>,
          normal_materials: &mut ResMut<'_, Assets<NormalMaterial>>,
-         _points_materials: &mut ResMut<'_, Assets<PointsMaterial>>| {
+         points_materials: &mut ResMut<'_, Assets<PointsMaterial>>| {
             let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, default());
 
             let option = AdaptiveTessellationOptions {
@@ -63,7 +62,7 @@ fn setup(
                 ..Default::default()
             };
             let tess = surf.tessellate(Some(option));
-            // let tess = surf.tessellate(None);
+            // let tess = surf.regular_tessellate(32, 32);
 
             let mut line_list =
                 Mesh::new(bevy::render::mesh::PrimitiveTopology::LineList, default());
@@ -98,14 +97,13 @@ fn setup(
                 })
                 .insert(Name::new("normal"));
 
-            /*
+            let points = surf.regular_sample_points(32, 32);
             commands
                 .spawn(MaterialMeshBundle {
                     mesh: meshes.add(PointsMesh {
-                        vertices: tess
-                            .points()
+                        vertices: points
                             .iter()
-                            .map(|pt| pt.cast::<f32>().into())
+                            .flat_map(|row| row.iter().map(|pt| pt.cast::<f32>().into()))
                             .collect(),
                         ..Default::default()
                     }),
@@ -117,11 +115,10 @@ fn setup(
                         },
                         ..Default::default()
                     }),
-                    // visibility: Visibility::Hidden,
+                    visibility: Visibility::Hidden,
                     ..Default::default()
                 })
                 .insert(Name::new("points"));
-            */
 
             let vertices = tess
                 .points()
@@ -218,27 +215,4 @@ fn setup(
         ..Default::default()
     };
     commands.spawn((orth, PanOrbitCamera::default()));
-}
-
-#[derive(Asset, TypePath, Default, AsBindGroup, Debug, Clone)]
-struct LineMaterial {
-    #[uniform(0)]
-    color: Color,
-}
-
-impl Material for LineMaterial {
-    fn fragment_shader() -> ShaderRef {
-        "shaders/line_material.wgsl".into()
-    }
-
-    fn specialize(
-        _pipeline: &MaterialPipeline<Self>,
-        descriptor: &mut RenderPipelineDescriptor,
-        _layout: &MeshVertexBufferLayout,
-        _key: MaterialPipelineKey<Self>,
-    ) -> Result<(), SpecializedMeshPipelineError> {
-        // This is the important part to tell bevy to render this material as a line between vertices
-        descriptor.primitive.polygon_mode = PolygonMode::Line;
-        Ok(())
-    }
 }
