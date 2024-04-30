@@ -20,9 +20,9 @@ nalgebra = { version = "0.32.5", features = [
 num-traits = "0.2.18"
 rand = "0.8.5"
 bevy = { version = "0.13.2", optional = true }
-bevy-inspector-egui = { version = "0.23.1", optional = true }
+bevy-inspector-egui = { version = "0.24.0", optional = true }
 bevy_infinite_grid = { version = "0.12", optional = true }
-bevy_normal_material = { version = "0.5.0", optional = true }
+bevy_normal_material = { version = "0.5.2", optional = true }
 bevy_panorbit_camera = { version = "0.17.0", optional = true }
 bevy_points = { version = "0.5.1", optional = true }
 
@@ -31,6 +31,7 @@ approx = { version = "0.5", default-features = false }
 
 [features]
 default = []
+# default = ["bevy"] # for debugging example
 bevy = [
   "dep:bevy",
   "dep:bevy-inspector-egui",
@@ -42,10 +43,10 @@ bevy = [
 
 [[example]]
 name = "interpolate_curve"
-path = "examples/curve/interpolate_curve.rs"
+path = "examples/interpolate_curve.rs"
 required-features = ["bevy"]
 
 [[example]]
 name = "loft_curves"
-path = "examples/surface/loft_curves.rs"
+path = "examples/loft_curves.rs"
 required-features = ["bevy"]
