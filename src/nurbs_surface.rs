@@ -102,6 +102,197 @@ where
         position
     }
 
+    // Compute a regularly spaced grid of points on surface.
+    // Generally, this algorithm is faster than directly evaluating these by pre-computing all of the basis functions
+    pub fn regular_sample_points(
+        &self,
+        divs_u: usize,
+        divs_v: usize,
+    ) -> Vec<Vec<OPoint<T, DimNameDiff<D, U1>>>> {
+        let (knot_spans_u, bases_u) = self
+            .u_knots
+            .regulary_spaced_basis_functions(self.u_degree, divs_u);
+        let (knot_spans_v, bases_v) = self
+            .v_knots
+            .regulary_spaced_basis_functions(self.v_degree, divs_v);
+        let mut pts = vec![];
+
+        for i in 0..=divs_u {
+            let mut row = vec![];
+
+            for j in 0..=divs_v {
+                let pt = self.point_given_bases_knot_spans(
+                    knot_spans_u[i],
+                    knot_spans_v[j],
+                    &bases_u[i],
+                    &bases_v[j],
+                );
+                row.push(dehomogenize(&pt).unwrap());
+            }
+
+            pts.push(row);
+        }
+
+        pts
+    }
+
+    /// Compute a point on the surface given the basis functions and knot spans
+    fn point_given_bases_knot_spans(
+        &self,
+        knot_span_u: usize,
+        knot_span_v: usize,
+        bases_u: &[T],
+        bases_v: &[T],
+    ) -> OPoint<T, D> {
+        let mut position = OPoint::<T, D>::origin();
+
+        // could be precomputed
+        let uind = knot_span_u - self.u_degree;
+        let mut vind = knot_span_v - self.v_degree;
+
+        for l in 0..(self.v_degree + 1) {
+            let mut temp = OPoint::<T, D>::origin();
+
+            for k in 0..(self.u_degree + 1) {
+                temp.coords += &self.control_points[uind + k][vind].coords * bases_u[k];
+            }
+
+            vind += 1;
+
+            position.coords += temp.coords * bases_v[l];
+        }
+
+        position
+    }
+
+    // Compute a regularly spaced grid of normals on surface.
+    pub fn regular_sample_normals(
+        &self,
+        divs_u: usize,
+        divs_v: usize,
+    ) -> Vec<Vec<OVector<T, DimNameDiff<D, U1>>>> {
+        let ders = self.regular_sample_rational_derivatives(divs_u, divs_v, 1);
+        ders.into_iter()
+            .map(|row| {
+                row.into_iter()
+                    .map(|der| {
+                        let v0 = &der[1][0];
+                        let v1 = &der[0][1];
+                        v0.cross(v1).normalize()
+                    })
+                    .collect()
+            })
+            .collect()
+    }
+
+    // Compute a regularly spaced grid of rational derivatives on surface.
+    #[allow(clippy::type_complexity)]
+    pub fn regular_sample_rational_derivatives(
+        &self,
+        divs_u: usize,
+        divs_v: usize,
+        derivs: usize,
+    ) -> Vec<Vec<Vec<Vec<OVector<T, DimNameDiff<D, U1>>>>>> {
+        let ders = self.regular_sample_derivatives(divs_u, divs_v, derivs);
+
+        let mut rat_ders = vec![];
+
+        for i in 0..=divs_u {
+            let mut row = vec![];
+            for j in 0..=divs_v {
+                let skl = rational_derivatives(&ders[i][j], derivs);
+                row.push(skl);
+            }
+            rat_ders.push(row);
+        }
+
+        rat_ders
+    }
+
+    /// Compute a regularly spaced grid of derivatives on a surface.
+    #[allow(clippy::type_complexity)]
+    pub fn regular_sample_derivatives(
+        &self,
+        divs_u: usize,
+        divs_v: usize,
+        derivs: usize,
+    ) -> Vec<Vec<Vec<Vec<OVector<T, D>>>>> {
+        let (knot_spans_u, bases_u) = self
+            .u_knots
+            .regularly_spaced_derivative_basis_functions(self.u_degree, divs_u);
+        let (knot_spans_v, bases_v) = self
+            .v_knots
+            .regularly_spaced_derivative_basis_functions(self.v_degree, divs_v);
+        let mut ders = vec![];
+
+        for i in 0..=divs_u {
+            let mut row = vec![];
+
+            for j in 0..=divs_v {
+                row.push(self.derivatives_given_bases_knot_spans(
+                    knot_spans_u[i],
+                    knot_spans_v[j],
+                    &bases_u[i],
+                    &bases_v[j],
+                    derivs,
+                ));
+            }
+
+            ders.push(row);
+        }
+
+        ders
+    }
+
+    /// Compute the derivatives given the basis functions and knot spans
+    pub fn derivatives_given_bases_knot_spans(
+        &self,
+        knot_span_u: usize,
+        knot_span_v: usize,
+        bases_u: &[Vec<T>],
+        bases_v: &[Vec<T>],
+        derivs: usize,
+    ) -> Vec<Vec<OVector<T, D>>> {
+        let du = if derivs < self.u_degree {
+            derivs
+        } else {
+            self.u_degree
+        };
+        let dv = if derivs < self.v_degree {
+            derivs
+        } else {
+            self.v_degree
+        };
+        let mut skl = vec![vec![OVector::<T, D>::zeros(); du + 1]; dv + 1];
+
+        for k in 0..=du {
+            let mut temp = vec![];
+            for s in 0..=self.v_degree {
+                let mut row = OVector::<T, D>::zeros();
+                for r in 0..=self.u_degree {
+                    row += &self.control_points[knot_span_u - self.u_degree + r]
+                        [knot_span_v - self.v_degree + s]
+                        .coords
+                        * bases_u[k][r];
+                }
+                temp.push(row);
+            }
+
+            let nk = derivs - k;
+            let dd = if nk < dv { nk } else { dv };
+
+            for l in 0..=dd {
+                let mut v = OVector::<T, D>::zeros();
+                for s in 0..=self.v_degree {
+                    v += &temp[s] * bases_v[l][s];
+                }
+                skl[k][l] = v;
+            }
+        }
+
+        skl
+    }
+
     /// Tessellate the surface into a meshable form
     /// if adaptive_options is None, the surface will be tessellated at control points
     /// or else it will be tessellated adaptively based on the options
@@ -189,6 +380,48 @@ where
         SurfaceTessellation::new(self, &nodes)
     }
 
+    /// Regularly tessellate the surface into a meshable form
+    /// This tessellation is faster than adaptive one because of pre-computed basis functions
+    /// There is trade-off between speed and mesh quality
+    pub fn regular_tessellate(&self, divs_u: usize, divs_v: usize) -> SurfaceTessellation<T, D> {
+        let points = self.regular_sample_points(divs_u, divs_v);
+        let ders = self.regular_sample_normals(divs_u, divs_v);
+        let u_span = self.u_knots.regularly_spaced_span(self.u_degree, divs_u);
+        let v_span = self.v_knots.regularly_spaced_span(self.v_degree, divs_v);
+
+        let points: Vec<_> = points.into_iter().flatten().collect();
+        let normals: Vec<_> = ders.into_iter().flatten().collect();
+        let faces = (0..divs_u)
+            .flat_map(|iu| {
+                let ioff = iu * (divs_v + 1);
+                (0..divs_v).flat_map(move |iv| {
+                    [
+                        [ioff + iv, ioff + iv + 1, ioff + iv + divs_v + 2],
+                        [ioff + iv, ioff + iv + divs_v + 2, ioff + iv + divs_v + 1],
+                    ]
+                })
+            })
+            .collect();
+        let uvs = (0..=divs_u)
+            .flat_map(|iu| {
+                let iu = T::from_usize(iu).unwrap();
+                let u = u_span.0 + u_span.2 * iu;
+                (0..=divs_v).map(move |iv| {
+                    let iv = T::from_usize(iv).unwrap();
+                    let v = v_span.0 + v_span.2 * iv;
+                    Vector2::new(u, v)
+                })
+            })
+            .collect();
+
+        SurfaceTessellation {
+            points,
+            normals,
+            faces,
+            uvs,
+        }
+    }
+
     /// Evaluate the normal at the given u, v parameters
     pub fn normal_at(&self, u: T, v: T) -> OVector<T, DimNameDiff<D, U1>> {
         let deriv = self.rational_derivatives(u, v, 1);
@@ -205,56 +438,7 @@ where
         derivs: usize,
     ) -> Vec<Vec<OVector<T, DimNameDiff<D, U1>>>> {
         let ders = self.derivatives(u, v, derivs);
-        let a_ders: Vec<_> = ders
-            .iter()
-            .map(|row| {
-                row.iter()
-                    .map(|d| {
-                        let mut a_ders = vec![];
-                        for i in 0..D::dim() - 1 {
-                            a_ders.push(d[i]);
-                        }
-                        OVector::<T, DimNameDiff<D, U1>>::from_vec(a_ders)
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .collect();
-        let w_ders: Vec<_> = ders
-            .iter()
-            .map(|row| row.iter().map(|d| d[D::dim() - 1]).collect::<Vec<_>>())
-            .collect();
-
-        let mut skl: Vec<Vec<OVector<T, DimNameDiff<D, U1>>>> = vec![];
-        let mut binom = Binomial::<T>::new();
-
-        for k in 0..=derivs {
-            let mut row = vec![];
-
-            for l in 0..=(derivs - k) {
-                let mut v = a_ders[k][l].clone();
-                for j in 1..=l {
-                    let coef = binom.get(l, j) * w_ders[0][j];
-                    v -= &row[l - j] * coef;
-                }
-
-                for i in 1..=k {
-                    let coef = binom.get(k, i) * w_ders[i][0];
-                    v -= &skl[k - i][l] * coef;
-                    let mut v2 = OVector::<T, DimNameDiff<D, U1>>::zeros();
-                    for j in 1..=l {
-                        v2 += &skl[k - i][l - j] * binom.get(l, j) * w_ders[i][j];
-                    }
-                    v -= v2 * binom.get(k, i);
-                }
-
-                let v = v / w_ders[0][0];
-                row.push(v);
-            }
-
-            skl.push(row);
-        }
-
-        skl
+        rational_derivatives(&ders, derivs)
     }
 
     /// Evaluate the derivatives at the given u, v parameters
@@ -423,6 +607,70 @@ where
             v_knots: knots_v,
         })
     }
+}
+
+/// Compute the rational derivatives of derivatives
+fn rational_derivatives<T, D>(
+    ders: &[Vec<OVector<T, D>>],
+    derivs: usize,
+) -> Vec<Vec<OVector<T, DimNameDiff<D, U1>>>>
+where
+    T: FloatingPoint,
+    D: DimName,
+    DefaultAllocator: Allocator<T, D>,
+    D: DimNameSub<U1>,
+    DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+{
+    let a_ders: Vec<_> = ders
+        .iter()
+        .map(|row| {
+            row.iter()
+                .map(|d| {
+                    let mut a_ders = vec![];
+                    for i in 0..D::dim() - 1 {
+                        a_ders.push(d[i]);
+                    }
+                    OVector::<T, DimNameDiff<D, U1>>::from_vec(a_ders)
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    let w_ders: Vec<_> = ders
+        .iter()
+        .map(|row| row.iter().map(|d| d[D::dim() - 1]).collect::<Vec<_>>())
+        .collect();
+
+    let mut skl: Vec<Vec<OVector<T, DimNameDiff<D, U1>>>> = vec![];
+    let mut binom = Binomial::<T>::new();
+
+    for k in 0..=derivs {
+        let mut row = vec![];
+
+        for l in 0..=(derivs - k) {
+            let mut v = a_ders[k][l].clone();
+            for j in 1..=l {
+                let coef = binom.get(l, j) * w_ders[0][j];
+                v -= &row[l - j] * coef;
+            }
+
+            for i in 1..=k {
+                let coef = binom.get(k, i) * w_ders[i][0];
+                v -= &skl[k - i][l] * coef;
+                let mut v2 = OVector::<T, DimNameDiff<D, U1>>::zeros();
+                for j in 1..=l {
+                    v2 += &skl[k - i][l - j] * binom.get(l, j) * w_ders[i][j];
+                }
+                v -= v2 * binom.get(k, i);
+            }
+
+            let v = v / w_ders[0][0];
+            row.push(v);
+        }
+
+        skl.push(row);
+    }
+
+    skl
 }
 
 /// Unify the knot vectors of a collection of NURBS curves

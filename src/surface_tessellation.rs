@@ -16,10 +16,10 @@ where
     DefaultAllocator: Allocator<T, D>,
     DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
 {
-    points: Vec<OPoint<T, DimNameDiff<D, U1>>>,
-    normals: Vec<OVector<T, DimNameDiff<D, U1>>>,
-    faces: Vec<[usize; 3]>,
-    uvs: Vec<Vector2<T>>,
+    pub(crate) points: Vec<OPoint<T, DimNameDiff<D, U1>>>,
+    pub(crate) normals: Vec<OVector<T, DimNameDiff<D, U1>>>,
+    pub(crate) faces: Vec<[usize; 3]>,
+    pub(crate) uvs: Vec<Vector2<T>>,
 }
 
 impl<T: FloatingPoint, D: DimName> SurfaceTessellation<T, D>
