@@ -47,6 +47,12 @@ path = "examples/interpolate_curve.rs"
 required-features = ["bevy"]
 
 [[example]]
+name = "trim_curve"
+path = "examples/trim_curve.rs"
+required-features = ["bevy"]
+
+[[example]]
 name = "loft_curves"
 path = "examples/loft_curves.rs"
 required-features = ["bevy"]
+
