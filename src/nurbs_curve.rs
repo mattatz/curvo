@@ -205,12 +205,16 @@ where
         let p3 = self.point_at(end);
 
         let t = 0.5_f64 + 0.2_f64 * rng.gen::<f64>();
-        let mid = start + (end - start) * T::from_f64(t).unwrap();
+        let delta = end - start;
+        if delta < T::from_f64(1e-8).unwrap() {
+            return vec![p1];
+        }
+
+        let mid = start + delta * T::from_f64(t).unwrap();
         let p2 = self.point_at(mid);
 
         let diff = &p1 - &p3;
         let diff2 = &p1 - &p2;
-
         if (diff.dot(&diff) < tol && diff2.dot(&diff2) > tol)
             || !three_points_are_flat(&p1, &p2, &p3, tol)
         {
@@ -920,6 +924,32 @@ where
         }
 
         cu
+    }
+
+    /// Trim the curve into two curves before and after the parameter
+    pub fn trim(&self, u: T) -> (Self, Self) {
+        let knots_to_insert: Vec<_> = (0..=self.degree).map(|_| u).collect();
+        let mut cloned = self.clone();
+        cloned.knot_refine(knots_to_insert);
+
+        let n = self.knots.len() - self.degree - 2;
+        let s = self.knots.find_knot_span_index(n, self.degree, u);
+        let knots0 = cloned.knots.as_slice()[0..=(s + self.degree + 1)].to_vec();
+        let knots1 = cloned.knots.as_slice()[s + 1..].to_vec();
+        let cpts0 = cloned.control_points[0..=s].to_vec();
+        let cpts1 = cloned.control_points[s + 1..].to_vec();
+        (
+            Self {
+                degree: self.degree,
+                control_points: cpts0,
+                knots: KnotVector::new(knots0),
+            },
+            Self {
+                degree: self.degree,
+                control_points: cpts1,
+                knots: KnotVector::new(knots1),
+            },
+        )
     }
 }
 
