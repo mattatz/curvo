@@ -16,7 +16,7 @@ The modeling operations for NURBS surfaces supported by this library currently i
 
 - [x] Extrude
 - [x] Loft
-- [ ] Sweep
+- [x] Sweep
 - [ ] Revolve
 
 I also plan to implement features for finding the nearest points on surfaces (already implemented for curves), as well as dividing them based on arc lengths.

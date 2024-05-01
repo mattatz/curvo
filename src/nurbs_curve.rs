@@ -1,7 +1,7 @@
 use nalgebra::allocator::Allocator;
 use nalgebra::{
     Const, DMatrix, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff, DimNameSub,
-    Matrix3, Matrix4, OPoint, OVector, Point2, Point3, U1,
+    OMatrix, OPoint, OVector, U1,
 };
 use rand::rngs::ThreadRng;
 use rand::Rng;
@@ -26,6 +26,7 @@ where
 
 /// 2D NURBS curve alias
 pub type NurbsCurve2D<T> = NurbsCurve<T, Const<3>>;
+
 /// 3D NURBS curve alias
 pub type NurbsCurve3D<T> = NurbsCurve<T, Const<4>>;
 
@@ -229,7 +230,7 @@ where
     }
 
     /// Evaluate the curve at a given parameter to get a point
-    fn point(&self, t: T) -> OPoint<T, D> {
+    pub(crate) fn point(&self, t: T) -> OPoint<T, D> {
         let n = self.knots.len() - self.degree - 2;
         let knot_span_index = self.knots.find_knot_span_index(n, self.degree, t);
         let basis = self.knots.basis_functions(knot_span_index, t, self.degree);
@@ -953,27 +954,19 @@ where
     }
 }
 
-/// Enable to transform a NURBS curve by 3x3 matrix
-impl<T: FloatingPoint> Transformable<&Matrix3<T>> for NurbsCurve2D<T> {
-    fn transform(&mut self, transform: &Matrix3<T>) {
+/// Enable to transform a NURBS curve by a given DxD matrix
+impl<'a, T: FloatingPoint, const D: usize> Transformable<&'a OMatrix<T, Const<D>, Const<D>>>
+    for NurbsCurve<T, Const<D>>
+{
+    fn transform(&mut self, transform: &'a OMatrix<T, Const<D>, Const<D>>) {
         self.control_points.iter_mut().for_each(|p| {
-            let hom = Point2::new(p.x, p.y).to_homogeneous();
-            let transformed = transform * hom;
-            p.x = transformed.x;
-            p.y = transformed.y;
-        });
-    }
-}
-
-/// Enable to transform a NURBS curve by 4x4 matrix
-impl<T: FloatingPoint> Transformable<&Matrix4<T>> for NurbsCurve3D<T> {
-    fn transform(&mut self, transform: &Matrix4<T>) {
-        self.control_points.iter_mut().for_each(|p| {
-            let hom = Point3::new(p.x, p.y, p.z).to_homogeneous();
-            let transformed = transform * hom;
-            p.x = transformed.x;
-            p.y = transformed.y;
-            p.z = transformed.z;
+            let mut pt = *p;
+            pt[D - 1] = T::one();
+            let transformed = transform * pt;
+            let w = transformed[D - 1];
+            for i in 0..D - 1 {
+                p[i] = transformed[i] / w;
+            }
         });
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "curvo"
-version = "0.1.5"
+version = "0.1.6"
 authors = ["Masatatsu Nakamura <masatatsu.nakamura@gmail.com"]
 edition = "2021"
 keywords = ["nurbs", "modeling", "graphics", "3d"]
@@ -54,5 +54,10 @@ required-features = ["bevy"]
 [[example]]
 name = "loft_curves"
 path = "examples/loft_curves.rs"
+required-features = ["bevy"]
+
+[[example]]
+name = "sweep_curves"
+path = "examples/sweep_curves.rs"
 required-features = ["bevy"]
 
