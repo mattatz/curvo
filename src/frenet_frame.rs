@@ -42,10 +42,15 @@ impl<T: FloatingPoint> FrenetFrame<T> {
         &self.binormal
     }
 
+    /// Returns the rotation matrix that transforms a target to the frame coordinates.
+    pub fn rotation(&self) -> Rotation3<T> {
+        Rotation3::face_towards(&self.tangent, &self.normal)
+    }
+
     /// Returns the transformation matrix that transforms a target to the frame coordinates.
     pub fn matrix(&self) -> IsometryMatrix3<T> {
-        let rot = Rotation3::face_towards(&self.tangent, &self.normal);
         let trans = Translation3::from(self.position);
+        let rot = self.rotation();
         trans * rot
     }
 }

@@ -7,7 +7,7 @@ use crate::{
     adaptive_tessellation_node::AdaptiveTessellationNode,
     adaptive_tessellation_processor::{AdaptiveTessellationOptions, AdaptiveTessellationProcessor},
     binomial::Binomial,
-    nurbs_curve::{dehomogenize, NurbsCurve},
+    nurbs_curve::{dehomogenize, NurbsCurve, NurbsCurve3D},
     prelude::{KnotVector, SurfaceTessellation},
     transformable::Transformable,
     FloatingPoint, SurfacePoint,
@@ -607,58 +607,6 @@ where
             v_knots: knots_v,
         })
     }
-
-    /// Try to sweep a profile curve along a rail curve to create a surface
-    /// # Example
-    /// ```
-    /// use curvo::prelude::*;
-    /// use nalgebra::{Point3, Translation3};
-    /// use approx::assert_relative_eq;
-    ///
-    /// // Create a collection of curves
-    /// let points: Vec<Point3<f64>> = vec![
-    ///     Point3::new(-1.0, -1.0, 0.),
-    ///     Point3::new(1.0, -1.0, 0.),
-    ///     Point3::new(1.0, 1.0, 0.),
-    ///     Point3::new(-1.0, 1.0, 0.),
-    /// ];
-    /// let profile = NurbsCurve3D::try_interpolate(&points, 3, None, None).unwrap();
-    ///
-    /// let points: Vec<Point3<f64>> = vec![
-    ///     Point3::new(1.0, 0., 0.),
-    ///     Point3::new(0.0, -1., 1.),
-    ///     Point3::new(-1.0, 0., 2.),
-    ///     Point3::new(0.0, 1., 3.),
-    /// ];
-    /// let rail= NurbsCurve3D::try_interpolate(&points, 3, None, None).unwrap();
-    ///
-    /// // Sweep the profile curve along the rail curve to create a NURBS surface
-    /// let swept = NurbsSurface::try_sweep(&profile, &rail);
-    /// assert!(swept.is_ok());
-    /// ```
-    pub fn try_sweep(profile: &NurbsCurve<T, D>, rail: &NurbsCurve<T, D>) -> anyhow::Result<Self>
-    where
-        DefaultAllocator: Allocator<T, D, D>,
-    {
-        let (start, end) = rail.knots_domain();
-        let pt0 = rail.point(start);
-        let samples = rail.control_points().len() * 2;
-        let span = (end - start) / T::from_usize(samples - 1).unwrap();
-
-        let curves: Vec<_> = (0..samples)
-            .map(|i| {
-                let mut delta = rail.point(start + T::from_usize(i).unwrap() * span) - &pt0;
-                delta[D::dim() - 1] = T::zero();
-                let mut crv = profile.clone();
-                crv.control_points_iter_mut().for_each(|pt| {
-                    pt.coords += &delta;
-                });
-                crv
-            })
-            .collect();
-
-        Self::try_loft(&curves, Some(3))
-    }
 }
 
 /// Compute the rational derivatives of derivatives
@@ -723,6 +671,64 @@ where
     }
 
     skl
+}
+
+/// A specialized trait for NURBS surfaces with 3D points,
+/// particularly designed for sweeping operations that require Frenet frames.
+impl<T: FloatingPoint> NurbsSurface3D<T> {
+    /// Try to sweep a profile curve along a rail curve to create a surface
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point3, Translation3};
+    /// use approx::assert_relative_eq;
+    ///
+    /// // Create a collection of curves
+    /// let points: Vec<Point3<f64>> = vec![
+    ///     Point3::new(-1.0, -1.0, 0.),
+    ///     Point3::new(1.0, -1.0, 0.),
+    ///     Point3::new(1.0, 1.0, 0.),
+    ///     Point3::new(-1.0, 1.0, 0.),
+    /// ];
+    /// let profile = NurbsCurve3D::try_interpolate(&points, 3, None, None).unwrap();
+    ///
+    /// let points: Vec<Point3<f64>> = vec![
+    ///     Point3::new(1.0, 0., 0.),
+    ///     Point3::new(0.0, -1., 1.),
+    ///     Point3::new(-1.0, 0., 2.),
+    ///     Point3::new(0.0, 1., 3.),
+    /// ];
+    /// let rail= NurbsCurve3D::try_interpolate(&points, 3, None, None).unwrap();
+    ///
+    /// // Sweep the profile curve along the rail curve to create a NURBS surface
+    /// let swept = NurbsSurface::try_sweep(&profile, &rail, Some(3));
+    /// assert!(swept.is_ok());
+    /// ```
+    pub fn try_sweep(
+        profile: &NurbsCurve3D<T>,
+        rail: &NurbsCurve3D<T>,
+        degree_v: Option<usize>,
+    ) -> anyhow::Result<Self> {
+        let (start, end) = rail.knots_domain();
+        let _pt0 = rail.point_at(start);
+        let samples = rail.control_points().len() * 2;
+        let span = (end - start) / T::from_usize(samples - 1).unwrap();
+
+        let parameters: Vec<_> = (0..samples)
+            .map(|i| start + T::from_usize(i).unwrap() * span)
+            .collect();
+
+        let frames = rail.compute_frenet_frames(&parameters);
+        let curves: Vec<_> = frames
+            .iter()
+            .map(|frame| {
+                let transform = frame.matrix();
+                profile.transformed(&transform.into())
+            })
+            .collect();
+
+        Self::try_loft(&curves, degree_v)
+    }
 }
 
 /// Unify the knot vectors of a collection of NURBS curves
