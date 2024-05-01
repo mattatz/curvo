@@ -83,11 +83,11 @@ fn setup(
         },
     ));
 
-    let orth = Camera3dBundle {
+    let camera = Camera3dBundle {
         transform: Transform::from_translation(Vec3::new(0., 2.5, 10.)),
         ..Default::default()
     };
-    commands.spawn((orth, PanOrbitCamera::default()));
+    commands.spawn((camera, PanOrbitCamera::default()));
     // commands.spawn(InfiniteGridBundle::default());
 }
 

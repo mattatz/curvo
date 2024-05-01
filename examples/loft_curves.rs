@@ -16,7 +16,7 @@ use bevy_points::{
     material::PointsShaderSettings, mesh::PointsMesh, plugin::PointsPlugin, prelude::PointsMaterial,
 };
 use materials::*;
-use nalgebra::{Point3, Rotation3, Translation3, Vector3};
+use nalgebra::{Const, OMatrix, Point3, Rotation3, Translation3, Vector3};
 
 use curvo::prelude::*;
 mod materials;
@@ -181,6 +181,10 @@ fn setup(
     let m = rotation * translation;
     let front = interpolated.transformed(&(translation.inverse()).into());
     let back = interpolated.transformed(&m.into());
+    let m: OMatrix<f64, Const<4>, Const<4>> = translation.into();
+    dbg!(m);
+    dbg!(m[(3, 2)]);
+    dbg!(m[(2, 3)]);
 
     let lofted = NurbsSurface::try_loft(&[front, back], Some(3)).unwrap();
 

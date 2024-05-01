@@ -56,3 +56,8 @@ name = "loft_curves"
 path = "examples/loft_curves.rs"
 required-features = ["bevy"]
 
+[[example]]
+name = "sweep_curves"
+path = "examples/sweep_curves.rs"
+required-features = ["bevy"]
+
