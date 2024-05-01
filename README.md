@@ -19,6 +19,8 @@ The modeling operations for NURBS surfaces supported by this library currently i
 - [x] Sweep
 - [ ] Revolve
 
+<img src="https://github.com/mattatz/curvo/assets/1085910/98abe976-4223-4452-b65e-21f1fcbec00d" width="360px" alt="Sweep a profile curve along a rail curve to create a surface" />
+
 I also plan to implement features for finding the nearest points on surfaces (already implemented for curves), as well as dividing them based on arc lengths.
 
 <img src="https://github.com/mattatz/curvo/assets/1085910/04cccd08-01c7-495d-b332-4ee2ed59644a" width="360px" alt="Find closest point on the NURBS curve" />
