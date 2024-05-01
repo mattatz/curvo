@@ -19,6 +19,8 @@ The modeling operations for NURBS surfaces supported by this library currently i
 - [x] Sweep
 - [ ] Revolve
 
+<img src="https://github.com/mattatz/curvo/assets/1085910/98abe976-4223-4452-b65e-21f1fcbec00d" width="360px" alt="Sweep a profile curve along a rail curve to create a surface" />
+
 I also plan to implement features for finding the nearest points on surfaces (already implemented for curves), as well as dividing them based on arc lengths.
 
 <img src="https://github.com/mattatz/curvo/assets/1085910/04cccd08-01c7-495d-b332-4ee2ed59644a" width="360px" alt="Find closest point on the NURBS curve" />
@@ -43,7 +45,7 @@ let interpolated = NurbsCurve3D::<f64>::try_interpolate(&points, 3, None, None).
 // NURBS curve & surface can be transformed by nalgebra's matrix
 let rotation = Rotation3::from_axis_angle(&Vector3::z_axis(), FRAC_PI_2);
 let translation = Translation3::new(0., 0., 3.);
-let transform_matrix = rotation * translation; // nalgebra::Isometry3
+let transform_matrix = translation * rotation; // nalgebra::Isometry3
 
 // Transform the curve by the given matrix (nalgebra::Isometry3 into nalgebra::Matrix4)
 let offsetted = interpolated.transformed(&transform_matrix.into());

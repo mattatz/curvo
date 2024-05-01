@@ -1,4 +1,4 @@
-use std::f64::consts::TAU;
+use std::f64::consts::{PI, TAU};
 
 use bevy::{
     prelude::*,
@@ -57,34 +57,35 @@ fn setup(
             let r = t * TAU;
             let rad = min_radius + g * (max_radius - min_radius);
             let x = r.cos() * rad;
-            let z = r.sin() * rad;
-            let y = depth * (rng.gen::<f64>() - 0.5);
+            let y = r.sin() * rad;
+            let z = depth * (rng.gen::<f64>() - 0.5);
             Point3::new(x, y, z)
         })
         .collect();
     let profile = NurbsCurve3D::try_periodic(&points, 3).unwrap();
 
-    let n = 16;
-    let length = 10.;
+    let n = 32;
+    let radius = 10.;
+    let height = 20.;
+    let angle = TAU * 2.0;
     let points: Vec<_> = (0..n)
         .map(|i| {
             let t = i as f64 / (n - 1) as f64;
-            let r = t * TAU * 1.25;
-            let x = r.cos();
-            let z = r.sin();
-            Point3::new(x, t * length, z)
+            let r = t * angle;
+            let x = r.cos() * radius;
+            let z = r.sin() * radius;
+            Point3::new(x, t * height, z)
         })
         .collect();
     let rail = NurbsCurve3D::try_interpolate(&points, 3, None, None).unwrap();
 
-    let mut profile_mesh = Mesh::new(bevy::render::mesh::PrimitiveTopology::LineStrip, default());
     let profile_vertices = profile
         .tessellate(Some(1e-3))
         .iter()
         .map(|p| p.cast::<f32>())
         .map(|p| [p.x, p.y, p.z])
         .collect();
-    profile_mesh.insert_attribute(
+    let profile_mesh = Mesh::new(PrimitiveTopology::LineStrip, default()).with_inserted_attribute(
         Mesh::ATTRIBUTE_POSITION,
         VertexAttributeValues::Float32x3(profile_vertices),
     );
@@ -92,20 +93,19 @@ fn setup(
         .spawn(MaterialMeshBundle {
             mesh: meshes.add(profile_mesh),
             material: line_materials.add(LineMaterial {
-                color: Color::TOMATO,
+                color: Color::WHITE,
             }),
             ..Default::default()
         })
-        .insert(Name::new("white"));
+        .insert(Name::new("profile"));
 
-    let mut rail_mesh = Mesh::new(bevy::render::mesh::PrimitiveTopology::LineStrip, default());
     let rail_vertices = rail
         .tessellate(Some(1e-3))
         .iter()
         .map(|p| p.cast::<f32>())
         .map(|p| [p.x, p.y, p.z])
         .collect();
-    rail_mesh.insert_attribute(
+    let rail_mesh = Mesh::new(PrimitiveTopology::LineStrip, default()).with_inserted_attribute(
         Mesh::ATTRIBUTE_POSITION,
         VertexAttributeValues::Float32x3(rail_vertices),
     );
@@ -113,13 +113,13 @@ fn setup(
         .spawn(MaterialMeshBundle {
             mesh: meshes.add(rail_mesh),
             material: line_materials.add(LineMaterial {
-                color: Color::SALMON,
+                color: Color::WHITE,
             }),
             ..Default::default()
         })
-        .insert(Name::new("white"));
+        .insert(Name::new("rail"));
 
-    let swept = NurbsSurface::try_sweep(&profile, &rail).unwrap();
+    let swept = NurbsSurface::try_sweep(&profile, &rail, Some(3)).unwrap();
 
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, default());
     let option = AdaptiveTessellationOptions {

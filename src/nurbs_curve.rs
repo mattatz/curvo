@@ -1,12 +1,13 @@
 use nalgebra::allocator::Allocator;
 use nalgebra::{
     Const, DMatrix, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff, DimNameSub,
-    OMatrix, OPoint, OVector, U1,
+    OMatrix, OPoint, OVector, Rotation3, UnitVector3, Vector3, U1,
 };
 use rand::rngs::ThreadRng;
 use rand::Rng;
 
 use crate::binomial::Binomial;
+use crate::frenet_frame::FrenetFrame;
 use crate::prelude::{Invertible, KnotVector};
 use crate::transformable::Transformable;
 use crate::trigonometry::{segment_closest_point, three_points_are_flat};
@@ -996,6 +997,68 @@ where
     fn invert(&mut self) {
         self.control_points.reverse();
         self.knots.invert();
+    }
+}
+
+impl<T: FloatingPoint> NurbsCurve3D<T> {
+    /// Compute the Frenet frames of the curve at given parameters
+    /// based on the method described in the paper: http://www.cs.indiana.edu/pub/techreports/TR425.pdf
+    pub fn compute_frenet_frames(&self, parameters: &[T]) -> Vec<FrenetFrame<T>> {
+        let tangents: Vec<_> = parameters
+            .iter()
+            .map(|u| self.tangent_at(*u).normalize())
+            .collect();
+        let mut normals = vec![Vector3::zeros()];
+        let mut binormals = vec![Vector3::zeros()];
+
+        let mut normal = Vector3::zeros();
+        let tx = tangents[0].x.abs();
+        let ty = tangents[0].y.abs();
+        let tz = tangents[0].z.abs();
+
+        let mut min = T::max_value().unwrap();
+        if tx <= min {
+            min = tx;
+            normal = Vector3::x();
+        }
+        if ty <= min {
+            min = ty;
+            normal = Vector3::y();
+        }
+        if tz <= min {
+            normal = Vector3::z();
+        }
+
+        let v = tangents[0].cross(&normal).normalize();
+        normals[0] = tangents[0].cross(&v).normalize();
+        binormals[0] = tangents[0].cross(&normals[0]).normalize();
+
+        for i in 1..parameters.len() {
+            let prev_normal = &normals[i - 1];
+
+            let v = tangents[i - 1].cross(&tangents[i]).normalize();
+            if v.norm() > T::default_epsilon() {
+                let theta = tangents[i - 1]
+                    .dot(&tangents[i])
+                    .clamp(-T::one(), T::one())
+                    .acos();
+                let rot = Rotation3::from_axis_angle(&UnitVector3::new_normalize(v), theta);
+                normals.push(rot * prev_normal);
+            } else {
+                normals.push(*prev_normal);
+            }
+
+            binormals.push(tangents[i].cross(&normals[i]).normalize());
+        }
+
+        parameters
+            .iter()
+            .enumerate()
+            .map(|(i, t)| {
+                let position = self.point_at(*t);
+                FrenetFrame::new(position, tangents[i], normals[i], binormals[i])
+            })
+            .collect()
     }
 }
 
