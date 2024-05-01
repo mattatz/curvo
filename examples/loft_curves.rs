@@ -181,7 +181,6 @@ fn setup(
     let m = translation * rotation;
     let front = interpolated.transformed(&(translation.inverse()).into());
     let back = interpolated.transformed(&m.into());
-    let m: OMatrix<f64, Const<4>, Const<4>> = translation.into();
 
     let lofted = NurbsSurface::try_loft(&[front, back], Some(3)).unwrap();
 
