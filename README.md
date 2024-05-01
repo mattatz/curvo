@@ -43,7 +43,7 @@ let interpolated = NurbsCurve3D::<f64>::try_interpolate(&points, 3, None, None).
 // NURBS curve & surface can be transformed by nalgebra's matrix
 let rotation = Rotation3::from_axis_angle(&Vector3::z_axis(), FRAC_PI_2);
 let translation = Translation3::new(0., 0., 3.);
-let transform_matrix = rotation * translation; // nalgebra::Isometry3
+let transform_matrix = translation * rotation; // nalgebra::Isometry3
 
 // Transform the curve by the given matrix (nalgebra::Isometry3 into nalgebra::Matrix4)
 let offsetted = interpolated.transformed(&transform_matrix.into());

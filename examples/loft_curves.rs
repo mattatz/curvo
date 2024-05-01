@@ -178,13 +178,10 @@ fn setup(
 
     let rotation = Rotation3::from_axis_angle(&Vector3::z_axis(), FRAC_PI_2);
     let translation = Translation3::new(0., 0., 1.5);
-    let m = rotation * translation;
+    let m = translation * rotation;
     let front = interpolated.transformed(&(translation.inverse()).into());
     let back = interpolated.transformed(&m.into());
     let m: OMatrix<f64, Const<4>, Const<4>> = translation.into();
-    dbg!(m);
-    dbg!(m[(3, 2)]);
-    dbg!(m[(2, 3)]);
 
     let lofted = NurbsSurface::try_loft(&[front, back], Some(3)).unwrap();
 
