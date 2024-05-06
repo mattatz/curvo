@@ -13,19 +13,18 @@ Curvo is a NURBS curve / surface modeling library for Rust.
 This library enables not only the creation of NURBS curves from control points, knot vectors, and weights associated with each control point, but also supports generating curves that precisely pass through the given control points and creating periodic curves. Additionally, it allows for the construction of NURBS surfaces through operations such as _extruding_ and _lofting_ based on NURBS curves as inputs.
 
 The modeling operations for NURBS surfaces supported by this library currently include the following:
-
 - Extrude
 - Loft
 - Sweep
 - Revolve
 
-<img src="https://github.com/mattatz/curvo/assets/1085910/98abe976-4223-4452-b65e-21f1fcbec00d" width="320px" alt="Sweep the profile curve along the rail curve to create a surface" />
+<img src="https://github.com/mattatz/curvo/assets/1085910/7a04901c-9edd-4780-b754-74a9518601be" width="360px" alt="Sweep the profile curve along the rail curve to create a surface" />
 
-<img width="320px" alt="Revolve the profile curve around an z-axis by PI radians to create a NURBS surface" src="https://github.com/mattatz/curvo/assets/1085910/74d5bf26-f096-448b-95ab-8acbb9994315">
+<img width="360px" alt="Revolve the profile curve around an z-axis by PI radians to create a NURBS surface" src="https://github.com/mattatz/curvo/assets/1085910/c23148ae-6392-4855-bfc5-f7ebd8389a8e">
 
 I also plan to implement features for finding the nearest points on surfaces (already implemented for curves), as well as dividing them based on arc lengths.
 
-<img src="https://github.com/mattatz/curvo/assets/1085910/04cccd08-01c7-495d-b332-4ee2ed59644a" width="320px" alt="Find closest point on the NURBS curve" />
+<img src="https://github.com/mattatz/curvo/assets/1085910/04cccd08-01c7-495d-b332-4ee2ed59644a" width="360px" alt="Find closest point on the NURBS curve" />
 
 ## Usage
 
