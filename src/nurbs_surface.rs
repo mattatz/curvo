@@ -1,6 +1,6 @@
 use nalgebra::{
     allocator::Allocator, Const, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OMatrix,
-    OPoint, OVector, RealField, Vector2, U1,
+    OPoint, OVector, Point3, Point4, RealField, Vector2, Vector3, U1,
 };
 use simba::scalar::SupersetOf;
 
@@ -11,7 +11,7 @@ use crate::{
     nurbs_curve::{dehomogenize, NurbsCurve, NurbsCurve3D},
     prelude::{KnotVector, SurfaceTessellation},
     transformable::Transformable,
-    FloatingPoint, SurfacePoint,
+    FloatingPoint, Ray, SurfacePoint,
 };
 
 /// NURBS surface representation
@@ -556,7 +556,6 @@ where
     /// ```
     /// use curvo::prelude::*;
     /// use nalgebra::{Point3, Translation3};
-    /// use approx::assert_relative_eq;
     ///
     /// // Create a collection of curves
     /// let points: Vec<Point3<f64>> = vec![
@@ -700,7 +699,6 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
     /// ```
     /// use curvo::prelude::*;
     /// use nalgebra::{Point3, Translation3};
-    /// use approx::assert_relative_eq;
     ///
     /// // Create a collection of curves
     /// let points: Vec<Point3<f64>> = vec![
@@ -747,6 +745,178 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
             .collect();
 
         Self::try_loft(&curves, degree_v)
+    }
+
+    /// Try to revolve a profile curve around an axis to create a surface
+    /// /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point3};
+    ///
+    /// // Create a profile curve to revolve
+    /// let points: Vec<Point3<f64>> = vec![
+    ///     Point3::new(-1.0, -1.0, 0.),
+    ///     Point3::new(1.0, -1.0, 0.),
+    ///     Point3::new(1.0, 1.0, 0.),
+    ///     Point3::new(-1.0, 1.0, 0.),
+    /// ];
+    /// let profile = NurbsCurve3D::try_interpolate(&points, 3).unwrap();
+    ///
+    /// // Revolve the profile curve around the z-axis by PI radians to create a NURBS surface
+    /// let reolved = NurbsSurface::try_revolve(&profile, &Point3::origin(), &Vector3::z_axis(), std::f64::consts::PI);
+    /// assert!(reolved.is_ok());
+    /// ```
+    pub fn try_revolve(
+        profile: &NurbsCurve3D<T>,
+        center: &Point3<T>,
+        axis: &Vector3<T>,
+        theta: T,
+    ) -> anyhow::Result<Self> {
+        let prof_points = profile.dehomogenized_control_points();
+        let prof_weights = profile.weights();
+
+        let two = T::from_f64(2.0).unwrap();
+        let (narcs, mut u_knots) = if theta <= T::pi() / two {
+            (1, vec![T::zero(); 6])
+        } else if theta <= T::pi() {
+            let mut knots = vec![T::zero(); 6 + 2];
+            let half = T::from_f64(0.5).unwrap();
+            knots[3] = half;
+            knots[4] = half;
+            (2, knots)
+        } else if theta <= T::from_f64(3.0).unwrap() * T::pi() / two {
+            let mut knots = vec![T::zero(); 6 + 2 * 2];
+            let frac_three = T::from_f64(1.0 / 3.0).unwrap();
+            let two_frac_three = T::from_f64(2.0 / 3.0).unwrap();
+            knots[3] = frac_three;
+            knots[4] = frac_three;
+            knots[5] = two_frac_three;
+            knots[6] = two_frac_three;
+            (3, knots)
+        } else {
+            let mut knots = vec![T::zero(); 6 + 2 * 3];
+            let frac_four = T::from_f64(1.0 / 4.0).unwrap();
+            let half = T::from_f64(0.5).unwrap();
+            let three_frac_four = T::from_f64(3.0 / 4.0).unwrap();
+            knots[3] = frac_four;
+            knots[4] = frac_four;
+            knots[5] = half;
+            knots[6] = half;
+            knots[7] = three_frac_four;
+            knots[8] = three_frac_four;
+            (4, knots)
+        };
+
+        let dtheta = theta / T::from_usize(narcs).unwrap();
+        let j = 3 + 2 * (narcs - 1);
+
+        for i in 0..3 {
+            u_knots[i] = T::zero();
+            u_knots[j + i] = T::one();
+        }
+
+        let wm = (dtheta / two).cos();
+
+        let mut angle = T::zero();
+        let mut sines = vec![T::zero(); narcs + 1];
+        let mut cosines = vec![T::zero(); narcs + 1];
+        for i in 0..=narcs {
+            cosines[i] = angle.cos();
+            sines[i] = angle.sin();
+            angle += dtheta;
+        }
+
+        let mut control_points = vec![vec![Point4::origin(); prof_points.len()]; 2 * narcs + 1];
+
+        for j in 0..prof_points.len() {
+            let p = &prof_points[j];
+            let s = (p - center).dot(axis);
+            let o = center + axis * s;
+
+            // vector from the axis
+            let mut x = p - o;
+            // radius at height
+            let r = x.norm();
+            // perpendicular vector to x & axis
+            let mut y = axis.cross(&x);
+
+            if r > T::default_epsilon() {
+                x *= T::one() / r;
+                y *= T::one() / r;
+            }
+
+            // control_points[0][j]
+            let mut p0 = prof_points[j];
+            control_points[0][j].x = p0.x;
+            control_points[0][j].y = p0.y;
+            control_points[0][j].z = p0.z;
+            control_points[0][j].w = prof_weights[j];
+
+            let mut t0 = y;
+            let mut index = 0;
+            for i in 1..=narcs {
+                let p2 = if r <= T::default_epsilon() {
+                    o
+                } else {
+                    o + x * cosines[i] * r + y * sines[i] * r
+                };
+
+                let k = index + 2;
+                control_points[k][j].x = p2.x;
+                control_points[k][j].y = p2.y;
+                control_points[k][j].z = p2.z;
+                control_points[k][j].w = prof_weights[j];
+
+                let t2 = y * cosines[i] - x * sines[i];
+
+                let l = index + 1;
+                if r <= T::default_epsilon() {
+                    control_points[l][j].x = o.x;
+                    control_points[l][j].y = o.y;
+                    control_points[l][j].z = o.z;
+                } else {
+                    let nt0 = t0.normalize();
+                    let nt2 = t2.normalize();
+                    let r0 = Ray::new(p0, nt0);
+                    let r1 = Ray::new(p2, nt2);
+                    let intersection = r0
+                        .find_intersection(&r1)
+                        .ok_or(anyhow::anyhow!("No intersection between rays"))?;
+
+                    let intersected = intersection.intersection0.0;
+                    control_points[l][j].x = intersected.x;
+                    control_points[l][j].y = intersected.y;
+                    control_points[l][j].z = intersected.z;
+                }
+
+                control_points[l][j].w = wm * prof_weights[j];
+
+                index += 2;
+
+                if i < narcs {
+                    p0 = p2;
+                    t0 = t2;
+                }
+            }
+        }
+
+        // Scale the control points by their weights to make them rational
+        control_points.iter_mut().for_each(|row| {
+            row.iter_mut().for_each(|p| {
+                let w = p.w;
+                p.x *= w;
+                p.y *= w;
+                p.z *= w;
+            });
+        });
+
+        Ok(Self {
+            control_points,
+            u_degree: 2,
+            v_degree: profile.degree(),
+            u_knots: KnotVector::new(u_knots),
+            v_knots: profile.knots().clone(),
+        })
     }
 }
 
