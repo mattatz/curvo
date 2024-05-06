@@ -751,7 +751,7 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
     /// /// # Example
     /// ```
     /// use curvo::prelude::*;
-    /// use nalgebra::{Point3};
+    /// use nalgebra::{Point3, Vector3};
     ///
     /// // Create a profile curve to revolve
     /// let points: Vec<Point3<f64>> = vec![
