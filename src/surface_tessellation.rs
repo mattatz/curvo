@@ -2,6 +2,7 @@ use nalgebra::{
     allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, OVector,
     Vector2, U1,
 };
+use simba::scalar::SupersetOf;
 
 use crate::{
     adaptive_tessellation_node::AdaptiveTessellationNode, prelude::NurbsSurface, FloatingPoint,
@@ -134,5 +135,19 @@ where
 
     pub fn faces(&self) -> &Vec<[usize; 3]> {
         &self.faces
+    }
+
+    /// Cast the surface tessellation to another floating point type.
+    pub fn cast<F: FloatingPoint + SupersetOf<T>>(&self) -> SurfaceTessellation<F, D>
+    where
+        DefaultAllocator: Allocator<F, D>,
+        DefaultAllocator: Allocator<F, DimNameDiff<D, U1>>,
+    {
+        SurfaceTessellation {
+            points: self.points.iter().map(|p| p.clone().cast()).collect(),
+            normals: self.normals.iter().map(|n| n.clone().cast()).collect(),
+            faces: self.faces.clone(),
+            uvs: self.uvs.iter().map(|uv| uv.cast()).collect(),
+        }
     }
 }

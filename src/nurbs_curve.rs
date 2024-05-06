@@ -5,6 +5,7 @@ use nalgebra::{
 };
 use rand::rngs::ThreadRng;
 use rand::Rng;
+use simba::scalar::SupersetOf;
 
 use crate::binomial::Binomial;
 use crate::frenet_frame::FrenetFrame;
@@ -952,6 +953,22 @@ where
                 knots: KnotVector::new(knots1),
             },
         )
+    }
+
+    /// Cast the curve to a curve with another floating point type
+    pub fn cast<F: FloatingPoint + SupersetOf<T>>(&self) -> NurbsCurve<F, D>
+    where
+        DefaultAllocator: Allocator<F, D>,
+    {
+        NurbsCurve {
+            control_points: self
+                .control_points
+                .iter()
+                .map(|p| p.clone().cast())
+                .collect(),
+            degree: self.degree,
+            knots: self.knots.cast(),
+        }
     }
 }
 

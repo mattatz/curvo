@@ -1652,6 +1652,7 @@ dependencies = [
  "nalgebra",
  "num-traits",
  "rand",
+ "simba",
 ]
 
 [[package]]

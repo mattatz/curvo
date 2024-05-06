@@ -127,21 +127,10 @@ fn setup(
         ..Default::default()
     };
     let tess = swept.tessellate(Some(option));
-    let vertices = tess
-        .points()
-        .iter()
-        .map(|pt| pt.cast::<f32>().into())
-        .collect();
-    let normals = tess
-        .normals()
-        .iter()
-        .map(|n| n.cast::<f32>().into())
-        .collect();
-    let uvs = tess
-        .uvs()
-        .iter()
-        .map(|uv| uv.cast::<f32>().into())
-        .collect();
+    let tess = tess.cast::<f32>();
+    let vertices = tess.points().iter().map(|pt| pt.clone().into()).collect();
+    let normals = tess.normals().iter().map(|n| n.clone().into()).collect();
+    let uvs = tess.uvs().iter().map(|uv| uv.clone().into()).collect();
     let indices = tess
         .faces()
         .iter()

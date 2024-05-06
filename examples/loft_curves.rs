@@ -62,6 +62,7 @@ fn setup(
                 ..Default::default()
             };
             let tess = surf.tessellate(Some(option));
+            let tess = tess.cast::<f32>();
             // let tess = surf.regular_tessellate(32, 32);
 
             let mut line_list =
@@ -74,8 +75,8 @@ fn setup(
                 .iter()
                 .enumerate()
                 .flat_map(|(i, p)| {
-                    let pt: Vec3 = p.cast::<f32>().into();
-                    let normal: Vec3 = normals[i].cast::<f32>().normalize().into();
+                    let pt: Vec3 = p.clone().into();
+                    let normal: Vec3 = normals[i].normalize().into();
                     [pt, pt + normal * normal_length]
                 })
                 .map(|p| p.to_array())
@@ -120,21 +121,9 @@ fn setup(
                 })
                 .insert(Name::new("points"));
 
-            let vertices = tess
-                .points()
-                .iter()
-                .map(|pt| pt.cast::<f32>().into())
-                .collect();
-            let normals = tess
-                .normals()
-                .iter()
-                .map(|n| n.cast::<f32>().into())
-                .collect();
-            let uvs = tess
-                .uvs()
-                .iter()
-                .map(|uv| uv.cast::<f32>().into())
-                .collect();
+            let vertices = tess.points().iter().map(|pt| pt.clone().into()).collect();
+            let normals = tess.normals().iter().map(|n| n.clone().into()).collect();
+            let uvs = tess.uvs().iter().map(|uv| uv.clone().into()).collect();
             let indices = tess
                 .faces()
                 .iter()

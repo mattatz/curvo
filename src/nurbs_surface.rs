@@ -2,6 +2,7 @@ use nalgebra::{
     allocator::Allocator, Const, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OMatrix,
     OPoint, OVector, RealField, Vector2, U1,
 };
+use simba::scalar::SupersetOf;
 
 use crate::{
     adaptive_tessellation_node::AdaptiveTessellationNode,
@@ -607,6 +608,24 @@ where
             v_knots: knots_v,
         })
     }
+
+    /// Cast the surface to a surface with another floating point type
+    pub fn cast<F: FloatingPoint + SupersetOf<T>>(&self) -> NurbsSurface<F, D>
+    where
+        DefaultAllocator: Allocator<F, D>,
+    {
+        NurbsSurface {
+            control_points: self
+                .control_points
+                .iter()
+                .map(|row| row.iter().map(|p| p.clone().cast()).collect())
+                .collect(),
+            u_degree: self.u_degree,
+            v_degree: self.v_degree,
+            u_knots: self.u_knots.cast(),
+            v_knots: self.v_knots.cast(),
+        }
+    }
 }
 
 /// Compute the rational derivatives of derivatives
@@ -882,3 +901,26 @@ impl<'a, T: FloatingPoint, const D: usize> Transformable<&'a OMatrix<T, Const<D>
         });
     }
 }
+
+/*
+impl<T: FloatingPoint + SubsetOf<F>, F: FloatingPoint, D: DimName> Castible<NurbsSurface<F, D>>
+    for NurbsSurface<T, D>
+where
+    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<F, D>,
+{
+    fn cast(&self) -> NurbsSurface<F, D> {
+        NurbsSurface {
+            control_points: self
+                .control_points
+                .iter()
+                .map(|row| row.iter().map(|p| p.clone().cast()).collect())
+                .collect(),
+            u_degree: self.u_degree,
+            v_degree: self.v_degree,
+            u_knots: self.u_knots.cast(),
+            v_knots: self.v_knots.cast(),
+        }
+    }
+}
+*/

@@ -64,9 +64,9 @@ fn setup(
 
     let mut mesh = Mesh::new(PrimitiveTopology::LineStrip, default());
     let vertices = curve
+        .cast::<f32>()
         .tessellate(Some(1e-6))
         .iter()
-        .map(|p| p.cast::<f32>())
         .map(|p| [p.x, p.y, p.z])
         .collect();
     mesh.insert_attribute(
@@ -87,7 +87,10 @@ fn setup(
     let samples = 32;
     let span = (end - start) / ((samples - 1) as f64);
     let parameters: Vec<_> = (0..samples).map(|i| start + span * (i as f64)).collect();
-    let frames = curve.compute_frenet_frames(&parameters);
+    let frames = curve
+        .compute_frenet_frames(&parameters)
+        .into_iter()
+        .map(|f| f.cast::<f32>());
 
     let size = 0.25;
     let hs = size * 0.5;
@@ -104,22 +107,14 @@ fn setup(
     let mut binormals = vec![];
 
     let length = 0.15;
-    frames.iter().enumerate().for_each(|(i, frame)| {
+    frames.enumerate().for_each(|(i, frame)| {
         let mut mesh = Mesh::new(PrimitiveTopology::LineStrip, default());
         mesh.insert_attribute(
             Mesh::ATTRIBUTE_POSITION,
             VertexAttributeValues::Float32x3(vertices.clone()),
         );
 
-        /*
-        let o = frame.position().cast::<f32>();
-        let dir = frame.tangent().cast::<f32>();
-        let up = frame.normal().cast::<f32>();
-        let tr = Transform::from_translation(o.into()).looking_to(dir.into(), up.into());
-        */
-
-        let matrix: Matrix4<f64> = frame.matrix().into();
-        let matrix = matrix.cast::<f32>();
+        let matrix: Matrix4<f32> = frame.matrix().into();
         let tr = Transform::from_matrix(matrix.into());
 
         commands
@@ -133,10 +128,10 @@ fn setup(
             })
             .insert(Name::new(format!("frame_{}", i)));
 
-        let p: Vec3 = frame.position().cast::<f32>().into();
-        let t: Vec3 = frame.tangent().cast::<f32>().into();
-        let n: Vec3 = frame.normal().cast::<f32>().into();
-        let b: Vec3 = frame.binormal().cast::<f32>().into();
+        let p: Vec3 = frame.position().clone().into();
+        let t: Vec3 = frame.tangent().clone().into();
+        let n: Vec3 = frame.normal().clone().into();
+        let b: Vec3 = frame.binormal().clone().into();
         tangents.push(p);
         tangents.push(p + t * length);
         normals.push(p);
