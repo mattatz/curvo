@@ -16,7 +16,7 @@ use bevy_points::{
     material::PointsShaderSettings, mesh::PointsMesh, plugin::PointsPlugin, prelude::PointsMaterial,
 };
 use materials::*;
-use nalgebra::{Const, OMatrix, Point3, Rotation3, Translation3, Vector3};
+use nalgebra::{Point3, Rotation3, Translation3, Vector3};
 
 use curvo::prelude::*;
 mod materials;
@@ -62,6 +62,7 @@ fn setup(
                 ..Default::default()
             };
             let tess = surf.tessellate(Some(option));
+            let tess = tess.cast::<f32>();
             // let tess = surf.regular_tessellate(32, 32);
 
             let mut line_list =
@@ -74,8 +75,8 @@ fn setup(
                 .iter()
                 .enumerate()
                 .flat_map(|(i, p)| {
-                    let pt: Vec3 = p.cast::<f32>().into();
-                    let normal: Vec3 = normals[i].cast::<f32>().normalize().into();
+                    let pt: Vec3 = (*p).into();
+                    let normal: Vec3 = normals[i].normalize().into();
                     [pt, pt + normal * normal_length]
                 })
                 .map(|p| p.to_array())
@@ -120,21 +121,9 @@ fn setup(
                 })
                 .insert(Name::new("points"));
 
-            let vertices = tess
-                .points()
-                .iter()
-                .map(|pt| pt.cast::<f32>().into())
-                .collect();
-            let normals = tess
-                .normals()
-                .iter()
-                .map(|n| n.cast::<f32>().into())
-                .collect();
-            let uvs = tess
-                .uvs()
-                .iter()
-                .map(|uv| uv.cast::<f32>().into())
-                .collect();
+            let vertices = tess.points().iter().map(|pt| (*pt).into()).collect();
+            let normals = tess.normals().iter().map(|n| (*n).into()).collect();
+            let uvs = tess.uvs().iter().map(|uv| (*uv).into()).collect();
             let indices = tess
                 .faces()
                 .iter()
@@ -173,8 +162,7 @@ fn setup(
         Point3::new(-1.0, 2.0, 0.),
         Point3::new(1.0, 2.5, 0.),
     ];
-    let interpolated =
-        NurbsCurve3D::<f64>::try_interpolate(&interpolation_target, 3, None, None).unwrap();
+    let interpolated = NurbsCurve3D::<f64>::try_interpolate(&interpolation_target, 3).unwrap();
 
     let rotation = Rotation3::from_axis_angle(&Vector3::z_axis(), FRAC_PI_2);
     let translation = Translation3::new(0., 0., 1.5);

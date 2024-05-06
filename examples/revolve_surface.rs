@@ -1,4 +1,4 @@
-use std::f64::consts::{PI, TAU};
+use std::f64::consts::TAU;
 
 use bevy::{
     prelude::*,
@@ -11,7 +11,7 @@ use bevy_normal_material::{material::NormalMaterial, plugin::NormalMaterialPlugi
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use bevy_points::{plugin::PointsPlugin, prelude::PointsMaterial};
 use materials::*;
-use nalgebra::Point3;
+use nalgebra::{Point3, Vector3};
 
 use curvo::prelude::*;
 use rand::Rng;
@@ -45,39 +45,24 @@ fn setup(
     mut normal_materials: ResMut<'_, Assets<NormalMaterial>>,
 ) {
     let mut rng = rand::thread_rng();
-    let n = 12;
-    let min_radius = 0.25;
+    let n = 10;
+    let depth = 8.;
+    let min_radius = 1.0;
     let max_radius = 2.5;
-    let depth = 0.5;
 
     let points: Vec<_> = (0..n)
         .map(|i| {
             let g = rng.gen::<f64>();
             let t = i as f64 / n as f64;
-            let r = t * TAU;
             let rad = min_radius + g * (max_radius - min_radius);
+            let r = 0_f64;
             let x = r.cos() * rad;
-            let y = r.sin() * rad;
-            let z = depth * (rng.gen::<f64>() - 0.5);
+            let z = r.sin() * rad;
+            let y = depth * t;
             Point3::new(x, y, z)
         })
         .collect();
-    let profile = NurbsCurve3D::try_periodic(&points, 3).unwrap();
-
-    let n = 32;
-    let radius = 10.;
-    let height = 20.;
-    let angle = TAU * 2.0;
-    let points: Vec<_> = (0..n)
-        .map(|i| {
-            let t = i as f64 / (n - 1) as f64;
-            let r = t * angle;
-            let x = r.cos() * radius;
-            let z = r.sin() * radius;
-            Point3::new(x, t * height, z)
-        })
-        .collect();
-    let rail = NurbsCurve3D::try_interpolate(&points, 3, None, None).unwrap();
+    let profile = NurbsCurve3D::try_interpolate(&points, 3).unwrap();
 
     let profile_vertices = profile
         .tessellate(Some(1e-3))
@@ -99,49 +84,20 @@ fn setup(
         })
         .insert(Name::new("profile"));
 
-    let rail_vertices = rail
-        .tessellate(Some(1e-3))
-        .iter()
-        .map(|p| p.cast::<f32>())
-        .map(|p| [p.x, p.y, p.z])
-        .collect();
-    let rail_mesh = Mesh::new(PrimitiveTopology::LineStrip, default()).with_inserted_attribute(
-        Mesh::ATTRIBUTE_POSITION,
-        VertexAttributeValues::Float32x3(rail_vertices),
-    );
-    commands
-        .spawn(MaterialMeshBundle {
-            mesh: meshes.add(rail_mesh),
-            material: line_materials.add(LineMaterial {
-                color: Color::WHITE,
-            }),
-            ..Default::default()
-        })
-        .insert(Name::new("rail"));
-
-    let swept = NurbsSurface::try_sweep(&profile, &rail, Some(3)).unwrap();
+    let revolved =
+        NurbsSurface::try_revolve(&profile, &Point3::origin(), &Vector3::y(), TAU / 4.0 * 3.0)
+            .unwrap();
 
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, default());
     let option = AdaptiveTessellationOptions {
-        norm_tolerance: 1e-1,
+        norm_tolerance: 1e-1 * 0.5,
         ..Default::default()
     };
-    let tess = swept.tessellate(Some(option));
-    let vertices = tess
-        .points()
-        .iter()
-        .map(|pt| pt.cast::<f32>().into())
-        .collect();
-    let normals = tess
-        .normals()
-        .iter()
-        .map(|n| n.cast::<f32>().into())
-        .collect();
-    let uvs = tess
-        .uvs()
-        .iter()
-        .map(|uv| uv.cast::<f32>().into())
-        .collect();
+    let tess = revolved.tessellate(Some(option));
+    let tess = tess.cast::<f32>();
+    let vertices = tess.points().iter().map(|pt| (*pt).into()).collect();
+    let normals = tess.normals().iter().map(|n| (*n).into()).collect();
+    let uvs = tess.uvs().iter().map(|uv| (*uv).into()).collect();
     let indices = tess
         .faces()
         .iter()

@@ -12,18 +12,20 @@ Curvo is a NURBS curve / surface modeling library for Rust.
 
 This library enables not only the creation of NURBS curves from control points, knot vectors, and weights associated with each control point, but also supports generating curves that precisely pass through the given control points and creating periodic curves. Additionally, it allows for the construction of NURBS surfaces through operations such as _extruding_ and _lofting_ based on NURBS curves as inputs.
 
-The modeling operations for NURBS surfaces supported by this library currently include (or are planned to include) the following:
+The modeling operations for NURBS surfaces supported by this library currently include the following:
 
-- [x] Extrude
-- [x] Loft
-- [x] Sweep
-- [ ] Revolve
+- Extrude
+- Loft
+- Sweep
+- Revolve
 
-<img src="https://github.com/mattatz/curvo/assets/1085910/98abe976-4223-4452-b65e-21f1fcbec00d" width="360px" alt="Sweep a profile curve along a rail curve to create a surface" />
+<img src="https://github.com/mattatz/curvo/assets/1085910/98abe976-4223-4452-b65e-21f1fcbec00d" width="320px" alt="Sweep the profile curve along the rail curve to create a surface" />
+
+<img width="320px" alt="Revolve the profile curve around an z-axis by PI radians to create a NURBS surface" src="https://github.com/mattatz/curvo/assets/1085910/74d5bf26-f096-448b-95ab-8acbb9994315">
 
 I also plan to implement features for finding the nearest points on surfaces (already implemented for curves), as well as dividing them based on arc lengths.
 
-<img src="https://github.com/mattatz/curvo/assets/1085910/04cccd08-01c7-495d-b332-4ee2ed59644a" width="360px" alt="Find closest point on the NURBS curve" />
+<img src="https://github.com/mattatz/curvo/assets/1085910/04cccd08-01c7-495d-b332-4ee2ed59644a" width="320px" alt="Find closest point on the NURBS curve" />
 
 ## Usage
 
@@ -40,7 +42,7 @@ let points = vec![
 
 // Create a NURBS curve that interpolates the given points with degree 3
 // You can also specify the precision of the curve by generic type (f32 or f64)
-let interpolated = NurbsCurve3D::<f64>::try_interpolate(&points, 3, None, None).unwrap();
+let interpolated = NurbsCurve3D::<f64>::try_interpolate(&points, 3).unwrap();
 
 // NURBS curve & surface can be transformed by nalgebra's matrix
 let rotation = Rotation3::from_axis_angle(&Vector3::z_axis(), FRAC_PI_2);

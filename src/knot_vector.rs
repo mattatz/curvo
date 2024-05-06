@@ -1,6 +1,7 @@
 use std::ops::Index;
 
-use nalgebra::RealField;
+use nalgebra::{convert, RealField};
+use simba::scalar::SupersetOf;
 
 use crate::{prelude::Invertible, FloatingPoint};
 
@@ -269,6 +270,18 @@ impl<T: RealField + Copy> KnotVector<T> {
         let (start, end) = self.domain(degree);
         let span = (end - start) / T::from_usize(divs).unwrap();
         (start, end, span, n)
+    }
+
+    /// Cast the knot vector to another floating point type
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// let knots: KnotVector<f64> = KnotVector::new(vec![1., 2., 3., 4., 5., 6.]);
+    /// let knots2 = knots.cast::<f32>();
+    /// assert_eq!(knots.first(), 1.0);
+    /// ```
+    pub fn cast<F: FloatingPoint + SupersetOf<T>>(&self) -> KnotVector<F> {
+        KnotVector::new(self.knots.iter().map(|v| convert(*v)).collect())
     }
 }
 

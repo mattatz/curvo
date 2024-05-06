@@ -58,7 +58,7 @@ fn setup(
         Point2::new(1., 1.),
     ];
     let degree = 3;
-    let curve = NurbsCurve2D::try_interpolate(&control_points, degree, None, None).unwrap();
+    let curve = NurbsCurve2D::try_interpolate(&control_points, degree).unwrap();
     commands.spawn(ProfileCurve(curve));
 
     commands.spawn((

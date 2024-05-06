@@ -1,4 +1,5 @@
 use nalgebra::{IsometryMatrix3, Point3, Rotation3, Translation3, Vector3};
+use simba::scalar::SupersetOf;
 
 use crate::FloatingPoint;
 
@@ -52,5 +53,15 @@ impl<T: FloatingPoint> FrenetFrame<T> {
         let trans = Translation3::from(self.position);
         let rot = self.rotation();
         trans * rot
+    }
+
+    /// Casts the Frenet frame to another floating point type.
+    pub fn cast<F: FloatingPoint + SupersetOf<T>>(&self) -> FrenetFrame<F> {
+        FrenetFrame {
+            position: self.position.cast(),
+            tangent: self.tangent.cast(),
+            normal: self.normal.cast(),
+            binormal: self.binormal.cast(),
+        }
     }
 }

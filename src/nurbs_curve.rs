@@ -1,10 +1,11 @@
 use nalgebra::allocator::Allocator;
 use nalgebra::{
     Const, DMatrix, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff, DimNameSub,
-    OMatrix, OPoint, OVector, Rotation3, UnitVector3, Vector3, U1,
+    DimNameSum, OMatrix, OPoint, OVector, Rotation3, UnitVector3, Vector3, U1,
 };
 use rand::rngs::ThreadRng;
 use rand::Rng;
+use simba::scalar::SupersetOf;
 
 use crate::binomial::Binomial;
 use crate::frenet_frame::FrenetFrame;
@@ -424,7 +425,7 @@ where
     ///     Point3::new(-1.0, 2.0, 0.),
     ///     Point3::new(1.0, 2.5, 0.),
     /// ];
-    /// let interpolated = NurbsCurve3D::try_interpolate(&points, 3, None, None);
+    /// let interpolated = NurbsCurve3D::try_interpolate(&points, 3);
     /// assert!(interpolated.is_ok());
     /// let curve = interpolated.unwrap();
     ///
@@ -438,6 +439,19 @@ where
     /// assert_relative_eq!(points[points.len() - 1], tail);
     /// ```
     pub fn try_interpolate(
+        points: &[OPoint<T, DimNameDiff<D, U1>>],
+        degree: usize,
+    ) -> anyhow::Result<Self>
+    where
+        DefaultAllocator: Allocator<T, D>,
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+    {
+        Self::try_interpolate_with_tangents(points, degree, None, None)
+    }
+
+    /// Try to create an interpolated NURBS curve from a set of points with start and end tangents
+    pub fn try_interpolate_with_tangents(
         points: &[OPoint<T, DimNameDiff<D, U1>>],
         degree: usize,
         start_tangent: Option<OVector<T, DimNameDiff<D, U1>>>,
@@ -582,6 +596,52 @@ where
             control_points,
             knots,
         })
+    }
+
+    /// Elevate the dimension of the curve (e.g., 2D -> 3D)
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::Point2;
+    /// let points: Vec<Point2<f64>> = vec![
+    ///     Point2::new(-1.0, -1.0),
+    ///     Point2::new(1.0, -1.0),
+    ///     Point2::new(1.0, 1.0),
+    ///     Point2::new(-1.0, 1.0),
+    /// ];
+    /// let curve2d = NurbsCurve2D::try_interpolate(&points, 3).unwrap();
+    /// let curve3d: NurbsCurve3D<f64> = curve2d.elevate_dimension();
+    /// let (start, end) = curve2d.knots_domain();
+    /// let (p0, p1) = (curve2d.point_at(start), curve2d.point_at(end));
+    /// let (p2, p3) = (curve3d.point_at(start), curve3d.point_at(end));
+    /// assert_eq!(p0.x, p2.x);
+    /// assert_eq!(p0.y, p2.y);
+    /// assert_eq!(p2.z, 0.0);
+    /// assert_eq!(p1.x, p3.x);
+    /// assert_eq!(p1.y, p3.y);
+    /// assert_eq!(p3.z, 0.0);
+    /// ```
+    pub fn elevate_dimension(&self) -> NurbsCurve<T, DimNameSum<D, U1>>
+    where
+        D: DimNameAdd<U1>,
+        DefaultAllocator: Allocator<T, DimNameSum<D, U1>>,
+    {
+        let mut control_points = vec![];
+        for p in self.control_points.iter() {
+            let mut coords = vec![];
+            for i in 0..(D::dim() - 1) {
+                coords.push(p[i]);
+            }
+            coords.push(T::zero()); // set a zero in the last dimension
+            coords.push(p[D::dim() - 1]);
+            control_points.push(OPoint::from_slice(&coords));
+        }
+
+        NurbsCurve {
+            control_points,
+            degree: self.degree,
+            knots: self.knots.clone(),
+        }
     }
 
     /// Try to elevate the degree of the curve
@@ -953,6 +1013,22 @@ where
             },
         )
     }
+
+    /// Cast the curve to a curve with another floating point type
+    pub fn cast<F: FloatingPoint + SupersetOf<T>>(&self) -> NurbsCurve<F, D>
+    where
+        DefaultAllocator: Allocator<F, D>,
+    {
+        NurbsCurve {
+            control_points: self
+                .control_points
+                .iter()
+                .map(|p| p.clone().cast())
+                .collect(),
+            degree: self.degree,
+            knots: self.knots.cast(),
+        }
+    }
 }
 
 /// Enable to transform a NURBS curve by a given DxD matrix
@@ -988,7 +1064,7 @@ where
     ///     Point2::new(1.0, 1.0),
     ///     Point2::new(0.0, 1.0),
     /// ];
-    /// let mut curve = NurbsCurve2D::try_interpolate(&points, 3, None, None).unwrap();
+    /// let mut curve = NurbsCurve2D::try_interpolate(&points, 3).unwrap();
     /// curve.invert();
     /// let (start, end) = curve.knots_domain();
     /// assert_relative_eq!(curve.point_at(start), points[points.len() - 1]);

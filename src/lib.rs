@@ -9,11 +9,13 @@ mod invertible;
 mod knot_vector;
 mod nurbs_curve;
 mod nurbs_surface;
+mod ray;
 mod surface_point;
 mod surface_tessellation;
 mod transformable;
 mod trigonometry;
 use floating_point::*;
+use ray::*;
 use surface_point::*;
 
 pub mod prelude {
