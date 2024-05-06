@@ -567,7 +567,7 @@ where
     ///     Point3::new(-1.0, 2.0, 0.),
     ///     Point3::new(1.0, 2.5, 0.),
     /// ];
-    /// let interpolated = NurbsCurve3D::try_interpolate(&points, 3, None, None).unwrap();
+    /// let interpolated = NurbsCurve3D::try_interpolate(&points, 3).unwrap();
     /// // Offset the curve by translation of 2.0 in the z direction
     /// let offsetted = interpolated.transformed(&Translation3::new(0.0, 0.0, 2.0).into());
     ///
@@ -591,7 +591,7 @@ where
                     .iter()
                     .map(|c| dehomogenize(&c.control_points()[i]).unwrap())
                     .collect::<Vec<_>>();
-                NurbsCurve::try_interpolate(&points, degree_v, None, None)
+                NurbsCurve::try_interpolate(&points, degree_v)
             })
             .collect();
         let v_curves = v_curves?;
@@ -709,7 +709,7 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
     ///     Point3::new(1.0, 1.0, 0.),
     ///     Point3::new(-1.0, 1.0, 0.),
     /// ];
-    /// let profile = NurbsCurve3D::try_interpolate(&points, 3, None, None).unwrap();
+    /// let profile = NurbsCurve3D::try_interpolate(&points, 3).unwrap();
     ///
     /// let points: Vec<Point3<f64>> = vec![
     ///     Point3::new(1.0, 0., 0.),
@@ -717,7 +717,7 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
     ///     Point3::new(-1.0, 0., 2.),
     ///     Point3::new(0.0, 1., 3.),
     /// ];
-    /// let rail= NurbsCurve3D::try_interpolate(&points, 3, None, None).unwrap();
+    /// let rail= NurbsCurve3D::try_interpolate(&points, 3).unwrap();
     ///
     /// // Sweep the profile curve along the rail curve to create a NURBS surface
     /// let swept = NurbsSurface::try_sweep(&profile, &rail, Some(3));
