@@ -16,7 +16,7 @@ use bevy_points::{
     material::PointsShaderSettings, mesh::PointsMesh, plugin::PointsPlugin, prelude::PointsMaterial,
 };
 use materials::*;
-use nalgebra::{Const, OMatrix, Point3, Rotation3, Translation3, Vector3};
+use nalgebra::{Point3, Rotation3, Translation3, Vector3};
 
 use curvo::prelude::*;
 mod materials;
@@ -75,7 +75,7 @@ fn setup(
                 .iter()
                 .enumerate()
                 .flat_map(|(i, p)| {
-                    let pt: Vec3 = p.clone().into();
+                    let pt: Vec3 = (*p).into();
                     let normal: Vec3 = normals[i].normalize().into();
                     [pt, pt + normal * normal_length]
                 })
@@ -121,9 +121,9 @@ fn setup(
                 })
                 .insert(Name::new("points"));
 
-            let vertices = tess.points().iter().map(|pt| pt.clone().into()).collect();
-            let normals = tess.normals().iter().map(|n| n.clone().into()).collect();
-            let uvs = tess.uvs().iter().map(|uv| uv.clone().into()).collect();
+            let vertices = tess.points().iter().map(|pt| (*pt).into()).collect();
+            let normals = tess.normals().iter().map(|n| (*n).into()).collect();
+            let uvs = tess.uvs().iter().map(|uv| (*uv).into()).collect();
             let indices = tess
                 .faces()
                 .iter()

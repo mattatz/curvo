@@ -128,10 +128,10 @@ fn setup(
             })
             .insert(Name::new(format!("frame_{}", i)));
 
-        let p: Vec3 = frame.position().clone().into();
-        let t: Vec3 = frame.tangent().clone().into();
-        let n: Vec3 = frame.normal().clone().into();
-        let b: Vec3 = frame.binormal().clone().into();
+        let p: Vec3 = (*frame.position()).into();
+        let t: Vec3 = (*frame.tangent()).into();
+        let n: Vec3 = (*frame.normal()).into();
+        let b: Vec3 = (*frame.binormal()).into();
         tangents.push(p);
         tangents.push(p + t * length);
         normals.push(p);

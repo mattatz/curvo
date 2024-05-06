@@ -10,7 +10,9 @@ pub struct Ray<T: FloatingPoint, const D: usize> {
 
 /// Represents the intersection of two rays in D dimensions.
 pub struct RayIntersection<T: FloatingPoint, const D: usize> {
+    #[allow(unused)]
     pub(crate) intersection0: (Point<T, D>, T),
+    #[allow(unused)]
     pub(crate) intersection1: (Point<T, D>, T),
 }
 
@@ -31,6 +33,7 @@ impl<T: FloatingPoint, const D: usize> Ray<T, D> {
         self.origin + self.direction * t
     }
 
+    /// Finds the intersection between two rays.
     pub fn find_intersection(&self, other: &Self) -> Option<RayIntersection<T, D>> {
         let dab = self.direction.dot(other.direction());
         let daa = self.direction.dot(&self.direction);

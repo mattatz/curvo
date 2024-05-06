@@ -1,4 +1,4 @@
-use std::f64::consts::{PI, TAU};
+use std::f64::consts::TAU;
 
 use bevy::{
     prelude::*,
@@ -128,9 +128,9 @@ fn setup(
     };
     let tess = swept.tessellate(Some(option));
     let tess = tess.cast::<f32>();
-    let vertices = tess.points().iter().map(|pt| pt.clone().into()).collect();
-    let normals = tess.normals().iter().map(|n| n.clone().into()).collect();
-    let uvs = tess.uvs().iter().map(|uv| uv.clone().into()).collect();
+    let vertices = tess.points().iter().map(|pt| (*pt).into()).collect();
+    let normals = tess.normals().iter().map(|n| (*n).into()).collect();
+    let uvs = tess.uvs().iter().map(|uv| (*uv).into()).collect();
     let indices = tess
         .faces()
         .iter()
