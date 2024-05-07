@@ -3,7 +3,10 @@ use std::ops::Index;
 use nalgebra::{convert, RealField};
 use simba::scalar::SupersetOf;
 
-use crate::{prelude::Invertible, FloatingPoint};
+use crate::{
+    prelude::{Invertible, KnotMultiplicity},
+    FloatingPoint,
+};
 
 /// Knot vector representation
 #[derive(Clone, Debug)]
@@ -50,6 +53,33 @@ impl<T: RealField + Copy> KnotVector<T> {
             self.knots[degree],
             self.knots[self.knots.len() - 1 - degree],
         )
+    }
+
+    /// Get the multiplicity of each knot
+    /// # Example
+    /// ```
+    /// use curvo::prelude::KnotVector;
+    /// let knots = KnotVector::new(vec![0., 0., 0., 1., 2., 3., 3., 3.]);
+    /// let knot_multiplicity = knots.multiplicity();
+    /// assert_eq!(knot_multiplicity[0].multiplicity(), 3);
+    /// assert_eq!(knot_multiplicity[1].multiplicity(), 1);
+    /// assert_eq!(knot_multiplicity[2].multiplicity(), 1);
+    /// assert_eq!(knot_multiplicity[3].multiplicity(), 3);
+    /// ```
+    pub fn multiplicity(&self) -> Vec<KnotMultiplicity<T>> {
+        let mut mult = vec![];
+
+        let mut current = KnotMultiplicity::new(self.knots[0], 0);
+        self.knots.iter().for_each(|knot| {
+            if (*knot - *current.knot()).abs() > T::default_epsilon() {
+                mult.push(current.clone());
+                current = KnotMultiplicity::new(*knot, 0);
+            }
+            current.increment_multiplicity();
+        });
+        mult.push(current);
+
+        mult
     }
 
     /// Find the knot span index by binary search
