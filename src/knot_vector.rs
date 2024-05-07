@@ -82,6 +82,15 @@ impl<T: RealField + Copy> KnotVector<T> {
         mult
     }
 
+    /// Find the knot span index by linear search
+    pub fn find_knot_span_linear(&self, n: usize, degree: usize, u: T) -> usize {
+        let mut span = degree + 1;
+        while span < n && u >= self.knots[span] {
+            span += 1;
+        }
+        span - 1
+    }
+
     /// Find the knot span index by binary search
     ///
     /// # Example

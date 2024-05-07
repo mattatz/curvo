@@ -26,13 +26,14 @@ bevy_normal_material = { version = "0.5.2", optional = true }
 bevy_panorbit_camera = { version = "0.17.0", optional = true }
 bevy_points = { version = "0.5.1", optional = true }
 simba = { version = "0.8.1", default-features = false }
+gauss-quad = "0.1.8"
 
 [dev-dependencies]
 approx = { version = "0.5", default-features = false }
 
 [features]
-default = []
-# default = ["bevy"] # for debugging example
+# default = []
+default = ["bevy"] # for debugging example
 bevy = [
   "dep:bevy",
   "dep:bevy-inspector-egui",
