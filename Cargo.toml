@@ -72,3 +72,9 @@ name = "frenet_frame"
 path = "examples/frenet_frame.rs"
 required-features = ["bevy"]
 
+[[example]]
+name = "decompose_curve_into_bezier_segments"
+path = "examples/decompose_curve_into_bezier_segments.rs"
+required-features = ["bevy"]
+
+

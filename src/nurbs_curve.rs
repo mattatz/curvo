@@ -345,6 +345,10 @@ where
         self.knots.domain(self.degree)
     }
 
+    pub fn length(&self) -> T {
+        todo!();
+    }
+
     /// Try to create a periodic NURBS curve from a set of points
     /// ```
     /// use curvo::prelude::*;
@@ -1012,6 +1016,38 @@ where
                 knots: KnotVector::new(knots1),
             },
         )
+    }
+
+    /// Decompose the curve into Bezier segments
+    pub fn decompose_bezier_segments(&self) -> Vec<Self> {
+        let knot_mult = self.knots.multiplicity();
+        let req_mult = self.degree + 1;
+
+        let mut curve = self.clone();
+        knot_mult.iter().for_each(|mult| {
+            if mult.multiplicity() < req_mult {
+                let knots_insert = vec![*mult.knot(); req_mult - mult.multiplicity()];
+                curve.knot_refine(knots_insert);
+            }
+        });
+
+        let div = curve.knots().len() / req_mult - 1;
+        let knot_length = req_mult * 2;
+        let mut segments = vec![];
+
+        for i in 0..div {
+            let start = i * req_mult;
+            let end = start + knot_length;
+            let knots = curve.knots().as_slice()[start..end].to_vec();
+            let control_points = curve.control_points[start..(start + req_mult)].to_vec();
+            segments.push(Self {
+                degree: self.degree,
+                control_points,
+                knots: KnotVector::new(knots),
+            });
+        }
+
+        segments
     }
 
     /// Cast the curve to a curve with another floating point type
