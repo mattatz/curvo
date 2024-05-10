@@ -103,7 +103,7 @@ fn trim_animation(
     let (start, end) = profile.0.knots_domain();
     let sec = time.elapsed_seconds_f64();
     let t = start + (end - start) * (0.5 + 0.5 * sec.sin());
-    let (c0, c1) = profile.0.trim(t);
+    let (c0, c1) = profile.0.try_trim(t).unwrap();
     let first = first.single();
     let second = second.single();
 

@@ -6,6 +6,7 @@ mod binomial;
 mod floating_point;
 mod frenet_frame;
 mod invertible;
+mod knot_multiplicity;
 mod knot_vector;
 mod nurbs_curve;
 mod nurbs_surface;
@@ -23,6 +24,7 @@ pub mod prelude {
     pub use crate::floating_point::*;
     pub use crate::frenet_frame::*;
     pub use crate::invertible::*;
+    pub use crate::knot_multiplicity::*;
     pub use crate::knot_vector::*;
     pub use crate::nurbs_curve::*;
     pub use crate::nurbs_surface::*;

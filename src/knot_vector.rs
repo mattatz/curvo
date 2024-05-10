@@ -3,7 +3,10 @@ use std::ops::Index;
 use nalgebra::{convert, RealField};
 use simba::scalar::SupersetOf;
 
-use crate::{prelude::Invertible, FloatingPoint};
+use crate::{
+    prelude::{Invertible, KnotMultiplicity},
+    FloatingPoint,
+};
 
 /// Knot vector representation
 #[derive(Clone, Debug)]
@@ -16,12 +19,35 @@ impl<T: RealField + Copy> KnotVector<T> {
         Self { knots }
     }
 
+    /// Create an uniform knot vector
+    /// an uniform knot vector has a degree + 1 multiplicity at the start and end
+    /// # Example
+    /// ```
+    /// use curvo::prelude::KnotVector;
+    /// let knots: KnotVector<f64> = KnotVector::uniform(3, 2);
+    /// assert_eq!(knots.to_vec(), vec![0., 0., 0., 1., 2., 2., 2.]);
+    /// ```
+    pub fn uniform(n: usize, degree: usize) -> Self {
+        let mut knots = vec![];
+        let m = degree;
+        knots.extend(std::iter::repeat(T::zero()).take(m));
+        for i in 0..n {
+            knots.push(T::from_usize(i).unwrap());
+        }
+        knots.extend(std::iter::repeat(T::from_usize(n - 1).unwrap()).take(m));
+        Self { knots }
+    }
+
     pub fn len(&self) -> usize {
         self.knots.len()
     }
 
     pub fn is_empty(&self) -> bool {
         self.knots.is_empty()
+    }
+
+    pub fn to_vec(&self) -> Vec<T> {
+        self.knots.clone()
     }
 
     pub fn first(&self) -> T {
@@ -50,6 +76,76 @@ impl<T: RealField + Copy> KnotVector<T> {
             self.knots[degree],
             self.knots[self.knots.len() - 1 - degree],
         )
+    }
+
+    /// Returns the index of the first knot greater than or equal to knot
+    pub fn floor(&self, knot: T) -> Option<usize> {
+        self.iter().rposition(|t| *t <= knot)
+    }
+
+    /// Add a knot and return the index of added knot
+    pub fn add(&mut self, knot: T) -> usize {
+        match self.floor(knot) {
+            Some(idx) => {
+                self.knots.insert(idx + 1, knot);
+                idx + 1
+            }
+            None => {
+                self.knots.insert(0, knot);
+                0
+            }
+        }
+    }
+
+    /// Get the multiplicity of each knot
+    /// # Example
+    /// ```
+    /// use curvo::prelude::KnotVector;
+    /// let knots = KnotVector::new(vec![0., 0., 0., 1., 2., 3., 3., 3.]);
+    /// let knot_multiplicity = knots.multiplicity();
+    /// assert_eq!(knot_multiplicity[0].multiplicity(), 3);
+    /// assert_eq!(knot_multiplicity[1].multiplicity(), 1);
+    /// assert_eq!(knot_multiplicity[2].multiplicity(), 1);
+    /// assert_eq!(knot_multiplicity[3].multiplicity(), 3);
+    /// ```
+    pub fn multiplicity(&self) -> Vec<KnotMultiplicity<T>> {
+        let mut mult = vec![];
+
+        let mut current = KnotMultiplicity::new(self.knots[0], 0);
+        self.knots.iter().for_each(|knot| {
+            if (*knot - *current.knot()).abs() > T::default_epsilon() {
+                mult.push(current.clone());
+                current = KnotMultiplicity::new(*knot, 0);
+            }
+            current.increment_multiplicity();
+        });
+        mult.push(current);
+
+        mult
+    }
+
+    /// Check if the knot vector is clamped
+    /// `clamped` means the first and last knots have a multiplicity greater than the degree
+    /// e.g. [0, 0, 0, 1, 2, 3, 3, 3] with degree 2 is clamped
+    pub fn is_clamped(&self, degree: usize) -> bool {
+        let multiplicity = self.multiplicity();
+        let start = multiplicity.first();
+        let end = multiplicity.last();
+        match (start, end) {
+            (Some(start), Some(end)) => {
+                start.multiplicity() > degree && end.multiplicity() > degree
+            }
+            _ => false,
+        }
+    }
+
+    /// Find the knot span index by linear search
+    pub fn find_knot_span_linear(&self, n: usize, degree: usize, u: T) -> usize {
+        let mut span = degree + 1;
+        while span < n && u >= self.knots[span] {
+            span += 1;
+        }
+        span - 1
     }
 
     /// Find the knot span index by binary search

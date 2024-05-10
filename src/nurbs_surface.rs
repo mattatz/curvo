@@ -575,7 +575,7 @@ where
     /// assert!(lofted.is_ok());
     /// ```
     pub fn try_loft(curves: &[NurbsCurve<T, D>], degree_v: Option<usize>) -> anyhow::Result<Self> {
-        let unified_curves = unify_curve_knot_vectors(curves)?;
+        let unified_curves = try_unify_curve_knot_vectors(curves)?;
 
         let degree_u = unified_curves[0].degree();
         let degree_v = degree_v.unwrap_or(degree_u).min(unified_curves.len() - 1);
@@ -922,7 +922,7 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
 
 /// Unify the knot vectors of a collection of NURBS curves
 ///
-fn unify_curve_knot_vectors<T, D>(
+fn try_unify_curve_knot_vectors<T, D>(
     curves: &[NurbsCurve<T, D>],
 ) -> anyhow::Result<Vec<NurbsCurve<T, D>>>
 where
@@ -982,7 +982,7 @@ where
     for curve in curves.iter_mut() {
         let rem = sorted_set_sub(&merged_knots, curve.knots().as_slice());
         if !rem.is_empty() {
-            curve.knot_refine(rem);
+            curve.try_refine_knot(rem)?;
         }
     }
 
