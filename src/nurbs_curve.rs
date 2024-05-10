@@ -349,12 +349,60 @@ where
     }
 
     /// Compute the length of the curve by gauss-legendre quadrature
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::Point2;
+    /// use approx::assert_relative_eq;
+    /// let control_points: Vec<Point2<f64>> = vec![
+    ///     Point2::new(0., 0.),
+    ///     Point2::new(1., 0.),
+    ///     Point2::new(1., 1.),
+    ///     Point2::new(0., 1.),
+    ///     Point2::new(0., 0.),
+    /// ];
+    /// let curve = NurbsCurve2D::try_interpolate(&control_points, 3).unwrap();
+    /// let approx = curve.try_length().unwrap();
+    /// let (start, end) = curve.knots_domain();
+    /// let resolution = 100;
+    /// let samples = curve.sample_regular_range(start, end, resolution);
+    /// let goal = (0..resolution - 1)
+    ///     .map(|i| {
+    ///     let p0 = samples[i];
+    ///     let p1 = samples[i + 1];
+    ///     (p0 - p1).norm()
+    /// })
+    /// .reduce(|a, b| a + b)
+    /// .unwrap();
+    /// assert_relative_eq!(approx, goal, epsilon = 1e-3);
+    /// ```
     pub fn try_length(&self) -> anyhow::Result<T>
     where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
     {
+        let mult = self.knots.multiplicity();
+        let start = mult.first().unwrap().multiplicity();
+        let end = mult.last().unwrap().multiplicity();
+
         let segments = self.try_decompose_bezier_segments()?;
+
+        // If the start/end parts of the knot vector are not duplicated,
+        // the Bezier segments will not be generated correctly,
+        // so reduce the number of segments by the amount that falls below the required duplication degree.
+        let required_multiplicity = self.degree + 1;
+        let i = if start < required_multiplicity {
+            required_multiplicity - start
+        } else {
+            0
+        };
+        let j = if end < required_multiplicity {
+            segments.len() - (required_multiplicity - end)
+        } else {
+            segments.len()
+        };
+        let segments = &segments[i..j];
+
         let (_, u) = self.knots_domain();
         // let gauss = GaussLegendre::init(16 + self.degree);
         let gauss = GaussLegendre::init(16 + self.degree);
@@ -866,74 +914,68 @@ where
         })
     }
 
-    /*
-    /// Try to insert knots into the curve
-    pub fn try_insert_knots(&mut self, u: T, r: usize) -> anyhow::Result<()> {
-        let degree = self.degree;
-        let n = self.knots.len() - degree - 2;
-        let k = self.knots.find_knot_span_index(n, degree, u);
+    /// Try to add a knot to the curve
+    pub fn try_add_knot(&mut self, knot: T) -> anyhow::Result<()> {
+        anyhow::ensure!(
+            knot >= self.knots[0],
+            "Knot is smaller than the first knot: {} < {}",
+            knot,
+            self.knots[0]
+        );
+        anyhow::ensure!(
+            knot <= self.knots[self.knots.len() - 1],
+            "Knot is larger than the last knot: {} > {}",
+            knot,
+            self.knots[self.knots.len() - 1]
+        );
 
-        let mut knots_post = vec![T::zero(); self.knots.len() + r];
-        let mut control_points_post = vec![OPoint::<T, D>::origin(); self.control_points.len() + r];
+        let k = self.degree;
+        let n = self.control_points.len();
+        let idx = self.knots.add(knot);
+        let start = if idx > k { idx - k } else { 0 };
+        let end = if idx > n {
+            self.control_points
+                .push(self.control_points.last().unwrap().clone());
+            n + 1
+        } else {
+            self.control_points
+                .insert(idx - 1, self.control_points[idx - 1].clone());
+            idx
+        };
 
-        let s = 0;
-
-        // Create new knot vector
-        for i in 0..=k {
-            knots_post[i] = self.knots[i];
+        for i in start..end {
+            let i0 = end + start - i - 1;
+            let delta = self.knots[i0 + k + 1] - self.knots[i0];
+            let inv = if delta != T::zero() {
+                T::one() / delta
+            } else {
+                T::zero()
+            };
+            let a = (self.knots[idx] - self.knots[i0]) * inv;
+            let delta_control_point = if i0 == 0 {
+                self.control_points[i0].coords.clone()
+            } else if i0 == self.control_points.len() {
+                -self.control_points[i0 - 1].coords.clone()
+            } else {
+                &self.control_points[i0] - &self.control_points[i0 - 1]
+            };
+            let mut p = delta_control_point * (T::one() - a);
+            p[D::dim() - 1] = T::zero();
+            self.control_points[i0].coords -= p;
         }
-        for i in 1..=r {
-            knots_post[k + i] = u;
-        }
-        for i in k + 1..self.knots.len() {
-            knots_post[i + r] = self.knots[i];
-        }
-
-        for i in 0..=(k - self.degree) {
-            control_points_post[i] = self.control_points[i].clone();
-        }
-        for i in (k - s)..self.control_points().len() {
-            control_points_post[i + r] = self.control_points[i].clone();
-        }
-
-        let mut control_points_temp = vec![OPoint::<T, D>::origin(); degree - s + 1];
-        for i in 0..control_points_temp.len() {
-            control_points_temp[i] = self.control_points[i + k - degree].clone();
-        }
-
-        let mut l = 0;
-
-        for j in 1..=r {
-            l = k - degree + j;
-            for i in 0..=(degree - j - s) {
-                let denom = self.knots[i + k + 1] - self.knots[l + i];
-                let inv_or_zero = if denom != T::zero() {
-                    T::one() / denom
-                } else {
-                    T::zero()
-                };
-                let alpha = (u - self.knots[l + i]) * inv_or_zero;
-                control_points_temp[i] =
-                    control_points_temp[i].lerp(&control_points_temp[i + 1], T::one() - alpha);
-            }
-
-            control_points_post[l] = control_points_temp[0].clone();
-            control_points_post[k + r - j - s] = control_points_temp[degree - j - s].clone();
-        }
-
-        for i in (l + 1)..(k - s) {
-            control_points_post[i] = control_points_temp[i - l].clone();
-        }
-
-        self.control_points = control_points_post;
-        self.knots = KnotVector::new(knots_post);
 
         Ok(())
     }
-    */
+
+    /// Check if the curve is clamped
+    pub fn is_clamped(&self) -> bool {
+        self.knots.is_clamped(self.degree)
+    }
 
     /// Try to refine the curve by inserting knots
-    pub fn try_knot_refine(&mut self, knots_to_insert: Vec<T>) -> anyhow::Result<()> {
+    pub fn try_refine_knot(&mut self, knots_to_insert: Vec<T>) -> anyhow::Result<()> {
+        anyhow::ensure!(self.is_clamped(), "Curve must be clamped to refine knots");
+
         if knots_to_insert.is_empty() {
             return Ok(());
         }
@@ -1100,7 +1142,7 @@ where
     pub fn try_trim(&self, u: T) -> anyhow::Result<(Self, Self)> {
         let knots_to_insert: Vec<_> = (0..=self.degree).map(|_| u).collect();
         let mut cloned = self.clone();
-        cloned.try_knot_refine(knots_to_insert)?;
+        cloned.try_refine_knot(knots_to_insert)?;
 
         let n = self.knots.len() - self.degree - 2;
         let s = self.knots.find_knot_span_index(n, self.degree, u);
@@ -1122,28 +1164,68 @@ where
         ))
     }
 
+    /// Try to clamp knots of the curve
+    /// Multiplex the start/end part of the knot vector so that the knot has `degree + 1` overlap
+    pub fn try_clamp(&mut self) -> anyhow::Result<()> {
+        let degree = self.degree();
+
+        let start = self.knots.first();
+        let end = self.knots.last();
+        let multiplicity = self.knots.multiplicity();
+        let start_knot_count = multiplicity
+            .iter()
+            .find(|m| *m.knot() == start)
+            .ok_or(anyhow::anyhow!("Start knot not found"))?
+            .multiplicity();
+        let end_knot_count = multiplicity
+            .iter()
+            .find(|m| *m.knot() == end)
+            .ok_or(anyhow::anyhow!("End knot not found"))?
+            .multiplicity();
+
+        for _ in start_knot_count..=degree {
+            self.try_add_knot(start)?;
+        }
+        for _ in end_knot_count..=degree {
+            self.try_add_knot(end)?;
+        }
+
+        Ok(())
+    }
+
     /// Decompose the curve into Bezier segments
     pub fn try_decompose_bezier_segments(&self) -> anyhow::Result<Vec<Self>> {
-        let knot_mults = self.knots.multiplicity();
-        let req_mult = self.degree + 1;
+        /*
+        anyhow::ensure!(
+            self.is_clamped(),
+            "Curve must be clamped to decompose into Bezier segments"
+        );
+        */
 
-        let mut curve = self.clone();
+        let mut cloned = self.clone();
+        if !cloned.is_clamped() {
+            cloned.try_clamp()?;
+        }
+
+        let knot_mults = cloned.knots.multiplicity();
+        let req_mult = cloned.degree + 1;
+
         for knot_mult in knot_mults.iter() {
             if knot_mult.multiplicity() < req_mult {
                 let knots_insert = vec![*knot_mult.knot(); req_mult - knot_mult.multiplicity()];
-                curve.try_knot_refine(knots_insert)?;
+                cloned.try_refine_knot(knots_insert)?;
             }
         }
 
-        let div = curve.knots().len() / req_mult - 1;
+        let div = cloned.knots().len() / req_mult - 1;
         let knot_length = req_mult * 2;
         let mut segments = vec![];
 
         for i in 0..div {
             let start = i * req_mult;
             let end = start + knot_length;
-            let knots = curve.knots().as_slice()[start..end].to_vec();
-            let control_points = curve.control_points[start..(start + req_mult)].to_vec();
+            let knots = cloned.knots().as_slice()[start..end].to_vec();
+            let control_points = cloned.control_points[start..(start + req_mult)].to_vec();
             segments.push(Self {
                 degree: self.degree,
                 control_points,
@@ -1296,42 +1378,5 @@ where
         Some(OPoint { coords })
     } else {
         None
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use approx::assert_relative_eq;
-    use nalgebra::Point2;
-
-    use crate::nurbs_curve::NurbsCurve2D;
-
-    #[test]
-    fn length_test() {
-        let control_points: Vec<Point2<f64>> = vec![
-            Point2::new(0., 0.),
-            Point2::new(1., 0.),
-            Point2::new(1., 1.),
-            Point2::new(0., 1.),
-            Point2::new(0., 0.),
-        ];
-        let degree = 3;
-        let m = control_points.len() + degree + 1;
-        let _knots: Vec<_> = (0..m).map(|i| i as f64).collect();
-        // let curve = NurbsCurve::try_new(degree, control_points.clone(), knots).unwrap();
-        let curve = NurbsCurve2D::try_interpolate(&control_points, degree).unwrap();
-        let approx = curve.try_length().unwrap();
-        let (start, end) = curve.knots_domain();
-        let resolution = 100;
-        let samples = curve.sample_regular_range(start, end, resolution);
-        let goal = (0..resolution - 1)
-            .map(|i| {
-                let p0 = samples[i];
-                let p1 = samples[i + 1];
-                (p0 - p1).norm()
-            })
-            .reduce(|a, b| a + b)
-            .unwrap();
-        assert_relative_eq!(approx, goal, epsilon = 1e-3);
     }
 }

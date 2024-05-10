@@ -982,7 +982,7 @@ where
     for curve in curves.iter_mut() {
         let rem = sorted_set_sub(&merged_knots, curve.knots().as_slice());
         if !rem.is_empty() {
-            curve.try_knot_refine(rem)?;
+            curve.try_refine_knot(rem)?;
         }
     }
 

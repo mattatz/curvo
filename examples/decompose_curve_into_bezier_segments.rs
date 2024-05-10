@@ -104,6 +104,7 @@ fn setup(
                 material: line_materials.add(LineMaterial {
                     color: Color::hsl(t * 360., 0.5, 0.5),
                 }),
+                // visibility: Visibility::Hidden,
                 ..Default::default()
             })
             .insert(Name::new("bezier segment"));
