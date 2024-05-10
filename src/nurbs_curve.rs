@@ -352,29 +352,25 @@ where
     /// # Example
     /// ```
     /// use curvo::prelude::*;
-    /// use nalgebra::Point2;
+    /// use nalgebra::Point3;
     /// use approx::assert_relative_eq;
-    /// let control_points: Vec<Point2<f64>> = vec![
-    ///     Point2::new(0., 0.),
-    ///     Point2::new(1., 0.),
-    ///     Point2::new(1., 1.),
-    ///     Point2::new(0., 1.),
-    ///     Point2::new(0., 0.),
-    /// ];
-    /// let curve = NurbsCurve2D::try_interpolate(&control_points, 3).unwrap();
-    /// let approx = curve.try_length().unwrap();
-    /// let (start, end) = curve.knots_domain();
-    /// let resolution = 100;
-    /// let samples = curve.sample_regular_range(start, end, resolution);
-    /// let goal = (0..resolution - 1)
-    ///     .map(|i| {
-    ///     let p0 = samples[i];
-    ///     let p1 = samples[i + 1];
-    ///     (p0 - p1).norm()
-    /// })
-    /// .reduce(|a, b| a + b)
-    /// .unwrap();
-    /// assert_relative_eq!(approx, goal, epsilon = 1e-3);
+    /// let corner_weight = 1. / 2.;
+    /// let unit_circle = NurbsCurve2D::try_new(
+    ///     2,
+    ///     vec![
+    ///         Point3::new(1.0, 0.0, 1.),
+    ///         Point3::new(1.0, 1.0, 1.0) * corner_weight,
+    ///         Point3::new(-1.0, 1.0, 1.0) * corner_weight,
+    ///         Point3::new(-1.0, 0.0, 1.),
+    ///         Point3::new(-1.0, -1.0, 1.0) * corner_weight,
+    ///         Point3::new(1.0, -1.0, 1.0) * corner_weight,
+    ///         Point3::new(1.0, 0.0, 1.),
+    ///     ],
+    ///     vec![0., 0., 0., 1. / 4., 1. / 2., 1. / 2., 3. / 4., 1., 1., 1.],
+    /// ).unwrap();
+    /// let approx = unit_circle.try_length().unwrap();
+    /// let goal = 2.0 * std::f64::consts::PI; // circumference of the unit circle
+    /// assert_relative_eq!(approx, goal);
     /// ```
     pub fn try_length(&self) -> anyhow::Result<T>
     where

@@ -23,7 +23,7 @@ bevy = { version = "0.13.2", optional = true }
 bevy-inspector-egui = { version = "0.24.0", optional = true }
 bevy_infinite_grid = { version = "0.12", optional = true }
 bevy_normal_material = { version = "0.5.2", optional = true }
-bevy_panorbit_camera = { version = "0.17.0", optional = true }
+bevy_panorbit_camera = { version = "0.18.0", optional = true }
 bevy_points = { version = "0.5.1", optional = true }
 simba = { version = "0.8.1", default-features = false }
 gauss-quad = "0.1.8"
@@ -32,8 +32,8 @@ gauss-quad = "0.1.8"
 approx = { version = "0.5", default-features = false }
 
 [features]
-# default = []
-default = ["bevy"] # for debugging example
+default = []
+# default = ["bevy"] # for debugging example
 bevy = [
   "dep:bevy",
   "dep:bevy-inspector-egui",
@@ -46,6 +46,11 @@ bevy = [
 [[example]]
 name = "interpolate_curve"
 path = "examples/interpolate_curve.rs"
+required-features = ["bevy"]
+
+[[example]]
+name = "circle_curve"
+path = "examples/circle_curve.rs"
 required-features = ["bevy"]
 
 [[example]]
