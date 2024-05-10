@@ -404,7 +404,6 @@ where
         let segments = &segments[i..j];
 
         let (_, u) = self.knots_domain();
-        // let gauss = GaussLegendre::init(16 + self.degree);
         let gauss = GaussLegendre::init(16 + self.degree);
         let length = segments
             .iter()
