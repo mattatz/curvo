@@ -12,7 +12,7 @@ use simba::scalar::SupersetOf;
 
 use crate::binomial::Binomial;
 use crate::frenet_frame::FrenetFrame;
-use crate::prelude::{Invertible, KnotVector};
+use crate::prelude::{CurveLengthParameter, Invertible, KnotVector};
 use crate::transformable::Transformable;
 use crate::trigonometry::{segment_closest_point, three_points_are_flat};
 use crate::FloatingPoint;
@@ -403,26 +403,107 @@ where
         let gauss = GaussLegendre::init(16 + self.degree);
         let length = segments
             .iter()
-            .map(|s| {
-                let (start, end) = s.knots_domain();
-                if start + T::default_epsilon() < u {
-                    let t = end.min(u);
-                    let left = start.to_f64().unwrap();
-                    let right = t.to_f64().unwrap();
-                    let sum = gauss.integrate(left, right, |x| {
-                        let x = T::from_f64(x).unwrap();
-                        let deriv = s.rational_derivatives(x, 1);
-                        let tan = deriv[1].norm();
-                        tan.to_f64().unwrap()
-                    });
-                    T::from_f64(sum).unwrap()
-                } else {
-                    T::zero()
-                }
-            })
+            .map(|s| compute_bezier_segment_length(s, u, &gauss))
             .reduce(T::add)
             .unwrap();
         Ok(length)
+    }
+
+    /// Divide a NURBS curve by a given length
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::Point3;
+    /// use approx::assert_relative_eq;
+    /// let corner_weight = 1. / 2.;
+    /// let unit_circle = NurbsCurve2D::try_new(
+    ///     2,
+    ///     vec![
+    ///         Point3::new(1.0, 0.0, 1.),
+    ///         Point3::new(1.0, 1.0, 1.0) * corner_weight,
+    ///         Point3::new(-1.0, 1.0, 1.0) * corner_weight,
+    ///         Point3::new(-1.0, 0.0, 1.),
+    ///         Point3::new(-1.0, -1.0, 1.0) * corner_weight,
+    ///         Point3::new(1.0, -1.0, 1.0) * corner_weight,
+    ///         Point3::new(1.0, 0.0, 1.),
+    ///     ],
+    ///     vec![0., 0., 0., 1. / 4., 1. / 2., 1. / 2., 3. / 4., 1., 1., 1.],
+    /// ).unwrap();
+    /// let u = std::f64::consts::FRAC_PI_2; // 90 degrees
+    /// let params = unit_circle.try_divide_by_length(u).unwrap();
+    /// let total_length = 2.0 * std::f64::consts::PI; // circumference of the unit circle
+    /// assert_relative_eq!(params[0].length(), 0.);
+    /// assert_relative_eq!(params[1].length(), total_length / 4.);
+    /// assert_relative_eq!(params[2].length(), total_length / 4. * 2.);
+    /// assert_relative_eq!(params[3].length(), total_length / 4. * 3.);
+    /// assert_relative_eq!(params[4].length(), total_length);
+    /// ```
+    pub fn try_divide_by_length(&self, length: T) -> anyhow::Result<Vec<CurveLengthParameter<T>>>
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+    {
+        anyhow::ensure!(length > T::zero(), "The length must be greater than zero");
+
+        let segments = self.try_decompose_bezier_segments()?;
+        let lengthes = segments
+            .iter()
+            .map(|s| s.try_length())
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        let total = lengthes.iter().fold(T::zero(), |a, b| a + *b);
+
+        anyhow::ensure!(
+            total > length,
+            "The curve is too short to divide by the given length"
+        );
+
+        let mut samples = vec![CurveLengthParameter::new(self.knots.first(), T::zero())];
+
+        let mut i = 0;
+        let mut lc = length;
+
+        let mut acc = T::zero();
+        let mut acc_prev = T::zero();
+
+        let gauss = GaussLegendre::init(16 + self.degree);
+        let eps = T::from_f64(1e-6).unwrap();
+        let tolerance = T::from_f64(1e-3 * 2.5).unwrap();
+
+        while i < segments.len() {
+            let current_length = lengthes[i];
+            acc += current_length;
+
+            while lc < acc + eps {
+                let u = compute_bezier_segment_parameter_at_length(
+                    &segments[i],
+                    lc - acc_prev,
+                    tolerance,
+                    current_length,
+                    &gauss,
+                );
+                samples.push(CurveLengthParameter::new(u, lc));
+                lc += length;
+            }
+
+            acc_prev += current_length;
+            i += 1;
+        }
+
+        Ok(samples)
+    }
+
+    /// Divide the curve by a given number of segments
+    pub fn try_divide_by_count(
+        &self,
+        segments: usize,
+    ) -> anyhow::Result<Vec<CurveLengthParameter<T>>>
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+    {
+        let length = self.try_length()?;
+        let u = length / T::from_usize(segments).unwrap();
+        self.try_divide_by_length(u)
     }
 
     /// Try to create a periodic NURBS curve from a set of points
@@ -1352,6 +1433,78 @@ impl<T: FloatingPoint> NurbsCurve3D<T> {
                 FrenetFrame::new(position, tangents[i], normals[i], binormals[i])
             })
             .collect()
+    }
+}
+
+/// Find the curve parameter at arc length on a Bezier segment of a NURBS curve
+/// by binary search
+fn compute_bezier_segment_parameter_at_length<T: FloatingPoint, D: DimName>(
+    s: &NurbsCurve<T, D>,
+    length: T,
+    tolerance: T,
+    total_length: T,
+    gauss: &GaussLegendre,
+) -> T
+where
+    D: DimNameSub<U1>,
+    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+{
+    let (k0, k1) = s.knots_domain();
+    if length < T::zero() {
+        return k0;
+    } else if length > total_length {
+        return k1;
+    }
+
+    let mut start = (k0, T::zero());
+    let mut end = (k1, total_length);
+
+    let inv = T::one() / T::from_usize(2).unwrap();
+
+    // binary search
+    while (end.1 - start.1) > tolerance {
+        let middle_parameter = (start.0 + end.0) * inv;
+        let mid = (
+            middle_parameter,
+            compute_bezier_segment_length(s, middle_parameter, gauss),
+        );
+        if mid.1 > length {
+            end = mid;
+        } else {
+            start = mid;
+        }
+    }
+
+    (start.0 + end.0) * inv
+}
+
+/// Compute the length of a Bezier segment of a NURBS curve
+/// by gauss-legendre quadrature
+fn compute_bezier_segment_length<T: FloatingPoint, D: DimName>(
+    s: &NurbsCurve<T, D>,
+    u: T,
+    gauss: &GaussLegendre,
+) -> T
+where
+    D: DimNameSub<U1>,
+    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+{
+    let (start, end) = s.knots_domain();
+    if start + T::default_epsilon() < u {
+        let t = end.min(u);
+        let left = start.to_f64().unwrap();
+        let right = t.to_f64().unwrap();
+        let sum = gauss.integrate(left, right, |x| {
+            let x = T::from_f64(x).unwrap();
+            let deriv = s.rational_derivatives(x, 1);
+            let tan = deriv[1].norm();
+            tan.to_f64().unwrap()
+        });
+        T::from_f64(sum).unwrap()
+    } else {
+        T::zero()
     }
 }
 

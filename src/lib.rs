@@ -3,6 +3,7 @@
 mod adaptive_tessellation_node;
 mod adaptive_tessellation_processor;
 mod binomial;
+mod curve_length_parameter;
 mod floating_point;
 mod frenet_frame;
 mod invertible;
@@ -21,6 +22,7 @@ use surface_point::*;
 
 pub mod prelude {
     pub use crate::adaptive_tessellation_processor::AdaptiveTessellationOptions;
+    pub use crate::curve_length_parameter::*;
     pub use crate::floating_point::*;
     pub use crate::frenet_frame::*;
     pub use crate::invertible::*;
