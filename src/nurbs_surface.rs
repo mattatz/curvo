@@ -21,6 +21,8 @@ pub struct NurbsSurface<T: FloatingPoint, D: DimName>
 where
     DefaultAllocator: Allocator<T, D>,
 {
+    /// control points with homogeneous coordinates
+    /// the last element of the vector is the `weight`
     control_points: Vec<Vec<OPoint<T, D>>>,
     u_degree: usize,
     v_degree: usize,

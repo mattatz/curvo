@@ -67,6 +67,7 @@ fn setup(
             mesh: meshes.add(Mesh::new(PrimitiveTopology::LineStrip, default())),
             material: line_materials.add(LineMaterial {
                 color: Color::WHITE,
+                ..Default::default()
             }),
             ..Default::default()
         },
@@ -77,6 +78,7 @@ fn setup(
             mesh: meshes.add(Mesh::new(PrimitiveTopology::LineStrip, default())),
             material: line_materials.add(LineMaterial {
                 color: Color::TOMATO,
+                ..Default::default()
             }),
             // visibility: Visibility::Hidden,
             ..Default::default()

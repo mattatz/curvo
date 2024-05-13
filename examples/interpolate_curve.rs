@@ -91,6 +91,7 @@ fn setup(
                     mesh: meshes.add(line),
                     material: line_materials.add(LineMaterial {
                         color: Color::AQUAMARINE,
+                        ..Default::default()
                     }),
                     // visibility: Visibility::Hidden,
                     ..Default::default()
@@ -113,6 +114,7 @@ fn setup(
                     mesh: meshes.add(line),
                     material: line_materials.add(LineMaterial {
                         color: Color::TOMATO,
+                        ..Default::default()
                     }),
                     // visibility: Visibility::Hidden,
                     ..Default::default()

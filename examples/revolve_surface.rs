@@ -79,6 +79,7 @@ fn setup(
             mesh: meshes.add(profile_mesh),
             material: line_materials.add(LineMaterial {
                 color: Color::WHITE,
+                ..Default::default()
             }),
             ..Default::default()
         })

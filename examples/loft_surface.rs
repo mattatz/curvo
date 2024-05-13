@@ -92,6 +92,7 @@ fn setup(
                     mesh: meshes.add(line_list),
                     material: line_materials.add(LineMaterial {
                         color: Color::YELLOW,
+                        ..Default::default()
                     }),
                     // visibility: Visibility::Hidden,
                     ..Default::default()

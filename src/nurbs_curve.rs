@@ -24,8 +24,12 @@ pub struct NurbsCurve<T: FloatingPoint, D: DimName>
 where
     DefaultAllocator: Allocator<T, D>,
 {
+    /// control points with homogeneous coordinates
+    /// the last element of the vector is the `weight`
     control_points: Vec<OPoint<T, D>>,
     degree: usize,
+    /// knot vector for the NURBS curve
+    /// the length of the knot vector is equal to the `# of control points + degree + 1`
     knots: KnotVector<T>,
 }
 
@@ -47,16 +51,17 @@ where
     /// # Example
     /// ```
     /// use curvo::prelude::*;
-    /// use nalgebra::Point2;
+    /// use nalgebra::Point3;
     ///
-    /// let control_points: Vec<Point2<f64>> = vec![
-    ///     Point2::new(50., 50.),
-    ///     Point2::new(30., 370.),
-    ///     Point2::new(180., 350.),
-    ///     Point2::new(150., 100.),
-    ///     Point2::new(250., 50.),
-    ///     Point2::new(350., 100.),
-    ///     Point2::new(470., 400.),
+    /// let w = 1.; // weight for each control points
+    /// let control_points: Vec<Point3<f64>> = vec![
+    ///     Point3::new(50., 50., w),
+    ///     Point3::new(30., 370., w),
+    ///     Point3::new(180., 350., w),
+    ///     Point3::new(150., 100., w),
+    ///     Point3::new(250., 50., w),
+    ///     Point3::new(350., 100., w),
+    ///     Point3::new(470., 400., w),
     /// ];
     /// let degree = 3;
     /// let m = control_points.len() + degree + 1;
