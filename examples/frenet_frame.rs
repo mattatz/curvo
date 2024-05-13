@@ -78,6 +78,7 @@ fn setup(
             mesh: meshes.add(mesh),
             material: line_materials.add(LineMaterial {
                 color: Color::WHITE,
+                ..Default::default()
             }),
             ..Default::default()
         })
@@ -122,6 +123,7 @@ fn setup(
                 mesh: meshes.add(mesh),
                 material: line_materials.add(LineMaterial {
                     color: Color::WHITE,
+                    ..Default::default()
                 }),
                 transform: tr,
                 ..Default::default()
@@ -154,7 +156,10 @@ fn setup(
                         VertexAttributeValues::Float32x3(vs.iter().map(|v| v.to_array()).collect()),
                     ),
                 ),
-                material: line_materials.add(LineMaterial { color }),
+                material: line_materials.add(LineMaterial {
+                    color,
+                    ..Default::default()
+                }),
                 ..Default::default()
             })
             .insert(Name::new(name));

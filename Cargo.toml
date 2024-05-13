@@ -1,6 +1,6 @@
 [package]
 name = "curvo"
-version = "0.1.12"
+version = "0.1.13"
 authors = ["Masatatsu Nakamura <masatatsu.nakamura@gmail.com"]
 edition = "2021"
 keywords = ["nurbs", "modeling", "graphics", "3d"]
@@ -19,6 +19,8 @@ nalgebra = { version = "0.32.5", features = [
 ] }
 num-traits = "0.2.18"
 rand = "0.8.5"
+rand_distr = { version = "0.4.3", default-features = false, optional = true }
+easer = { version = "0.3.0", optional = true }
 simba = { version = "0.8.1", default-features = false }
 gauss-quad = "0.1.8"
 bevy = { version = "0.13.2", optional = true }
@@ -36,6 +38,8 @@ approx = { version = "0.5", default-features = false }
 default = []
 # default = ["bevy"] # for debugging example
 bevy = [
+  "dep:easer",
+  "dep:rand_distr",
   "dep:bevy",
   "dep:bevy_egui",
   "dep:bevy-inspector-egui",
@@ -90,4 +94,7 @@ name = "divide_curve_by_arc_length"
 path = "examples/divide_curve_by_arc_length.rs"
 required-features = ["bevy"]
 
-
+[[example]]
+name = "multiple_degree_curves"
+path = "examples/multiple_degree_curves.rs"
+required-features = ["bevy"]
