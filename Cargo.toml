@@ -1,6 +1,6 @@
 [package]
 name = "curvo"
-version = "0.1.12"
+version = "0.1.13"
 authors = ["Masatatsu Nakamura <masatatsu.nakamura@gmail.com"]
 edition = "2021"
 keywords = ["nurbs", "modeling", "graphics", "3d"]
