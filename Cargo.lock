@@ -1639,12 +1639,13 @@ checksum = "96a6ac251f4a2aca6b3f91340350eab87ae57c3f127ffeb585e92bd336717991"
 
 [[package]]
 name = "curvo"
-version = "0.1.11"
+version = "0.1.12"
 dependencies = [
  "anyhow",
  "approx",
  "bevy",
  "bevy-inspector-egui",
+ "bevy_egui",
  "bevy_infinite_grid",
  "bevy_normal_material",
  "bevy_panorbit_camera",
