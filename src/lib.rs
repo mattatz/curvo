@@ -3,6 +3,8 @@
 mod adaptive_tessellation_node;
 mod adaptive_tessellation_processor;
 mod binomial;
+mod closest_parameter_newton;
+mod closest_parameter_problem;
 mod curve_length_parameter;
 mod floating_point;
 mod frenet_frame;
@@ -16,6 +18,8 @@ mod surface_point;
 mod surface_tessellation;
 mod transformable;
 mod trigonometry;
+use closest_parameter_newton::*;
+use closest_parameter_problem::*;
 use floating_point::*;
 use ray::*;
 use surface_point::*;

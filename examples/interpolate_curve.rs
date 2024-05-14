@@ -207,11 +207,13 @@ fn find_closest_point(
             gizmos.circle(pt, Direction3d::Z, 0.1, Color::GRAY);
             let curve = curves.single();
             let p = Point3::from(pt).cast();
-            let closest = curve.0.closest_point(&p);
-            let center = closest.cast::<f32>().into();
-            gizmos.circle(center, Direction3d::Z, 0.05, Color::WHITE);
+            let closest = curve.0.find_closest_point(&p);
+            if let Ok(closest) = closest {
+                let center = closest.cast::<f32>().into();
+                gizmos.circle(center, Direction3d::Z, 0.05, Color::WHITE);
 
-            gizmos.line(pt, center, Color::WHITE);
+                gizmos.line(pt, center, Color::WHITE);
+            }
         }
     }
 }

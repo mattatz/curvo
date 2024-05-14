@@ -1,10 +1,12 @@
 use std::vec;
 
+use argmin::core::{ArgminFloat, Executor, State};
+use argmin_math::ArgminScaledSub;
 use gauss_quad::GaussLegendre;
 use nalgebra::allocator::Allocator;
 use nalgebra::{
     Const, DMatrix, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff, DimNameSub,
-    DimNameSum, OMatrix, OPoint, OVector, Rotation3, UnitVector3, Vector3, U1,
+    DimNameSum, OMatrix, OPoint, OVector, RealField, Rotation3, UnitVector3, Vector3, U1,
 };
 use rand::rngs::ThreadRng;
 use rand::Rng;
@@ -15,7 +17,7 @@ use crate::frenet_frame::FrenetFrame;
 use crate::prelude::{CurveLengthParameter, Invertible, KnotVector};
 use crate::transformable::Transformable;
 use crate::trigonometry::{segment_closest_point, three_points_are_flat};
-use crate::FloatingPoint;
+use crate::{ClosestParameterNewton, ClosestParameterProblem, FloatingPoint};
 
 /// NURBS curve representation
 /// By generics, it can be used for 2D or 3D curves with f32 or f64 scalar types
@@ -263,7 +265,11 @@ where
     }
 
     /// Evaluate the rational derivatives at a given parameter
-    fn rational_derivatives(&self, u: T, derivs: usize) -> Vec<OVector<T, DimNameDiff<D, U1>>>
+    pub(crate) fn rational_derivatives(
+        &self,
+        u: T,
+        derivs: usize,
+    ) -> Vec<OVector<T, DimNameDiff<D, U1>>>
     where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
@@ -1130,29 +1136,32 @@ where
     }
 
     /// Find the closest point on the curve to a given point
-    pub fn closest_point(
+    pub fn find_closest_point(
         &self,
         point: &OPoint<T, DimNameDiff<D, U1>>,
-    ) -> OPoint<T, DimNameDiff<D, U1>>
+    ) -> anyhow::Result<OPoint<T, DimNameDiff<D, U1>>>
     where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+        T: ArgminFloat,
+        T: ArgminScaledSub<T, T, T>,
     {
-        let u = self.closest_parameter(point);
-        self.point_at(u)
+        self.find_closest_parameter(point).map(|u| self.point_at(u))
     }
 
     /// Find the closest parameter on the curve to a given point with Newton's method
-    pub fn closest_parameter(&self, point: &OPoint<T, DimNameDiff<D, U1>>) -> T
+    pub fn find_closest_parameter(&self, point: &OPoint<T, DimNameDiff<D, U1>>) -> anyhow::Result<T>
     where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+        T: ArgminFloat,
+        T: ArgminScaledSub<T, T, T>,
     {
         let (min_u, max_u) = self.knots_domain();
         let samples = self.control_points.len() * self.degree;
         let pts = self.sample_regular_range_with_parameter(min_u, max_u, samples);
 
-        let mut min = T::max_value().unwrap();
+        let mut min = <T as RealField>::max_value().unwrap();
         let mut u = min_u;
 
         let closed =
@@ -1175,6 +1184,16 @@ where
             }
         }
 
+        let solver = ClosestParameterNewton::new((min_u, max_u), closed);
+        let res = Executor::new(ClosestParameterProblem::new(point, self), solver)
+            .configure(|state| state.param(u).max_iters(5))
+            .run()?;
+        res.state()
+            .get_best_param()
+            .cloned()
+            .ok_or(anyhow::anyhow!("No best parameter found"))
+
+        /*
         let mut cu = u;
 
         let max_iterations = 5;
@@ -1217,6 +1236,7 @@ where
         }
 
         cu
+            */
     }
 
     /// Trim the curve into two curves before and after the parameter
@@ -1531,5 +1551,83 @@ where
         Some(OPoint { coords })
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use argmin::core::{Executor, Gradient, Hessian, State};
+    use nalgebra::{
+        allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, OVector,
+        Point3, U1,
+    };
+
+    use crate::{
+        nurbs_curve::NurbsCurve3D, trigonometry::segment_closest_point, ClosestParameterProblem,
+        FloatingPoint,
+    };
+
+    use super::NurbsCurve;
+
+    #[test]
+    fn optim() {
+        let points: Vec<Point3<f64>> = vec![
+            Point3::new(-1.0, -1.0, 0.),
+            Point3::new(1.0, -1.0, 0.),
+            Point3::new(1.0, 1.0, 0.),
+            Point3::new(-1.0, 1.0, 0.),
+            Point3::new(-1.0, 2.0, 0.),
+            Point3::new(1.0, 2.5, 0.),
+        ];
+        let curve = NurbsCurve3D::try_interpolate(&points, 3);
+        let curve = curve.unwrap();
+        let point = Point3::<f64>::origin();
+
+        let (min_u, max_u) = curve.knots_domain();
+        let samples = curve.control_points.len() * curve.degree;
+        let pts = curve.sample_regular_range_with_parameter(min_u, max_u, samples);
+
+        let mut min = f64::MAX;
+        let mut u = min_u;
+
+        let closed = (&curve.control_points[0]
+            - &curve.control_points[curve.control_points.len() - 1])
+            .norm()
+            < f64::EPSILON;
+
+        for i in 0..pts.len() - 1 {
+            let u0 = pts[i].0;
+            let u1 = pts[i + 1].0;
+
+            let p0 = &pts[i].1;
+            let p1 = &pts[i + 1].1;
+
+            let (proj_u, proj_pt) = segment_closest_point(&point, p0, p1, u0, u1);
+            let d = (point - proj_pt).norm();
+
+            if d < min {
+                min = d;
+                u = proj_u;
+            }
+        }
+
+        /*
+                let solver: Newton<f64> = Newton::new();
+                let res = Executor::new(ClosestParameterProblem::new(point, &curve), solver)
+                    .configure(|state| state.param(u).max_iters(5))
+                    .run();
+                let res = res
+                    .ok()
+                    .and_then(|res| res.state().get_best_param().cloned());
+                if let Some(res) = res {
+                    let pt = curve.point_at(res);
+                    let d = pt - point;
+                    dbg!(d.magnitude());
+
+                    let goal = curve.find_closest_point(&point);
+                    let d = goal - point;
+                    dbg!(d.magnitude());
+                }
+        */
     }
 }
