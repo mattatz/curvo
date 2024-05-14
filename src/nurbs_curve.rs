@@ -1194,6 +1194,7 @@ where
             .ok_or(anyhow::anyhow!("No best parameter found"))
 
         /*
+        // old newton method implementation
         let mut cu = u;
 
         let max_iterations = 5;
@@ -1215,7 +1216,7 @@ where
                 return cu;
             }
 
-            let f = e[1].dot(&dif);
+            let f = c2n;
             let s0 = e[2].dot(&dif);
             let s1 = e[1].dot(&e[1]);
             let df = s0 + s1;
@@ -1234,9 +1235,8 @@ where
 
             cu = ct;
         }
-
         cu
-            */
+        */
     }
 
     /// Trim the curve into two curves before and after the parameter
@@ -1556,18 +1556,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use argmin::core::{Executor, Gradient, Hessian, State};
-    use nalgebra::{
-        allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, OVector,
-        Point3, U1,
-    };
+    use argmin::core::State;
+    use nalgebra::Point3;
 
-    use crate::{
-        nurbs_curve::NurbsCurve3D, trigonometry::segment_closest_point, ClosestParameterProblem,
-        FloatingPoint,
-    };
-
-    use super::NurbsCurve;
+    use crate::{nurbs_curve::NurbsCurve3D, trigonometry::segment_closest_point};
 
     #[test]
     fn optim() {
@@ -1590,7 +1582,7 @@ mod tests {
         let mut min = f64::MAX;
         let mut u = min_u;
 
-        let closed = (&curve.control_points[0]
+        let _closed = (&curve.control_points[0]
             - &curve.control_points[curve.control_points.len() - 1])
             .norm()
             < f64::EPSILON;

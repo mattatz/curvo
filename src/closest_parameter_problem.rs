@@ -35,8 +35,9 @@ where
     type Param = T;
     type Gradient = OVector<T, U1>;
 
+    /// C'(u) * ( C(u) - P )
     fn gradient(&self, param: &Self::Param) -> Result<Self::Gradient, anyhow::Error> {
-        let e = self.curve.rational_derivatives(*param, 2);
+        let e = self.curve.rational_derivatives(*param, 1);
         let d = &e[0] - &self.point.coords;
         let f = e[1].dot(&d);
         Ok(OVector::<T, U1>::new(f))
@@ -52,6 +53,7 @@ where
     type Param = T;
     type Hessian = OVector<T, U1>;
 
+    /// C"(u) * ( C(u) - p ) + C'(u) * C'(u)
     fn hessian(&self, param: &Self::Param) -> Result<Self::Hessian, anyhow::Error> {
         let e = self.curve.rational_derivatives(*param, 2);
         let d = &e[0] - &self.point.coords;

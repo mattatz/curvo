@@ -54,9 +54,9 @@ where
     fn next_iter(
         &mut self,
         problem: &mut Problem<O>,
-        mut state: IterState<P, G, (), H, (), F>,
+        state: IterState<P, G, (), H, (), F>,
     ) -> Result<(IterState<P, G, (), H, (), F>, Option<KV>), Error> {
-        let param = state.take_param().ok_or_else(argmin_error_closure!(
+        let param = state.get_param().ok_or_else(argmin_error_closure!(
             NotInitialized,
             concat!(
                 "`Newton` requires an initial parameter vector. ",
@@ -64,8 +64,8 @@ where
             )
         ))?;
 
-        let grad = problem.gradient(&param)?;
-        let hessian = problem.hessian(&param)?;
+        let grad = problem.gradient(param)?;
+        let hessian = problem.hessian(param)?;
         let new_param = param.scaled_sub(&self.gamma, &hessian.inv()?.dot(&grad));
 
         // Constrain the parameter to the domain
@@ -89,6 +89,16 @@ where
     }
 
     fn terminate(&mut self, state: &IterState<P, G, (), H, (), F>) -> TerminationStatus {
-        TerminationStatus::NotTerminated
+        match (state.get_param(), state.get_prev_param()) {
+            (Some(current_param), Some(prev_param)) => {
+                let delta = (*current_param - *prev_param).abs();
+                if delta < P::epsilon() {
+                    TerminationStatus::Terminated(TerminationReason::SolverConverged)
+                } else {
+                    TerminationStatus::NotTerminated
+                }
+            }
+            _ => TerminationStatus::NotTerminated,
+        }
     }
 }
