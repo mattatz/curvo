@@ -19,13 +19,6 @@ where
     P: Clone + ArgminScaledSub<P, F, P>,
 {
     /// Construct a new instance of [`Newton`]
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// # use argmin::solver::newton::Newton;
-    /// let newton: Newton<f64> = Newton::new();
-    /// ```
     pub fn new(domain: (P, P), closed: bool) -> Self {
         ClosestParameterNewton {
             gamma: float!(1.0),
@@ -37,17 +30,6 @@ where
     /// Set step size gamma
     ///
     /// Gamma must be in `(0, 1]` and defaults to `1`.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// # use argmin::solver::newton::Newton;
-    /// # use argmin::core::Error;
-    /// # fn main() -> Result<(), Error> {
-    /// let newton: Newton<f64> = Newton::new().with_gamma(0.4)?;
-    /// # Ok(())
-    /// # }
-    /// ```
     pub fn with_gamma(mut self, gamma: F) -> Result<Self, Error> {
         if gamma <= float!(0.0) || gamma > float!(1.0) {
             return Err(argmin_error!(
