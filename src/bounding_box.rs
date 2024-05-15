@@ -2,13 +2,14 @@ use std::ops::Bound;
 
 use nalgebra::{
     allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, OVector,
-    Vector3, U1,
+    Point2, Point3, Vector3, U1, U2, U3,
 };
 use simba::scalar::SupersetOf;
 
 use crate::{nurbs_curve::NurbsCurve, FloatingPoint};
 
 /// A struct representing a bounding box in D space.
+#[derive(Clone)]
 pub struct BoundingBox<T, D: DimName>
 where
     DefaultAllocator: Allocator<T, D>,
@@ -114,6 +115,39 @@ where
             min: self.min.clone().cast(),
             max: self.max.clone().cast(),
         }
+    }
+
+    /// Get corner points of the bounding box.
+    pub fn corners(&self) -> Vec<OPoint<T, D>> {
+        let dim = D::dim() as u32;
+        let mut corners = Vec::with_capacity(2usize.pow(dim));
+        for i in 0..2usize.pow(dim) {
+            let mut point = OPoint::<T, D>::origin();
+            for j in 0..D::dim() {
+                point[j] = if i & (1 << j) == 0 {
+                    self.min[j]
+                } else {
+                    self.max[j]
+                };
+            }
+            corners.push(point);
+        }
+        corners
+    }
+
+    /// Get lines of the bounding box.
+    pub fn lines(&self) -> Vec<(OPoint<T, D>, OPoint<T, D>)> {
+        let corners = self.corners();
+        let mut lines = Vec::with_capacity(2usize.pow(D::dim() as u32));
+        let pow = 2usize.pow(D::dim() as u32);
+        for i in 0..D::dim() {
+            for j in 0..pow {
+                let a = corners[j].clone();
+                let b = corners[j ^ (1 << i)].clone();
+                lines.push((a, b));
+            }
+        }
+        lines
     }
 }
 

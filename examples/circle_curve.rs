@@ -82,21 +82,14 @@ fn setup(
         .insert(Name::new("curve"));
 
     let bbox = BoundingBox::from(&unit_circle);
-    let min = bbox.min().cast::<f32>();
-    let max = bbox.max().cast::<f32>();
-    let line_vertices = vec![
-        [min.x, min.y, 0.],
-        [max.x, min.y, 0.],
-        [max.x, min.y, 0.],
-        [max.x, max.y, 0.],
-        [max.x, max.y, 0.],
-        [min.x, max.y, 0.],
-        [min.x, max.y, 0.],
-        [min.x, min.y, 0.],
-    ];
+    let vertices = bbox
+        .lines()
+        .iter()
+        .flat_map(|(a, b)| [a, b].iter().map(|p| [p.x, p.y, 0.]).collect::<Vec<_>>())
+        .collect();
     let line = Mesh::new(PrimitiveTopology::LineList, default()).with_inserted_attribute(
         Mesh::ATTRIBUTE_POSITION,
-        VertexAttributeValues::Float32x3(line_vertices),
+        VertexAttributeValues::Float32x3(vertices),
     );
     commands
         .spawn(MaterialMeshBundle {
