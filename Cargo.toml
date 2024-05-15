@@ -37,8 +37,8 @@ argmin-math = { version = "0.4.0", features = ["nalgebra_latest"] }
 approx = { version = "0.5", default-features = false }
 
 [features]
-default = []
-# default = ["bevy"] # for debugging example
+# default = []
+default = ["bevy"] # for debugging example
 bevy = [
   "dep:easer",
   "dep:rand_distr",
@@ -99,4 +99,9 @@ required-features = ["bevy"]
 [[example]]
 name = "multiple_degree_curves"
 path = "examples/multiple_degree_curves.rs"
+required-features = ["bevy"]
+
+[[example]]
+name = "intersect_curves"
+path = "examples/intersect_curves.rs"
 required-features = ["bevy"]

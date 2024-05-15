@@ -359,6 +359,11 @@ where
         self.knots.domain(self.degree)
     }
 
+    pub fn knots_domain_interval(&self) -> T {
+        let (d0, d1) = self.knots_domain();
+        d1 - d0
+    }
+
     /// Compute the length of the curve by gauss-legendre quadrature
     /// # Example
     /// ```

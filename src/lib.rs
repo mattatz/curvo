@@ -4,6 +4,8 @@ mod adaptive_tessellation_node;
 mod adaptive_tessellation_processor;
 mod binomial;
 mod bounding_box;
+mod bounding_box_traversal;
+mod bounding_box_tree;
 mod closest_parameter_newton;
 mod closest_parameter_problem;
 mod curve_length_parameter;
@@ -28,6 +30,8 @@ use surface_point::*;
 pub mod prelude {
     pub use crate::adaptive_tessellation_processor::AdaptiveTessellationOptions;
     pub use crate::bounding_box::*;
+    pub use crate::bounding_box_traversal::*;
+    pub use crate::bounding_box_tree::*;
     pub use crate::curve_length_parameter::*;
     pub use crate::floating_point::*;
     pub use crate::frenet_frame::*;
