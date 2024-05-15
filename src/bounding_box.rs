@@ -69,18 +69,17 @@ where
     /// use curvo::prelude::BoundingBox;
     ///
     /// let b0 = BoundingBox::new(Vector3::from_element(0.), Vector3::from_element(1.));
-    /// assert!(b0.intersects(&b0));
+    /// assert!(b0.intersects(&b0, None));
     ///
     /// let eps = 1e-6;
     /// let b1 = BoundingBox::new(Vector3::from_element(0.5), Vector3::from_element(1.5));
-    /// assert!(b0.intersects(&b1));
+    /// assert!(b0.intersects(&b1, None));
     ///
     /// let b2 = BoundingBox::new(Vector3::from_element(1. + eps), Vector3::from_element(2. + eps));
-    /// assert!(!b0.intersects(&b2));
+    /// assert!(!b0.intersects(&b2, None));
     /// ```
-    pub fn intersects(&self, other: &Self) -> bool {
-        let tolerance = T::default_epsilon();
-
+    pub fn intersects(&self, other: &Self, tolerance: Option<T>) -> bool {
+        let tolerance = tolerance.unwrap_or(T::default_epsilon());
         // Check if the bounding boxes intersect along each dimension.
         for i in 0..D::dim() {
             let min0 = self.min[i];

@@ -27,10 +27,12 @@ where
         let mut trees = vec![(ta, tb)];
         let mut pairs = vec![];
 
+        let tol = Some(-T::from_f64(1e-2).unwrap());
+
         while trees.len() > 0 {
             let (a, b) = trees.pop().unwrap();
 
-            if !a.bounding_box().intersects(&b.bounding_box()) {
+            if !a.bounding_box().intersects(&b.bounding_box(), tol) {
                 continue;
             }
 
@@ -72,5 +74,15 @@ where
         &self,
     ) -> impl Iterator<Item = &(BoundingBoxTree<'a, T, D>, BoundingBoxTree<'a, T, D>)> {
         self.pairs.iter()
+    }
+
+    pub fn into_pairs(self) -> Vec<(BoundingBoxTree<'a, T, D>, BoundingBoxTree<'a, T, D>)> {
+        self.pairs
+    }
+
+    pub fn into_pairs_iter(
+        self,
+    ) -> impl Iterator<Item = (BoundingBoxTree<'a, T, D>, BoundingBoxTree<'a, T, D>)> {
+        self.pairs.into_iter()
     }
 }
