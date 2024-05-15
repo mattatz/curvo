@@ -1,6 +1,9 @@
 use bevy::{
     prelude::*,
-    render::{camera::ScalingMode, mesh::VertexAttributeValues},
+    render::{
+        camera::ScalingMode,
+        mesh::{PrimitiveTopology, VertexAttributeValues},
+    },
     window::close_on_esc,
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
@@ -57,13 +60,12 @@ fn setup(
     // dbg!(unit_circle.try_length().unwrap(), 2.0 * std::f64::consts::PI);
 
     let samples = unit_circle.tessellate(Some(1e-8));
-    let mut line = Mesh::new(bevy::render::mesh::PrimitiveTopology::LineStrip, default());
     let line_vertices = samples
         .iter()
         .map(|p| p.cast::<f32>())
         .map(|p| [p.x, p.y, 0.])
         .collect();
-    line.insert_attribute(
+    let line = Mesh::new(PrimitiveTopology::LineStrip, default()).with_inserted_attribute(
         Mesh::ATTRIBUTE_POSITION,
         VertexAttributeValues::Float32x3(line_vertices),
     );
@@ -78,6 +80,35 @@ fn setup(
             ..Default::default()
         })
         .insert(Name::new("curve"));
+
+    let bbox = BoundingBox::from(&unit_circle);
+    let min = bbox.min().cast::<f32>();
+    let max = bbox.max().cast::<f32>();
+    let line_vertices = vec![
+        [min.x, min.y, 0.],
+        [max.x, min.y, 0.],
+        [max.x, min.y, 0.],
+        [max.x, max.y, 0.],
+        [max.x, max.y, 0.],
+        [min.x, max.y, 0.],
+        [min.x, max.y, 0.],
+        [min.x, min.y, 0.],
+    ];
+    let line = Mesh::new(PrimitiveTopology::LineList, default()).with_inserted_attribute(
+        Mesh::ATTRIBUTE_POSITION,
+        VertexAttributeValues::Float32x3(line_vertices),
+    );
+    commands
+        .spawn(MaterialMeshBundle {
+            mesh: meshes.add(line),
+            material: line_materials.add(LineMaterial {
+                color: Color::WHITE,
+                ..Default::default()
+            }),
+            // visibility: Visibility::Hidden,
+            ..Default::default()
+        })
+        .insert(Name::new("bounding box"));
 
     let scale = 5.;
     let orth = Camera3dBundle {
