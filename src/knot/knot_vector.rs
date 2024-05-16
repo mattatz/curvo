@@ -3,10 +3,7 @@ use std::ops::Index;
 use nalgebra::{convert, RealField};
 use simba::scalar::SupersetOf;
 
-use crate::{
-    prelude::{Invertible, KnotMultiplicity},
-    FloatingPoint,
-};
+use crate::prelude::{FloatingPoint, Invertible, KnotMultiplicity};
 
 /// Knot vector representation
 #[derive(Clone, Debug)]

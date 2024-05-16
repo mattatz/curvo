@@ -3,7 +3,7 @@ use nalgebra::{
     allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, OVector, U1,
 };
 
-use crate::{nurbs_curve::NurbsCurve, FloatingPoint};
+use crate::{curve::nurbs_curve::NurbsCurve, misc::FloatingPoint};
 
 pub struct ClosestParameterProblem<'a, T: FloatingPoint, D: DimName>
 where

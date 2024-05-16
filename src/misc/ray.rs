@@ -1,6 +1,6 @@
 use nalgebra::{Point, SVector};
 
-use crate::FloatingPoint;
+use crate::misc::FloatingPoint;
 
 /// Represents a ray in D dimensions.
 pub struct Ray<T: FloatingPoint, const D: usize> {

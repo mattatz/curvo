@@ -1,16 +1,14 @@
 use bevy::{
-    core::Zeroable,
     prelude::*,
-    render::{
-        camera::ScalingMode,
-        mesh::{PrimitiveTopology, VertexAttributeValues},
-    },
+    render::mesh::{PrimitiveTopology, VertexAttributeValues},
     window::close_on_esc,
 };
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin, InfiniteGridSettings};
 
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use bevy_points::{
+    material::PointsShaderSettings,
     plugin::PointsPlugin,
     prelude::{PointsMaterial, PointsMesh},
 };
@@ -30,6 +28,7 @@ fn main() {
         .add_plugins(PanOrbitCameraPlugin)
         .add_plugins(PointsPlugin)
         .add_plugins(AppPlugin)
+        .add_plugins(WorldInspectorPlugin::new())
         .run();
 }
 struct AppPlugin;
@@ -37,7 +36,7 @@ struct AppPlugin;
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.add_systems(Startup, setup)
-            .add_systems(Update, (close_on_esc));
+            .add_systems(Update, close_on_esc);
     }
 }
 
@@ -82,7 +81,9 @@ fn setup(
         .iter()
         .map(|pt| Point3::new(-pt.x, pt.y, pt.z))
         .collect::<Vec<_>>();
-    let mirrored = NurbsCurve3D::try_interpolate(&mirror, curve.degree()).unwrap();
+    let mirrored = NurbsCurve3D::try_interpolate(&mirror, curve.degree())
+        .unwrap()
+        .inverse();
     let line_vertices = mirrored
         .tessellate(Some(1e-8))
         .iter()
@@ -125,13 +126,39 @@ fn setup(
                     mesh: meshes.add(line),
                     material: line_materials.add(LineMaterial {
                         color: Color::WHITE,
-                        ..Default::default()
+                        opacity: 0.25,
+                        alpha_mode: AlphaMode::Blend,
                     }),
-                    // visibility: Visibility::Hidden,
+                    visibility: Visibility::Hidden,
                     ..Default::default()
                 })
                 .insert(Name::new("bounding box"));
         });
+    }
+
+    let intersections = curve.find_intersections(&mirrored);
+    if let Ok(intersections) = intersections {
+        commands
+            .spawn(MaterialMeshBundle {
+                mesh: meshes.add(PointsMesh::from_iter(intersections.iter().flat_map(|it| {
+                    [
+                        Vec3::from(it.a().0.cast::<f32>()),
+                        Vec3::from(it.b().0.cast::<f32>()),
+                    ]
+                }))),
+                material: points_materials.add(PointsMaterial {
+                    settings: PointsShaderSettings {
+                        point_size: 0.02,
+                        color: Color::WHITE,
+                        ..Default::default()
+                    },
+                    circle: true,
+                    ..Default::default()
+                }),
+                // visibility: Visibility::Hidden,
+                ..Default::default()
+            })
+            .insert(Name::new("intersection points"));
     }
 
     let center = Vec3::ZERO;

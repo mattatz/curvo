@@ -4,9 +4,11 @@ use nalgebra::{
 };
 
 use crate::{
-    adaptive_tessellation_processor::AdaptiveTessellationOptions, prelude::NurbsSurface,
-    FloatingPoint, SurfacePoint,
+    misc::FloatingPoint,
+    prelude::{AdaptiveTessellationOptions, NurbsSurface},
 };
+
+use super::SurfacePoint;
 
 /// Node for adaptive tessellation of a surface
 pub struct AdaptiveTessellationNode<T: RealField, D: DimName>

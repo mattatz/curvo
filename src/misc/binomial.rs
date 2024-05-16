@@ -25,6 +25,12 @@ pub struct Binomial<T> {
     memo: HashMap<usize, HashMap<usize, T>>,
 }
 
+impl<T: RealField + Copy> Default for Binomial<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<T: RealField + Copy> Binomial<T> {
     pub fn new() -> Self {
         Self {
@@ -91,7 +97,7 @@ mod tests {
         let mut binomial = super::Binomial::<f64>::new();
         for n in 1..10 {
             for k in 1..=n {
-                assert_eq!(binomial.get(n, k), crate::binomial::binomial(n, k));
+                assert_eq!(binomial.get(n, k), crate::misc::binomial::binomial(n, k));
             }
         }
     }

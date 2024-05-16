@@ -1,12 +1,15 @@
-use std::ops::Bound;
+pub mod bounding_box_traversal;
+pub mod bounding_box_tree;
+
+pub use bounding_box_traversal::*;
+pub use bounding_box_tree::*;
 
 use nalgebra::{
-    allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, OVector,
-    Point2, Point3, Vector3, U1, U2, U3,
+    allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, OVector, U1,
 };
 use simba::scalar::SupersetOf;
 
-use crate::{nurbs_curve::NurbsCurve, FloatingPoint};
+use crate::{curve::nurbs_curve::NurbsCurve, misc::FloatingPoint};
 
 /// A struct representing a bounding box in D space.
 #[derive(Clone)]
@@ -168,6 +171,6 @@ where
 {
     fn from(value: &'a NurbsCurve<T, D>) -> Self {
         let pts = value.dehomogenized_control_points();
-        Self::new_with_points(pts.into_iter())
+        Self::new_with_points(pts)
     }
 }

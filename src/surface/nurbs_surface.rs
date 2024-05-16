@@ -5,13 +5,17 @@ use nalgebra::{
 use simba::scalar::SupersetOf;
 
 use crate::{
-    adaptive_tessellation_node::AdaptiveTessellationNode,
-    adaptive_tessellation_processor::{AdaptiveTessellationOptions, AdaptiveTessellationProcessor},
-    binomial::Binomial,
-    nurbs_curve::{dehomogenize, NurbsCurve, NurbsCurve3D},
+    curve::nurbs_curve::{dehomogenize, NurbsCurve, NurbsCurve3D},
+    misc::binomial::Binomial,
+    misc::transformable::Transformable,
+    misc::FloatingPoint,
+    misc::Ray,
     prelude::{KnotVector, SurfaceTessellation},
-    transformable::Transformable,
-    FloatingPoint, Ray, SurfacePoint,
+    tessellation::adaptive_tessellation_node::AdaptiveTessellationNode,
+    tessellation::adaptive_tessellation_processor::{
+        AdaptiveTessellationOptions, AdaptiveTessellationProcessor,
+    },
+    tessellation::surface_point::SurfacePoint,
 };
 
 /// NURBS surface representation

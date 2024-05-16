@@ -1,10 +1,8 @@
 use std::borrow::Cow;
 
-use nalgebra::{
-    allocator::Allocator, DefaultAllocator, DimDiff, DimName, DimNameDiff, DimNameSub, DimSub, U1,
-};
+use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, U1};
 
-use crate::{bounding_box::BoundingBox, nurbs_curve::NurbsCurve, FloatingPoint};
+use crate::{bounding_box::BoundingBox, curve::nurbs_curve::NurbsCurve, misc::FloatingPoint};
 
 /// A struct representing a bounding box tree in D space.
 #[derive(Clone)]

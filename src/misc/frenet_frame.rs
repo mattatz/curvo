@@ -1,7 +1,7 @@
 use nalgebra::{IsometryMatrix3, Point3, Rotation3, Translation3, Vector3};
 use simba::scalar::SupersetOf;
 
-use crate::FloatingPoint;
+use crate::misc::FloatingPoint;
 
 /// A Frenet frame at a point on a curve.
 #[derive(Debug, Clone)]

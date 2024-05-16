@@ -1,6 +1,6 @@
 use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, U1};
 
-use crate::{nurbs_curve::NurbsCurve, prelude::BoundingBoxTree, FloatingPoint};
+use crate::{curve::nurbs_curve::NurbsCurve, misc::FloatingPoint, prelude::BoundingBoxTree};
 
 pub struct BoundingBoxTraversal<'a, T: FloatingPoint, D: DimName>
 where
@@ -29,9 +29,7 @@ where
 
         let tol = Some(-T::from_f64(1e-2).unwrap());
 
-        while trees.len() > 0 {
-            let (a, b) = trees.pop().unwrap();
-
+        while let Some((a, b)) = trees.pop() {
             if !a.bounding_box().intersects(&b.bounding_box(), tol) {
                 continue;
             }

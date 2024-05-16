@@ -1,6 +1,7 @@
 use std::vec;
 
 use argmin::core::{ArgminFloat, Executor, State};
+
 use argmin_math::ArgminScaledSub;
 use gauss_quad::GaussLegendre;
 use nalgebra::allocator::Allocator;
@@ -12,12 +13,13 @@ use rand::rngs::ThreadRng;
 use rand::Rng;
 use simba::scalar::SupersetOf;
 
-use crate::binomial::Binomial;
-use crate::frenet_frame::FrenetFrame;
-use crate::prelude::{CurveLengthParameter, Invertible, KnotVector};
-use crate::transformable::Transformable;
-use crate::trigonometry::{segment_closest_point, three_points_are_flat};
-use crate::{ClosestParameterNewton, ClosestParameterProblem, FloatingPoint};
+use crate::intersection::curve_intersection::CurveIntersection;
+use crate::misc::binomial::Binomial;
+use crate::misc::frenet_frame::FrenetFrame;
+use crate::misc::transformable::Transformable;
+use crate::misc::trigonometry::{segment_closest_point, three_points_are_flat};
+use crate::prelude::{BoundingBoxTraversal, CurveLengthParameter, Invertible, KnotVector};
+use crate::{misc::FloatingPoint, ClosestParameterNewton, ClosestParameterProblem};
 
 /// NURBS curve representation
 /// By generics, it can be used for 2D or 3D curves with f32 or f64 scalar types
@@ -1244,6 +1246,89 @@ where
         */
     }
 
+    pub fn find_intersections(
+        &self,
+        other: &Self,
+    ) -> anyhow::Result<Vec<CurveIntersection<OPoint<T, DimNameDiff<D, U1>>, T>>>
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+        T: ArgminFloat,
+    {
+        let _eps = T::from_f64(1e-8).unwrap();
+        let traversed = BoundingBoxTraversal::try_traverse(self, other, None)?;
+
+        let pts = traversed
+            .into_pairs_iter()
+            .filter_map(|(a, b)| {
+                let _ca = a.curve_owned();
+                let _cb = b.curve_owned();
+
+                // gauss-newton line search example
+                // https://github.com/argmin-rs/argmin/blob/main/examples/gaussnewton_linesearch/src/main.rs
+
+                /*
+                let problem = CurveIntersectionProblem::new(&ca, &cb);
+                let init_param = OVector::<T, U2>::new(ca.knots_domain().0, cb.knots_domain().0);
+                let solver = CurveIntersectionNewton::<T>::new();
+                let res = Executor::new(problem, solver)
+                    .configure(|state| state.param(init_param).max_iters(5))
+                    .run();
+                */
+
+                /*
+                res.state()
+                    .get_best_param()
+                    .cloned()
+                    .ok_or(anyhow::anyhow!("No best parameter found"));
+                */
+
+                todo!()
+
+                /*
+                let init_cost = problem.cost(&init_param).unwrap();
+                let init_grad = problem.gradient(&init_param).unwrap();
+                solver.search_direction(-init_grad);
+                solver.initial_step_length(T::one());
+                // solver.initial_step_length(T::from_f64(5.).unwrap());
+                let res = Executor::new(problem, solver)
+                    .configure(|state| {
+                        state
+                            .param(init_param)
+                            // .cost(init_cost)
+                            // .gradient(init_grad)
+                            .max_iters(1000)
+                    })
+                    .run();
+                // dbg!(init_cost, init_grad);
+                if let Err(err) = res {
+                    dbg!(err);
+                    return None;
+                }
+                res.ok().and_then(|r| {
+                    dbg!(init_param, r.state().get_best_param());
+                    r.state().get_best_param().map(|param| {
+                        let p0 = ca.point_at(param[0]);
+                        let p1 = cb.point_at(param[1]);
+                        CurveIntersection::new((p0, param[0]), (p1, param[1]))
+                    })
+                })
+                */
+            })
+            .filter(|_it| {
+                true
+                /*
+                let p0 = &it.a().0;
+                let p1 = &it.b().0;
+                let d = (p0 - p1).norm_squared();
+                d < eps
+                */
+            })
+            .collect();
+
+        Ok(pts)
+    }
+
     /// Trim the curve into two curves before and after the parameter
     pub fn try_trim(&self, u: T) -> anyhow::Result<(Self, Self)> {
         let knots_to_insert: Vec<_> = (0..=self.degree).map(|_| u).collect();
@@ -1560,71 +1645,4 @@ where
 }
 
 #[cfg(test)]
-mod tests {
-    use argmin::core::State;
-    use nalgebra::Point3;
-
-    use crate::{nurbs_curve::NurbsCurve3D, trigonometry::segment_closest_point};
-
-    #[test]
-    fn optim() {
-        let points: Vec<Point3<f64>> = vec![
-            Point3::new(-1.0, -1.0, 0.),
-            Point3::new(1.0, -1.0, 0.),
-            Point3::new(1.0, 1.0, 0.),
-            Point3::new(-1.0, 1.0, 0.),
-            Point3::new(-1.0, 2.0, 0.),
-            Point3::new(1.0, 2.5, 0.),
-        ];
-        let curve = NurbsCurve3D::try_interpolate(&points, 3);
-        let curve = curve.unwrap();
-        let point = Point3::<f64>::origin();
-
-        let (min_u, max_u) = curve.knots_domain();
-        let samples = curve.control_points.len() * curve.degree;
-        let pts = curve.sample_regular_range_with_parameter(min_u, max_u, samples);
-
-        let mut min = f64::MAX;
-        let mut u = min_u;
-
-        let _closed = (&curve.control_points[0]
-            - &curve.control_points[curve.control_points.len() - 1])
-            .norm()
-            < f64::EPSILON;
-
-        for i in 0..pts.len() - 1 {
-            let u0 = pts[i].0;
-            let u1 = pts[i + 1].0;
-
-            let p0 = &pts[i].1;
-            let p1 = &pts[i + 1].1;
-
-            let (proj_u, proj_pt) = segment_closest_point(&point, p0, p1, u0, u1);
-            let d = (point - proj_pt).norm();
-
-            if d < min {
-                min = d;
-                u = proj_u;
-            }
-        }
-
-        /*
-                let solver: Newton<f64> = Newton::new();
-                let res = Executor::new(ClosestParameterProblem::new(point, &curve), solver)
-                    .configure(|state| state.param(u).max_iters(5))
-                    .run();
-                let res = res
-                    .ok()
-                    .and_then(|res| res.state().get_best_param().cloned());
-                if let Some(res) = res {
-                    let pt = curve.point_at(res);
-                    let d = pt - point;
-                    dbg!(d.magnitude());
-
-                    let goal = curve.find_closest_point(&point);
-                    let d = goal - point;
-                    dbg!(d.magnitude());
-                }
-        */
-    }
-}
+mod tests {}
