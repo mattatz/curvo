@@ -7,13 +7,14 @@ use gauss_quad::GaussLegendre;
 use nalgebra::allocator::Allocator;
 use nalgebra::{
     Const, DMatrix, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff, DimNameSub,
-    DimNameSum, OMatrix, OPoint, OVector, RealField, Rotation3, UnitVector3, Vector3, U1,
+    DimNameSum, OMatrix, OPoint, OVector, RealField, Rotation3, UnitVector3, Vector2, Vector3, U1,
 };
 use rand::rngs::ThreadRng;
 use rand::Rng;
 use simba::scalar::SupersetOf;
 
 use crate::intersection::curve_intersection::CurveIntersection;
+use crate::intersection::{CurveIntersectionNewton, CurveIntersectionProblem};
 use crate::misc::binomial::Binomial;
 use crate::misc::frenet_frame::FrenetFrame;
 use crate::misc::transformable::Transformable;
@@ -1199,51 +1200,6 @@ where
             .get_best_param()
             .cloned()
             .ok_or(anyhow::anyhow!("No best parameter found"))
-
-        /*
-        // old newton method implementation
-        let mut cu = u;
-
-        let max_iterations = 5;
-        for _ in 0..max_iterations {
-            let e = self.rational_derivatives(cu, 2);
-            let dif = &e[0] - &point.coords;
-
-            let c1v = dif.norm();
-
-            let c2n = e[1].dot(&dif);
-            let c2d = e[1].norm() * c1v;
-
-            let c2v = c2n / c2d;
-
-            let c1 = c1v < T::default_epsilon();
-            let c2 = c2v.abs() < T::default_epsilon();
-
-            if c1 && c2 {
-                return cu;
-            }
-
-            let f = c2n;
-            let s0 = e[2].dot(&dif);
-            let s1 = e[1].dot(&e[1]);
-            let df = s0 + s1;
-            let mut ct = cu - f / df;
-
-            if ct < min_u {
-                ct = if closed { max_u - (ct - min_u) } else { min_u };
-            } else if ct > max_u {
-                ct = if closed { min_u + (ct - max_u) } else { max_u };
-            }
-
-            let c3v = (&e[1] * (ct - cu)).norm();
-            if c3v < T::default_epsilon() {
-                return cu;
-            }
-
-            cu = ct;
-        }
-        cu
-        */
     }
 
     pub fn find_intersections(
@@ -1255,74 +1211,57 @@ where
         DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
         T: ArgminFloat,
     {
-        let _eps = T::from_f64(1e-8).unwrap();
+        let eps = T::from_f64(1e-8).unwrap();
         let traversed = BoundingBoxTraversal::try_traverse(self, other, None)?;
 
         let pts = traversed
             .into_pairs_iter()
             .filter_map(|(a, b)| {
-                let _ca = a.curve_owned();
-                let _cb = b.curve_owned();
+                let ca = a.curve_owned();
+                let cb = b.curve_owned();
 
                 // gauss-newton line search example
                 // https://github.com/argmin-rs/argmin/blob/main/examples/gaussnewton_linesearch/src/main.rs
 
-                /*
                 let problem = CurveIntersectionProblem::new(&ca, &cb);
-                let init_param = OVector::<T, U2>::new(ca.knots_domain().0, cb.knots_domain().0);
+
+                let inv = T::from_f64(0.5).unwrap();
+                let d0 = ca.knots_domain();
+                let d1 = cb.knots_domain();
+
+                // Define initial parameter vector
+                let init_param = Vector2::<T>::new(
+                    // ca.knots_domain().0,
+                    // cb.knots_domain().0
+                    (d0.0 + d0.1) * inv,
+                    (d1.0 + d1.1) * inv,
+                );
+
+                // Set up solver
                 let solver = CurveIntersectionNewton::<T>::new();
+
+                // Run solver
                 let res = Executor::new(problem, solver)
-                    .configure(|state| state.param(init_param).max_iters(5))
+                    .configure(|state| state.param(init_param).max_iters(1000))
                     .run();
-                */
 
-                /*
-                res.state()
-                    .get_best_param()
-                    .cloned()
-                    .ok_or(anyhow::anyhow!("No best parameter found"));
-                */
-
-                todo!()
-
-                /*
-                let init_cost = problem.cost(&init_param).unwrap();
-                let init_grad = problem.gradient(&init_param).unwrap();
-                solver.search_direction(-init_grad);
-                solver.initial_step_length(T::one());
-                // solver.initial_step_length(T::from_f64(5.).unwrap());
-                let res = Executor::new(problem, solver)
-                    .configure(|state| {
-                        state
-                            .param(init_param)
-                            // .cost(init_cost)
-                            // .gradient(init_grad)
-                            .max_iters(1000)
-                    })
-                    .run();
-                // dbg!(init_cost, init_grad);
-                if let Err(err) = res {
-                    dbg!(err);
-                    return None;
+                match res {
+                    Ok(r) => {
+                        // println!("{}", r.state().get_termination_status());
+                        r.state().get_best_param().map(|param| {
+                            let p0 = ca.point_at(param[0]);
+                            let p1 = cb.point_at(param[1]);
+                            CurveIntersection::new((p0, param[0]), (p1, param[1]))
+                        })
+                    }
+                    _ => None,
                 }
-                res.ok().and_then(|r| {
-                    dbg!(init_param, r.state().get_best_param());
-                    r.state().get_best_param().map(|param| {
-                        let p0 = ca.point_at(param[0]);
-                        let p1 = cb.point_at(param[1]);
-                        CurveIntersection::new((p0, param[0]), (p1, param[1]))
-                    })
-                })
-                */
             })
-            .filter(|_it| {
-                true
-                /*
+            .filter(|it| {
                 let p0 = &it.a().0;
                 let p1 = &it.b().0;
                 let d = (p0 - p1).norm_squared();
                 d < eps
-                */
             })
             .collect();
 
@@ -1643,6 +1582,3 @@ where
         None
     }
 }
-
-#[cfg(test)]
-mod tests {}

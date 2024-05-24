@@ -133,6 +133,31 @@ fn setup(
                     ..Default::default()
                 })
                 .insert(Name::new("bounding box"));
+
+            [a.curve(), b.curve()].iter().for_each(|curve| {
+                let line_vertices = curve
+                    .tessellate(Some(1e-8))
+                    .iter()
+                    .map(|p| p.cast::<f32>())
+                    .map(|p| [p.x, p.y, p.z])
+                    .collect();
+                let line = Mesh::new(PrimitiveTopology::LineStrip, default())
+                    .with_inserted_attribute(
+                        Mesh::ATTRIBUTE_POSITION,
+                        VertexAttributeValues::Float32x3(line_vertices),
+                    );
+                commands
+                    .spawn(MaterialMeshBundle {
+                        mesh: meshes.add(line),
+                        material: line_materials.add(LineMaterial {
+                            color: Color::WHITE,
+                            ..Default::default()
+                        }),
+                        visibility: Visibility::Hidden,
+                        ..Default::default()
+                    })
+                    .insert(Name::new("segment"));
+            });
         });
     }
 
@@ -148,7 +173,7 @@ fn setup(
                 }))),
                 material: points_materials.add(PointsMaterial {
                     settings: PointsShaderSettings {
-                        point_size: 0.02,
+                        point_size: 0.05,
                         color: Color::WHITE,
                         ..Default::default()
                     },

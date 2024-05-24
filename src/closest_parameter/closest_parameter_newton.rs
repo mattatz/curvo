@@ -49,7 +49,7 @@ where
     H: ArgminInv<H> + ArgminDot<G, P>,
     F: ArgminFloat,
 {
-    const NAME: &'static str = "Newton method";
+    const NAME: &'static str = "Closest parameter newton method";
 
     fn next_iter(
         &mut self,
@@ -89,6 +89,10 @@ where
     }
 
     fn terminate(&mut self, state: &IterState<P, G, (), H, (), F>) -> TerminationStatus {
+        if state.iter > state.max_iters {
+            return TerminationStatus::Terminated(TerminationReason::MaxItersReached);
+        }
+
         match (state.get_param(), state.get_prev_param()) {
             (Some(current_param), Some(prev_param)) => {
                 let delta = (*current_param - *prev_param).abs();
