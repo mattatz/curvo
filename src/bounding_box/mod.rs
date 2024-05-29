@@ -12,7 +12,7 @@ use simba::scalar::SupersetOf;
 use crate::{curve::nurbs_curve::NurbsCurve, misc::FloatingPoint};
 
 /// A struct representing a bounding box in D space.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct BoundingBox<T, D: DimName>
 where
     DefaultAllocator: Allocator<T, D>,
@@ -44,7 +44,7 @@ where
     /// Create a new bounding box from point iterator.
     pub fn new_with_points<I: IntoIterator<Item = OPoint<T, D>>>(iter: I) -> Self {
         let mut min = OVector::<T, D>::from_element(T::max_value().unwrap());
-        let mut max = OVector::<T, D>::from_element(T::min_value().unwrap());
+        let mut max = OVector::<T, D>::from_element(-T::max_value().unwrap());
 
         for point in iter {
             for i in 0..D::dim() {
@@ -62,6 +62,14 @@ where
 
     pub fn max(&self) -> &OVector<T, D> {
         &self.max
+    }
+
+    pub fn center(&self) -> OVector<T, D> {
+        (&self.min + &self.max) / T::from_usize(2).unwrap()
+    }
+
+    pub fn size(&self) -> OVector<T, D> {
+        &self.max - &self.min
     }
 
     /// Check if the bounding box intersects with another bounding box.
