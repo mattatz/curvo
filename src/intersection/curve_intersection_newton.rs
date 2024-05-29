@@ -8,9 +8,6 @@ use crate::misc::FloatingPoint;
 /// Original source: https://argmin-rs.github.io/argmin/argmin/solver/newton/struct.Newton.html
 #[derive(Clone, Copy)]
 pub struct CurveIntersectionNewton<F> {
-    /// gamma
-    gamma: F,
-
     /// tolerance
     tolerance: F,
 
@@ -24,9 +21,8 @@ where
 {
     fn default() -> Self {
         Self {
-            gamma: float!(1.0),
             tolerance: float!(1e-8),
-            line_search_max_iters: 100,
+            line_search_max_iters: 32,
         }
     }
 }
@@ -40,18 +36,14 @@ where
         Self::default()
     }
 
-    /// Set step size gamma
-    ///
-    /// Gamma must be in `(0, 1]` and defaults to `1`.
-    pub fn with_gamma(mut self, gamma: F) -> Result<Self, Error> {
-        if gamma <= float!(0.0) || gamma > float!(1.0) {
-            return Err(argmin_error!(
-                InvalidParameter,
-                "Newton: gamma must be in  (0, 1]."
-            ));
-        }
-        self.gamma = gamma;
-        Ok(self)
+    pub fn with_tolerance(mut self, tolerance: F) -> Self {
+        self.tolerance = tolerance;
+        self
+    }
+
+    pub fn with_line_search_max_iters(mut self, line_search_max_iters: u64) -> Self {
+        self.line_search_max_iters = line_search_max_iters;
+        self
     }
 }
 
@@ -121,19 +113,24 @@ where
         // println!("norm: {}", norm);
 
         let mut t = F::one();
-        let df0 = g0.dot(&step) * F::from_f64(1e-1).unwrap();
+        let df0 = g0.dot(&step);
         let mut x1 = *x0;
-        let mut f1 = f0;
+        let mut f1 = anyhow::Ok(f0);
 
+        let dt = F::from_f64(1e-1).unwrap();
         let dec = F::from_f64(0.5).unwrap();
         for _ in 0..self.line_search_max_iters {
             if t * norm < self.tolerance {
                 break;
             }
+
             let s = step * t;
             x1 = x0 + s;
-            f1 = problem.cost(&x1)?;
-            if f1 - f0 >= t * df0 {
+            f1 = problem.cost(&x1);
+            if match f1 {
+                Ok(f1) => f1 - f0 >= dt * t * df0,
+                _ => true,
+            } {
                 t *= dec;
             } else {
                 break;
@@ -141,6 +138,8 @@ where
         }
 
         // println!("{}: {}, {}", state.iter, x1, f1);
+
+        let f1 = f1?;
 
         let g1 = problem.gradient(&x1)?;
         let y = g1 - g0;
@@ -171,7 +170,9 @@ where
             }
         }
 
-        if nalgebra::ComplexField::abs(state.get_cost() - state.get_prev_cost()) < self.tolerance {
+        if nalgebra::ComplexField::abs(state.get_best_cost() - state.get_prev_best_cost())
+            < self.tolerance
+        {
             return TerminationStatus::Terminated(TerminationReason::SolverConverged);
         }
 

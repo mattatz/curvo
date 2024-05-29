@@ -21,12 +21,6 @@ where
     pub fn new(a: &'a NurbsCurve<T, D>, b: &'a NurbsCurve<T, D>) -> Self {
         CurveIntersectionProblem { a, b }
     }
-
-    pub fn constrain(&self, param: &Vector2<T>) -> Vector2<T> {
-        let d0 = self.a.knots_domain();
-        let d1 = self.b.knots_domain();
-        Vector2::new(d0.0.max(param[0]).min(d0.1), d1.0.max(param[1]).min(d1.1))
-    }
 }
 
 impl<'a, T: FloatingPoint, D: DimName> Gradient for CurveIntersectionProblem<'a, T, D>
@@ -39,9 +33,8 @@ where
     type Gradient = Vector2<T>;
 
     fn gradient(&self, param: &Self::Param) -> Result<Self::Gradient, anyhow::Error> {
-        let p = self.constrain(param);
-        let du = self.a.rational_derivatives(p[0], 1);
-        let dv = self.b.rational_derivatives(p[1], 1);
+        let du = self.a.rational_derivatives(param[0], 1);
+        let dv = self.b.rational_derivatives(param[1], 1);
         let r = &du[0] - &dv[0];
         Ok(Vector2::new(r.dot(&du[1]), -r.dot(&dv[1])) * T::from_f64(2.).unwrap())
     }
@@ -57,10 +50,15 @@ where
     type Output = T;
 
     fn cost(&self, param: &Self::Param) -> Result<Self::Output, anyhow::Error> {
-        let p = self.constrain(param);
-        let p1 = self.a.point_at(p[0]);
-        let p2 = self.b.point_at(p[1]);
-        let d = p1 - p2;
-        Ok(d.dot(&d))
+        let da = self.a.knots_domain();
+        let db = self.b.knots_domain();
+        if param[0] < da.0 || da.1 < param[0] || param[1] < db.0 || db.1 < param[1] {
+            Err(anyhow::anyhow!("Parameter out of domain"))
+        } else {
+            let p1 = self.a.point_at(param[0]);
+            let p2 = self.b.point_at(param[1]);
+            let d = p1 - p2;
+            Ok(d.dot(&d))
+        }
     }
 }
