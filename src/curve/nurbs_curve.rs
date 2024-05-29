@@ -367,6 +367,10 @@ where
         d1 - d0
     }
 
+    pub fn knots_constrain(&self, u: T) -> T {
+        self.knots.constrain(self.degree, u)
+    }
+
     /// Compute the length of the curve by gauss-legendre quadrature
     /// # Example
     /// ```
@@ -1205,13 +1209,14 @@ where
     pub fn find_intersections(
         &self,
         other: &Self,
+        epsilon: Option<T>,
     ) -> anyhow::Result<Vec<CurveIntersection<OPoint<T, DimNameDiff<D, U1>>, T>>>
     where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
         T: ArgminFloat,
     {
-        let eps = T::from_f64(1e-8).unwrap();
+        let eps = epsilon.unwrap_or(T::from_f64(1e-6).unwrap());
         let traversed = BoundingBoxTraversal::try_traverse(self, other, None)?;
 
         let pts = traversed
@@ -1238,11 +1243,11 @@ where
                 );
 
                 // Set up solver
-                let solver = CurveIntersectionNewton::<T>::new();
+                let solver = CurveIntersectionNewton::<T>::new().with_line_search_max_iters(32);
 
                 // Run solver
                 let res = Executor::new(problem, solver)
-                    .configure(|state| state.param(init_param).max_iters(1000))
+                    .configure(|state| state.param(init_param).max_iters(32))
                     .run();
 
                 match res {
@@ -1389,12 +1394,18 @@ impl<'a, T: FloatingPoint, const D: usize> Transformable<&'a OMatrix<T, Const<D>
 {
     fn transform(&mut self, transform: &'a OMatrix<T, Const<D>, Const<D>>) {
         self.control_points.iter_mut().for_each(|p| {
-            let mut pt = *p;
+            // dehomogenize
+            let ow = p[D - 1];
+            let mut pt = p.clone();
+            for i in 0..D - 1 {
+                pt[i] = pt[i] / ow;
+            }
+
             pt[D - 1] = T::one();
             let transformed = transform * pt;
             let w = transformed[D - 1];
             for i in 0..D - 1 {
-                p[i] = transformed[i] / w;
+                p[i] = transformed[i] / w * ow;
             }
         });
     }
