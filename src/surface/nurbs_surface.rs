@@ -1066,12 +1066,18 @@ impl<'a, T: FloatingPoint, const D: usize> Transformable<&'a OMatrix<T, Const<D>
     fn transform(&mut self, transform: &'a OMatrix<T, Const<D>, Const<D>>) {
         self.control_points.iter_mut().for_each(|rows| {
             rows.iter_mut().for_each(|p| {
-                let mut pt = *p;
+                // dehomogenize
+                let ow = p[D - 1];
+                let mut pt = p.clone();
+                for i in 0..D - 1 {
+                    pt[i] = pt[i] / ow;
+                }
+
                 pt[D - 1] = T::one();
                 let transformed = transform * pt;
                 let w = transformed[D - 1];
                 for i in 0..D - 1 {
-                    p[i] = transformed[i] / w;
+                    p[i] = transformed[i] / w * ow;
                 }
             });
         });
