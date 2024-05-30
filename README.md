@@ -28,7 +28,7 @@ The supported features also include finding the closest point on NURBS curves, f
 
 <img src="https://github.com/mattatz/curvo/assets/1085910/b2cabe4c-446b-40ff-8caf-a1fdd2d5d577" width="360px" alt="Divide the NURBS curve based on arc length" />
 
-<img src="https://github.com/mattatz/curvo/assets/1085910/d4afd048-7be0-4eba-8aaa-9608fd10bc29"
+<img src="https://github.com/mattatz/curvo/assets/1085910/acc2ca67-fc38-4529-a87e-021e62c6d504"
 width="360px" alt="Find intersection points between two NURBS curves" />
 
 ## Usage
