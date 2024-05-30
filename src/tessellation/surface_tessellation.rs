@@ -5,7 +5,8 @@ use nalgebra::{
 use simba::scalar::SupersetOf;
 
 use crate::{
-    adaptive_tessellation_node::AdaptiveTessellationNode, prelude::NurbsSurface, FloatingPoint,
+    misc::FloatingPoint, prelude::NurbsSurface,
+    tessellation::adaptive_tessellation_node::AdaptiveTessellationNode,
 };
 
 /// Surface tessellation representation

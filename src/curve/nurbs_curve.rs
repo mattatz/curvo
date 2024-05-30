@@ -1,21 +1,29 @@
 use std::vec;
 
+use argmin::core::{ArgminFloat, Executor, State};
+use argmin_math::ArgminScaledSub;
 use gauss_quad::GaussLegendre;
+use itertools::Itertools;
 use nalgebra::allocator::Allocator;
 use nalgebra::{
-    Const, DMatrix, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff, DimNameSub,
-    DimNameSum, OMatrix, OPoint, OVector, Rotation3, UnitVector3, Vector3, U1,
+    ComplexField, Const, DMatrix, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff,
+    DimNameSub, DimNameSum, OMatrix, OPoint, OVector, RealField, Rotation3, UnitVector3, Vector2,
+    Vector3, U1,
 };
 use rand::rngs::ThreadRng;
 use rand::Rng;
 use simba::scalar::SupersetOf;
 
-use crate::binomial::Binomial;
-use crate::frenet_frame::FrenetFrame;
-use crate::prelude::{CurveLengthParameter, Invertible, KnotVector};
-use crate::transformable::Transformable;
-use crate::trigonometry::{segment_closest_point, three_points_are_flat};
-use crate::FloatingPoint;
+use crate::intersection::curve_intersection::CurveIntersection;
+use crate::intersection::{
+    CurveIntersectionNewton, CurveIntersectionProblem, CurveIntersectionSolverOptions,
+};
+use crate::misc::binomial::Binomial;
+use crate::misc::frenet_frame::FrenetFrame;
+use crate::misc::transformable::Transformable;
+use crate::misc::trigonometry::{segment_closest_point, three_points_are_flat};
+use crate::prelude::{BoundingBoxTraversal, CurveLengthParameter, Invertible, KnotVector};
+use crate::{misc::FloatingPoint, ClosestParameterNewton, ClosestParameterProblem};
 
 /// NURBS curve representation
 /// By generics, it can be used for 2D or 3D curves with f32 or f64 scalar types
@@ -263,7 +271,11 @@ where
     }
 
     /// Evaluate the rational derivatives at a given parameter
-    fn rational_derivatives(&self, u: T, derivs: usize) -> Vec<OVector<T, DimNameDiff<D, U1>>>
+    pub(crate) fn rational_derivatives(
+        &self,
+        u: T,
+        derivs: usize,
+    ) -> Vec<OVector<T, DimNameDiff<D, U1>>>
     where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
@@ -351,6 +363,15 @@ where
 
     pub fn knots_domain(&self) -> (T, T) {
         self.knots.domain(self.degree)
+    }
+
+    pub fn knots_domain_interval(&self) -> T {
+        let (d0, d1) = self.knots_domain();
+        d1 - d0
+    }
+
+    pub fn knots_constrain(&self, u: T) -> T {
+        self.knots.constrain(self.degree, u)
     }
 
     /// Compute the length of the curve by gauss-legendre quadrature
@@ -1130,29 +1151,32 @@ where
     }
 
     /// Find the closest point on the curve to a given point
-    pub fn closest_point(
+    pub fn find_closest_point(
         &self,
         point: &OPoint<T, DimNameDiff<D, U1>>,
-    ) -> OPoint<T, DimNameDiff<D, U1>>
+    ) -> anyhow::Result<OPoint<T, DimNameDiff<D, U1>>>
     where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+        T: ArgminFloat,
+        T: ArgminScaledSub<T, T, T>,
     {
-        let u = self.closest_parameter(point);
-        self.point_at(u)
+        self.find_closest_parameter(point).map(|u| self.point_at(u))
     }
 
     /// Find the closest parameter on the curve to a given point with Newton's method
-    pub fn closest_parameter(&self, point: &OPoint<T, DimNameDiff<D, U1>>) -> T
+    pub fn find_closest_parameter(&self, point: &OPoint<T, DimNameDiff<D, U1>>) -> anyhow::Result<T>
     where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+        T: ArgminFloat,
+        T: ArgminScaledSub<T, T, T>,
     {
         let (min_u, max_u) = self.knots_domain();
         let samples = self.control_points.len() * self.degree;
         let pts = self.sample_regular_range_with_parameter(min_u, max_u, samples);
 
-        let mut min = T::max_value().unwrap();
+        let mut min = <T as RealField>::max_value().unwrap();
         let mut u = min_u;
 
         let closed =
@@ -1175,48 +1199,158 @@ where
             }
         }
 
-        let mut cu = u;
+        let solver = ClosestParameterNewton::new((min_u, max_u), closed);
+        let res = Executor::new(ClosestParameterProblem::new(point, self), solver)
+            .configure(|state| state.param(u).max_iters(5))
+            .run()?;
+        res.state()
+            .get_best_param()
+            .cloned()
+            .ok_or(anyhow::anyhow!("No best parameter found"))
+    }
 
-        let max_iterations = 5;
-        for _ in 0..max_iterations {
-            let e = self.rational_derivatives(cu, 2);
-            let dif = &e[0] - &point.coords;
+    /// Find the intersection points with another curve by gauss-newton line search
+    /// * `other` - The other curve to intersect with
+    /// * `options` - Hyperparameters for the intersection solver
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point2, Point3};
+    /// use approx::assert_relative_eq;
+    /// let corner_weight = 1. / 2.;
+    /// let unit_circle = NurbsCurve2D::try_new(
+    ///     2,
+    ///     vec![
+    ///         Point3::new(1.0, 0.0, 1.),
+    ///         Point3::new(1.0, 1.0, 1.0) * corner_weight,
+    ///         Point3::new(-1.0, 1.0, 1.0) * corner_weight,
+    ///         Point3::new(-1.0, 0.0, 1.),
+    ///         Point3::new(-1.0, -1.0, 1.0) * corner_weight,
+    ///         Point3::new(1.0, -1.0, 1.0) * corner_weight,
+    ///         Point3::new(1.0, 0.0, 1.),
+    ///     ],
+    ///     vec![0., 0., 0., 1. / 4., 1. / 2., 1. / 2., 3. / 4., 1., 1., 1.],
+    /// ).unwrap();
+    /// let line = NurbsCurve2D::try_new(
+    ///     1,
+    ///     vec![
+    ///         Point3::new(-2.0, 0.0, 1.),
+    ///         Point3::new(2.0, 0.0, 1.),
+    ///     ],
+    ///     vec![0., 0., 1., 1.],
+    /// ).unwrap();
+    ///
+    /// // Hyperparameters for the intersection solver
+    /// let options = CurveIntersectionSolverOptions {
+    ///     minimum_distance: 1e-7, // minimum distance between intersections
+    ///     cost_tolerance: 1e-12, // cost tolerance for the solver convergence
+    ///     max_iters: 200, // maximum number of iterations in the solver
+    ///     ..Default::default()
+    /// };
+    ///
+    /// let mut intersections = unit_circle.find_intersections(&line, Some(options)).unwrap();
+    /// assert_eq!(intersections.len(), 2);
+    ///
+    /// intersections.sort_by(|i0, i1| {
+    ///     i0.a().0.x.partial_cmp(&i1.a().0.x).unwrap()
+    /// });
+    /// let p0 = &intersections[0];
+    /// assert_relative_eq!(p0.a().0, Point2::new(-1.0, 0.0), epsilon = 1e-7);
+    /// let p1 = &intersections[1];
+    /// assert_relative_eq!(p1.a().0, Point2::new(1.0, 0.0), epsilon = 1e-7);
+    ///
+    /// ```
+    #[allow(clippy::type_complexity)]
+    pub fn find_intersections(
+        &self,
+        other: &Self,
+        options: Option<CurveIntersectionSolverOptions<T>>,
+    ) -> anyhow::Result<Vec<CurveIntersection<OPoint<T, DimNameDiff<D, U1>>, T>>>
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+        T: ArgminFloat,
+    {
+        let options = options.unwrap_or_default();
 
-            let c1v = dif.norm();
+        let traversed = BoundingBoxTraversal::try_traverse(
+            self,
+            other,
+            Some(
+                self.knots_domain_interval() / T::from_usize(options.knot_domain_division).unwrap(),
+            ),
+            Some(
+                other.knots_domain_interval()
+                    / T::from_usize(options.knot_domain_division).unwrap(),
+            ),
+        )?;
+        let eps = options.minimum_distance * T::from_f64(5.).unwrap();
 
-            let c2n = e[1].dot(&dif);
-            let c2d = e[1].norm() * c1v;
+        let pts = traversed
+            .into_pairs_iter()
+            .filter_map(|(a, b)| {
+                let ca = a.curve_owned();
+                let cb = b.curve_owned();
 
-            let c2v = c2n / c2d;
+                let problem = CurveIntersectionProblem::new(&ca, &cb);
 
-            let c1 = c1v < T::default_epsilon();
-            let c2 = c2v.abs() < T::default_epsilon();
+                let inv = T::from_f64(0.5).unwrap();
+                let d0 = ca.knots_domain();
+                let d1 = cb.knots_domain();
 
-            if c1 && c2 {
-                return cu;
-            }
+                // Define initial parameter vector
+                let init_param = Vector2::<T>::new(
+                    // ca.knots_domain().0,
+                    // cb.knots_domain().0,
+                    (d0.0 + d0.1) * inv,
+                    (d1.0 + d1.1) * inv,
+                );
 
-            let f = e[1].dot(&dif);
-            let s0 = e[2].dot(&dif);
-            let s1 = e[1].dot(&e[1]);
-            let df = s0 + s1;
-            let mut ct = cu - f / df;
+                // Set up solver
+                let solver = CurveIntersectionNewton::<T>::new()
+                    .with_step_size_tolerance(options.step_size_tolerance)
+                    .with_cost_tolerance(options.cost_tolerance);
 
-            if ct < min_u {
-                ct = if closed { max_u - (ct - min_u) } else { min_u };
-            } else if ct > max_u {
-                ct = if closed { min_u + (ct - max_u) } else { max_u };
-            }
+                // Run solver
+                let res = Executor::new(problem, solver)
+                    .configure(|state| state.param(init_param).max_iters(options.max_iters))
+                    .run();
 
-            let c3v = (&e[1] * (ct - cu)).norm();
-            if c3v < T::default_epsilon() {
-                return cu;
-            }
+                match res {
+                    Ok(r) => {
+                        // println!("{}", r.state().get_termination_status());
+                        r.state().get_best_param().map(|param| {
+                            let p0 = ca.point_at(param[0]);
+                            let p1 = cb.point_at(param[1]);
+                            CurveIntersection::new((p0, param[0]), (p1, param[1]))
+                        })
+                    }
+                    Err(_e) => {
+                        // println!("{}", e);
+                        None
+                    }
+                }
+            })
+            .filter(|it| {
+                // filter out intersections that are too close
+                let p0 = &it.a().0;
+                let p1 = &it.b().0;
+                let d = (p0 - p1).norm();
+                d < options.minimum_distance
+            })
+            .coalesce(|x, y| {
+                // merge intersections that are close in parameter space
+                let da = ComplexField::abs(x.a().1 - y.a().1);
+                let db = ComplexField::abs(x.b().1 - y.b().1);
+                if da < eps || db < eps {
+                    Ok(x)
+                } else {
+                    Err((x, y))
+                }
+            })
+            .collect();
 
-            cu = ct;
-        }
-
-        cu
+        Ok(pts)
     }
 
     /// Trim the curve into two curves before and after the parameter
@@ -1340,12 +1474,18 @@ impl<'a, T: FloatingPoint, const D: usize> Transformable<&'a OMatrix<T, Const<D>
 {
     fn transform(&mut self, transform: &'a OMatrix<T, Const<D>, Const<D>>) {
         self.control_points.iter_mut().for_each(|p| {
+            // dehomogenize
+            let ow = p[D - 1];
             let mut pt = *p;
+            for i in 0..D - 1 {
+                pt[i] /= ow;
+            }
+
             pt[D - 1] = T::one();
             let transformed = transform * pt;
             let w = transformed[D - 1];
             for i in 0..D - 1 {
-                p[i] = transformed[i] / w;
+                p[i] = transformed[i] / w * ow;
             }
         });
     }
@@ -1443,7 +1583,7 @@ impl<T: FloatingPoint> NurbsCurve3D<T> {
 
 /// Find the curve parameter at arc length on a Bezier segment of a NURBS curve
 /// by binary search
-fn compute_bezier_segment_parameter_at_length<T: FloatingPoint, D: DimName>(
+fn compute_bezier_segment_parameter_at_length<T: FloatingPoint, D>(
     s: &NurbsCurve<T, D>,
     length: T,
     tolerance: T,
@@ -1451,7 +1591,7 @@ fn compute_bezier_segment_parameter_at_length<T: FloatingPoint, D: DimName>(
     gauss: &GaussLegendre,
 ) -> T
 where
-    D: DimNameSub<U1>,
+    D: DimName + DimNameSub<U1>,
     DefaultAllocator: Allocator<T, D>,
     DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
 {
@@ -1486,13 +1626,13 @@ where
 
 /// Compute the length of a Bezier segment of a NURBS curve
 /// by gauss-legendre quadrature
-fn compute_bezier_segment_length<T: FloatingPoint, D: DimName>(
+fn compute_bezier_segment_length<T: FloatingPoint, D>(
     s: &NurbsCurve<T, D>,
     u: T,
     gauss: &GaussLegendre,
 ) -> T
 where
-    D: DimNameSub<U1>,
+    D: DimName + DimNameSub<U1>,
     DefaultAllocator: Allocator<T, D>,
     DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
 {
@@ -1514,11 +1654,11 @@ where
 }
 
 /// Dehomogenize a point
-pub fn dehomogenize<T: FloatingPoint, D: DimName>(
+pub fn dehomogenize<T: FloatingPoint, D>(
     point: &OPoint<T, D>,
 ) -> Option<OPoint<T, DimNameDiff<D, U1>>>
 where
-    D: DimNameSub<U1>,
+    D: DimName + DimNameSub<U1>,
     DefaultAllocator: Allocator<T, D>,
     DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
 {

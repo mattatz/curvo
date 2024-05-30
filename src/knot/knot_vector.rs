@@ -3,10 +3,7 @@ use std::ops::Index;
 use nalgebra::{convert, RealField};
 use simba::scalar::SupersetOf;
 
-use crate::{
-    prelude::{Invertible, KnotMultiplicity},
-    FloatingPoint,
-};
+use crate::prelude::{FloatingPoint, Invertible, KnotMultiplicity};
 
 /// Knot vector representation
 #[derive(Clone, Debug)]
@@ -76,6 +73,11 @@ impl<T: RealField + Copy> KnotVector<T> {
             self.knots[degree],
             self.knots[self.knots.len() - 1 - degree],
         )
+    }
+
+    pub fn constrain(&self, degree: usize, u: T) -> T {
+        let (min, max) = self.domain(degree);
+        min.max(u).min(max)
     }
 
     /// Returns the index of the first knot greater than or equal to knot

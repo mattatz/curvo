@@ -147,6 +147,7 @@ fn animate(
     settings.time_since_last_update += delta;
 }
 
+#[allow(clippy::too_many_arguments)]
 fn reset(
     mut commands: Commands,
     _time: Res<Time>,
@@ -187,7 +188,6 @@ fn reset(
                             color: Color::WHITE,
                             point_size: 0.025,
                             opacity: 0.5,
-                            ..Default::default()
                         },
                         alpha_mode: AlphaMode::Blend,
                         circle: true,

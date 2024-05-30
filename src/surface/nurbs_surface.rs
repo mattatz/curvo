@@ -5,13 +5,17 @@ use nalgebra::{
 use simba::scalar::SupersetOf;
 
 use crate::{
-    adaptive_tessellation_node::AdaptiveTessellationNode,
-    adaptive_tessellation_processor::{AdaptiveTessellationOptions, AdaptiveTessellationProcessor},
-    binomial::Binomial,
-    nurbs_curve::{dehomogenize, NurbsCurve, NurbsCurve3D},
+    curve::nurbs_curve::{dehomogenize, NurbsCurve, NurbsCurve3D},
+    misc::binomial::Binomial,
+    misc::transformable::Transformable,
+    misc::FloatingPoint,
+    misc::Ray,
     prelude::{KnotVector, SurfaceTessellation},
-    transformable::Transformable,
-    FloatingPoint, Ray, SurfacePoint,
+    tessellation::adaptive_tessellation_node::AdaptiveTessellationNode,
+    tessellation::adaptive_tessellation_processor::{
+        AdaptiveTessellationOptions, AdaptiveTessellationProcessor,
+    },
+    tessellation::surface_point::SurfacePoint,
 };
 
 /// NURBS surface representation
@@ -1062,12 +1066,18 @@ impl<'a, T: FloatingPoint, const D: usize> Transformable<&'a OMatrix<T, Const<D>
     fn transform(&mut self, transform: &'a OMatrix<T, Const<D>, Const<D>>) {
         self.control_points.iter_mut().for_each(|rows| {
             rows.iter_mut().for_each(|p| {
+                // dehomogenize
+                let ow = p[D - 1];
                 let mut pt = *p;
+                for i in 0..D - 1 {
+                    pt[i] /= ow;
+                }
+
                 pt[D - 1] = T::one();
                 let transformed = transform * pt;
                 let w = transformed[D - 1];
                 for i in 0..D - 1 {
-                    p[i] = transformed[i] / w;
+                    p[i] = transformed[i] / w * ow;
                 }
             });
         });
