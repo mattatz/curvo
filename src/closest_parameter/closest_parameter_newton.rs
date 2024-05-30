@@ -30,6 +30,7 @@ where
     /// Set step size gamma
     ///
     /// Gamma must be in `(0, 1]` and defaults to `1`.
+    #[allow(unused)]
     pub fn with_gamma(mut self, gamma: F) -> Result<Self, Error> {
         if gamma <= float!(0.0) || gamma > float!(1.0) {
             return Err(argmin_error!(
@@ -42,7 +43,7 @@ where
     }
 }
 
-impl<'a, O, P, G, H, F> Solver<O, IterState<P, G, (), H, (), F>> for ClosestParameterNewton<F, P>
+impl<O, P, G, H, F> Solver<O, IterState<P, G, (), H, (), F>> for ClosestParameterNewton<F, P>
 where
     O: Gradient<Param = P, Gradient = G> + Hessian<Param = P, Hessian = H>,
     P: Clone + ArgminScaledSub<P, F, P> + ArgminFloat,

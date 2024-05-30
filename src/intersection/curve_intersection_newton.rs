@@ -1,5 +1,4 @@
 use argmin::{argmin_error_closure, core::*, float};
-use argmin_math::ArgminDot;
 use nalgebra::{Matrix2, Vector2};
 
 use crate::misc::FloatingPoint;
@@ -47,7 +46,7 @@ where
     }
 }
 
-impl<'a, O, F> Solver<O, IterState<Vector2<F>, Vector2<F>, (), Matrix2<F>, (), F>>
+impl<O, F> Solver<O, IterState<Vector2<F>, Vector2<F>, (), Matrix2<F>, (), F>>
     for CurveIntersectionNewton<F>
 where
     O: Gradient<Param = Vector2<F>, Gradient = Vector2<F>>

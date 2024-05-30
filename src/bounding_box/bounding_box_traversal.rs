@@ -66,6 +66,7 @@ where
         Ok(Self { pairs })
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn pairs(&self) -> &[(BoundingBoxTree<'a, T, D>, BoundingBoxTree<'a, T, D>)] {
         &self.pairs
     }

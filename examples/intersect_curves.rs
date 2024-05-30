@@ -239,6 +239,7 @@ fn setup(
     });
 }
 
+#[allow(clippy::type_complexity)]
 fn update(
     time: Res<Time>,
     mut set: ParamSet<(
