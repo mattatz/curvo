@@ -1068,9 +1068,9 @@ impl<'a, T: FloatingPoint, const D: usize> Transformable<&'a OMatrix<T, Const<D>
             rows.iter_mut().for_each(|p| {
                 // dehomogenize
                 let ow = p[D - 1];
-                let mut pt = p.clone();
+                let mut pt = *p;
                 for i in 0..D - 1 {
-                    pt[i] = pt[i] / ow;
+                    pt[i] /= ow;
                 }
 
                 pt[D - 1] = T::one();

@@ -22,6 +22,8 @@ use crate::misc::trigonometry::{segment_closest_point, three_points_are_flat};
 use crate::prelude::{BoundingBoxTraversal, CurveLengthParameter, Invertible, KnotVector};
 use crate::{misc::FloatingPoint, ClosestParameterNewton, ClosestParameterProblem};
 
+use super::CurveIntersectionSolverOptions;
+
 /// NURBS curve representation
 /// By generics, it can be used for 2D or 3D curves with f32 or f64 scalar types
 #[derive(Clone, Debug)]
@@ -1206,27 +1208,37 @@ where
             .ok_or(anyhow::anyhow!("No best parameter found"))
     }
 
+    /// Find the intersection points with another curve by gauss-newton line search
     pub fn find_intersections(
         &self,
         other: &Self,
-        epsilon: Option<T>,
+        options: Option<CurveIntersectionSolverOptions<T>>,
     ) -> anyhow::Result<Vec<CurveIntersection<OPoint<T, DimNameDiff<D, U1>>, T>>>
     where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
         T: ArgminFloat,
     {
-        let eps = epsilon.unwrap_or(T::from_f64(1e-6).unwrap());
-        let traversed = BoundingBoxTraversal::try_traverse(self, other, None)?;
+        let options = options.unwrap_or_default();
+
+        let traversed = BoundingBoxTraversal::try_traverse(
+            self,
+            other,
+            Some(
+                self.knots_domain_interval() / T::from_usize(options.knot_domain_division).unwrap(),
+            ),
+            Some(
+                other.knots_domain_interval()
+                    / T::from_usize(options.knot_domain_division).unwrap(),
+            ),
+        )?;
+        let eps = options.minimum_distance * options.minimum_distance;
 
         let pts = traversed
             .into_pairs_iter()
             .filter_map(|(a, b)| {
                 let ca = a.curve_owned();
                 let cb = b.curve_owned();
-
-                // gauss-newton line search example
-                // https://github.com/argmin-rs/argmin/blob/main/examples/gaussnewton_linesearch/src/main.rs
 
                 let problem = CurveIntersectionProblem::new(&ca, &cb);
 
@@ -1243,11 +1255,14 @@ where
                 );
 
                 // Set up solver
-                let solver = CurveIntersectionNewton::<T>::new().with_line_search_max_iters(32);
+                let solver = CurveIntersectionNewton::<T>::new()
+                    .with_step_size_tolerance(options.step_size_tolerance)
+                    .with_cost_tolerance(options.cost_tolerance)
+                    .with_line_search_max_iters(options.line_search_max_iters);
 
                 // Run solver
                 let res = Executor::new(problem, solver)
-                    .configure(|state| state.param(init_param).max_iters(32))
+                    .configure(|state| state.param(init_param).max_iters(options.solver_max_iters))
                     .run();
 
                 match res {
@@ -1396,9 +1411,9 @@ impl<'a, T: FloatingPoint, const D: usize> Transformable<&'a OMatrix<T, Const<D>
         self.control_points.iter_mut().for_each(|p| {
             // dehomogenize
             let ow = p[D - 1];
-            let mut pt = p.clone();
+            let mut pt = *p;
             for i in 0..D - 1 {
-                pt[i] = pt[i] / ow;
+                pt[i] /= ow;
             }
 
             pt[D - 1] = T::one();

@@ -1,4 +1,4 @@
-use argmin::{argmin_error, argmin_error_closure, core::*, float};
+use argmin::{argmin_error_closure, core::*, float};
 use argmin_math::ArgminDot;
 use nalgebra::{Matrix2, Vector2};
 
@@ -8,10 +8,13 @@ use crate::misc::FloatingPoint;
 /// Original source: https://argmin-rs.github.io/argmin/argmin/solver/newton/struct.Newton.html
 #[derive(Clone, Copy)]
 pub struct CurveIntersectionNewton<F> {
-    /// tolerance
-    tolerance: F,
+    /// Tolerance for the step size in the line search
+    step_size_tolerance: F,
 
-    /// maximum number of iterations for line search
+    /// Tolerance for the cost function to determine convergence
+    cost_tolerance: F,
+
+    /// Maximum number of iterations for line search
     line_search_max_iters: u64,
 }
 
@@ -21,7 +24,8 @@ where
 {
     fn default() -> Self {
         Self {
-            tolerance: float!(1e-8),
+            step_size_tolerance: float!(1e-8),
+            cost_tolerance: float!(1e-8),
             line_search_max_iters: 32,
         }
     }
@@ -36,8 +40,13 @@ where
         Self::default()
     }
 
-    pub fn with_tolerance(mut self, tolerance: F) -> Self {
-        self.tolerance = tolerance;
+    pub fn with_step_size_tolerance(mut self, tolerance: F) -> Self {
+        self.step_size_tolerance = tolerance;
+        self
+    }
+
+    pub fn with_cost_tolerance(mut self, tolerance: F) -> Self {
+        self.cost_tolerance = tolerance;
         self
     }
 
@@ -120,7 +129,7 @@ where
         let dt = F::from_f64(1e-1).unwrap();
         let dec = F::from_f64(0.5).unwrap();
         for _ in 0..self.line_search_max_iters {
-            if t * norm < self.tolerance {
+            if t * norm < self.step_size_tolerance {
                 break;
             }
 
@@ -165,13 +174,13 @@ where
         if let (Some(g), Some(h)) = (state.get_gradient(), state.get_hessian()) {
             let step = h * g;
             let norm = step.norm();
-            if norm < self.tolerance {
+            if norm < self.step_size_tolerance {
                 return TerminationStatus::Terminated(TerminationReason::SolverConverged);
             }
         }
 
         if nalgebra::ComplexField::abs(state.get_best_cost() - state.get_prev_best_cost())
-            < self.tolerance
+            < self.cost_tolerance
         {
             return TerminationStatus::Terminated(TerminationReason::SolverConverged);
         }

@@ -5,13 +5,16 @@ use nalgebra::{
 
 use crate::{curve::nurbs_curve::NurbsCurve, misc::FloatingPoint};
 
+/// Gradient & Hessian provider for finding the closest parameter on a curve to a given point.
 pub struct ClosestParameterProblem<'a, T: FloatingPoint, D: DimName>
 where
     DefaultAllocator: Allocator<T, D>,
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
 {
+    /// The point to find the closest parameter to.
     point: &'a OPoint<T, DimNameDiff<D, U1>>,
+    /// The curve to find the closest parameter on.
     curve: &'a NurbsCurve<T, D>,
 }
 

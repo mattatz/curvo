@@ -19,15 +19,17 @@ where
     pub fn try_traverse(
         a: &'a NurbsCurve<T, D>,
         b: &'a NurbsCurve<T, D>,
-        tolerance: Option<T>,
+        a_knot_tolerance: Option<T>,
+        b_knot_tolerance: Option<T>,
     ) -> anyhow::Result<Self> {
-        let ta = BoundingBoxTree::new(a, tolerance);
-        let tb = BoundingBoxTree::new(b, tolerance);
+        let ta = BoundingBoxTree::new(a, a_knot_tolerance);
+        let tb = BoundingBoxTree::new(b, b_knot_tolerance);
 
         let mut trees = vec![(ta, tb)];
         let mut pairs = vec![];
 
-        let tol = Some(-T::from_f64(1e-2).unwrap());
+        let tol = Some(T::zero());
+        // let tol = T::from_f64(-1e-4);
 
         while let Some((a, b)) = trees.pop() {
             if !a.bounding_box().intersects(&b.bounding_box(), tol) {

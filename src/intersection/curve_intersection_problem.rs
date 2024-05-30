@@ -6,11 +6,14 @@ use nalgebra::{
 
 use crate::{curve::nurbs_curve::NurbsCurve, misc::FloatingPoint};
 
+// Gradient & CostFunction provider for finding the intersection between two curves.
 pub struct CurveIntersectionProblem<'a, T: FloatingPoint, D: DimName>
 where
     DefaultAllocator: Allocator<T, D>,
 {
+    /// The first curve to find the intersection with.
     a: &'a NurbsCurve<T, D>,
+    /// The second curve to find the intersection with.
     b: &'a NurbsCurve<T, D>,
 }
 

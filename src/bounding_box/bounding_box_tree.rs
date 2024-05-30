@@ -26,7 +26,6 @@ where
         let tol = tolerance.unwrap_or_else(|| {
             let i = curve.knots_domain_interval();
             i / T::from_usize(64).unwrap()
-            // i / T::from_usize(128).unwrap()
         });
         BoundingBoxTree {
             curve: Cow::Borrowed(curve),
