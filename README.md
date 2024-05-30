@@ -22,11 +22,14 @@ The modeling operations for NURBS surfaces supported by this library currently i
 
 <img width="360px" alt="Revolve the profile curve around an z-axis by PI radians to create a NURBS surface" src="https://github.com/mattatz/curvo/assets/1085910/c23148ae-6392-4855-bfc5-f7ebd8389a8e">
 
-The features supported also include finding for the closest point on NURBS curves and dividing based on arc length.
+The supported features also include finding the closest point on NURBS curves, finding intersections between two NURBS curves, and dividing based on arc length.
 
 <img src="https://github.com/mattatz/curvo/assets/1085910/04cccd08-01c7-495d-b332-4ee2ed59644a" width="360px" alt="Find closest point on the NURBS curve" />
 
 <img src="https://github.com/mattatz/curvo/assets/1085910/b2cabe4c-446b-40ff-8caf-a1fdd2d5d577" width="360px" alt="Divide the NURBS curve based on arc length" />
+
+<img src="https://github.com/mattatz/curvo/assets/1085910/d4afd048-7be0-4eba-8aaa-9608fd10bc29"
+width="360px" alt="Find intersection points between two NURBS curves" />
 
 ## Usage
 
