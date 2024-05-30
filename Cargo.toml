@@ -38,8 +38,8 @@ itertools = "0.13.0"
 approx = { version = "0.5", default-features = false }
 
 [features]
-# default = []
-default = ["bevy"] # for debugging example
+default = []
+# default = ["bevy"] # for debugging example
 bevy = [
   "dep:easer",
   "dep:rand_distr",
