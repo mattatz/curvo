@@ -21,11 +21,11 @@ pub struct CurveIntersectionSolverOptions<T: FloatingPoint> {
 impl<T: FloatingPoint> Default for CurveIntersectionSolverOptions<T> {
     fn default() -> Self {
         Self {
-            minimum_distance: T::from_f64(1e-6).unwrap(),
+            minimum_distance: T::from_f64(1e-5).unwrap(),
             knot_domain_division: 64,
             step_size_tolerance: T::from_f64(1e-8).unwrap(),
             cost_tolerance: T::from_f64(1e-8).unwrap(),
-            solver_max_iters: 16,
+            solver_max_iters: 32,
             line_search_max_iters: 32,
         }
     }

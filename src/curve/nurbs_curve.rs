@@ -1,28 +1,27 @@
 use std::vec;
 
 use argmin::core::{ArgminFloat, Executor, State};
-
 use argmin_math::ArgminScaledSub;
 use gauss_quad::GaussLegendre;
+use itertools::Itertools;
 use nalgebra::allocator::Allocator;
 use nalgebra::{
-    Const, DMatrix, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff, DimNameSub,
-    DimNameSum, OMatrix, OPoint, OVector, RealField, Rotation3, UnitVector3, Vector2, Vector3, U1,
+    ComplexField, Const, DMatrix, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff, DimNameSub, DimNameSum, OMatrix, OPoint, OVector, RealField, Rotation3, UnitVector3, Vector2, Vector3, U1
 };
 use rand::rngs::ThreadRng;
 use rand::Rng;
 use simba::scalar::SupersetOf;
 
 use crate::intersection::curve_intersection::CurveIntersection;
-use crate::intersection::{CurveIntersectionNewton, CurveIntersectionProblem};
+use crate::intersection::{
+    CurveIntersectionNewton, CurveIntersectionProblem, CurveIntersectionSolverOptions,
+};
 use crate::misc::binomial::Binomial;
 use crate::misc::frenet_frame::FrenetFrame;
 use crate::misc::transformable::Transformable;
 use crate::misc::trigonometry::{segment_closest_point, three_points_are_flat};
 use crate::prelude::{BoundingBoxTraversal, CurveLengthParameter, Invertible, KnotVector};
 use crate::{misc::FloatingPoint, ClosestParameterNewton, ClosestParameterProblem};
-
-use super::CurveIntersectionSolverOptions;
 
 /// NURBS curve representation
 /// By generics, it can be used for 2D or 3D curves with f32 or f64 scalar types
@@ -1209,6 +1208,44 @@ where
     }
 
     /// Find the intersection points with another curve by gauss-newton line search
+    /// * `other` - The other curve to intersect with
+    /// * `options` - Hyperparameters for the intersection solver
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::Point3;
+    /// use approx::assert_relative_eq;
+    /// let corner_weight = 1. / 2.;
+    /// let unit_circle = NurbsCurve2D::try_new(
+    ///     2,
+    ///     vec![
+    ///         Point3::new(1.0, 0.0, 1.),
+    ///         Point3::new(1.0, 1.0, 1.0) * corner_weight,
+    ///         Point3::new(-1.0, 1.0, 1.0) * corner_weight,
+    ///         Point3::new(-1.0, 0.0, 1.),
+    ///         Point3::new(-1.0, -1.0, 1.0) * corner_weight,
+    ///         Point3::new(1.0, -1.0, 1.0) * corner_weight,
+    ///         Point3::new(1.0, 0.0, 1.),
+    ///     ],
+    ///     vec![0., 0., 0., 1. / 4., 1. / 2., 1. / 2., 3. / 4., 1., 1., 1.],
+    /// ).unwrap();
+    /// let line = NurbsCurve2D::try_new(
+    ///     1,
+    ///     vec![
+    ///         Point3::new(-2.0, 0.0, 1.),
+    ///         Point3::new(2.0, 0.0, 1.),
+    ///     ],
+    ///     vec![0., 0., 1., 1.],
+    /// ).unwrap();
+    /// let options = CurveIntersectionSolverOptions {
+    ///     minimum_distance: 1e-6,
+    ///     solver_max_iters: 50,
+    ///     line_search_max_iters: 30,
+    ///     ..Default::default()
+    /// };
+    /// let intersections = unit_circle.find_intersections(&line, Some(options)).unwrap();
+    /// assert_eq!(intersections.len(), 2);
+    /// ```
     pub fn find_intersections(
         &self,
         other: &Self,
@@ -1248,10 +1285,10 @@ where
 
                 // Define initial parameter vector
                 let init_param = Vector2::<T>::new(
-                    // ca.knots_domain().0,
-                    // cb.knots_domain().0
-                    (d0.0 + d0.1) * inv,
-                    (d1.0 + d1.1) * inv,
+                    ca.knots_domain().0,
+                    cb.knots_domain().0
+                    // (d0.0 + d0.1) * inv,
+                    // (d1.0 + d1.1) * inv,
                 );
 
                 // Set up solver
@@ -1282,6 +1319,13 @@ where
                 let p1 = &it.b().0;
                 let d = (p0 - p1).norm_squared();
                 d < eps
+            })
+            .coalesce(|x, y| {
+                if ComplexField::abs(x.a().1 - y.a().1) < eps {
+                    Ok(x)
+                } else {
+                    Err((x, y))
+                }
             })
             .collect();
 

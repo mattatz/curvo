@@ -1,4 +1,5 @@
 /// A struct representing the intersection of two curves.
+#[derive(Debug, Clone)]
 pub struct CurveIntersection<P, T> {
     /// The point & parameter of the first curve at the intersection.
     a: (P, T),

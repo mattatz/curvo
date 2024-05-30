@@ -7,12 +7,8 @@ use bevy::{
 };
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin, InfiniteGridSettings};
 
-
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
-use bevy_points::{
-    plugin::PointsPlugin,
-    prelude::{PointsMaterial},
-};
+use bevy_points::{plugin::PointsPlugin, prelude::PointsMaterial};
 use nalgebra::{Point2, Point3, Rotation2, Translation2};
 
 use curvo::prelude::*;
