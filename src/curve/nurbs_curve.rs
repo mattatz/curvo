@@ -1312,7 +1312,7 @@ where
                             CurveIntersection::new((p0, param[0]), (p1, param[1]))
                         })
                     }
-                    Err(e) => {
+                    Err(_e) => {
                         // println!("{}", e);
                         None
                     }

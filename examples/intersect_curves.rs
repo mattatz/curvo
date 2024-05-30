@@ -34,6 +34,7 @@ impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.add_systems(Startup, setup)
             .add_systems(Update, (update, close_on_esc));
+        // .add_systems(Update, (close_on_esc));
     }
 }
 
@@ -119,10 +120,10 @@ fn setup(
             ..Default::default()
         })
         .insert(SecondCurve(circle.clone()))
-        .insert(Name::new("mirrored"));
+        .insert(Name::new("circle"));
 
     /*
-    let traversed = BoundingBoxTraversal::try_traverse(&curve, &mirrored, None);
+    let traversed = BoundingBoxTraversal::try_traverse(&curve, &circle, None, None);
     if let Ok(traversed) = traversed {
         let n = traversed.pairs_iter().count();
         traversed
@@ -191,8 +192,10 @@ fn setup(
                 });
             });
     }
+        */
 
-    let intersections = curve.find_intersections(&mirrored);
+    /*
+    let intersections = curve.find_intersections(&circle, None);
     if let Ok(intersections) = intersections {
         commands
             .spawn(MaterialMeshBundle {
