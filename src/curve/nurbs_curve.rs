@@ -1583,7 +1583,7 @@ impl<T: FloatingPoint> NurbsCurve3D<T> {
 
 /// Find the curve parameter at arc length on a Bezier segment of a NURBS curve
 /// by binary search
-fn compute_bezier_segment_parameter_at_length<T: FloatingPoint, D: DimName>(
+fn compute_bezier_segment_parameter_at_length<T: FloatingPoint, D>(
     s: &NurbsCurve<T, D>,
     length: T,
     tolerance: T,
@@ -1591,7 +1591,7 @@ fn compute_bezier_segment_parameter_at_length<T: FloatingPoint, D: DimName>(
     gauss: &GaussLegendre,
 ) -> T
 where
-    D: DimNameSub<U1>,
+    D: DimName + DimNameSub<U1>,
     DefaultAllocator: Allocator<T, D>,
     DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
 {
@@ -1626,13 +1626,13 @@ where
 
 /// Compute the length of a Bezier segment of a NURBS curve
 /// by gauss-legendre quadrature
-fn compute_bezier_segment_length<T: FloatingPoint, D: DimName>(
+fn compute_bezier_segment_length<T: FloatingPoint, D>(
     s: &NurbsCurve<T, D>,
     u: T,
     gauss: &GaussLegendre,
 ) -> T
 where
-    D: DimNameSub<U1>,
+    D: DimName + DimNameSub<U1>,
     DefaultAllocator: Allocator<T, D>,
     DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
 {
@@ -1654,11 +1654,11 @@ where
 }
 
 /// Dehomogenize a point
-pub fn dehomogenize<T: FloatingPoint, D: DimName>(
+pub fn dehomogenize<T: FloatingPoint, D>(
     point: &OPoint<T, D>,
 ) -> Option<OPoint<T, DimNameDiff<D, U1>>>
 where
-    D: DimNameSub<U1>,
+    D: DimName + DimNameSub<U1>,
     DefaultAllocator: Allocator<T, D>,
     DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
 {
