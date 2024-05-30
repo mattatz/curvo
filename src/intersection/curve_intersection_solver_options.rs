@@ -13,9 +13,7 @@ pub struct CurveIntersectionSolverOptions<T: FloatingPoint> {
     /// Tolerance for the cost function to determine convergence.
     pub cost_tolerance: T,
     /// Maximum number of iterations for the Newton method.
-    pub solver_max_iters: u64,
-    /// Maximum number of iterations for the line search in the Newton method.
-    pub line_search_max_iters: u64,
+    pub max_iters: u64,
 }
 
 impl<T: FloatingPoint> Default for CurveIntersectionSolverOptions<T> {
@@ -25,8 +23,7 @@ impl<T: FloatingPoint> Default for CurveIntersectionSolverOptions<T> {
             knot_domain_division: 64,
             step_size_tolerance: T::from_f64(1e-8).unwrap(),
             cost_tolerance: T::from_f64(1e-8).unwrap(),
-            solver_max_iters: 32,
-            line_search_max_iters: 32,
+            max_iters: 200,
         }
     }
 }
@@ -52,13 +49,8 @@ impl<T: FloatingPoint> CurveIntersectionSolverOptions<T> {
         self
     }
 
-    pub fn with_solver_max_iters(mut self, iterations_max_iters: u64) -> Self {
-        self.solver_max_iters = iterations_max_iters;
-        self
-    }
-
-    pub fn with_line_search_max_iters(mut self, line_search_max_iters: u64) -> Self {
-        self.line_search_max_iters = line_search_max_iters;
+    pub fn with_max_iters(mut self, max_iters: u64) -> Self {
+        self.max_iters = max_iters;
         self
     }
 }

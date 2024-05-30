@@ -13,9 +13,6 @@ pub struct CurveIntersectionNewton<F> {
 
     /// Tolerance for the cost function to determine convergence
     cost_tolerance: F,
-
-    /// Maximum number of iterations for line search
-    line_search_max_iters: u64,
 }
 
 impl<F> Default for CurveIntersectionNewton<F>
@@ -26,7 +23,6 @@ where
         Self {
             step_size_tolerance: float!(1e-8),
             cost_tolerance: float!(1e-8),
-            line_search_max_iters: 32,
         }
     }
 }
@@ -47,11 +43,6 @@ where
 
     pub fn with_cost_tolerance(mut self, tolerance: F) -> Self {
         self.cost_tolerance = tolerance;
-        self
-    }
-
-    pub fn with_line_search_max_iters(mut self, line_search_max_iters: u64) -> Self {
-        self.line_search_max_iters = line_search_max_iters;
         self
     }
 }
@@ -115,6 +106,7 @@ where
         };
 
         let h0 = state.get_hessian().cloned().unwrap_or(Matrix2::identity());
+        // println!("cost: {:?}, hessian: {:?}", &f0, &h0);
 
         // line search
         let step = -h0 * g0;
@@ -129,9 +121,12 @@ where
 
         let dt = F::from_f64(1e-1).unwrap();
         let dec = F::from_f64(0.5).unwrap();
-        for _ in 0..self.line_search_max_iters {
+        let mut it = 0;
+        let max_iters = state.get_max_iters();
+        for _ in 0..max_iters {
+            it += 1;
             if t * norm < self.step_size_tolerance {
-                return Ok((state.cost(f0), None));
+                break;
             }
 
             let s = step * t;
@@ -149,7 +144,7 @@ where
 
         // println!("{}: {}, {}", state.iter, x1, f1);
 
-        let f1 = f1?;
+        let f1 = f1.unwrap_or(f0);
 
         let g1 = problem.gradient(&x1)?;
         let y = g1 - g0;
@@ -161,7 +156,15 @@ where
         let h1 = (h0 + s_t * ((ys + y.dot(&hy)) / (ys * ys)))
             - (((hy * s.transpose()) + (s * hy.transpose())) / ys);
 
-        Ok((state.param(x1).cost(f1).gradient(g1).hessian(h1), None))
+        Ok((
+            state
+                .param(x1)
+                .cost(f1)
+                .gradient(g1)
+                .hessian(h1)
+                .max_iters(max_iters - it), // decrease remaining iterations by # of line search iterations
+            None,
+        ))
     }
 
     fn terminate(
@@ -196,9 +199,18 @@ where
             }
         }
 
-        if nalgebra::ComplexField::abs(state.get_cost() - state.get_prev_cost())
-            < self.cost_tolerance
-            || nalgebra::ComplexField::abs(state.get_best_cost() - state.get_prev_best_cost())
+        if let (Some(g), Some(h)) = (state.get_gradient(), state.get_hessian()) {
+            let step = h * g;
+            let norm = step.norm();
+            if norm < self.step_size_tolerance {
+                return TerminationStatus::Terminated(TerminationReason::SolverExit(
+                    "step size tolerance reached".into(),
+                ));
+            }
+        }
+
+        if state.get_cost() != state.get_prev_cost()
+            && nalgebra::ComplexField::abs(state.get_cost() - state.get_prev_cost())
                 < self.cost_tolerance
         {
             return TerminationStatus::Terminated(TerminationReason::SolverConverged);

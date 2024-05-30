@@ -1287,21 +1287,20 @@ where
 
                 // Define initial parameter vector
                 let init_param = Vector2::<T>::new(
-                    ca.knots_domain().0,
-                    cb.knots_domain().0,
-                    // (d0.0 + d0.1) * inv,
-                    // (d1.0 + d1.1) * inv,
+                    // ca.knots_domain().0,
+                    // cb.knots_domain().0,
+                    (d0.0 + d0.1) * inv,
+                    (d1.0 + d1.1) * inv,
                 );
 
                 // Set up solver
                 let solver = CurveIntersectionNewton::<T>::new()
                     .with_step_size_tolerance(options.step_size_tolerance)
-                    .with_cost_tolerance(options.cost_tolerance)
-                    .with_line_search_max_iters(options.line_search_max_iters);
+                    .with_cost_tolerance(options.cost_tolerance);
 
                 // Run solver
                 let res = Executor::new(problem, solver)
-                    .configure(|state| state.param(init_param).max_iters(options.solver_max_iters))
+                    .configure(|state| state.param(init_param).max_iters(options.max_iters))
                     .run();
 
                 match res {
@@ -1313,7 +1312,10 @@ where
                             CurveIntersection::new((p0, param[0]), (p1, param[1]))
                         })
                     }
-                    _ => None,
+                    Err(e) => {
+                        // println!("{}", e);
+                        None
+                    }
                 }
             })
             .filter(|it| {
