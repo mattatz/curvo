@@ -61,7 +61,7 @@ where
             let p1 = self.a.point_at(param[0]);
             let p2 = self.b.point_at(param[1]);
             let d = p1 - p2;
-            Ok(d.dot(&d))
+            Ok(d.norm_squared())
         }
     }
 }

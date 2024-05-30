@@ -118,6 +118,7 @@ where
 
         // line search
         let step = -h0 * g0;
+
         let norm = step.norm();
         // println!("norm: {}", norm);
 
@@ -130,7 +131,7 @@ where
         let dec = F::from_f64(0.5).unwrap();
         for _ in 0..self.line_search_max_iters {
             if t * norm < self.step_size_tolerance {
-                break;
+                return Ok((state.cost(f0), None));
             }
 
             let s = step * t;
@@ -154,11 +155,11 @@ where
         let y = g1 - g0;
         let s = step * t;
         let ys = y.dot(&s);
-        let s_t = tensor(&s, &s);
+        let s_t = s * s.transpose();
         let hy = h0 * y;
 
         let h1 = (h0 + s_t * ((ys + y.dot(&hy)) / (ys * ys)))
-            - ((tensor(&hy, &s) + tensor(&s, &hy)) / ys);
+            - (((hy * s.transpose()) + (s * hy.transpose())) / ys);
 
         Ok((state.param(x1).cost(f1).gradient(g1).hessian(h1), None))
     }
@@ -171,29 +172,38 @@ where
             return TerminationStatus::Terminated(TerminationReason::MaxItersReached);
         }
 
-        if let (Some(g), Some(h)) = (state.get_gradient(), state.get_hessian()) {
-            let step = h * g;
-            let norm = step.norm();
-            if norm < self.step_size_tolerance {
-                return TerminationStatus::Terminated(TerminationReason::SolverConverged);
+        if let Some(g) = state.get_gradient() {
+            if g.x.is_nan() || g.y.is_nan() || g.x.is_infinite() || g.y.is_infinite() {
+                return TerminationStatus::Terminated(TerminationReason::SolverExit(
+                    "gradient is NaN or infinite".into(),
+                ));
             }
         }
 
-        if nalgebra::ComplexField::abs(state.get_best_cost() - state.get_prev_best_cost())
+        if let Some(h) = state.get_hessian() {
+            if h[(0, 0)].is_nan()
+                || h[(0, 1)].is_nan()
+                || h[(1, 0)].is_nan()
+                || h[(1, 1)].is_nan()
+                || h[(0, 0)].is_infinite()
+                || h[(0, 1)].is_infinite()
+                || h[(1, 0)].is_infinite()
+                || h[(1, 1)].is_infinite()
+            {
+                return TerminationStatus::Terminated(TerminationReason::SolverExit(
+                    "hessian is NaN or infinite".into(),
+                ));
+            }
+        }
+
+        if nalgebra::ComplexField::abs(state.get_cost() - state.get_prev_cost())
             < self.cost_tolerance
+            || nalgebra::ComplexField::abs(state.get_best_cost() - state.get_prev_best_cost())
+                < self.cost_tolerance
         {
             return TerminationStatus::Terminated(TerminationReason::SolverConverged);
         }
 
         TerminationStatus::NotTerminated
     }
-}
-
-fn tensor<T: FloatingPoint>(a: &Vector2<T>, b: &Vector2<T>) -> Matrix2<T> {
-    let mut res = Matrix2::zeros();
-    res[(0, 0)] = a[0] * b[0];
-    res[(0, 1)] = a[0] * b[1];
-    res[(1, 0)] = a[1] * b[0];
-    res[(1, 1)] = a[1] * b[1];
-    res
 }

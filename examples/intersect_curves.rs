@@ -245,8 +245,9 @@ fn update(
     )>,
     mut gizmos: Gizmos,
 ) {
-    let elapsed = time.elapsed_seconds();
-    let delta = time.delta_seconds();
+    let speed = 1.0;
+    let elapsed = time.elapsed_seconds() * speed;
+    let delta = time.delta_seconds() * speed;
 
     set.p1().iter_mut().for_each(|(_, mut tr1)| {
         tr1.rotate_local_z(-delta * 0.25);
@@ -304,7 +305,7 @@ fn update(
                 );
             });
     }
-        */
+    */
 
     let p0 = set.p0();
     let camera_transform = p0.single();

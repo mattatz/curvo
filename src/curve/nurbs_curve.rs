@@ -6,7 +6,9 @@ use gauss_quad::GaussLegendre;
 use itertools::Itertools;
 use nalgebra::allocator::Allocator;
 use nalgebra::{
-    ComplexField, Const, DMatrix, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff, DimNameSub, DimNameSum, OMatrix, OPoint, OVector, RealField, Rotation3, UnitVector3, Vector2, Vector3, U1
+    ComplexField, Const, DMatrix, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff,
+    DimNameSub, DimNameSum, OMatrix, OPoint, OVector, RealField, Rotation3, UnitVector3, Vector2,
+    Vector3, U1,
 };
 use rand::rngs::ThreadRng;
 use rand::Rng;
@@ -1286,7 +1288,7 @@ where
                 // Define initial parameter vector
                 let init_param = Vector2::<T>::new(
                     ca.knots_domain().0,
-                    cb.knots_domain().0
+                    cb.knots_domain().0,
                     // (d0.0 + d0.1) * inv,
                     // (d1.0 + d1.1) * inv,
                 );
