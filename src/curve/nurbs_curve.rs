@@ -1215,7 +1215,7 @@ where
     /// # Example
     /// ```
     /// use curvo::prelude::*;
-    /// use nalgebra::Point3;
+    /// use nalgebra::{Point2, Point3};
     /// use approx::assert_relative_eq;
     /// let corner_weight = 1. / 2.;
     /// let unit_circle = NurbsCurve2D::try_new(
@@ -1239,15 +1239,28 @@ where
     ///     ],
     ///     vec![0., 0., 1., 1.],
     /// ).unwrap();
+    ///
+    /// // Hyperparameters for the intersection solver
     /// let options = CurveIntersectionSolverOptions {
-    ///     minimum_distance: 1e-6,
-    ///     solver_max_iters: 50,
-    ///     line_search_max_iters: 30,
+    ///     minimum_distance: 1e-7, // minimum distance between intersections
+    ///     cost_tolerance: 1e-12, // cost tolerance for the solver convergence
+    ///     max_iters: 200, // maximum number of iterations in the solver
     ///     ..Default::default()
     /// };
-    /// let intersections = unit_circle.find_intersections(&line, Some(options)).unwrap();
+    ///
+    /// let mut intersections = unit_circle.find_intersections(&line, Some(options)).unwrap();
     /// assert_eq!(intersections.len(), 2);
+    ///
+    /// intersections.sort_by(|i0, i1| {
+    ///     i0.a().0.x.partial_cmp(&i1.a().0.x).unwrap()
+    /// });
+    /// let p0 = &intersections[0];
+    /// assert_relative_eq!(p0.a().0, Point2::new(-1.0, 0.0), epsilon = 1e-7);
+    /// let p1 = &intersections[1];
+    /// assert_relative_eq!(p1.a().0, Point2::new(1.0, 0.0), epsilon = 1e-7);
+    ///
     /// ```
+    #[allow(clippy::type_complexity)]
     pub fn find_intersections(
         &self,
         other: &Self,
@@ -1271,7 +1284,7 @@ where
                     / T::from_usize(options.knot_domain_division).unwrap(),
             ),
         )?;
-        let eps = options.minimum_distance * options.minimum_distance;
+        let eps = options.minimum_distance * T::from_f64(5.).unwrap();
 
         let pts = traversed
             .into_pairs_iter()
@@ -1319,13 +1332,17 @@ where
                 }
             })
             .filter(|it| {
+                // filter out intersections that are too close
                 let p0 = &it.a().0;
                 let p1 = &it.b().0;
-                let d = (p0 - p1).norm_squared();
-                d < eps
+                let d = (p0 - p1).norm();
+                d < options.minimum_distance
             })
             .coalesce(|x, y| {
-                if ComplexField::abs(x.a().1 - y.a().1) < eps {
+                // merge intersections that are close in parameter space
+                let da = ComplexField::abs(x.a().1 - y.a().1);
+                let db = ComplexField::abs(x.b().1 - y.b().1);
+                if da < eps || db < eps {
                     Ok(x)
                 } else {
                     Err((x, y))

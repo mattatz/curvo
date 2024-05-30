@@ -22,7 +22,7 @@ impl<T: FloatingPoint> Default for CurveIntersectionSolverOptions<T> {
             minimum_distance: T::from_f64(1e-5).unwrap(),
             knot_domain_division: 64,
             step_size_tolerance: T::from_f64(1e-8).unwrap(),
-            cost_tolerance: T::from_f64(1e-8).unwrap(),
+            cost_tolerance: T::from_f64(1e-10).unwrap(),
             max_iters: 200,
         }
     }
