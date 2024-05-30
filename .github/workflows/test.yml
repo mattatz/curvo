@@ -24,7 +24,7 @@ jobs:
       - uses: actions-rs/install@v0.1
         with:
           crate: cargo-audit
-          version: latest
+          version: 1.78
 
       - name: Run cargo fmt
         if: ${{ matrix.node_index == 'fmt' }}
