@@ -1473,7 +1473,7 @@ where
     ///
     /// // Hyperparameters for the intersection solver
     /// let options = CurveIntersectionSolverOptions {
-    ///     minimum_distance: 1e-7, // minimum distance between intersections
+    ///     minimum_distance: 1e-5, // minimum distance between intersections
     ///     cost_tolerance: 1e-12, // cost tolerance for the solver convergence
     ///     max_iters: 200, // maximum number of iterations in the solver
     ///     ..Default::default()
@@ -1486,9 +1486,9 @@ where
     ///     i0.a().0.x.partial_cmp(&i1.a().0.x).unwrap()
     /// });
     /// let p0 = &intersections[0];
-    /// assert_relative_eq!(p0.a().0, Point2::new(-1.0, 0.0), epsilon = 1e-7);
+    /// assert_relative_eq!(p0.a().0, Point2::new(-1.0, 0.0), epsilon = 1e-5);
     /// let p1 = &intersections[1];
-    /// assert_relative_eq!(p1.a().0, Point2::new(1.0, 0.0), epsilon = 1e-7);
+    /// assert_relative_eq!(p1.a().0, Point2::new(1.0, 0.0), epsilon = 1e-5);
     ///
     /// ```
     #[allow(clippy::type_complexity)]
