@@ -63,6 +63,11 @@ path = "examples/circle_curve.rs"
 required-features = ["bevy"]
 
 [[example]]
+name = "ellipse_arc_curve"
+path = "examples/ellipse_arc_curve.rs"
+required-features = ["bevy"]
+
+[[example]]
 name = "trim_curve"
 path = "examples/trim_curve.rs"
 required-features = ["bevy"]
