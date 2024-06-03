@@ -1,36 +1,48 @@
-use nalgebra::{Point, SVector};
+use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, OPoint, OVector};
 
 use crate::misc::FloatingPoint;
 
 /// Represents a ray in D dimensions.
-pub struct Ray<T: FloatingPoint, const D: usize> {
-    pub(crate) origin: Point<T, D>,
-    pub(crate) direction: SVector<T, D>,
+pub struct Ray<T: FloatingPoint, D>
+where
+    D: DimName,
+    DefaultAllocator: Allocator<T, D>,
+{
+    pub(crate) origin: OPoint<T, D>,
+    pub(crate) direction: OVector<T, D>,
 }
 
 /// Represents the intersection of two rays in D dimensions.
-pub struct RayIntersection<T: FloatingPoint, const D: usize> {
+pub struct RayIntersection<T: FloatingPoint, D>
+where
+    D: DimName,
+    DefaultAllocator: Allocator<T, D>,
+{
     #[allow(unused)]
-    pub(crate) intersection0: (Point<T, D>, T),
+    pub(crate) intersection0: (OPoint<T, D>, T),
     #[allow(unused)]
-    pub(crate) intersection1: (Point<T, D>, T),
+    pub(crate) intersection1: (OPoint<T, D>, T),
 }
 
-impl<T: FloatingPoint, const D: usize> Ray<T, D> {
-    pub fn new(origin: Point<T, D>, direction: SVector<T, D>) -> Self {
+impl<T: FloatingPoint, D> Ray<T, D>
+where
+    D: DimName,
+    DefaultAllocator: Allocator<T, D>,
+{
+    pub fn new(origin: OPoint<T, D>, direction: OVector<T, D>) -> Self {
         Self { origin, direction }
     }
 
-    pub fn origin(&self) -> &Point<T, D> {
+    pub fn origin(&self) -> &OPoint<T, D> {
         &self.origin
     }
 
-    pub fn direction(&self) -> &SVector<T, D> {
+    pub fn direction(&self) -> &OVector<T, D> {
         &self.direction
     }
 
-    pub fn point_at(&self, t: T) -> Point<T, D> {
-        self.origin + self.direction * t
+    pub fn point_at(&self, t: T) -> OPoint<T, D> {
+        &self.origin + &self.direction * t
     }
 
     /// Finds the intersection between two rays.

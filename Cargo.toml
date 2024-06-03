@@ -1,6 +1,6 @@
 [package]
 name = "curvo"
-version = "0.1.16"
+version = "0.1.17"
 authors = ["Masatatsu Nakamura <masatatsu.nakamura@gmail.com"]
 edition = "2021"
 keywords = ["nurbs", "modeling", "graphics", "3d"]
@@ -60,6 +60,11 @@ required-features = ["bevy"]
 [[example]]
 name = "circle_curve"
 path = "examples/circle_curve.rs"
+required-features = ["bevy"]
+
+[[example]]
+name = "ellipse_arc_curve"
+path = "examples/ellipse_arc_curve.rs"
 required-features = ["bevy"]
 
 [[example]]

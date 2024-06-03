@@ -10,7 +10,7 @@ use bevy_infinite_grid::InfiniteGridPlugin;
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use bevy_points::plugin::PointsPlugin;
-use nalgebra::Point3;
+use nalgebra::{Point2, Vector2};
 
 use curvo::prelude::*;
 
@@ -42,21 +42,8 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut line_materials: ResMut<Assets<LineMaterial>>,
 ) {
-    let corner_weight = 1. / 2.;
-    let unit_circle = NurbsCurve2D::try_new(
-        2,
-        vec![
-            Point3::new(1.0, 0.0, 1.),
-            Point3::new(1.0, 1.0, 1.0) * corner_weight,
-            Point3::new(-1.0, 1.0, 1.0) * corner_weight,
-            Point3::new(-1.0, 0.0, 1.),
-            Point3::new(-1.0, -1.0, 1.0) * corner_weight,
-            Point3::new(1.0, -1.0, 1.0) * corner_weight,
-            Point3::new(1.0, 0.0, 1.),
-        ],
-        vec![0., 0., 0., 1. / 4., 1. / 2., 1. / 2., 3. / 4., 1., 1., 1.],
-    )
-    .unwrap();
+    let unit_circle =
+        NurbsCurve2D::try_circle(&Point2::origin(), &Vector2::x(), &Vector2::y(), 1.).unwrap();
     // dbg!(unit_circle.try_length().unwrap(), 2.0 * std::f64::consts::PI);
 
     let samples = unit_circle.tessellate(Some(1e-8));

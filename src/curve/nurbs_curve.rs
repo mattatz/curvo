@@ -1,3 +1,4 @@
+use std::f64::consts::{FRAC_PI_2, TAU};
 use std::vec;
 
 use argmin::core::{ArgminFloat, Executor, State};
@@ -22,6 +23,7 @@ use crate::misc::binomial::Binomial;
 use crate::misc::frenet_frame::FrenetFrame;
 use crate::misc::transformable::Transformable;
 use crate::misc::trigonometry::{segment_closest_point, three_points_are_flat};
+use crate::misc::Ray;
 use crate::prelude::{BoundingBoxTraversal, CurveLengthParameter, Invertible, KnotVector};
 use crate::{misc::FloatingPoint, ClosestParameterNewton, ClosestParameterProblem};
 
@@ -378,21 +380,13 @@ where
     /// # Example
     /// ```
     /// use curvo::prelude::*;
-    /// use nalgebra::Point3;
+    /// use nalgebra::{Point2, Vector2};
     /// use approx::assert_relative_eq;
-    /// let corner_weight = 1. / 2.;
-    /// let unit_circle = NurbsCurve2D::try_new(
-    ///     2,
-    ///     vec![
-    ///         Point3::new(1.0, 0.0, 1.),
-    ///         Point3::new(1.0, 1.0, 1.0) * corner_weight,
-    ///         Point3::new(-1.0, 1.0, 1.0) * corner_weight,
-    ///         Point3::new(-1.0, 0.0, 1.),
-    ///         Point3::new(-1.0, -1.0, 1.0) * corner_weight,
-    ///         Point3::new(1.0, -1.0, 1.0) * corner_weight,
-    ///         Point3::new(1.0, 0.0, 1.),
-    ///     ],
-    ///     vec![0., 0., 0., 1. / 4., 1. / 2., 1. / 2., 3. / 4., 1., 1., 1.],
+    /// let unit_circle = NurbsCurve2D::try_circle(
+    ///     &Point2::origin(),
+    ///     &Vector2::x(),
+    ///     &Vector2::y(),
+    ///     1.
     /// ).unwrap();
     /// let approx = unit_circle.try_length().unwrap();
     /// let goal = 2.0 * std::f64::consts::PI; // circumference of the unit circle
@@ -439,21 +433,13 @@ where
     /// # Example
     /// ```
     /// use curvo::prelude::*;
-    /// use nalgebra::Point3;
+    /// use nalgebra::{Point2, Vector2};
     /// use approx::assert_relative_eq;
-    /// let corner_weight = 1. / 2.;
-    /// let unit_circle = NurbsCurve2D::try_new(
-    ///     2,
-    ///     vec![
-    ///         Point3::new(1.0, 0.0, 1.),
-    ///         Point3::new(1.0, 1.0, 1.0) * corner_weight,
-    ///         Point3::new(-1.0, 1.0, 1.0) * corner_weight,
-    ///         Point3::new(-1.0, 0.0, 1.),
-    ///         Point3::new(-1.0, -1.0, 1.0) * corner_weight,
-    ///         Point3::new(1.0, -1.0, 1.0) * corner_weight,
-    ///         Point3::new(1.0, 0.0, 1.),
-    ///     ],
-    ///     vec![0., 0., 0., 1. / 4., 1. / 2., 1. / 2., 3. / 4., 1., 1., 1.],
+    /// let unit_circle = NurbsCurve2D::try_circle(
+    ///     &Point2::origin(),
+    ///     &Vector2::x(),
+    ///     &Vector2::y(),
+    ///     1.,
     /// ).unwrap();
     /// let u = std::f64::consts::FRAC_PI_2; // 90 degrees
     /// let params = unit_circle.try_divide_by_length(u).unwrap();
@@ -782,6 +768,259 @@ where
             degree,
             control_points,
             knots,
+        })
+    }
+
+    /// Try to create a circle curve
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point2, Vector2};
+    /// use approx::assert_relative_eq;
+    /// let unit_circle = NurbsCurve2D::try_circle(
+    ///     &Point2::origin(),
+    ///     &Vector2::x(),
+    ///     &Vector2::y(),
+    ///     1.,
+    /// ).unwrap();
+    /// let (start, end) = unit_circle.knots_domain();
+    /// assert_eq!(start, 0.);
+    /// assert_eq!(end, std::f64::consts::TAU);
+    /// assert_relative_eq!(unit_circle.point_at(start), Point2::new(1., 0.), epsilon = 1e-10);
+    /// assert_relative_eq!(unit_circle.point_at(end), Point2::new(1., 0.), epsilon = 1e-10);
+    /// assert_relative_eq!(unit_circle.point_at((start + end) / 2.), Point2::new(-1., 0.), epsilon = 1e-10);
+    /// ```
+    pub fn try_circle(
+        center: &OPoint<T, DimNameDiff<D, U1>>,
+        x_axis: &OVector<T, DimNameDiff<D, U1>>,
+        y_axis: &OVector<T, DimNameDiff<D, U1>>,
+        radius: T,
+    ) -> anyhow::Result<Self>
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+    {
+        Self::try_arc(
+            center,
+            x_axis,
+            y_axis,
+            radius,
+            T::zero(),
+            T::from_f64(TAU).unwrap(),
+        )
+    }
+
+    /// Try to create an ellipse curve
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point2, Vector2};
+    /// use approx::assert_relative_eq;
+    /// let ellipse = NurbsCurve2D::try_ellipse(
+    ///     &Point2::origin(),
+    ///     &(Vector2::x() * 2.),
+    ///     &(Vector2::y() * 1.25),
+    /// ).unwrap();
+    /// let (start, end) = ellipse.knots_domain();
+    /// assert_eq!(start, 0.);
+    /// assert_eq!(end, std::f64::consts::TAU);
+    /// assert_relative_eq!(ellipse.point_at(start), Point2::new(2., 0.), epsilon = 1e-10);
+    /// assert_relative_eq!(ellipse.point_at(end), Point2::new(2., 0.), epsilon = 1e-10);
+    /// assert_relative_eq!(ellipse.point_at((start + end) / 2.), Point2::new(-2., 0.), epsilon = 1e-10);
+    /// assert_relative_eq!(ellipse.point_at(std::f64::consts::FRAC_PI_2), Point2::new(0., 1.25), epsilon = 1e-10);
+    /// ```
+    pub fn try_ellipse(
+        center: &OPoint<T, DimNameDiff<D, U1>>,
+        x_axis: &OVector<T, DimNameDiff<D, U1>>,
+        y_axis: &OVector<T, DimNameDiff<D, U1>>,
+    ) -> anyhow::Result<Self>
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+    {
+        Self::try_ellipse_arc(center, x_axis, y_axis, T::zero(), T::from_f64(TAU).unwrap())
+    }
+
+    /// Try to create an arc curve
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point2, Vector2};
+    /// use approx::assert_relative_eq;
+    /// let arc = NurbsCurve2D::try_arc(
+    ///     &Point2::origin(),
+    ///     &Vector2::x(),
+    ///     &Vector2::y(),
+    ///     1.,
+    ///     0.,
+    ///     std::f64::consts::FRAC_PI_2,
+    /// ).unwrap();
+    /// let (start, end) = arc.knots_domain();
+    /// assert_eq!(start, 0.);
+    /// assert_eq!(end, std::f64::consts::FRAC_PI_2);
+    /// assert_relative_eq!(arc.point_at(start), Point2::new(1., 0.), epsilon = 1e-10);
+    /// assert_relative_eq!(arc.point_at(end), Point2::new(0., 1.), epsilon = 1e-10);
+    /// ```
+    pub fn try_arc(
+        center: &OPoint<T, DimNameDiff<D, U1>>,
+        x_axis: &OVector<T, DimNameDiff<D, U1>>,
+        y_axis: &OVector<T, DimNameDiff<D, U1>>,
+        radius: T,
+        start_angle: T,
+        end_angle: T,
+    ) -> anyhow::Result<Self>
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+    {
+        let x_axis = x_axis.normalize() * radius;
+        let y_axis = y_axis.normalize() * radius;
+        Self::try_ellipse_arc(center, &x_axis, &y_axis, start_angle, end_angle)
+    }
+
+    /// Try to create an ellipse arc curve
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point2, Vector2};
+    /// use approx::assert_relative_eq;
+    /// let ellipse_arc = NurbsCurve2D::try_ellipse_arc(
+    ///     &Point2::origin(),
+    ///     &(Vector2::x() * 2.),
+    ///     &Vector2::y(),
+    ///     0.,
+    ///     std::f64::consts::FRAC_PI_2,
+    /// ).unwrap();
+    /// let (start, end) = ellipse_arc.knots_domain();
+    /// assert_eq!(start, 0.);
+    /// assert_eq!(end, std::f64::consts::FRAC_PI_2);
+    /// assert_relative_eq!(ellipse_arc.point_at(start), Point2::new(2., 0.), epsilon = 1e-10);
+    /// assert_relative_eq!(ellipse_arc.point_at(end), Point2::new(0., 1.), epsilon = 1e-10);
+    /// ```
+    pub fn try_ellipse_arc(
+        center: &OPoint<T, DimNameDiff<D, U1>>,
+        x_axis: &OVector<T, DimNameDiff<D, U1>>,
+        y_axis: &OVector<T, DimNameDiff<D, U1>>,
+        start_angle: T,
+        end_angle: T,
+    ) -> anyhow::Result<Self>
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+    {
+        let x_radius = x_axis.norm();
+        let y_radius = y_axis.norm();
+
+        let x_axis = x_axis.normalize();
+        let y_axis = y_axis.normalize();
+
+        anyhow::ensure!(
+            end_angle > start_angle,
+            "`end_angle` must be greater than `start_angle`. {} <= {}",
+            end_angle,
+            start_angle
+        );
+
+        let theta = end_angle - start_angle;
+
+        let arcs = (theta / T::from_f64(FRAC_PI_2).unwrap()).floor().to_usize();
+        let arcs = arcs.unwrap_or(1).max(1).min(4);
+        let dtheta = theta / T::from_usize(arcs).unwrap();
+        let w1 = (dtheta / T::from_f64(2.0).unwrap()).cos();
+        let mut p0 = center
+            + &x_axis * x_radius * start_angle.cos()
+            + &y_axis * y_radius * start_angle.sin();
+        let mut t0 = &y_axis * start_angle.cos() - &x_axis * start_angle.sin();
+
+        let n = 2 * arcs + 1;
+        let degree = 2;
+        let mut control_points = vec![p0.clone(); n];
+        let mut weights = vec![T::one(); n];
+        let mut knots = vec![T::zero(); n + degree + 1];
+
+        let mut angle = start_angle;
+        let mut index = 0;
+        for i in 1..(arcs + 1) {
+            angle += dtheta;
+
+            let p2 = center + &x_axis * x_radius * angle.cos() + &y_axis * y_radius * angle.sin();
+
+            let t2 = &y_axis * angle.cos() - &x_axis * angle.sin();
+            let ray = Ray::new(p0.clone(), t0.normalize());
+            let other = Ray::new(p2.clone(), t2.normalize());
+            let intersection = ray
+                .find_intersection(&other)
+                .ok_or(anyhow::anyhow!("No intersection"))?;
+
+            let p1 = &p0 + &t0 * intersection.intersection0.1;
+
+            control_points[index + 2] = p2.clone();
+            weights[index + 2] = T::one();
+
+            control_points[index + 1] = p1;
+            weights[index + 1] = w1;
+
+            index += 2;
+
+            if i < arcs {
+                p0 = p2;
+                t0 = t2;
+            }
+        }
+
+        for i in 0..3 {
+            knots[n + i] = T::one();
+        }
+
+        match arcs {
+            2 => {
+                let v = T::from_f64(0.5).unwrap();
+                knots[3] = v;
+                knots[4] = v;
+            }
+            3 => {
+                let v1 = T::from_f64(1. / 3.).unwrap();
+                let v2 = T::from_f64(2. / 3.).unwrap();
+                knots[3] = v1;
+                knots[4] = v1;
+                knots[5] = v2;
+                knots[6] = v2;
+            }
+            4 => {
+                let v1 = T::from_f64(1. / 4.).unwrap();
+                let v2 = T::from_f64(2. / 4.).unwrap();
+                let v3 = T::from_f64(3. / 4.).unwrap();
+                knots[3] = v1;
+                knots[4] = v1;
+                knots[5] = v2;
+                knots[6] = v2;
+                knots[7] = v3;
+                knots[8] = v3;
+            }
+            _ => {}
+        };
+
+        // convert normalized knot range to the given start and end angle
+        knots.iter_mut().for_each(|v| {
+            *v = theta * *v + start_angle;
+        });
+
+        Ok(Self {
+            degree,
+            control_points: control_points
+                .into_iter()
+                .enumerate()
+                .map(|(i, p)| {
+                    let mut coords = vec![];
+                    let w = weights[i];
+                    for i in 0..(D::dim() - 1) {
+                        coords.push(p[i] * w);
+                    }
+                    coords.push(w);
+                    OPoint::from_slice(&coords)
+                })
+                .collect(),
+            knots: KnotVector::new(knots),
         })
     }
 
@@ -1215,21 +1454,13 @@ where
     /// # Example
     /// ```
     /// use curvo::prelude::*;
-    /// use nalgebra::{Point2, Point3};
+    /// use nalgebra::{Point2, Point3, Vector2};
     /// use approx::assert_relative_eq;
-    /// let corner_weight = 1. / 2.;
-    /// let unit_circle = NurbsCurve2D::try_new(
-    ///     2,
-    ///     vec![
-    ///         Point3::new(1.0, 0.0, 1.),
-    ///         Point3::new(1.0, 1.0, 1.0) * corner_weight,
-    ///         Point3::new(-1.0, 1.0, 1.0) * corner_weight,
-    ///         Point3::new(-1.0, 0.0, 1.),
-    ///         Point3::new(-1.0, -1.0, 1.0) * corner_weight,
-    ///         Point3::new(1.0, -1.0, 1.0) * corner_weight,
-    ///         Point3::new(1.0, 0.0, 1.),
-    ///     ],
-    ///     vec![0., 0., 0., 1. / 4., 1. / 2., 1. / 2., 3. / 4., 1., 1., 1.],
+    /// let unit_circle = NurbsCurve2D::try_circle(
+    ///     &Point2::origin(),
+    ///     &Vector2::x(),
+    ///     &Vector2::y(),
+    ///     1.
     /// ).unwrap();
     /// let line = NurbsCurve2D::try_new(
     ///     1,
