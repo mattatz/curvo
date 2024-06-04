@@ -1,4 +1,5 @@
 /// A struct that contains the parameter of a curve and the arc length of the curve at that parameter.
+#[derive(Debug, Clone, Copy)]
 pub struct CurveLengthParameter<T: Copy> {
     parameter: T,
     length: T,
