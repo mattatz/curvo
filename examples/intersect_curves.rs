@@ -83,13 +83,8 @@ fn setup(
         .insert(FirstCurve(curve.clone()))
         .insert(Name::new("curve"));
 
-    let circle = NurbsCurve2D::try_circle(
-        &Point2::origin(),
-        &Vector2::x(),
-        &Vector2::y(),
-        1.,
-    )
-    .unwrap();
+    let circle =
+        NurbsCurve2D::try_circle(&Point2::origin(), &Vector2::x(), &Vector2::y(), 1.).unwrap();
 
     let line_vertices = circle
         .tessellate(Some(1e-8))

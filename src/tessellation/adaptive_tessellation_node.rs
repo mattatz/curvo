@@ -25,8 +25,7 @@ where
     pub(crate) split_vertical: bool,
     pub(crate) split_horizontal: bool,
     pub(crate) horizontal: bool,
-    pub(crate) u05: T,
-    pub(crate) v05: T,
+    pub(crate) center: Vector2<T>,
 }
 
 impl<T: FloatingPoint, D: DimName> AdaptiveTessellationNode<T, D>
@@ -49,8 +48,7 @@ where
             split_horizontal: false,
             split_vertical: false,
             horizontal: false,
-            u05: T::zero(),
-            v05: T::zero(),
+            center: Vector2::zeros(),
         }
     }
 
@@ -63,19 +61,18 @@ where
     }
 
     pub fn center(&self, surface: &NurbsSurface<T, D>) -> SurfacePoint<T, DimNameDiff<D, U1>> {
-        self.evaluate_surface(surface, self.u05, self.v05)
+        self.evaluate_surface(surface, self.center)
     }
 
     pub fn evaluate_corners(&mut self, surface: &NurbsSurface<T, D>) {
         //eval the center
         let inv = T::from_f64(0.5).unwrap();
-        self.u05 = (self.corners[0].uv[0] + self.corners[2].uv[0]) * inv;
-        self.v05 = (self.corners[0].uv[1] + self.corners[2].uv[1]) * inv;
+        self.center = (self.corners[0].uv + self.corners[2].uv) * inv;
 
         //eval all of the corners
         for i in 0..4 {
             let c = &self.corners[i];
-            let evaled = self.evaluate_surface(surface, c.uv[0], c.uv[1]);
+            let evaled = self.evaluate_surface(surface, c.uv);
             self.corners[i] = evaled;
         }
     }
@@ -83,10 +80,9 @@ where
     pub fn evaluate_surface(
         &self,
         surface: &NurbsSurface<T, D>,
-        u: T,
-        v: T,
+        uv: Vector2<T>,
     ) -> SurfacePoint<T, DimNameDiff<D, U1>> {
-        let derivs = surface.rational_derivatives(u, v, 1);
+        let derivs = surface.rational_derivatives(uv.x, uv.y, 1);
         let pt = derivs[0][0].clone();
         let mut norm = derivs[0][1].cross(&derivs[1][0]);
         let degen = norm.magnitude_squared() < T::default_epsilon();
@@ -96,7 +92,7 @@ where
         SurfacePoint {
             point: pt.into(),
             normal: norm,
-            uv: Vector2::new(u, v),
+            uv,
             is_normal_degenerated: degen,
         }
     }
@@ -184,20 +180,28 @@ where
             None => {
                 match index {
                     0 => {
-                        self.mid_points[0] =
-                            Some(self.evaluate_surface(surface, self.u05, self.corners[0].uv[1]));
+                        self.mid_points[0] = Some(self.evaluate_surface(
+                            surface,
+                            Vector2::new(self.center.x, self.corners[0].uv.y),
+                        ));
                     }
                     1 => {
-                        self.mid_points[1] =
-                            Some(self.evaluate_surface(surface, self.corners[1].uv[0], self.v05));
+                        self.mid_points[1] = Some(self.evaluate_surface(
+                            surface,
+                            Vector2::new(self.corners[1].uv.x, self.center.y),
+                        ));
                     }
                     2 => {
-                        self.mid_points[2] =
-                            Some(self.evaluate_surface(surface, self.u05, self.corners[2].uv[1]));
+                        self.mid_points[2] = Some(self.evaluate_surface(
+                            surface,
+                            Vector2::new(self.center.x, self.corners[2].uv.y),
+                        ));
                     }
                     3 => {
-                        self.mid_points[3] =
-                            Some(self.evaluate_surface(surface, self.corners[0].uv[0], self.v05));
+                        self.mid_points[3] = Some(self.evaluate_surface(
+                            surface,
+                            Vector2::new(self.corners[0].uv.x, self.center.y),
+                        ));
                     }
                     _ => {}
                 };
