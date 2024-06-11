@@ -61,6 +61,18 @@ where
         }
     }
 
+    pub fn u_degree(&self) -> usize {
+        self.u_degree
+    }
+
+    pub fn v_degree(&self) -> usize {
+        self.v_degree
+    }
+
+    pub fn control_points(&self) -> &Vec<Vec<OPoint<T, D>>> {
+        &self.control_points
+    }
+
     /// Get the u domain of the knot vector by degree
     pub fn u_knots_domain(&self) -> (T, T) {
         self.u_knots.domain(self.u_degree)
