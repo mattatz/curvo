@@ -20,7 +20,7 @@ where
     pub(crate) id: usize,
     pub(crate) children: Vec<usize>,
     pub(crate) corners: [SurfacePoint<T, DimNameDiff<D, U1>>; 4],
-    pub(crate) neighbors: [Option<usize>; 4],
+    pub(crate) neighbors: [Option<usize>; 4], // [south, east, north, west] order (east & west are u direction, north & south are v direction)
     pub(crate) mid_points: [Option<SurfacePoint<T, DimNameDiff<D, U1>>>; 4],
     pub(crate) split_vertical: bool,
     pub(crate) split_horizontal: bool,
@@ -254,16 +254,19 @@ where
             return false;
         }
 
-        self.split_vertical = (self.corners[0].normal() - self.corners[1].normal()).norm_squared()
-            > options.norm_tolerance
-            || (self.corners[2].normal() - self.corners[3].normal()).norm_squared()
-                > options.norm_tolerance;
+        // println!("{}, {}", surface.v_degree() >= 2, surface.u_degree() >= 2);
 
-        self.split_horizontal = (self.corners[1].normal() - self.corners[2].normal())
-            .norm_squared()
-            > options.norm_tolerance
-            || (self.corners[3].normal() - self.corners[0].normal()).norm_squared()
-                > options.norm_tolerance;
+        self.split_vertical = surface.u_degree() >= 2
+            && ((self.corners[0].normal() - self.corners[1].normal()).norm_squared()
+                > options.norm_tolerance
+                || (self.corners[2].normal() - self.corners[3].normal()).norm_squared()
+                    > options.norm_tolerance);
+
+        self.split_horizontal = surface.v_degree() >= 2
+            && ((self.corners[1].normal() - self.corners[2].normal()).norm_squared()
+                > options.norm_tolerance
+                || (self.corners[3].normal() - self.corners[0].normal()).norm_squared()
+                    > options.norm_tolerance);
 
         if self.split_vertical || self.split_horizontal {
             return true;

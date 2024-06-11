@@ -323,8 +323,8 @@ where
         let is_adaptive = adaptive_options.is_some();
         let mut options = adaptive_options.unwrap_or_default();
 
-        let min_u = (self.control_points.len() - 1) * 2;
-        let min_v = (self.control_points[0].len() - 1) * 2;
+        let min_u = (self.control_points.len() - 1) * 2.min(self.u_degree);
+        let min_v = (self.control_points[0].len() - 1) * 2.min(self.v_degree);
 
         options.min_divs_u = options.min_divs_u.max(min_u);
         options.min_divs_v = options.min_divs_v.max(min_v);
