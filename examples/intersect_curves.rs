@@ -9,7 +9,7 @@ use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin, InfiniteGridSet
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use bevy_points::{plugin::PointsPlugin, prelude::PointsMaterial};
-use nalgebra::{Point2, Point3, Rotation2, Translation2};
+use nalgebra::{Point2, Point3, Rotation2, Translation2, Vector2};
 
 use curvo::prelude::*;
 
@@ -83,21 +83,8 @@ fn setup(
         .insert(FirstCurve(curve.clone()))
         .insert(Name::new("curve"));
 
-    let corner_weight = 1. / 2.;
-    let circle = NurbsCurve2D::try_new(
-        2,
-        vec![
-            Point3::new(1.0, 0.0, 1.),
-            Point3::new(1.0, 1.0, 1.0) * corner_weight,
-            Point3::new(-1.0, 1.0, 1.0) * corner_weight,
-            Point3::new(-1.0, 0.0, 1.),
-            Point3::new(-1.0, -1.0, 1.0) * corner_weight,
-            Point3::new(1.0, -1.0, 1.0) * corner_weight,
-            Point3::new(1.0, 0.0, 1.),
-        ],
-        vec![0., 0., 0., 1. / 4., 1. / 2., 1. / 2., 3. / 4., 1., 1., 1.],
-    )
-    .unwrap();
+    let circle =
+        NurbsCurve2D::try_circle(&Point2::origin(), &Vector2::x(), &Vector2::y(), 1.).unwrap();
 
     let line_vertices = circle
         .tessellate(Some(1e-8))

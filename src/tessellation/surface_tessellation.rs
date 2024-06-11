@@ -1,6 +1,6 @@
 use nalgebra::{
-    allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, OVector,
-    Vector2, U1,
+    allocator::Allocator, Const, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint,
+    OVector, Vector2, U1,
 };
 use simba::scalar::SupersetOf;
 
@@ -23,6 +23,12 @@ where
     pub(crate) faces: Vec<[usize; 3]>,
     pub(crate) uvs: Vec<Vector2<T>>,
 }
+
+/// 2D tessellation alias
+pub type SurfaceTessellation2D<T> = SurfaceTessellation<T, Const<3>>;
+
+/// 3D tessellation alias
+pub type SurfaceTessellation3D<T> = SurfaceTessellation<T, Const<4>>;
 
 impl<T: FloatingPoint, D: DimName> SurfaceTessellation<T, D>
 where

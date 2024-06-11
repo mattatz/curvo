@@ -12,9 +12,8 @@ use crate::{
     misc::Ray,
     prelude::{KnotVector, SurfaceTessellation},
     tessellation::adaptive_tessellation_node::AdaptiveTessellationNode,
-    tessellation::adaptive_tessellation_processor::{
-        AdaptiveTessellationOptions, AdaptiveTessellationProcessor,
-    },
+    tessellation::adaptive_tessellation_option::AdaptiveTessellationOptions,
+    tessellation::adaptive_tessellation_processor::AdaptiveTessellationProcessor,
     tessellation::surface_point::SurfacePoint,
 };
 
@@ -59,6 +58,18 @@ where
             v_knots: KnotVector::new(v_knots),
             control_points,
         }
+    }
+
+    pub fn u_degree(&self) -> usize {
+        self.u_degree
+    }
+
+    pub fn v_degree(&self) -> usize {
+        self.v_degree
+    }
+
+    pub fn control_points(&self) -> &Vec<Vec<OPoint<T, D>>> {
+        &self.control_points
     }
 
     /// Get the u domain of the knot vector by degree
@@ -309,43 +320,62 @@ where
         adaptive_options: Option<AdaptiveTessellationOptions<T>>,
     ) -> SurfaceTessellation<T, D> {
         let is_adaptive = adaptive_options.is_some();
-        let mut options = adaptive_options.unwrap_or_default();
+        let options = adaptive_options.unwrap_or_default();
 
-        let min_u = (self.control_points.len() - 1) * 2;
-        let min_v = (self.control_points[0].len() - 1) * 2;
+        let us: Vec<_> = if self.u_degree <= 1 {
+            self.u_knots
+                .iter()
+                .skip(1)
+                .take(self.u_knots.len() - 2)
+                .cloned()
+                .collect()
+        } else {
+            let min_u = (self.control_points.len() - 1) * 2;
+            let divs_u = options.min_divs_u.max(min_u);
+            let (umin, umax) = self.u_knots_domain();
+            let du = (umax - umin) / T::from_usize(divs_u).unwrap();
+            (0..=divs_u)
+                .map(|i| umin + du * T::from_usize(i).unwrap())
+                .collect()
+        };
 
-        options.min_divs_u = options.min_divs_u.max(min_u);
-        options.min_divs_v = options.min_divs_v.max(min_v);
-
-        let divs_u = options.min_divs_u;
-        let divs_v = options.min_divs_v;
-
-        let (umin, umax) = self.u_knots_domain();
-        let (vmin, vmax) = self.v_knots_domain();
-        let du = (umax - umin) / T::from_usize(divs_u).unwrap();
-        let dv = (vmax - vmin) / T::from_usize(divs_v).unwrap();
+        let vs: Vec<_> = if self.v_degree <= 1 {
+            self.v_knots
+                .iter()
+                .skip(1)
+                .take(self.v_knots.len() - 2)
+                .cloned()
+                .collect()
+        } else {
+            let min_v = (self.control_points[0].len() - 1) * 2;
+            let divs_v = options.min_divs_v.max(min_v);
+            let (vmin, vmax) = self.v_knots_domain();
+            let dv = (vmax - vmin) / T::from_usize(divs_v).unwrap();
+            (0..=divs_v)
+                .map(|i| vmin + dv * T::from_usize(i).unwrap())
+                .collect()
+        };
 
         let mut pts = vec![];
 
-        for i in 0..=divs_v {
+        vs.iter().for_each(|v| {
             let mut row = vec![];
-            for j in 0..=divs_u {
-                let u = umin + du * T::from_usize(j).unwrap();
-                let v = vmin + dv * T::from_usize(i).unwrap();
-
-                let ds = self.rational_derivatives(u, v, 1);
+            us.iter().for_each(|u| {
+                let ds = self.rational_derivatives(*u, *v, 1);
                 let norm = ds[0][1].cross(&ds[1][0]).normalize();
                 row.push(SurfacePoint {
                     point: ds[0][0].clone().into(),
                     normal: norm,
-                    uv: Vector2::new(u, v),
+                    uv: Vector2::new(*u, *v),
                     is_normal_degenerated: false,
                 });
-            }
+            });
             pts.push(row);
-        }
+        });
 
         let mut divs = vec![];
+        let divs_u = us.len() - 1;
+        let divs_v = vs.len() - 1;
         for i in 0..divs_v {
             for j in 0..divs_u {
                 let iv = divs_v - i;
