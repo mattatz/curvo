@@ -22,8 +22,6 @@ where
     pub(crate) corners: [SurfacePoint<T, DimNameDiff<D, U1>>; 4],
     pub(crate) neighbors: [Option<usize>; 4], // [south, east, north, west] order (east & west are u direction, north & south are v direction)
     pub(crate) mid_points: [Option<SurfacePoint<T, DimNameDiff<D, U1>>>; 4],
-    pub(crate) split_vertical: bool,
-    pub(crate) split_horizontal: bool,
     pub(crate) horizontal: bool,
     pub(crate) center: Vector2<T>,
 }
@@ -45,8 +43,6 @@ where
             neighbors: neighbors.unwrap_or([None, None, None, None]),
             children: vec![],
             mid_points: [None, None, None, None],
-            split_horizontal: false,
-            split_vertical: false,
             horizontal: false,
             center: Vector2::zeros(),
         }
@@ -235,48 +231,78 @@ where
         }
     }
 
+    /// Check if the node should be divided
     pub fn should_divide(
         &mut self,
         surface: &NurbsSurface<T, D>,
         options: &AdaptiveTessellationOptions<T>,
         current_depth: usize,
-    ) -> bool {
+    ) -> DividableDirection {
+        let is_u_linear = surface.u_degree() <= 1;
+        let is_v_linear = surface.v_degree() <= 1;
+
         if current_depth < options.min_depth {
-            return true;
+            match (is_u_linear, is_v_linear) {
+                (true, true) => return DividableDirection::None,
+                (true, false) => return DividableDirection::Vertical,
+                (false, true) => return DividableDirection::Horizontal,
+                (false, false) => return DividableDirection::Both,
+            }
         }
+
         if current_depth >= options.max_depth {
-            return false;
+            return DividableDirection::None;
         }
 
         if self.has_bad_normals() {
             self.fix_normals();
             //don't divide any further when encountering a degenerate normal
-            return false;
+            return DividableDirection::None;
         }
 
         // println!("{}, {}", surface.v_degree() >= 2, surface.u_degree() >= 2);
 
-        self.split_vertical = surface.u_degree() >= 2
+        let vertical = !is_u_linear
             && ((self.corners[0].normal() - self.corners[1].normal()).norm_squared()
                 > options.norm_tolerance
                 || (self.corners[2].normal() - self.corners[3].normal()).norm_squared()
                     > options.norm_tolerance);
 
-        self.split_horizontal = surface.v_degree() >= 2
+        let horizontal = !is_v_linear
             && ((self.corners[1].normal() - self.corners[2].normal()).norm_squared()
                 > options.norm_tolerance
                 || (self.corners[3].normal() - self.corners[0].normal()).norm_squared()
                     > options.norm_tolerance);
 
-        if self.split_vertical || self.split_horizontal {
-            return true;
+        match (vertical, horizontal) {
+            (true, true) => DividableDirection::Both,
+            (true, false) => DividableDirection::Vertical,
+            (false, true) => DividableDirection::Horizontal,
+            (false, false) => {
+                let center = self.center(surface);
+                if (center.normal() - self.corners[0].normal()).norm_squared()
+                    > options.norm_tolerance
+                    || (center.normal() - self.corners[1].normal()).norm_squared()
+                        > options.norm_tolerance
+                    || (center.normal() - self.corners[2].normal()).norm_squared()
+                        > options.norm_tolerance
+                    || (center.normal() - self.corners[3].normal()).norm_squared()
+                        > options.norm_tolerance
+                {
+                    DividableDirection::Both
+                } else {
+                    DividableDirection::None
+                }
+            }
         }
-
-        let center = self.center(surface);
-
-        (center.normal() - self.corners[0].normal()).norm_squared() > options.norm_tolerance
-            || (center.normal() - self.corners[1].normal()).norm_squared() > options.norm_tolerance
-            || (center.normal() - self.corners[2].normal()).norm_squared() > options.norm_tolerance
-            || (center.normal() - self.corners[3].normal()).norm_squared() > options.norm_tolerance
     }
+}
+
+/// Enum to represent the direction in which a node can be divided
+#[derive(Debug)]
+pub enum DividableDirection {
+    Both,
+    Vertical,
+    Horizontal,
+    None,
 }

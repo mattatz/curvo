@@ -17,6 +17,6 @@ pub mod prelude {
     pub use crate::knot::*;
     pub use crate::misc::*;
     pub use crate::surface::*;
-    pub use crate::tessellation::adaptive_tessellation_processor::AdaptiveTessellationOptions;
+    pub use crate::tessellation::adaptive_tessellation_option::AdaptiveTessellationOptions;
     pub use crate::tessellation::surface_tessellation::*;
 }

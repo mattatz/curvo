@@ -1,38 +1,14 @@
-use nalgebra::{
-    allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, RealField, U1,
-};
+use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, U1};
 
 use crate::{
     misc::FloatingPoint, prelude::NurbsSurface,
     tessellation::adaptive_tessellation_node::AdaptiveTessellationNode,
 };
 
-/// Options for adaptive tessellation of a surface
-#[derive(Clone, Debug)]
-pub struct AdaptiveTessellationOptions<T: RealField> {
-    /// Tolerance for the normal vector: if the L2 norm of the normal vectors is below this value, the edge is considered flat
-    pub norm_tolerance: T,
-    /// Minimum number of divisions in u direction
-    pub min_divs_u: usize,
-    /// Minimum number of divisions in v direction
-    pub min_divs_v: usize,
-    /// Minimum depth for division
-    pub min_depth: usize,
-    /// Maximum depth for division
-    pub max_depth: usize,
-}
-
-impl<T: RealField> Default for AdaptiveTessellationOptions<T> {
-    fn default() -> Self {
-        Self {
-            norm_tolerance: T::from_f64(2.5e-2).unwrap(),
-            min_divs_u: 1,
-            min_divs_v: 1,
-            min_depth: 0,
-            max_depth: 8,
-        }
-    }
-}
+use super::{
+    adaptive_tessellation_node::DividableDirection,
+    adaptive_tessellation_option::AdaptiveTessellationOptions,
+};
 
 /// Processor for adaptive tessellation of a surface
 pub struct AdaptiveTessellationProcessor<'a, T: FloatingPoint, D: DimName>
@@ -114,7 +90,8 @@ where
     }
 
     pub fn divide(&mut self, id: usize, options: &AdaptiveTessellationOptions<T>) {
-        self.iterate(id, options, 0, true);
+        let horizontal = self.surface.u_degree() > 1;
+        self.iterate(id, options, 0, horizontal);
     }
 
     /// Iterate over the nodes and divide them if necessary
@@ -129,23 +106,21 @@ where
         let id0 = self.nodes.len();
         let id1 = id0 + 1;
 
-        let (c0, c1) = {
-            let node = self.nodes.get_mut(id).unwrap();
-            node.evaluate_corners(self.surface);
+        let node = self.nodes.get_mut(id).unwrap();
+        node.evaluate_corners(self.surface);
 
-            if !node.should_divide(self.surface, options, current_depth) {
+        let dividable = node.should_divide(self.surface, options, current_depth);
+
+        node.horizontal = match dividable {
+            DividableDirection::Both => horizontal,
+            DividableDirection::Vertical => false,
+            DividableDirection::Horizontal => true,
+            DividableDirection::None => {
                 return;
             }
+        };
 
-            //is the quad flat in one dir and curved in the other?
-            node.horizontal = if node.split_vertical && !node.split_horizontal {
-                false
-            } else if !node.split_vertical && node.split_horizontal {
-                true
-            } else {
-                horizontal
-            };
-
+        let (c0, c1) = {
             if node.horizontal {
                 let bottom = [
                     node.corners[0].clone(),
