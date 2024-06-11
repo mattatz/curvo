@@ -33,6 +33,7 @@ bevy_points = { version = "0.5.1", optional = true }
 argmin = "0.10.0"
 argmin-math = { version = "0.4.0", features = ["nalgebra_latest"] }
 itertools = "0.13.0"
+log = { version = "0.4.21", optional = true }
 
 [dev-dependencies]
 approx = { version = "0.5", default-features = false }
@@ -51,6 +52,7 @@ bevy = [
   "dep:bevy_panorbit_camera",
   "dep:bevy_points"
 ]
+log = ["dep:log"]
 
 [[example]]
 name = "interpolate_curve"

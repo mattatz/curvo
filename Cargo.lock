@@ -1687,6 +1687,7 @@ dependencies = [
  "easer",
  "gauss-quad",
  "itertools 0.13.0",
+ "log",
  "nalgebra 0.32.5",
  "num-traits",
  "rand",
