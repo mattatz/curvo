@@ -117,6 +117,8 @@ where
         self.iterate(id, options, 0, true);
     }
 
+    /// Iterate over the nodes and divide them if necessary
+    /// todo: should not divide if a degree on current direction is 1 & duplicate vertices to avoid share a normal
     fn iterate(
         &mut self,
         id: usize,

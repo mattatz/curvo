@@ -160,12 +160,12 @@ where
 
                 //clip the range of uvs to match self one
                 let idx = edge_index % 2;
-                let mut cornercopy: Vec<_> = corners
+                let mut corner: Vec<_> = corners
                     .into_iter()
                     .filter(|c| c.uv[idx] > orig[0].uv[idx] + e && c.uv[idx] < orig[2].uv[idx] - e)
                     .collect();
-                cornercopy.reverse();
-                [base_arr, cornercopy].concat()
+                corner.reverse();
+                [base_arr, corner].concat()
             }
         }
     }
@@ -271,13 +271,9 @@ where
 
         let center = self.center(surface);
 
-        return (center.normal() - self.corners[0].normal()).norm_squared()
-            > options.norm_tolerance
-            || (center.normal() - self.corners[1].normal()).norm_squared()
-                > options.norm_tolerance
-            || (center.normal() - self.corners[2].normal()).norm_squared()
-                > options.norm_tolerance
-            || (center.normal() - self.corners[3].normal()).norm_squared()
-                > options.norm_tolerance;
+        (center.normal() - self.corners[0].normal()).norm_squared() > options.norm_tolerance
+            || (center.normal() - self.corners[1].normal()).norm_squared() > options.norm_tolerance
+            || (center.normal() - self.corners[2].normal()).norm_squared() > options.norm_tolerance
+            || (center.normal() - self.corners[3].normal()).norm_squared() > options.norm_tolerance
     }
 }
