@@ -238,16 +238,8 @@ where
         options: &AdaptiveTessellationOptions<T>,
         current_depth: usize,
     ) -> DividableDirection {
-        let is_u_linear = surface.u_degree() <= 1;
-        let is_v_linear = surface.v_degree() <= 1;
-
         if current_depth < options.min_depth {
-            match (is_u_linear, is_v_linear) {
-                (true, true) => return DividableDirection::None,
-                (true, false) => return DividableDirection::Vertical,
-                (false, true) => return DividableDirection::Horizontal,
-                (false, false) => return DividableDirection::Both,
-            }
+            return DividableDirection::Both;
         }
 
         if current_depth >= options.max_depth {
@@ -262,17 +254,15 @@ where
 
         // println!("{}, {}", surface.v_degree() >= 2, surface.u_degree() >= 2);
 
-        let vertical = !is_u_linear
-            && ((self.corners[0].normal() - self.corners[1].normal()).norm_squared()
-                > options.norm_tolerance
-                || (self.corners[2].normal() - self.corners[3].normal()).norm_squared()
-                    > options.norm_tolerance);
+        let vertical = (self.corners[0].normal() - self.corners[1].normal()).norm_squared()
+            > options.norm_tolerance
+            || (self.corners[2].normal() - self.corners[3].normal()).norm_squared()
+                > options.norm_tolerance;
 
-        let horizontal = !is_v_linear
-            && ((self.corners[1].normal() - self.corners[2].normal()).norm_squared()
-                > options.norm_tolerance
-                || (self.corners[3].normal() - self.corners[0].normal()).norm_squared()
-                    > options.norm_tolerance);
+        let horizontal = (self.corners[1].normal() - self.corners[2].normal()).norm_squared()
+            > options.norm_tolerance
+            || (self.corners[3].normal() - self.corners[0].normal()).norm_squared()
+                > options.norm_tolerance;
 
         match (vertical, horizontal) {
             (true, true) => DividableDirection::Both,
