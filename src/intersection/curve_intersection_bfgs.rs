@@ -160,6 +160,7 @@ where
                     .param(param.clone())
                     .gradient(prev_grad.clone())
                     .cost(cur_cost)
+                    .max_iters(32)
             })
             .ctrlc(false);
 
