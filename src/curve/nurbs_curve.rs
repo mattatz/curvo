@@ -8,8 +8,8 @@ use itertools::Itertools;
 use nalgebra::allocator::Allocator;
 use nalgebra::{
     ComplexField, Const, DMatrix, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff,
-    DimNameSub, DimNameSum, OMatrix, OPoint, OVector, RealField, Rotation3, UnitVector3, Vector2,
-    Vector3, U1,
+    DimNameSub, DimNameSum, Matrix2, OMatrix, OPoint, OVector, RealField, Rotation3, UnitVector3,
+    Vector2, Vector3, U1,
 };
 use rand::rngs::ThreadRng;
 use rand::Rng;
@@ -17,7 +17,7 @@ use simba::scalar::SupersetOf;
 
 use crate::intersection::curve_intersection::CurveIntersection;
 use crate::intersection::{
-    CurveIntersectionNewton, CurveIntersectionProblem, CurveIntersectionSolverOptions,
+    CurveIntersectionBFGS, CurveIntersectionProblem, CurveIntersectionSolverOptions,
 };
 use crate::misc::binomial::Binomial;
 use crate::misc::frenet_frame::FrenetFrame;
@@ -924,7 +924,7 @@ where
         let theta = end_angle - start_angle;
 
         let arcs = (theta / T::from_f64(FRAC_PI_2).unwrap()).floor().to_usize();
-        let arcs = arcs.unwrap_or(1).max(1).min(4);
+        let arcs = arcs.unwrap_or(1).clamp(1, 4);
         let dtheta = theta / T::from_usize(arcs).unwrap();
         let w1 = (dtheta / T::from_f64(2.0).unwrap()).cos();
         let mut p0 = center
@@ -1538,13 +1538,18 @@ where
                 );
 
                 // Set up solver
-                let solver = CurveIntersectionNewton::<T>::new()
+                let solver = CurveIntersectionBFGS::<T>::new()
                     .with_step_size_tolerance(options.step_size_tolerance)
                     .with_cost_tolerance(options.cost_tolerance);
 
                 // Run solver
                 let res = Executor::new(problem, solver)
-                    .configure(|state| state.param(init_param).max_iters(options.max_iters))
+                    .configure(|state| {
+                        state
+                            .param(init_param)
+                            .inv_hessian(Matrix2::identity())
+                            .max_iters(options.max_iters)
+                    })
                     .run();
 
                 match res {

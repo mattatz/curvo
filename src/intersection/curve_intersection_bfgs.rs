@@ -3,10 +3,10 @@ use nalgebra::{Matrix2, Vector2};
 
 use crate::misc::FloatingPoint;
 
-/// Customized Newton's method for finding the intersections between NURBS curves
+/// Customized quasi-Newton's method for finding the intersections between NURBS curves
 /// Original source: https://argmin-rs.github.io/argmin/argmin/solver/newton/struct.Newton.html
 #[derive(Clone, Copy)]
-pub struct CurveIntersectionNewton<F> {
+pub struct CurveIntersectionBFGS<F> {
     /// Tolerance for the step size in the line search
     step_size_tolerance: F,
 
@@ -14,7 +14,7 @@ pub struct CurveIntersectionNewton<F> {
     cost_tolerance: F,
 }
 
-impl<F> Default for CurveIntersectionNewton<F>
+impl<F> Default for CurveIntersectionBFGS<F>
 where
     F: FloatingPoint,
 {
@@ -26,7 +26,7 @@ where
     }
 }
 
-impl<F> CurveIntersectionNewton<F>
+impl<F> CurveIntersectionBFGS<F>
 where
     F: FloatingPoint,
 {
@@ -47,7 +47,7 @@ where
 }
 
 impl<O, F> Solver<O, IterState<Vector2<F>, Vector2<F>, (), Matrix2<F>, (), F>>
-    for CurveIntersectionNewton<F>
+    for CurveIntersectionBFGS<F>
 where
     O: Gradient<Param = Vector2<F>, Gradient = Vector2<F>>
         + CostFunction<Param = Vector2<F>, Output = F>,

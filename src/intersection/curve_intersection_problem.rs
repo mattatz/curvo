@@ -1,7 +1,7 @@
 use argmin::core::{CostFunction, Gradient};
 
 use nalgebra::{
-    allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, Vector2, U1,
+    allocator::Allocator, Const, DefaultAllocator, DimName, DimNameDiff, DimNameSub, Vector2, U1,
 };
 
 use crate::{curve::nurbs_curve::NurbsCurve, misc::FloatingPoint};
@@ -53,15 +53,23 @@ where
     type Output = T;
 
     fn cost(&self, param: &Self::Param) -> Result<Self::Output, anyhow::Error> {
-        let da = self.a.knots_domain();
-        let db = self.b.knots_domain();
-        if param[0] < da.0 || da.1 < param[0] || param[1] < db.0 || db.1 < param[1] {
-            Err(anyhow::anyhow!("Parameter out of domain"))
-        } else {
-            let p1 = self.a.point_at(param[0]);
-            let p2 = self.b.point_at(param[1]);
-            let d = p1 - p2;
+        let p1 = self.a.point(param[0]);
+        let p2 = self.b.point(param[1]);
+        let c1 = p1.coords;
+        let c2 = p2.coords;
+        let idx = D::dim() - 1;
+        let w1 = c1[idx];
+        let w2 = c2[idx];
+
+        if w1 != T::zero() && w2 != T::zero() {
+            let v1 =
+                c1.generic_view((0, 0), (<D as DimNameSub<U1>>::Output::name(), Const::<1>)) / w1;
+            let v2 =
+                c2.generic_view((0, 0), (<D as DimNameSub<U1>>::Output::name(), Const::<1>)) / w2;
+            let d = v1 - v2;
             Ok(d.norm_squared())
+        } else {
+            Err(anyhow::anyhow!("Parameter out of domain"))
         }
     }
 }
