@@ -2,14 +2,15 @@ use std::f64::consts::{FRAC_PI_2, TAU};
 use std::vec;
 
 use argmin::core::{ArgminFloat, Executor, State};
+use argmin::solver::linesearch::MoreThuenteLineSearch;
 use argmin_math::ArgminScaledSub;
 use gauss_quad::GaussLegendre;
 use itertools::Itertools;
 use nalgebra::allocator::Allocator;
 use nalgebra::{
     ComplexField, Const, DMatrix, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff,
-    DimNameSub, DimNameSum, OMatrix, OPoint, OVector, RealField, Rotation3, UnitVector3, Vector2,
-    Vector3, U1,
+    DimNameSub, DimNameSum, Matrix2, OMatrix, OPoint, OVector, RealField, Rotation3, UnitVector3,
+    Vector2, Vector3, U1,
 };
 use rand::rngs::ThreadRng;
 use rand::Rng;
@@ -17,7 +18,8 @@ use simba::scalar::SupersetOf;
 
 use crate::intersection::curve_intersection::CurveIntersection;
 use crate::intersection::{
-    CurveIntersectionNewton, CurveIntersectionProblem, CurveIntersectionSolverOptions,
+    CurveIntersectionBFGS, CurveIntersectionNewton, CurveIntersectionProblem,
+    CurveIntersectionSolverOptions,
 };
 use crate::misc::binomial::Binomial;
 use crate::misc::frenet_frame::FrenetFrame;
@@ -1538,13 +1540,25 @@ where
                 );
 
                 // Set up solver
-                let solver = CurveIntersectionNewton::<T>::new()
-                    .with_step_size_tolerance(options.step_size_tolerance)
-                    .with_cost_tolerance(options.cost_tolerance);
+                // let solver = CurveIntersectionNewton::<T>::new().with_step_size_tolerance(options.step_size_tolerance).with_cost_tolerance(options.cost_tolerance);
+
+                let linesearch = MoreThuenteLineSearch::<Vector2<T>, Vector2<T>, T>::new()
+                    .with_c(T::from_f64(1e-4).unwrap(), T::from_f64(0.9).unwrap())
+                    .unwrap();
+                let solver = CurveIntersectionBFGS::new(linesearch)
+                    .with_tolerance_grad(options.step_size_tolerance)
+                    .and_then(|bfgs| bfgs.with_tolerance_cost(options.cost_tolerance))
+                    .unwrap();
+                // let solver = CurveIntersectionBFGS::new(linesearch);
 
                 // Run solver
                 let res = Executor::new(problem, solver)
-                    .configure(|state| state.param(init_param).max_iters(options.max_iters))
+                    .configure(|state| {
+                        state
+                            .param(init_param)
+                            .inv_hessian(Matrix2::identity())
+                            .max_iters(options.max_iters)
+                    })
                     .run();
 
                 match res {
@@ -1556,7 +1570,7 @@ where
                             CurveIntersection::new((p0, param[0]), (p1, param[1]))
                         })
                     }
-                    Err(_e) => {
+                    Err(e) => {
                         // println!("{}", e);
                         None
                     }
