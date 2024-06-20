@@ -60,6 +60,7 @@ where
         let idx = D::dim() - 1;
         let w1 = c1[idx];
         let w2 = c2[idx];
+
         if w1 != T::zero() && w2 != T::zero() {
             let v1 =
                 c1.generic_view((0, 0), (<D as DimNameSub<U1>>::Output::name(), Const::<1>)) / w1;
@@ -70,23 +71,5 @@ where
         } else {
             Err(anyhow::anyhow!("Parameter out of domain"))
         }
-
-        /*
-        let p1 = self.a.point_at(param[0]);
-        let p2 = self.b.point_at(param[1]);
-        let d = p1 - p2;
-        Ok(d.norm_squared())
-        */
-
-        /*
-        if param[0] < da.0 || da.1 < param[0] || param[1] < db.0 || db.1 < param[1] {
-            Err(anyhow::anyhow!("Parameter out of domain"))
-        } else {
-            let p1 = self.a.point_at(param[0]);
-            let p2 = self.b.point_at(param[1]);
-            let d = p1 - p2;
-            Ok(d.norm_squared())
-        }
-        */
     }
 }
