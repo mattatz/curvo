@@ -154,19 +154,20 @@ where
         // println!("iter: {:?}, p: {:?}", state.get_iter(), param);
 
         // Run solver
-        let OptimizationResult {
-            problem: line_problem,
-            state: mut sub_state,
-            ..
-        } = Executor::new(problem.take_problem().unwrap(), self.linesearch.clone())
+        let solver = Executor::new(problem.take_problem().unwrap(), self.linesearch.clone())
             .configure(|config| {
                 config
                     .param(param.clone())
                     .gradient(prev_grad.clone())
                     .cost(cur_cost)
             })
-            .ctrlc(false)
-            .run()?;
+            .ctrlc(false);
+
+        let OptimizationResult {
+            problem: line_problem,
+            state: mut sub_state,
+            ..
+        } = solver.run()?;
 
         let xk1 = sub_state.take_param().ok_or_else(argmin_error_closure!(
             PotentialBug,
