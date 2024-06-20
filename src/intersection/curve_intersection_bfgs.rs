@@ -1,79 +1,64 @@
-use anyhow::Error;
-use argmin::{
-    argmin_error, argmin_error_closure,
-    core::{
-        ArgminFloat, CostFunction, Executor, Gradient, IterState, LineSearch, OptimizationResult,
-        Problem, Solver, State, TerminationReason, TerminationStatus, KV,
-    },
-    float,
-};
-use nalgebra::{ComplexField, Matrix2, Vector2};
+use argmin::{argmin_error_closure, core::*, float};
+use nalgebra::{Matrix2, Vector2};
 
 use crate::misc::FloatingPoint;
 
 /// Customized quasi-Newton's method for finding the intersections between NURBS curves
-/// Original source: https://argmin-rs.github.io/argmin/argmin/solver/quasinewton/struct.BFGS.html
-#[derive(Clone)]
-pub struct CurveIntersectionBFGS<L, F> {
-    /// line search
-    linesearch: L,
-    /// Tolerance for the stopping criterion based on the change of the norm on the gradient
-    tol_grad: F,
-    /// Tolerance for the stopping criterion based on the change of the cost stopping criterion
-    tol_cost: F,
+/// Original source: https://argmin-rs.github.io/argmin/argmin/solver/newton/struct.Newton.html
+#[derive(Clone, Copy)]
+pub struct CurveIntersectionBFGS<F> {
+    /// Tolerance for the step size in the line search
+    step_size_tolerance: F,
+
+    /// Tolerance for the cost function to determine convergence
+    cost_tolerance: F,
 }
 
-impl<L, F> CurveIntersectionBFGS<L, F>
+impl<F> Default for CurveIntersectionBFGS<F>
 where
     F: FloatingPoint,
 {
-    pub fn new(linesearch: L) -> Self {
-        CurveIntersectionBFGS {
-            linesearch,
-            tol_grad: F::default_epsilon().sqrt(),
-            tol_cost: F::default_epsilon(),
+    fn default() -> Self {
+        Self {
+            step_size_tolerance: float!(1e-8),
+            cost_tolerance: float!(1e-8),
         }
-    }
-
-    pub fn with_tolerance_grad(mut self, tol_grad: F) -> Result<Self, Error> {
-        if tol_grad < float!(0.0) {
-            return Err(argmin_error!(
-                InvalidParameter,
-                "`BFGS`: gradient tolerance must be >= 0."
-            ));
-        }
-        self.tol_grad = tol_grad;
-        Ok(self)
-    }
-
-    pub fn with_tolerance_cost(mut self, tol_cost: F) -> Result<Self, Error> {
-        if tol_cost < float!(0.0) {
-            return Err(argmin_error!(
-                InvalidParameter,
-                "`BFGS`: cost tolerance must be >= 0."
-            ));
-        }
-        self.tol_cost = tol_cost;
-        Ok(self)
     }
 }
 
-impl<O, L, F> Solver<O, IterState<Vector2<F>, Vector2<F>, (), Matrix2<F>, (), F>>
-    for CurveIntersectionBFGS<L, F>
+impl<F> CurveIntersectionBFGS<F>
 where
-    O: CostFunction<Param = Vector2<F>, Output = F>
-        + Gradient<Param = Vector2<F>, Gradient = Vector2<F>>,
-    L: Clone
-        + LineSearch<Vector2<F>, F>
-        + Solver<O, IterState<Vector2<F>, Vector2<F>, (), (), (), F>>,
+    F: FloatingPoint,
+{
+    /// Construct a new instance of [`Newton`]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_step_size_tolerance(mut self, tolerance: F) -> Self {
+        self.step_size_tolerance = tolerance;
+        self
+    }
+
+    pub fn with_cost_tolerance(mut self, tolerance: F) -> Self {
+        self.cost_tolerance = tolerance;
+        self
+    }
+}
+
+impl<O, F> Solver<O, IterState<Vector2<F>, Vector2<F>, (), Matrix2<F>, (), F>>
+    for CurveIntersectionBFGS<F>
+where
+    O: Gradient<Param = Vector2<F>, Gradient = Vector2<F>>
+        + CostFunction<Param = Vector2<F>, Output = F>,
     F: FloatingPoint + ArgminFloat,
 {
-    const NAME: &'static str = "Curve intersection quasi-newton method";
+    const NAME: &'static str = "Curve intersection newton method with line search";
 
     fn init(
         &mut self,
         problem: &mut Problem<O>,
-        mut state: IterState<Vector2<F>, Vector2<F>, (), Matrix2<F>, (), F>,
+        state: IterState<Vector2<F>, Vector2<F>, (), Matrix2<F>, (), F>,
     ) -> Result<
         (
             IterState<Vector2<F>, Vector2<F>, (), Matrix2<F>, (), F>,
@@ -81,48 +66,22 @@ where
         ),
         Error,
     > {
-        let param = state.take_param().ok_or_else(argmin_error_closure!(
+        let x0 = state.get_param().ok_or_else(argmin_error_closure!(
             NotInitialized,
             concat!(
-                "`BFGS` requires an initial parameter vector. ",
+                "`Newton` requires an initial parameter vector. ",
                 "Please provide an initial guess via `Executor`s `configure` method."
             )
         ))?;
+        let cost = problem.cost(x0)?;
 
-        let inv_hessian = state.take_inv_hessian().ok_or_else(argmin_error_closure!(
-            NotInitialized,
-            concat!(
-                "`BFGS` requires an initial inverse Hessian. ",
-                "Please provide an initial guess via `Executor`s `configure` method."
-            )
-        ))?;
-
-        let cost = state.get_cost();
-        let cost = if cost.is_infinite() {
-            problem.cost(&param)?
-        } else {
-            cost
-        };
-
-        let grad = state
-            .take_gradient()
-            .map(Result::Ok)
-            .unwrap_or_else(|| problem.gradient(&param))?;
-
-        Ok((
-            state
-                .param(param)
-                .cost(cost)
-                .gradient(grad)
-                .inv_hessian(inv_hessian),
-            None,
-        ))
+        Ok((state.cost(cost), None))
     }
 
     fn next_iter(
         &mut self,
         problem: &mut Problem<O>,
-        mut state: IterState<Vector2<F>, Vector2<F>, (), Matrix2<F>, (), F>,
+        state: IterState<Vector2<F>, Vector2<F>, (), Matrix2<F>, (), F>,
     ) -> Result<
         (
             IterState<Vector2<F>, Vector2<F>, (), Matrix2<F>, (), F>,
@@ -130,91 +89,79 @@ where
         ),
         Error,
     > {
-        let param = state.take_param().ok_or_else(argmin_error_closure!(
-            PotentialBug,
-            "`BFGS`: Parameter vector in state not set."
+        let x0 = state.get_param().ok_or_else(argmin_error_closure!(
+            NotInitialized,
+            concat!(
+                "`Newton` requires an initial parameter vector. ",
+                "Please provide an initial guess via `Executor`s `configure` method."
+            )
         ))?;
 
-        let cur_cost = state.get_cost();
+        let f0 = state.get_cost();
 
-        let prev_grad = state.take_gradient().ok_or_else(argmin_error_closure!(
-            PotentialBug,
-            "`BFGS`: Gradient in state not set."
-        ))?;
+        let g0 = match state.get_gradient() {
+            Some(prev) => *prev,
+            None => problem.gradient(x0)?,
+        };
 
-        let inv_hessian = state.take_inv_hessian().ok_or_else(argmin_error_closure!(
-            PotentialBug,
-            "`BFGS`: Inverse Hessian in state not set."
-        ))?;
+        let h0 = state.get_hessian().cloned().unwrap_or(Matrix2::identity());
+        // println!("cost: {:?}, hessian: {:?}", &f0, &h0);
 
-        let p = -inv_hessian * prev_grad;
+        // line search
+        let step = -h0 * g0;
 
-        self.linesearch.search_direction(p);
+        let norm = step.norm();
+        // println!("norm: {}", norm);
 
-        // println!("iter: {:?}, p: {:?}", state.get_iter(), param);
+        let mut t = F::one();
+        let df0 = g0.dot(&step);
+        let mut x1 = *x0;
+        let mut f1 = anyhow::Ok(f0);
 
-        // Run solver
-        let solver = Executor::new(problem.take_problem().unwrap(), self.linesearch.clone())
-            .configure(|config| {
-                config
-                    .param(param.clone())
-                    .gradient(prev_grad.clone())
-                    .cost(cur_cost)
-                    .max_iters(32)
-            })
-            .ctrlc(false);
+        let dt = F::from_f64(1e-1).unwrap();
+        let dec = F::from_f64(0.5).unwrap();
+        let mut it = 0;
+        let max_iters = state.get_max_iters();
+        for _ in 0..max_iters {
+            it += 1;
+            if t * norm < self.step_size_tolerance {
+                break;
+            }
 
-        let OptimizationResult {
-            problem: line_problem,
-            state: mut sub_state,
-            ..
-        } = solver.run()?;
+            let s = step * t;
+            x1 = x0 + s;
+            f1 = problem.cost(&x1);
+            if match f1 {
+                Ok(f1) => f1 - f0 >= dt * t * df0,
+                _ => true,
+            } {
+                t *= dec;
+            } else {
+                break;
+            }
+        }
 
-        let xk1 = sub_state.take_param().ok_or_else(argmin_error_closure!(
-            PotentialBug,
-            "`BFGS`: No parameters returned by line search."
-        ))?;
+        // println!("{}: {}, {}", state.iter, x1, f1);
 
-        let next_cost = sub_state.get_cost();
+        let f1 = f1.unwrap_or(f0);
 
-        // take care of function eval counts
-        problem.consume_problem(line_problem);
+        let g1 = problem.gradient(&x1)?;
+        let y = g1 - g0;
+        let s = step * t;
+        let ys = y.dot(&s);
+        let s_t = s * s.transpose();
+        let hy = h0 * y;
 
-        let grad = problem.gradient(&xk1)?;
-
-        let yk = grad - prev_grad;
-
-        let sk = xk1 - param;
-
-        let yksk = yk.dot(&sk);
-        let rhok = float!(1.0) / yksk;
-
-        let e = Matrix2::identity();
-        let mat1 = sk * yk.transpose();
-        let mat1 = mat1 * rhok;
-
-        let tmp1 = e - mat1;
-
-        let mat2 = mat1.transpose();
-        let tmp2 = e - mat2;
-
-        let sksk = sk * sk.transpose();
-        let sksk = sksk * rhok;
-
-        // if state.get_iter() == 0 {
-        //     let ykyk: f64 = yk.dot(&yk);
-        //     self.inv_hessian = self.inv_hessian.eye_like().mul(&(yksk / ykyk));
-        //     println!("{:?}", self.inv_hessian);
-        // }
-
-        let inv_hessian = tmp1 * (inv_hessian.dot(&tmp2)) + sksk;
+        let h1 = (h0 + s_t * ((ys + y.dot(&hy)) / (ys * ys)))
+            - (((hy * s.transpose()) + (s * hy.transpose())) / ys);
 
         Ok((
             state
-                .param(xk1)
-                .cost(next_cost)
-                .gradient(grad)
-                .inv_hessian(inv_hessian),
+                .param(x1)
+                .cost(f1)
+                .gradient(g1)
+                .hessian(h1)
+                .max_iters(max_iters - it), // decrease remaining iterations by # of line search iterations
             None,
         ))
     }
@@ -223,12 +170,51 @@ where
         &mut self,
         state: &IterState<Vector2<F>, Vector2<F>, (), Matrix2<F>, (), F>,
     ) -> TerminationStatus {
-        if state.get_gradient().unwrap().norm() < self.tol_grad {
+        if state.iter > state.max_iters {
+            return TerminationStatus::Terminated(TerminationReason::MaxItersReached);
+        }
+
+        if let Some(g) = state.get_gradient() {
+            if g.x.is_nan() || g.y.is_nan() || g.x.is_infinite() || g.y.is_infinite() {
+                return TerminationStatus::Terminated(TerminationReason::SolverExit(
+                    "gradient is NaN or infinite".into(),
+                ));
+            }
+        }
+
+        if let Some(h) = state.get_hessian() {
+            if h[(0, 0)].is_nan()
+                || h[(0, 1)].is_nan()
+                || h[(1, 0)].is_nan()
+                || h[(1, 1)].is_nan()
+                || h[(0, 0)].is_infinite()
+                || h[(0, 1)].is_infinite()
+                || h[(1, 0)].is_infinite()
+                || h[(1, 1)].is_infinite()
+            {
+                return TerminationStatus::Terminated(TerminationReason::SolverExit(
+                    "hessian is NaN or infinite".into(),
+                ));
+            }
+        }
+
+        if let (Some(g), Some(h)) = (state.get_gradient(), state.get_hessian()) {
+            let step = h * g;
+            let norm = step.norm();
+            if norm < self.step_size_tolerance {
+                return TerminationStatus::Terminated(TerminationReason::SolverExit(
+                    "step size tolerance reached".into(),
+                ));
+            }
+        }
+
+        if state.get_cost() != state.get_prev_cost()
+            && nalgebra::ComplexField::abs(state.get_cost() - state.get_prev_cost())
+                < self.cost_tolerance
+        {
             return TerminationStatus::Terminated(TerminationReason::SolverConverged);
         }
-        if ComplexField::abs(state.get_prev_cost() - state.cost) < self.tol_cost {
-            return TerminationStatus::Terminated(TerminationReason::SolverConverged);
-        }
+
         TerminationStatus::NotTerminated
     }
 }

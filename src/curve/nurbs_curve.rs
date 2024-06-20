@@ -2,7 +2,6 @@ use std::f64::consts::{FRAC_PI_2, TAU};
 use std::vec;
 
 use argmin::core::{ArgminFloat, Executor, State};
-use argmin::solver::linesearch::MoreThuenteLineSearch;
 use argmin_math::ArgminScaledSub;
 use gauss_quad::GaussLegendre;
 use itertools::Itertools;
@@ -18,8 +17,7 @@ use simba::scalar::SupersetOf;
 
 use crate::intersection::curve_intersection::CurveIntersection;
 use crate::intersection::{
-    CurveIntersectionBFGS, CurveIntersectionNewton, CurveIntersectionProblem,
-    CurveIntersectionSolverOptions,
+    CurveIntersectionBFGS, CurveIntersectionProblem, CurveIntersectionSolverOptions,
 };
 use crate::misc::binomial::Binomial;
 use crate::misc::frenet_frame::FrenetFrame;
@@ -926,7 +924,7 @@ where
         let theta = end_angle - start_angle;
 
         let arcs = (theta / T::from_f64(FRAC_PI_2).unwrap()).floor().to_usize();
-        let arcs = arcs.unwrap_or(1).max(1).min(4);
+        let arcs = arcs.unwrap_or(1).clamp(1, 4);
         let dtheta = theta / T::from_usize(arcs).unwrap();
         let w1 = (dtheta / T::from_f64(2.0).unwrap()).cos();
         let mut p0 = center
@@ -1540,16 +1538,9 @@ where
                 );
 
                 // Set up solver
-                // let solver = CurveIntersectionNewton::<T>::new().with_step_size_tolerance(options.step_size_tolerance).with_cost_tolerance(options.cost_tolerance);
-
-                let linesearch = MoreThuenteLineSearch::<Vector2<T>, Vector2<T>, T>::new()
-                    .with_c(T::from_f64(1e-4).unwrap(), T::from_f64(0.9).unwrap())
-                    .unwrap();
-                let solver = CurveIntersectionBFGS::new(linesearch)
-                    .with_tolerance_grad(options.step_size_tolerance)
-                    .and_then(|bfgs| bfgs.with_tolerance_cost(options.cost_tolerance))
-                    .unwrap();
-                // let solver = CurveIntersectionBFGS::new(linesearch);
+                let solver = CurveIntersectionBFGS::<T>::new()
+                    .with_step_size_tolerance(options.step_size_tolerance)
+                    .with_cost_tolerance(options.cost_tolerance);
 
                 // Run solver
                 let res = Executor::new(problem, solver)
@@ -1570,7 +1561,7 @@ where
                             CurveIntersection::new((p0, param[0]), (p1, param[1]))
                         })
                     }
-                    Err(e) => {
+                    Err(_e) => {
                         // println!("{}", e);
                         None
                     }
