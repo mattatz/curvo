@@ -70,6 +70,11 @@ path = "examples/ellipse_arc_curve.rs"
 required-features = ["bevy"]
 
 [[example]]
+name = "polyline_curve"
+path = "examples/polyline_curve.rs"
+required-features = ["bevy"]
+
+[[example]]
 name = "trim_curve"
 path = "examples/trim_curve.rs"
 required-features = ["bevy"]

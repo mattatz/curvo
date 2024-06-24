@@ -106,6 +106,63 @@ where
         })
     }
 
+    /// Create a new NURBS curve with a 1 degree as a polyline
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::Point2;
+    /// use itertools::Itertools;
+    /// let points = vec![
+    ///     Point2::new(-1.0, -1.0),
+    ///     Point2::new(1.0, -1.0),
+    ///     Point2::new(1.0, 0.0),
+    ///     Point2::new(-1.0, 0.0),
+    ///     Point2::new(-1.0, 1.0),
+    ///     Point2::new(1.0, 1.0),
+    /// ];
+    /// let polyline_curve = NurbsCurve2D::polyline(&points);
+    /// let (start, end) = polyline_curve.knots_domain();
+    /// let start = polyline_curve.point_at(start);
+    /// let end = polyline_curve.point_at(end);
+    /// assert_eq!(points[0], start);
+    /// assert_eq!(points[points.len() - 1], end);
+    ///
+    /// let length = polyline_curve.try_length().unwrap();
+    /// let goal = points.iter().tuple_windows().map(|(a, b)| (a - b).norm()).sum();
+    /// assert_eq!(length, goal);
+    /// ```
+    pub fn polyline(points: &[OPoint<T, DimNameDiff<D, U1>>]) -> Self
+    where
+        D: DimNameSub<U1>,
+        <D as DimNameSub<U1>>::Output: DimNameAdd<U1>,
+        DefaultAllocator: Allocator<T, D>,
+        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+        DefaultAllocator: Allocator<T, <<D as DimNameSub<U1>>::Output as DimNameAdd<U1>>::Output>,
+    {
+        let mut knots = vec![T::zero(); 2];
+
+        let mut acc = T::zero();
+        for i in 0..(points.len() - 1) {
+            acc += (&points[i] - &points[i + 1]).norm();
+            knots.push(acc);
+        }
+        knots.push(acc);
+
+        let knots = knots.into_iter().map(|k| k / acc).collect();
+
+        Self {
+            degree: 1,
+            knots: KnotVector::new(knots),
+            control_points: points
+                .iter()
+                .map(|p| {
+                    let coord = p.to_homogeneous();
+                    OPoint::from_slice(coord.as_slice())
+                })
+                .collect(),
+        }
+    }
+
     /// Create a dehomogenized version of the curve
     pub fn dehomogenize(&self) -> NurbsCurve<T, DimNameDiff<D, U1>>
     where
