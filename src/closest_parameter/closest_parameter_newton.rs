@@ -1,5 +1,4 @@
 use argmin::{argmin_error, argmin_error_closure, core::*, float};
-use argmin_math::ArgminScaledSub;
 
 /// Customized Newton's method for finding the closest parameter on a NURBS curve
 /// Original source: https://argmin-rs.github.io/argmin/argmin/solver/newton/struct.Newton.html
@@ -16,7 +15,7 @@ pub struct ClosestParameterNewton<F, P> {
 impl<F, P> ClosestParameterNewton<F, P>
 where
     F: ArgminFloat,
-    P: Clone + ArgminScaledSub<P, F, P>,
+    P: Clone,
 {
     /// Construct a new instance of [`Newton`]
     pub fn new(domain: (P, P), closed: bool) -> Self {
@@ -46,8 +45,7 @@ where
 impl<O, F> Solver<O, IterState<F, F, (), F, (), F>> for ClosestParameterNewton<F, F>
 where
     O: Gradient<Param = F, Gradient = F> + Hessian<Param = F, Hessian = F>,
-    F: Clone + ArgminScaledSub<F, F, F> + ArgminFloat,
-    F: ArgminFloat,
+    F: Clone + ArgminFloat,
 {
     const NAME: &'static str = "Closest parameter newton method";
 
@@ -67,7 +65,7 @@ where
         let grad = problem.gradient(param)?;
         let hessian = problem.hessian(param)?;
         let inv = F::one() / hessian;
-        let new_param = param.scaled_sub(&self.gamma, &(inv * grad));
+        let new_param = *param - self.gamma * inv * grad;
 
         // Constrain the parameter to the domain
         let new_param = if new_param < self.knot_domain.0 {

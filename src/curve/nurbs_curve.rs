@@ -2,7 +2,6 @@ use std::f64::consts::{FRAC_PI_2, TAU};
 use std::vec;
 
 use argmin::core::{ArgminFloat, Executor, State};
-use argmin_math::ArgminScaledSub;
 use gauss_quad::GaussLegendre;
 use itertools::Itertools;
 use nalgebra::allocator::Allocator;
@@ -1455,7 +1454,6 @@ where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
         T: ArgminFloat,
-        T: ArgminScaledSub<T, T, T>,
     {
         self.find_closest_parameter(point).map(|u| self.point_at(u))
     }
@@ -1466,7 +1464,6 @@ where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
         T: ArgminFloat,
-        T: ArgminScaledSub<T, T, T>,
     {
         let (min_u, max_u) = self.knots_domain();
         let samples = self.control_points.len() * self.degree;
