@@ -9,7 +9,7 @@ use crate::{bounding_box::BoundingBox, curve::nurbs_curve::NurbsCurve, misc::Flo
 #[derive(Clone)]
 pub struct BoundingBoxTree<'a, T: FloatingPoint, D: DimName>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     curve: Cow<'a, NurbsCurve<T, D>>,
     tolerance: T,
@@ -18,8 +18,8 @@ where
 impl<'a, T: FloatingPoint, D: DimName> BoundingBoxTree<'a, T, D>
 where
     D: DimNameSub<U1>,
-    DefaultAllocator: Allocator<T, D>,
-    DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     /// Create a new bounding box tree from a curve.
     pub fn new(curve: &'a NurbsCurve<T, D>, tolerance: Option<T>) -> Self {

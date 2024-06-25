@@ -9,7 +9,7 @@ use crate::{curve::nurbs_curve::NurbsCurve, misc::FloatingPoint};
 // Gradient & CostFunction provider for finding the intersection between two curves.
 pub struct CurveIntersectionProblem<'a, T: FloatingPoint, D: DimName>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     /// The first curve to find the intersection with.
     a: &'a NurbsCurve<T, D>,
@@ -19,7 +19,7 @@ where
 
 impl<'a, T: FloatingPoint, D: DimName> CurveIntersectionProblem<'a, T, D>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     pub fn new(a: &'a NurbsCurve<T, D>, b: &'a NurbsCurve<T, D>) -> Self {
         CurveIntersectionProblem { a, b }
@@ -28,9 +28,9 @@ where
 
 impl<'a, T: FloatingPoint, D: DimName> Gradient for CurveIntersectionProblem<'a, T, D>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
     D: DimNameSub<U1>,
-    DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     type Param = Vector2<T>;
     type Gradient = Vector2<T>;
@@ -45,9 +45,9 @@ where
 
 impl<'a, T: FloatingPoint, D: DimName> CostFunction for CurveIntersectionProblem<'a, T, D>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
     D: DimNameSub<U1>,
-    DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     type Param = Vector2<T>;
     type Output = T;

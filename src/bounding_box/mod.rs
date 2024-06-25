@@ -13,9 +13,9 @@ use crate::{curve::nurbs_curve::NurbsCurve, misc::FloatingPoint};
 
 /// A struct representing a bounding box in D space.
 #[derive(Clone, Debug)]
-pub struct BoundingBox<T, D: DimName>
+pub struct BoundingBox<T: FloatingPoint, D: DimName>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     min: OVector<T, D>,
     max: OVector<T, D>,
@@ -23,7 +23,7 @@ where
 
 impl<T: FloatingPoint, D: DimName> BoundingBox<T, D>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     /// Create a new bounding box from a minimum and maximum point.
     pub fn new(min: OVector<T, D>, max: OVector<T, D>) -> Self {
@@ -119,7 +119,7 @@ where
     /// Cast the bounding box to a curve with another floating point type
     pub fn cast<F: FloatingPoint + SupersetOf<T>>(&self) -> BoundingBox<F, D>
     where
-        DefaultAllocator: Allocator<F, D>,
+        DefaultAllocator: Allocator<D>,
     {
         BoundingBox {
             min: self.min.clone().cast(),
@@ -163,7 +163,7 @@ where
 
 impl<T: FloatingPoint, D: DimName> FromIterator<OPoint<T, D>> for BoundingBox<T, D>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     fn from_iter<I: IntoIterator<Item = OPoint<T, D>>>(iter: I) -> Self {
         Self::new_with_points(iter)
@@ -173,9 +173,9 @@ where
 impl<'a, T: FloatingPoint, D: DimName> From<&'a NurbsCurve<T, D>>
     for BoundingBox<T, DimNameDiff<D, U1>>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
     D: DimNameSub<U1>,
-    DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     fn from(value: &'a NurbsCurve<T, D>) -> Self {
         let pts = value.dehomogenized_control_points();

@@ -14,8 +14,8 @@ use super::SurfacePoint;
 pub struct AdaptiveTessellationNode<T: RealField, D: DimName>
 where
     D: DimNameSub<U1>,
-    DefaultAllocator: Allocator<T, D>,
-    DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     pub(crate) id: usize,
     pub(crate) children: Vec<usize>,
@@ -29,8 +29,8 @@ where
 impl<T: FloatingPoint, D: DimName> AdaptiveTessellationNode<T, D>
 where
     D: DimNameSub<U1>,
-    DefaultAllocator: Allocator<T, D>,
-    DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     pub fn new(
         id: usize,

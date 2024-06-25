@@ -1,5 +1,4 @@
 use argmin::{argmin_error, argmin_error_closure, core::*, float};
-use argmin_math::{ArgminDot, ArgminInv, ArgminScaledSub};
 
 /// Customized Newton's method for finding the closest parameter on a NURBS curve
 /// Original source: https://argmin-rs.github.io/argmin/argmin/solver/newton/struct.Newton.html
@@ -16,7 +15,7 @@ pub struct ClosestParameterNewton<F, P> {
 impl<F, P> ClosestParameterNewton<F, P>
 where
     F: ArgminFloat,
-    P: Clone + ArgminScaledSub<P, F, P>,
+    P: Clone,
 {
     /// Construct a new instance of [`Newton`]
     pub fn new(domain: (P, P), closed: bool) -> Self {
@@ -43,20 +42,18 @@ where
     }
 }
 
-impl<O, P, G, H, F> Solver<O, IterState<P, G, (), H, (), F>> for ClosestParameterNewton<F, P>
+impl<O, F> Solver<O, IterState<F, F, (), F, (), F>> for ClosestParameterNewton<F, F>
 where
-    O: Gradient<Param = P, Gradient = G> + Hessian<Param = P, Hessian = H>,
-    P: Clone + ArgminScaledSub<P, F, P> + ArgminFloat,
-    H: ArgminInv<H> + ArgminDot<G, P>,
-    F: ArgminFloat,
+    O: Gradient<Param = F, Gradient = F> + Hessian<Param = F, Hessian = F>,
+    F: Clone + ArgminFloat,
 {
     const NAME: &'static str = "Closest parameter newton method";
 
     fn next_iter(
         &mut self,
         problem: &mut Problem<O>,
-        state: IterState<P, G, (), H, (), F>,
-    ) -> Result<(IterState<P, G, (), H, (), F>, Option<KV>), Error> {
+        state: IterState<F, F, (), F, (), F>,
+    ) -> Result<(IterState<F, F, (), F, (), F>, Option<KV>), Error> {
         let param = state.get_param().ok_or_else(argmin_error_closure!(
             NotInitialized,
             concat!(
@@ -67,7 +64,8 @@ where
 
         let grad = problem.gradient(param)?;
         let hessian = problem.hessian(param)?;
-        let new_param = param.scaled_sub(&self.gamma, &hessian.inv()?.dot(&grad));
+        let inv = F::one() / hessian;
+        let new_param = *param - self.gamma * inv * grad;
 
         // Constrain the parameter to the domain
         let new_param = if new_param < self.knot_domain.0 {
@@ -89,7 +87,7 @@ where
         Ok((state.param(new_param), None))
     }
 
-    fn terminate(&mut self, state: &IterState<P, G, (), H, (), F>) -> TerminationStatus {
+    fn terminate(&mut self, state: &IterState<F, F, (), F, (), F>) -> TerminationStatus {
         if state.iter > state.max_iters {
             return TerminationStatus::Terminated(TerminationReason::MaxItersReached);
         }
@@ -97,7 +95,7 @@ where
         match (state.get_param(), state.get_prev_param()) {
             (Some(current_param), Some(prev_param)) => {
                 let delta = (*current_param - *prev_param).abs();
-                if delta < P::epsilon() {
+                if delta < F::epsilon() {
                     TerminationStatus::Terminated(TerminationReason::SolverConverged)
                 } else {
                     TerminationStatus::NotTerminated

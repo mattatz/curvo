@@ -4,7 +4,7 @@ use crate::{curve::nurbs_curve::NurbsCurve, misc::FloatingPoint, prelude::Boundi
 
 pub struct BoundingBoxTraversal<'a, T: FloatingPoint, D: DimName>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     pairs: Vec<(BoundingBoxTree<'a, T, D>, BoundingBoxTree<'a, T, D>)>,
 }
@@ -12,8 +12,8 @@ where
 impl<'a, T: FloatingPoint, D: DimName> BoundingBoxTraversal<'a, T, D>
 where
     D: DimNameSub<U1>,
-    DefaultAllocator: Allocator<T, D>,
-    DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     /// Try to traverse bounding box tree pairs to find pairs of intersecting curves.
     pub fn try_traverse(

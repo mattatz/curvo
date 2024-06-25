@@ -15,8 +15,8 @@ use crate::{
 pub struct SurfaceTessellation<T: FloatingPoint, D: DimName>
 where
     D: DimNameSub<U1>,
-    DefaultAllocator: Allocator<T, D>,
-    DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     pub(crate) points: Vec<OPoint<T, DimNameDiff<D, U1>>>,
     pub(crate) normals: Vec<OVector<T, DimNameDiff<D, U1>>>,
@@ -33,8 +33,8 @@ pub type SurfaceTessellation3D<T> = SurfaceTessellation<T, Const<4>>;
 impl<T: FloatingPoint, D: DimName> SurfaceTessellation<T, D>
 where
     D: DimNameSub<U1>,
-    DefaultAllocator: Allocator<T, D>,
-    DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     /// Create a new surface tessellation from surface and adaptive tessellation nodes
     pub fn new(surface: &NurbsSurface<T, D>, nodes: &Vec<AdaptiveTessellationNode<T, D>>) -> Self {
@@ -147,8 +147,8 @@ where
     /// Cast the surface tessellation to another floating point type.
     pub fn cast<F: FloatingPoint + SupersetOf<T>>(&self) -> SurfaceTessellation<F, D>
     where
-        DefaultAllocator: Allocator<F, D>,
-        DefaultAllocator: Allocator<F, DimNameDiff<D, U1>>,
+        DefaultAllocator: Allocator<D>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
         SurfaceTessellation {
             points: self.points.iter().map(|p| p.clone().cast()).collect(),
