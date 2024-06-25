@@ -7,7 +7,7 @@ pub fn three_points_are_flat<T: RealField + Copy, D: DimName>(
     tolerance: T,
 ) -> bool
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     let p21 = p2 - p1;
     let p31 = p3 - p1;
@@ -34,7 +34,7 @@ pub fn segment_closest_point<T: RealField + Copy, D: DimName>(
     u1: T,
 ) -> (T, OPoint<T, D>)
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     let dif = end - start;
     let l = dif.norm();

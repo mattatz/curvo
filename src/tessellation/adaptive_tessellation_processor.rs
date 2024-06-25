@@ -14,8 +14,8 @@ use super::{
 pub struct AdaptiveTessellationProcessor<'a, T: FloatingPoint, D: DimName>
 where
     D: DimNameSub<U1>,
-    DefaultAllocator: Allocator<T, D>,
-    DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     /// The surface to tessellate
     pub(crate) surface: &'a NurbsSurface<T, D>,
@@ -26,8 +26,8 @@ where
 impl<'a, T: FloatingPoint, D: DimName> AdaptiveTessellationProcessor<'a, T, D>
 where
     D: DimNameSub<U1>,
-    DefaultAllocator: Allocator<T, D>,
-    DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     pub fn north(
         &self,

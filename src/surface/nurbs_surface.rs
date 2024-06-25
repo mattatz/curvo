@@ -22,7 +22,7 @@ use crate::{
 #[derive(Clone, Debug)]
 pub struct NurbsSurface<T: FloatingPoint, D: DimName>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     /// control points with homogeneous coordinates
     /// the last element of the vector is the `weight`
@@ -40,9 +40,9 @@ pub type NurbsSurface3D<T> = NurbsSurface<T, Const<4>>;
 
 impl<T: FloatingPoint, D: DimName> NurbsSurface<T, D>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
     D: DimNameSub<U1>,
-    DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     pub fn new(
         u_degree: usize,
@@ -647,7 +647,7 @@ where
     /// Cast the surface to a surface with another floating point type
     pub fn cast<F: FloatingPoint + SupersetOf<T>>(&self) -> NurbsSurface<F, D>
     where
-        DefaultAllocator: Allocator<F, D>,
+        DefaultAllocator: Allocator<D>,
     {
         NurbsSurface {
             control_points: self
@@ -671,9 +671,9 @@ fn rational_derivatives<T, D>(
 where
     T: FloatingPoint,
     D: DimName,
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
     D: DimNameSub<U1>,
-    DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     let a_ders: Vec<_> = ders
         .iter()
@@ -964,7 +964,7 @@ fn try_unify_curve_knot_vectors<T, D>(
 where
     T: FloatingPoint,
     D: DimName,
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     let max_degree = curves.iter().fold(0, |d, c| d.max(c.degree()));
 
@@ -1118,7 +1118,7 @@ impl<'a, T: FloatingPoint, const D: usize> Transformable<&'a OMatrix<T, Const<D>
 impl<T: FloatingPoint + SubsetOf<F>, F: FloatingPoint, D: DimName> Castible<NurbsSurface<F, D>>
     for NurbsSurface<T, D>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<F, D>,
 {
     fn cast(&self) -> NurbsSurface<F, D> {

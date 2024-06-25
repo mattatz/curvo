@@ -7,7 +7,7 @@ use nalgebra::{
 #[derive(Clone, Debug)]
 pub struct SurfacePoint<T: RealField, D: DimName>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     pub uv: Vector2<T>,
     pub point: OPoint<T, D>,
@@ -17,7 +17,7 @@ where
 
 impl<T: RealField, D: DimName> SurfacePoint<T, D>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     pub fn normal(&self) -> &OVector<T, D> {
         &self.normal

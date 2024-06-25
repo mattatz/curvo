@@ -6,7 +6,7 @@ use crate::misc::FloatingPoint;
 pub struct Ray<T: FloatingPoint, D>
 where
     D: DimName,
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     pub(crate) origin: OPoint<T, D>,
     pub(crate) direction: OVector<T, D>,
@@ -16,7 +16,7 @@ where
 pub struct RayIntersection<T: FloatingPoint, D>
 where
     D: DimName,
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     #[allow(unused)]
     pub(crate) intersection0: (OPoint<T, D>, T),
@@ -27,7 +27,7 @@ where
 impl<T: FloatingPoint, D> Ray<T, D>
 where
     D: DimName,
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     pub fn new(origin: OPoint<T, D>, direction: OVector<T, D>) -> Self {
         Self { origin, direction }

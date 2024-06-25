@@ -127,10 +127,10 @@ fn setup(
     let interpolation_target = vec![
         Point3::new(-1.0, -1.0, 0.),
         Point3::new(1.0, -1.0, 0.),
-        Point3::new(1.0, 1.0, 0.),
+        Point3::new(1.0, 0.0, 0.),
+        Point3::new(-1.0, 0.0, 0.),
         Point3::new(-1.0, 1.0, 0.),
-        Point3::new(-1.0, 2.0, 0.),
-        Point3::new(1.0, 2.5, 0.),
+        Point3::new(1.0, 1.0, 0.),
     ];
 
     commands

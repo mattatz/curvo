@@ -32,7 +32,7 @@ use crate::{misc::FloatingPoint, ClosestParameterNewton, ClosestParameterProblem
 #[derive(Clone, Debug)]
 pub struct NurbsCurve<T: FloatingPoint, D: DimName>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     /// control points with homogeneous coordinates
     /// the last element of the vector is the `weight`
@@ -51,7 +51,7 @@ pub type NurbsCurve3D<T> = NurbsCurve<T, Const<4>>;
 
 impl<T: FloatingPoint, D: DimName> NurbsCurve<T, D>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     /// Create a new NURBS curve
     /// # Failures
@@ -135,9 +135,9 @@ where
     where
         D: DimNameSub<U1>,
         <D as DimNameSub<U1>>::Output: DimNameAdd<U1>,
-        DefaultAllocator: Allocator<T, D>,
-        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
-        DefaultAllocator: Allocator<T, <<D as DimNameSub<U1>>::Output as DimNameAdd<U1>>::Output>,
+        DefaultAllocator: Allocator<D>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+        DefaultAllocator: Allocator<<<D as DimNameSub<U1>>::Output as DimNameAdd<U1>>::Output>,
     {
         let mut knots = vec![T::zero(); 2];
 
@@ -167,7 +167,7 @@ where
     pub fn dehomogenize(&self) -> NurbsCurve<T, DimNameDiff<D, U1>>
     where
         D: DimNameSub<U1>,
-        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
         NurbsCurve {
             degree: self.degree,
@@ -180,7 +180,7 @@ where
     pub fn dehomogenized_control_points(&self) -> Vec<OPoint<T, DimNameDiff<D, U1>>>
     where
         D: DimNameSub<U1>,
-        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
         self.control_points
             .iter()
@@ -199,7 +199,7 @@ where
     pub fn point_at(&self, t: T) -> OPoint<T, DimNameDiff<D, U1>>
     where
         D: DimNameSub<U1>,
-        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
         let p = self.point(t);
         dehomogenize(&p).unwrap()
@@ -214,7 +214,7 @@ where
     ) -> Vec<OPoint<T, DimNameDiff<D, U1>>>
     where
         D: DimNameSub<U1>,
-        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
         let mut points = vec![];
         let us = T::from_usize(samples).unwrap();
@@ -237,7 +237,7 @@ where
     ) -> Vec<(T, OPoint<T, DimNameDiff<D, U1>>)>
     where
         D: DimNameSub<U1>,
-        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
         let mut points = vec![];
         let us = T::from_usize(samples).unwrap();
@@ -254,7 +254,7 @@ where
     pub fn tessellate(&self, tolerance: Option<T>) -> Vec<OPoint<T, DimNameDiff<D, U1>>>
     where
         D: DimNameSub<U1>,
-        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
         if self.degree == 1 {
             return self.dehomogenized_control_points();
@@ -277,7 +277,7 @@ where
     ) -> Vec<OPoint<T, DimNameDiff<D, U1>>>
     where
         D: DimNameSub<U1>,
-        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
         let p1 = self.point_at(start);
         let p3 = self.point_at(end);
@@ -323,7 +323,7 @@ where
     pub fn tangent_at(&self, u: T) -> OVector<T, DimNameDiff<D, U1>>
     where
         D: DimNameSub<U1>,
-        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
         let deriv = self.rational_derivatives(u, 1);
         deriv[1].clone()
@@ -337,7 +337,7 @@ where
     ) -> Vec<OVector<T, DimNameDiff<D, U1>>>
     where
         D: DimNameSub<U1>,
-        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
         let ders = self.derivatives(u, derivs);
         let a_ders: Vec<_> = ders
@@ -452,7 +452,7 @@ where
     pub fn try_length(&self) -> anyhow::Result<T>
     where
         D: DimNameSub<U1>,
-        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
         let mult = self.knots.multiplicity();
         let start = mult.first().unwrap().multiplicity();
@@ -510,7 +510,7 @@ where
     pub fn try_divide_by_length(&self, length: T) -> anyhow::Result<Vec<CurveLengthParameter<T>>>
     where
         D: DimNameSub<U1>,
-        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
         anyhow::ensure!(length > T::zero(), "The length must be greater than zero");
 
@@ -568,7 +568,7 @@ where
     ) -> anyhow::Result<Vec<CurveLengthParameter<T>>>
     where
         D: DimNameSub<U1>,
-        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
         let length = self.try_length()?;
         let u = length / T::from_usize(segments).unwrap();
@@ -605,9 +605,9 @@ where
     where
         D: DimNameSub<U1>,
         <D as DimNameSub<U1>>::Output: DimNameAdd<U1>,
-        DefaultAllocator: Allocator<T, D>,
-        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
-        DefaultAllocator: Allocator<T, <<D as DimNameSub<U1>>::Output as DimNameAdd<U1>>::Output>,
+        DefaultAllocator: Allocator<D>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+        DefaultAllocator: Allocator<<<D as DimNameSub<U1>>::Output as DimNameAdd<U1>>::Output>,
     {
         let n = points.len();
         if n < degree + 1 {
@@ -673,9 +673,9 @@ where
         degree: usize,
     ) -> anyhow::Result<Self>
     where
-        DefaultAllocator: Allocator<T, D>,
+        DefaultAllocator: Allocator<D>,
         D: DimNameSub<U1>,
-        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
         Self::try_interpolate_with_tangents(points, degree, None, None)
     }
@@ -688,9 +688,9 @@ where
         end_tangent: Option<OVector<T, DimNameDiff<D, U1>>>,
     ) -> anyhow::Result<Self>
     where
-        DefaultAllocator: Allocator<T, D>,
+        DefaultAllocator: Allocator<D>,
         D: DimNameSub<U1>,
-        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
         let n = points.len();
         if n < degree + 1 {
@@ -855,7 +855,7 @@ where
     ) -> anyhow::Result<Self>
     where
         D: DimNameSub<U1>,
-        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
         Self::try_arc(
             center,
@@ -893,7 +893,7 @@ where
     ) -> anyhow::Result<Self>
     where
         D: DimNameSub<U1>,
-        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
         Self::try_ellipse_arc(center, x_axis, y_axis, T::zero(), T::from_f64(TAU).unwrap())
     }
@@ -928,7 +928,7 @@ where
     ) -> anyhow::Result<Self>
     where
         D: DimNameSub<U1>,
-        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
         let x_axis = x_axis.normalize() * radius;
         let y_axis = y_axis.normalize() * radius;
@@ -963,7 +963,7 @@ where
     ) -> anyhow::Result<Self>
     where
         D: DimNameSub<U1>,
-        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
         let x_radius = x_axis.norm();
         let y_radius = y_axis.norm();
@@ -1107,7 +1107,7 @@ where
     pub fn elevate_dimension(&self) -> NurbsCurve<T, DimNameSum<D, U1>>
     where
         D: DimNameAdd<U1>,
-        DefaultAllocator: Allocator<T, DimNameSum<D, U1>>,
+        DefaultAllocator: Allocator<DimNameSum<D, U1>>,
     {
         let mut control_points = vec![];
         for p in self.control_points.iter() {
@@ -1453,7 +1453,7 @@ where
     ) -> anyhow::Result<OPoint<T, DimNameDiff<D, U1>>>
     where
         D: DimNameSub<U1>,
-        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
         T: ArgminFloat,
         T: ArgminScaledSub<T, T, T>,
     {
@@ -1464,7 +1464,7 @@ where
     pub fn find_closest_parameter(&self, point: &OPoint<T, DimNameDiff<D, U1>>) -> anyhow::Result<T>
     where
         D: DimNameSub<U1>,
-        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
         T: ArgminFloat,
         T: ArgminScaledSub<T, T, T>,
     {
@@ -1556,7 +1556,7 @@ where
     ) -> anyhow::Result<Vec<CurveIntersection<OPoint<T, DimNameDiff<D, U1>>, T>>>
     where
         D: DimNameSub<U1>,
-        DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
         T: ArgminFloat,
     {
         let options = options.unwrap_or_default();
@@ -1747,7 +1747,7 @@ where
     /// Cast the curve to a curve with another floating point type
     pub fn cast<F: FloatingPoint + SupersetOf<T>>(&self) -> NurbsCurve<F, D>
     where
-        DefaultAllocator: Allocator<F, D>,
+        DefaultAllocator: Allocator<D>,
     {
         NurbsCurve {
             control_points: self
@@ -1786,7 +1786,7 @@ impl<'a, T: FloatingPoint, const D: usize> Transformable<&'a OMatrix<T, Const<D>
 
 impl<T: FloatingPoint, D: DimName> Invertible for NurbsCurve<T, D>
 where
-    DefaultAllocator: Allocator<T, D>,
+    DefaultAllocator: Allocator<D>,
 {
     /// Reverse the direction of the curve
     /// # Example
@@ -1885,8 +1885,8 @@ fn compute_bezier_segment_parameter_at_length<T: FloatingPoint, D>(
 ) -> T
 where
     D: DimName + DimNameSub<U1>,
-    DefaultAllocator: Allocator<T, D>,
-    DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     let (k0, k1) = s.knots_domain();
     if length < T::zero() {
@@ -1926,8 +1926,8 @@ fn compute_bezier_segment_length<T: FloatingPoint, D>(
 ) -> T
 where
     D: DimName + DimNameSub<U1>,
-    DefaultAllocator: Allocator<T, D>,
-    DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     let (start, end) = s.knots_domain();
     if start + T::default_epsilon() < u {
@@ -1952,8 +1952,8 @@ pub fn dehomogenize<T: FloatingPoint, D>(
 ) -> Option<OPoint<T, DimNameDiff<D, U1>>>
 where
     D: DimName + DimNameSub<U1>,
-    DefaultAllocator: Allocator<T, D>,
-    DefaultAllocator: Allocator<T, DimNameDiff<D, U1>>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     let v = &point.coords;
     let idx = D::dim() - 1;
