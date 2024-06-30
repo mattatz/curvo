@@ -691,138 +691,22 @@ where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
-        let n = points.len();
-        if n < degree + 1 {
-            anyhow::bail!("Too few control points for curve");
-        }
-
-        let mut us: Vec<T> = vec![T::zero()];
-        for i in 1..n {
-            let sub = &points[i] - &points[i - 1];
-            let chord = sub.norm();
-            let last = us[i - 1];
-            us.push(last + chord);
-        }
-
-        // normalize
-        let max = us[us.len() - 1];
-        for i in 0..us.len() {
-            us[i] /= max;
-        }
-
-        let mut knots_start = vec![T::zero(); degree + 1];
-
-        let has_tangent = start_tangent.is_some() && end_tangent.is_some();
-        let (start, end) = if has_tangent {
-            (0, us.len() - degree + 1)
-        } else {
-            (1, us.len() - degree)
-        };
-
-        for i in start..end {
-            let mut weight_sums = T::zero();
-            for j in 0..degree {
-                weight_sums += us[i + j];
-            }
-            knots_start.push(weight_sums / T::from_usize(degree).unwrap());
-        }
-
-        let knots = KnotVector::new([knots_start, vec![T::one(); degree + 1]].concat());
-        let plen = points.len();
-
-        let (n, ld) = if has_tangent {
-            (plen + 1, plen - (degree - 1))
-        } else {
-            (plen - 1, plen - (degree + 1))
-        };
-
-        // build basis function coefficients matrix
-
-        let mut m_a = DMatrix::<T>::zeros(us.len(), degree + 1 + ld);
-        for i in 0..us.len() {
-            let u = us[i];
-            let knot_span_index = knots.find_knot_span_index(n, degree, u);
-            let basis = knots.basis_functions(knot_span_index, u, degree);
-
-            let ls = knot_span_index - degree;
-            let row_start = vec![T::zero(); ls];
-            let row_end = vec![T::zero(); ld - ls];
-            let e = [row_start, basis, row_end].concat();
-            for j in 0..e.len() {
-                m_a[(i, j)] = e[j];
-            }
-        }
-
-        // dbg!(&mA);
-
-        if has_tangent {
-            let cols = m_a.ncols();
-            let ln = cols - 2;
-            let tan_row0 = [vec![-T::one(), T::one()], vec![T::zero(); ln]].concat();
-            let tan_row1 = [vec![T::zero(); ln], vec![-T::one(), T::one()]].concat();
-            // dbg!(&tan_row0);
-            // dbg!(&tan_row1);
-            m_a = m_a.insert_row(1, T::zero());
-            let rows = m_a.nrows();
-            m_a = m_a.insert_row(rows - 1, T::zero());
-            for i in 0..cols {
-                m_a[(1, i)] = tan_row0[i];
-                m_a[(rows - 1, i)] = tan_row1[i];
-            }
-        }
-
-        let dim = D::dim() - 1;
-
-        let mult0 = knots[degree + 1] / T::from_usize(degree).unwrap();
-        let mult1 = (T::one() - knots[knots.len() - degree - 2]) / T::from_usize(degree).unwrap();
-
-        // solve Ax = b with LU decomposition
-        let lu = m_a.lu();
-        let mut m_x = DMatrix::<T>::identity(if has_tangent { plen + 2 } else { plen }, dim);
-        let rows = m_x.nrows();
-        for i in 0..dim {
-            let b: Vec<_> = if has_tangent {
-                let st = start_tangent.as_ref().unwrap()[i];
-                let et = end_tangent.as_ref().unwrap()[i];
-                let mut b = vec![points[0].coords[i]];
-                b.push(mult0 * st);
-                for j in 1..(plen - 1) {
-                    b.push(points[j].coords[i]);
-                }
-                b.push(mult1 * et);
-                b.push(points[plen - 1].coords[i]);
-                b
-            } else {
-                points.iter().map(|p| p.coords[i]).collect()
-            };
-
-            let b = DVector::from_vec(b);
-            // dbg!(&b);
-            let xs = lu.solve(&b).ok_or(anyhow::anyhow!("Solve failed"))?;
-            for j in 0..rows {
-                m_x[(j, i)] = xs[j];
-            }
-        }
-
-        // dbg!(&mX.shape());
-
-        // extract control points from solved x
-        let mut control_points = vec![];
-        for i in 0..m_x.nrows() {
-            let mut coords = vec![];
-            for j in 0..m_x.ncols() {
-                coords.push(m_x[(i, j)]);
-            }
-            coords.push(T::one());
-            control_points.push(OPoint::from_slice(&coords));
-        }
-
-        // dbg!(control_points.len());
-        // dbg!(knots.len());
-
+        let (control_points, knots) = try_interpolate_control_points(
+            &points
+                .iter()
+                .map(|p| DVector::from_vec(p.iter().copied().collect()))
+                .collect::<Vec<_>>(),
+            degree,
+            true,
+            start_tangent.map(|v| DVector::from_vec(v.iter().copied().collect())),
+            end_tangent.map(|v| DVector::from_vec(v.iter().copied().collect())),
+        )?;
         Ok(Self {
             degree,
-            control_points,
+            control_points: control_points
+                .iter()
+                .map(|v| OPoint::from_slice(v.as_slice()))
+                .collect(),
             knots,
         })
     }
@@ -1962,4 +1846,141 @@ where
     } else {
         None
     }
+}
+
+pub fn try_interpolate_control_points<T: FloatingPoint>(
+    points: &[DVector<T>],
+    degree: usize,
+    homogeneous: bool,
+    start_tangent: Option<DVector<T>>,
+    end_tangent: Option<DVector<T>>,
+) -> anyhow::Result<(Vec<DVector<T>>, KnotVector<T>)> {
+    let n = points.len();
+    if n < degree + 1 {
+        anyhow::bail!("Too few control points for curve");
+    }
+
+    let mut us: Vec<T> = vec![T::zero()];
+    for i in 1..n {
+        let sub = &points[i] - &points[i - 1];
+        let chord = sub.norm();
+        let last = us[i - 1];
+        us.push(last + chord);
+    }
+
+    // normalize
+    let max = us[us.len() - 1];
+    for i in 0..us.len() {
+        us[i] /= max;
+    }
+
+    let mut knots_start = vec![T::zero(); degree + 1];
+
+    let has_tangent = start_tangent.is_some() && end_tangent.is_some();
+    let (start, end) = if has_tangent {
+        (0, us.len() - degree + 1)
+    } else {
+        (1, us.len() - degree)
+    };
+
+    for i in start..end {
+        let mut weight_sums = T::zero();
+        for j in 0..degree {
+            weight_sums += us[i + j];
+        }
+        knots_start.push(weight_sums / T::from_usize(degree).unwrap());
+    }
+
+    let knots = KnotVector::new([knots_start, vec![T::one(); degree + 1]].concat());
+    let plen = points.len();
+
+    let (n, ld) = if has_tangent {
+        (plen + 1, plen - (degree - 1))
+    } else {
+        (plen - 1, plen - (degree + 1))
+    };
+
+    // build basis function coefficients matrix
+
+    let mut m_a = DMatrix::<T>::zeros(us.len(), degree + 1 + ld);
+    for i in 0..us.len() {
+        let u = us[i];
+        let knot_span_index = knots.find_knot_span_index(n, degree, u);
+        let basis = knots.basis_functions(knot_span_index, u, degree);
+
+        let ls = knot_span_index - degree;
+        let row_start = vec![T::zero(); ls];
+        let row_end = vec![T::zero(); ld - ls];
+        let e = [row_start, basis, row_end].concat();
+        for j in 0..e.len() {
+            m_a[(i, j)] = e[j];
+        }
+    }
+
+    // dbg!(&mA);
+
+    if has_tangent {
+        let cols = m_a.ncols();
+        let ln = cols - 2;
+        let tan_row0 = [vec![-T::one(), T::one()], vec![T::zero(); ln]].concat();
+        let tan_row1 = [vec![T::zero(); ln], vec![-T::one(), T::one()]].concat();
+        // dbg!(&tan_row0);
+        // dbg!(&tan_row1);
+        m_a = m_a.insert_row(1, T::zero());
+        let rows = m_a.nrows();
+        m_a = m_a.insert_row(rows - 1, T::zero());
+        for i in 0..cols {
+            m_a[(1, i)] = tan_row0[i];
+            m_a[(rows - 1, i)] = tan_row1[i];
+        }
+    }
+
+    let dim = points[0].len();
+    let mult0 = knots[degree + 1] / T::from_usize(degree).unwrap();
+    let mult1 = (T::one() - knots[knots.len() - degree - 2]) / T::from_usize(degree).unwrap();
+
+    // solve Ax = b with LU decomposition
+    let lu = m_a.lu();
+    let mut m_x = DMatrix::<T>::identity(if has_tangent { plen + 2 } else { plen }, dim);
+    let rows = m_x.nrows();
+    for i in 0..dim {
+        let b: Vec<_> = if has_tangent {
+            let st = start_tangent.as_ref().unwrap()[i];
+            let et = end_tangent.as_ref().unwrap()[i];
+            let mut b = vec![points[0][i]];
+            b.push(mult0 * st);
+            for j in 1..(plen - 1) {
+                b.push(points[j][i]);
+            }
+            b.push(mult1 * et);
+            b.push(points[plen - 1][i]);
+            b
+        } else {
+            points.iter().map(|p| p[i]).collect()
+        };
+
+        let b = DVector::from_vec(b);
+        // dbg!(&b);
+        let xs = lu.solve(&b).ok_or(anyhow::anyhow!("Solve failed"))?;
+        for j in 0..rows {
+            m_x[(j, i)] = xs[j];
+        }
+    }
+
+    // dbg!(&mX.shape());
+
+    // extract control points from solved x
+    let mut control_points = vec![];
+    for i in 0..m_x.nrows() {
+        let mut coords = vec![];
+        for j in 0..m_x.ncols() {
+            coords.push(m_x[(i, j)]);
+        }
+        if homogeneous {
+            coords.push(T::one());
+        }
+        control_points.push(DVector::from_vec(coords));
+    }
+
+    Ok((control_points, knots))
 }

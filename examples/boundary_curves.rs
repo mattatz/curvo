@@ -110,7 +110,7 @@ fn setup(
         })
         .insert(Name::new("lofted"));
 
-    let boundary = lofted.try_boundary_curves(true);
+    let boundary = lofted.try_boundary_curves();
     if let Ok(boundary) = boundary {
         boundary.iter().for_each(|curve| {
             let (a, b) = curve.knots_domain();

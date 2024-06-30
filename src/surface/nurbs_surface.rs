@@ -1,14 +1,18 @@
 use std::borrow::Cow;
 
 use nalgebra::{
-    allocator::Allocator, Const, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OMatrix,
-    OPoint, OVector, Point3, Point4, RealField, Vector2, Vector3, U1,
+    allocator::Allocator, Const, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff,
+    DimNameSub, DimNameSum, OMatrix, OPoint, OVector, Point3, Point4, RealField, Vector2, Vector3,
+    U1,
 };
 use simba::scalar::SupersetOf;
 
 use crate::{
-    curve::nurbs_curve::{dehomogenize, NurbsCurve, NurbsCurve3D},
-    misc::{binomial::Binomial, transformable::Transformable, FloatingPoint, Invertible, Ray},
+    curve::{
+        nurbs_curve::{dehomogenize, NurbsCurve, NurbsCurve3D},
+        try_interpolate_control_points,
+    },
+    misc::{binomial::Binomial, transformable::Transformable, FloatingPoint, Ray},
     prelude::{KnotVector, SurfaceTessellation},
     tessellation::{
         adaptive_tessellation_node::AdaptiveTessellationNode,
@@ -611,30 +615,51 @@ where
     /// let lofted = NurbsSurface::try_loft(&[interpolated, offsetted], None);
     /// assert!(lofted.is_ok());
     /// ```
-    pub fn try_loft(curves: &[NurbsCurve<T, D>], degree_v: Option<usize>) -> anyhow::Result<Self> {
+    pub fn try_loft(curves: &[NurbsCurve<T, D>], degree_v: Option<usize>) -> anyhow::Result<Self>
+    where
+        D: DimNameAdd<U1>,
+        DefaultAllocator: Allocator<DimNameSum<D, U1>>,
+    {
         let unified_curves = try_unify_curve_knot_vectors(curves)?;
 
         let degree_u = unified_curves[0].degree();
         let degree_v = degree_v.unwrap_or(degree_u).min(unified_curves.len() - 1);
 
         let knots_u = unified_curves[0].knots().clone();
-        let mut control_points = vec![];
 
         // Interpolate each column of control points to get the nurbs curve aligned with the v direction
         let v_curves: anyhow::Result<Vec<_>> = (0..unified_curves[0].control_points().len())
             .map(|i| {
                 let points = unified_curves
                     .iter()
-                    .map(|c| dehomogenize(&c.control_points()[i]).unwrap())
+                    .map(|c| c.control_points()[i].clone())
                     .collect::<Vec<_>>();
-                NurbsCurve::try_interpolate(&points, degree_v)
+                let (control_points, knots) = try_interpolate_control_points(
+                    &points
+                        .iter()
+                        .map(|p| DVector::from_vec(p.iter().copied().collect()))
+                        .collect::<Vec<_>>(),
+                    degree_v,
+                    false,
+                    None,
+                    None,
+                )?;
+                NurbsCurve::try_new(
+                    degree_v,
+                    control_points
+                        .iter()
+                        .map(|p| OPoint::from_slice(p.as_slice()))
+                        .collect(),
+                    knots.to_vec(),
+                )
             })
             .collect();
         let v_curves = v_curves?;
-        v_curves.iter().for_each(|c| {
-            control_points.push(c.control_points().clone());
-        });
         let knots_v = v_curves.last().unwrap().knots().clone();
+        let control_points = v_curves
+            .iter()
+            .map(|c| c.control_points().clone())
+            .collect();
 
         Ok(Self {
             control_points,
@@ -736,26 +761,15 @@ where
     }
 
     /// Try to create boundary curves of the surface
-    /// if cycle is true, the boundary curves will be closed
-    pub fn try_boundary_curves(&self, cycle: bool) -> anyhow::Result<[NurbsCurve<T, D>; 4]> {
+    pub fn try_boundary_curves(&self) -> anyhow::Result<[NurbsCurve<T, D>; 4]> {
         let (u_start, u_end) = self.u_knots_domain();
         let (v_start, v_end) = self.v_knots_domain();
-        let boundary = if cycle {
-            [
-                self.try_isocurve(u_start, false)?,
-                self.try_isocurve(v_start, true)?.inverse(),
-                self.try_isocurve(u_end, false)?.inverse(),
-                self.try_isocurve(v_end, true)?,
-            ]
-        } else {
-            [
-                self.try_isocurve(u_start, false)?,
-                self.try_isocurve(v_start, true)?,
-                self.try_isocurve(u_end, false)?,
-                self.try_isocurve(v_end, true)?,
-            ]
-        };
-        Ok(boundary)
+        Ok([
+            self.try_isocurve(u_start, false)?,
+            self.try_isocurve(v_start, true)?,
+            self.try_isocurve(u_end, false)?,
+            self.try_isocurve(v_end, true)?,
+        ])
     }
 
     /// Try to refine the surface by inserting knots
@@ -939,7 +953,6 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
         degree_v: Option<usize>,
     ) -> anyhow::Result<Self> {
         let (start, end) = rail.knots_domain();
-        let _pt0 = rail.point_at(start);
         let samples = rail.control_points().len() * 2;
         let span = (end - start) / T::from_usize(samples - 1).unwrap();
 
