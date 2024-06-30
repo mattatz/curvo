@@ -762,25 +762,15 @@ where
 
     /// Try to create boundary curves of the surface
     /// if cycle is true, the boundary curves will be closed
-    pub fn try_boundary_curves(&self, cycle: bool) -> anyhow::Result<[NurbsCurve<T, D>; 4]> {
+    pub fn try_boundary_curves(&self) -> anyhow::Result<[NurbsCurve<T, D>; 4]> {
         let (u_start, u_end) = self.u_knots_domain();
         let (v_start, v_end) = self.v_knots_domain();
-        let boundary = if cycle {
-            [
-                self.try_isocurve(u_start, false)?,
-                self.try_isocurve(v_start, true)?.inverse(),
-                self.try_isocurve(u_end, false)?.inverse(),
-                self.try_isocurve(v_end, true)?,
-            ]
-        } else {
-            [
-                self.try_isocurve(u_start, false)?,
-                self.try_isocurve(v_start, true)?,
-                self.try_isocurve(u_end, false)?,
-                self.try_isocurve(v_end, true)?,
-            ]
-        };
-        Ok(boundary)
+        Ok([
+            self.try_isocurve(u_start, false)?,
+            self.try_isocurve(v_start, true)?,
+            self.try_isocurve(u_end, false)?,
+            self.try_isocurve(v_end, true)?,
+        ])
     }
 
     /// Try to refine the surface by inserting knots
