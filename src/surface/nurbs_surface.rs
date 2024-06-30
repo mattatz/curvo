@@ -12,7 +12,7 @@ use crate::{
         nurbs_curve::{dehomogenize, NurbsCurve, NurbsCurve3D},
         try_interpolate_control_points,
     },
-    misc::{binomial::Binomial, transformable::Transformable, FloatingPoint, Invertible, Ray},
+    misc::{binomial::Binomial, transformable::Transformable, FloatingPoint, Ray},
     prelude::{KnotVector, SurfaceTessellation},
     tessellation::{
         adaptive_tessellation_node::AdaptiveTessellationNode,
@@ -637,7 +637,7 @@ where
                 let (control_points, knots) = try_interpolate_control_points(
                     &points
                         .iter()
-                        .map(|p| DVector::from_vec(p.iter().map(|v| *v).collect()))
+                        .map(|p| DVector::from_vec(p.iter().copied().collect()))
                         .collect::<Vec<_>>(),
                     degree_v,
                     false,

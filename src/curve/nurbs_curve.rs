@@ -694,12 +694,12 @@ where
         let (control_points, knots) = try_interpolate_control_points(
             &points
                 .iter()
-                .map(|p| DVector::from_vec(p.iter().map(|v| *v).collect()))
+                .map(|p| DVector::from_vec(p.iter().copied().collect()))
                 .collect::<Vec<_>>(),
             degree,
             true,
-            start_tangent.map(|v| DVector::from_vec(v.iter().map(|v| *v).collect())),
-            end_tangent.map(|v| DVector::from_vec(v.iter().map(|v| *v).collect())),
+            start_tangent.map(|v| DVector::from_vec(v.iter().copied().collect())),
+            end_tangent.map(|v| DVector::from_vec(v.iter().copied().collect())),
         )?;
         Ok(Self {
             degree,
