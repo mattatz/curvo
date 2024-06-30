@@ -1686,11 +1686,11 @@ dependencies = [
  "gauss-quad",
  "itertools 0.13.0",
  "log",
- "nalgebra 0.33.0",
+ "nalgebra",
  "num-traits",
  "rand",
  "rand_distr",
- "simba 0.9.0",
+ "simba",
 ]
 
 [[package]]
@@ -2045,11 +2045,11 @@ dependencies = [
 
 [[package]]
 name = "gauss-quad"
-version = "0.1.8"
+version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a0032f2490f690c0e2315268425c3f5407557230ebc265747082d7fd8a57926"
+checksum = "ff26d658d1572fbb8ac2bf1d233eac782d531afa022ec4c95b23d75e062e0e08"
 dependencies = [
- "nalgebra 0.30.1",
+ "nalgebra",
 ]
 
 [[package]]
@@ -2739,22 +2739,6 @@ dependencies = [
 
 [[package]]
 name = "nalgebra"
-version = "0.30.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fb2d0de08694bed883320212c18ee3008576bfe8c306f4c3c4a58b4876998be"
-dependencies = [
- "approx",
- "matrixmultiply",
- "nalgebra-macros 0.1.0",
- "num-complex",
- "num-rational",
- "num-traits",
- "simba 0.7.3",
- "typenum",
-]
-
-[[package]]
-name = "nalgebra"
 version = "0.33.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c4b5f057b303842cf3262c27e465f4c303572e7f6b0648f60e16248ac3397f4"
@@ -2762,24 +2746,13 @@ dependencies = [
  "approx",
  "glam",
  "matrixmultiply",
- "nalgebra-macros 0.2.2",
+ "nalgebra-macros",
  "num-complex",
  "num-rational",
  "num-traits",
  "serde",
- "simba 0.9.0",
+ "simba",
  "typenum",
-]
-
-[[package]]
-name = "nalgebra-macros"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "01fcc0b8149b4632adc89ac3b7b31a12fb6099a0317a4eb2ebff574ef7de7218"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 1.0.109",
 ]
 
 [[package]]
@@ -3567,19 +3540,6 @@ name = "shlex"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
-
-[[package]]
-name = "simba"
-version = "0.7.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f3fd720c48c53cace224ae62bef1bbff363a70c68c4802a78b5cc6159618176"
-dependencies = [
- "approx",
- "num-complex",
- "num-traits",
- "paste",
- "wide",
-]
 
 [[package]]
 name = "simba"
