@@ -8,6 +8,7 @@ use bevy::{
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
 use std::f64::consts::{FRAC_PI_2, PI, TAU};
+use systems::screenshot_on_spacebar;
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use bevy_points::plugin::PointsPlugin;
@@ -16,12 +17,19 @@ use nalgebra::{Point2, Vector2};
 use curvo::prelude::*;
 
 mod materials;
+mod systems;
 
 use materials::*;
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                resolution: (640., 480.).into(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }))
         .add_plugins(LineMaterialPlugin)
         .add_plugins(InfiniteGridPlugin)
         .add_plugins(PanOrbitCameraPlugin)
@@ -34,7 +42,7 @@ struct AppPlugin;
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.add_systems(Startup, setup)
-            .add_systems(Update, close_on_esc);
+            .add_systems(Update, (screenshot_on_spacebar, close_on_esc));
     }
 }
 

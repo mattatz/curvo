@@ -17,7 +17,13 @@ mod materials;
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                resolution: (640., 480.).into(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }))
         .add_plugins(LineMaterialPlugin)
         .add_plugins(InfiniteGridPlugin)
         .add_plugins(PanOrbitCameraPlugin)

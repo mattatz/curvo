@@ -16,16 +16,18 @@ use bevy_points::{
     material::PointsShaderSettings, mesh::PointsMesh, plugin::PointsPlugin, prelude::PointsMaterial,
 };
 use materials::*;
+use systems::*;
 use nalgebra::{Point3, Rotation3, Translation3, Vector3};
 
 use curvo::prelude::*;
 mod materials;
+mod systems;
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                resolution: (864., 480.).into(),
+                resolution: (640., 480.).into(),
                 ..Default::default()
             }),
             ..Default::default()
@@ -190,19 +192,4 @@ fn setup(
         ..Default::default()
     };
     commands.spawn((camera, PanOrbitCamera::default()));
-}
-
-fn screenshot_on_spacebar(
-    input: Res<ButtonInput<KeyCode>>,
-    main_window: Query<Entity, With<PrimaryWindow>>,
-    mut screenshot_manager: ResMut<ScreenshotManager>,
-    mut counter: Local<u32>,
-) {
-    if input.just_pressed(KeyCode::Space) {
-        let path = format!("./screenshot-{}.png", *counter);
-        *counter += 1;
-        screenshot_manager
-            .save_screenshot_to_disk(main_window.single(), path)
-            .unwrap();
-    }
 }
