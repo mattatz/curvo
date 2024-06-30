@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use nalgebra::{
     allocator::Allocator, Const, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OMatrix,
     OPoint, OVector, Point3, Point4, RealField, Vector2, Vector3, U1,
@@ -642,6 +644,158 @@ where
             u_knots: knots_u,
             v_knots: knots_v,
         })
+    }
+
+    /// Try to create a iso curve from the surface
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point3, Vector3};
+    /// use approx::assert_relative_eq;
+    /// let circle = NurbsCurve3D::try_circle(&Point3::origin(), &Vector3::x(), &Vector3::y(), 1.).unwrap();
+    /// let extruded = NurbsSurface3D::extrude(&circle, Vector3::z());
+    ///
+    /// // Create an iso curve at the start of the u direction
+    /// let (start, _) = extruded.u_knots_domain();
+    /// let u_iso = extruded.try_isocurve(start, false).unwrap();
+    /// let (iso_start, iso_end) = u_iso.knots_domain();
+    /// assert_relative_eq!(u_iso.point_at(iso_start), Point3::new(1.0, 0.0, 1.0), epsilon = 1e-8);
+    /// assert_relative_eq!(u_iso.point_at(iso_end), Point3::new(1.0, 0.0, 1.0), epsilon = 1e-8);
+    ///
+    /// // Create an iso curve at the start of the v direction
+    /// let (start, _) = extruded.v_knots_domain();
+    /// let v_iso = extruded.try_isocurve(start, true).unwrap();
+    /// let (iso_start, iso_end) = v_iso.knots_domain();
+    /// assert_relative_eq!(v_iso.point_at(iso_start), Point3::new(1.0, 0.0, 1.0), epsilon = 1e-8);
+    /// assert_relative_eq!(v_iso.point_at(iso_end), Point3::new(1.0, 0.0, 0.0), epsilon = 1e-8);
+    /// ```
+    pub fn try_isocurve(&self, t: T, v_direction: bool) -> anyhow::Result<NurbsCurve<T, D>> {
+        let (knots, degree) = if v_direction {
+            (self.v_knots.clone(), self.v_degree)
+        } else {
+            (self.u_knots.clone(), self.u_degree)
+        };
+
+        let mult = knots.multiplicity();
+        let knots_to_insert = mult
+            .iter()
+            .enumerate()
+            .find_map(|(i, m)| {
+                if (t - *m.knot()).abs() < T::default_epsilon() {
+                    Some(i)
+                } else {
+                    None
+                }
+            })
+            .and_then(|knot_index| {
+                let m = mult[knot_index].multiplicity();
+                if degree + 1 >= m {
+                    Some((degree + 1) - m)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(degree + 1);
+
+        let refined = if knots_to_insert > 0 {
+            let mut refined = self.clone();
+            refined.try_refine_knot(vec![t; knots_to_insert], v_direction)?;
+            Cow::Owned(refined)
+        } else {
+            Cow::Borrowed(self)
+        };
+
+        let span = if (t - knots.first()).abs() < T::default_epsilon() {
+            0
+        } else if (t - knots.last()).abs() < T::default_epsilon() {
+            if v_direction {
+                refined.control_points[0].len() - 1
+            } else {
+                refined.control_points.len() - 1
+            }
+        } else {
+            knots.find_knot_span_index(knots.len() - degree - 2, degree, t)
+        };
+
+        if v_direction {
+            NurbsCurve::try_new(
+                refined.u_degree,
+                refined
+                    .control_points
+                    .iter()
+                    .map(|row| row[span].clone())
+                    .collect(),
+                refined.u_knots.clone().to_vec(),
+            )
+        } else {
+            NurbsCurve::try_new(
+                self.v_degree,
+                refined.control_points[span].clone(),
+                refined.v_knots.clone().to_vec(),
+            )
+        }
+    }
+
+    /// Try to refine the surface by inserting knots
+    pub fn try_refine_knot(
+        &mut self,
+        knots_to_insert: Vec<T>,
+        v_direction: bool,
+    ) -> anyhow::Result<()> {
+        if !v_direction {
+            let transpose = |points: &Vec<Vec<OPoint<T, D>>>| -> Vec<Vec<OPoint<T, D>>> {
+                let mut transposed = vec![vec![]; points[0].len()];
+                points.iter().for_each(|row| {
+                    row.iter().enumerate().for_each(|(j, p)| {
+                        transposed[j].push(p.clone());
+                    })
+                });
+                transposed
+            };
+            let refined = transpose(&self.control_points)
+                .iter()
+                .map(|row| {
+                    let mut curve = NurbsCurve::try_new(
+                        self.u_degree,
+                        row.clone(),
+                        self.u_knots.clone().to_vec(),
+                    )?;
+                    curve.try_refine_knot(knots_to_insert.clone())?;
+                    Ok(curve)
+                })
+                .collect::<anyhow::Result<Vec<_>>>()?;
+
+            let u_knots = refined
+                .first()
+                .map(|c| c.knots().clone())
+                .ok_or(anyhow::anyhow!("No curves"))?;
+            self.control_points =
+                transpose(&refined.iter().map(|c| c.control_points().clone()).collect());
+            self.u_knots = u_knots;
+        } else {
+            let refined = self
+                .control_points
+                .iter()
+                .map(|row| {
+                    let mut curve = NurbsCurve::try_new(
+                        self.v_degree,
+                        row.clone(),
+                        self.v_knots.clone().to_vec(),
+                    )?;
+                    curve.try_refine_knot(knots_to_insert.clone())?;
+                    Ok(curve)
+                })
+                .collect::<anyhow::Result<Vec<_>>>()?;
+
+            let v_knots = refined
+                .first()
+                .map(|c| c.knots().clone())
+                .ok_or(anyhow::anyhow!("No curves"))?;
+            self.control_points = refined.iter().map(|c| c.control_points().clone()).collect();
+            self.v_knots = v_knots;
+        };
+
+        Ok(())
     }
 
     /// Cast the surface to a surface with another floating point type

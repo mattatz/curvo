@@ -117,3 +117,9 @@ required-features = ["bevy"]
 name = "intersect_curves"
 path = "examples/intersect_curves.rs"
 required-features = ["bevy"]
+
+[[example]]
+name = "iso_curves"
+path = "examples/iso_curves.rs"
+required-features = ["bevy"]
+
