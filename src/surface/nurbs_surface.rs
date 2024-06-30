@@ -761,7 +761,6 @@ where
     }
 
     /// Try to create boundary curves of the surface
-    /// if cycle is true, the boundary curves will be closed
     pub fn try_boundary_curves(&self) -> anyhow::Result<[NurbsCurve<T, D>; 4]> {
         let (u_start, u_end) = self.u_knots_domain();
         let (v_start, v_end) = self.v_knots_domain();
