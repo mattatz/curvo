@@ -12,9 +12,7 @@ use bevy_infinite_grid::InfiniteGridPlugin;
 
 use bevy_normal_material::{material::NormalMaterial, plugin::NormalMaterialPlugin};
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
-use bevy_points::{
-    material::PointsShaderSettings, mesh::PointsMesh, plugin::PointsPlugin, prelude::PointsMaterial,
-};
+use bevy_points::{plugin::PointsPlugin, prelude::PointsMaterial};
 use materials::*;
 use nalgebra::{Point3, Rotation3, Translation3, Vector3};
 
@@ -51,7 +49,7 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut line_materials: ResMut<Assets<LineMaterial>>,
-    mut points_materials: ResMut<Assets<PointsMaterial>>,
+    _points_materials: ResMut<Assets<PointsMaterial>>,
     mut normal_materials: ResMut<'_, Assets<NormalMaterial>>,
 ) {
     let interpolation_target = vec![
@@ -69,7 +67,6 @@ fn setup(
     let m = translation * rotation;
     let front = interpolated.transformed(&(translation.inverse()).into());
     let back = interpolated.transformed(&m.into());
-
     let lofted = NurbsSurface::try_loft(&[front, back], Some(3)).unwrap();
 
     let option = AdaptiveTessellationOptions {
@@ -103,7 +100,7 @@ fn setup(
         .spawn(MaterialMeshBundle {
             mesh: meshes.add(mesh),
             material: normal_materials.add(NormalMaterial {
-                opacity: 0.1,
+                opacity: 0.05,
                 cull_mode: None,
                 alpha_mode: AlphaMode::Blend,
                 ..Default::default()
@@ -113,76 +110,42 @@ fn setup(
         })
         .insert(Name::new("lofted"));
 
-    let v_direction = true;
-    let (min, max) = if v_direction {
-        lofted.v_knots_domain()
-    } else {
-        lofted.u_knots_domain()
-    };
-    let div = 64;
-    for i in 0..div {
-        let u = min + (max - min) * i as f64 / (div - 1) as f64;
-        // println!("u:{}, min:{}, max:{}", u, min, max);
-        let iso = lofted.try_isocurve(u, v_direction);
-        match iso {
-            Ok(curve) => {
-                let samples = curve.tessellate(Some(1e-8));
-                let line_vertices: Vec<_> = samples
-                    .iter()
-                    .map(|p| p.cast::<f32>())
-                    .map(|p| p.into())
-                    .collect();
-                let n = line_vertices.len();
-                let line = Mesh::new(PrimitiveTopology::LineStrip, default())
-                    .with_inserted_attribute(
-                        Mesh::ATTRIBUTE_POSITION,
-                        VertexAttributeValues::Float32x3(line_vertices),
-                    )
-                    .with_inserted_attribute(
-                        Mesh::ATTRIBUTE_COLOR,
-                        VertexAttributeValues::Float32x4(
-                            (0..n)
-                                .map(|i| Color::hsl(((i as f32) / n as f32) * 300., 0.5, 0.5))
-                                .map(|c| c.rgba_to_vec4().into())
-                                .collect(),
-                        ),
-                    );
-                commands
-                    .spawn(MaterialMeshBundle {
-                        mesh: meshes.add(line),
-                        material: line_materials.add(LineMaterial {
-                            color: Color::WHITE,
-                            ..Default::default()
-                        }),
+    let boundary = lofted.try_boundary_curves(true);
+    if let Ok(boundary) = boundary {
+        boundary.iter().for_each(|curve| {
+            let (a, b) = curve.knots_domain();
+            let samples = curve.sample_regular_range(a, b, 128);
+            let line_vertices: Vec<_> = samples
+                .iter()
+                .map(|p| p.cast::<f32>())
+                .map(|p| p.into())
+                .collect();
+            let n = line_vertices.len();
+            let line = Mesh::new(PrimitiveTopology::LineStrip, default())
+                .with_inserted_attribute(
+                    Mesh::ATTRIBUTE_POSITION,
+                    VertexAttributeValues::Float32x3(line_vertices),
+                )
+                .with_inserted_attribute(
+                    Mesh::ATTRIBUTE_COLOR,
+                    VertexAttributeValues::Float32x4(
+                        (0..n)
+                            .map(|i| Color::hsl(((i as f32) / n as f32) * 100., 0.5, 0.5))
+                            .map(|c| c.rgba_to_vec4().into())
+                            .collect(),
+                    ),
+                );
+            commands
+                .spawn(MaterialMeshBundle {
+                    mesh: meshes.add(line),
+                    material: line_materials.add(LineMaterial {
+                        color: Color::WHITE,
                         ..Default::default()
-                    })
-                    .insert(Name::new("iso curve"));
-
-                let (start, end) = curve.knots_domain();
-                let points = curve.sample_regular_range(start, end, 16);
-                commands
-                    .spawn(MaterialMeshBundle {
-                        mesh: meshes.add(PointsMesh {
-                            vertices: points.iter().map(|pt| pt.cast::<f32>().into()).collect(),
-                            ..Default::default()
-                        }),
-                        material: points_materials.add(PointsMaterial {
-                            settings: PointsShaderSettings {
-                                point_size: 0.05,
-                                color: Color::TOMATO,
-                                ..Default::default()
-                            },
-                            ..Default::default()
-                        }),
-                        visibility: Visibility::Hidden,
-                        ..Default::default()
-                    })
-                    .insert(Name::new("points"));
-            }
-            Err(e) => {
-                println!("error:{}", e);
-            }
-        }
+                    }),
+                    ..Default::default()
+                })
+                .insert(Name::new("boundary curve"));
+        });
     }
 
     let camera = Camera3dBundle {

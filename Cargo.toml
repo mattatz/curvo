@@ -123,3 +123,7 @@ name = "iso_curves"
 path = "examples/iso_curves.rs"
 required-features = ["bevy"]
 
+[[example]]
+name = "boundary_curves"
+path = "examples/boundary_curves.rs"
+required-features = ["bevy"]
