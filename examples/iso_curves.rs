@@ -16,8 +16,8 @@ use bevy_points::{
     material::PointsShaderSettings, mesh::PointsMesh, plugin::PointsPlugin, prelude::PointsMaterial,
 };
 use materials::*;
-use systems::*;
 use nalgebra::{Point3, Rotation3, Translation3, Vector3};
+use systems::*;
 
 use curvo::prelude::*;
 mod materials;
