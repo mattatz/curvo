@@ -30,7 +30,11 @@ The supported features also include finding the closest point on NURBS curves, f
 
 <img src="https://github.com/mattatz/curvo/assets/1085910/acc2ca67-fc38-4529-a87e-021e62c6d504" width="360px" alt="Find intersection points between two NURBS curves" />
 
-<img src="https://github.com/mattatz/curvo/assets/1085910/08f6277d-1a62-495c-bd26-e5feeb90a258" width="360px" alt="Ellipse arc features" />
+Additional features are as follows:
+
+<img src="https://github.com/mattatz/curvo/assets/1085910/08f6277d-1a62-495c-bd26-e5feeb90a258" width="360px" alt="Ellipse arc generation" />
+
+<img src="https://github.com/mattatz/curvo/assets/1085910/4aa841bc-ad97-4dcf-9257-2b0c0adce376" width="360px" alt="Iso-curves on a surface" />
 
 ## Usage
 
