@@ -59,14 +59,19 @@ impl Material for LineMaterial {
     fn specialize(
         _pipeline: &bevy::pbr::MaterialPipeline<Self>,
         descriptor: &mut bevy::render::render_resource::RenderPipelineDescriptor,
-        _layout: &bevy::render::mesh::MeshVertexBufferLayout,
+        layout: &bevy::render::mesh::MeshVertexBufferLayout,
         _key: bevy::pbr::MaterialPipelineKey<Self>,
     ) -> Result<(), bevy::render::render_resource::SpecializedMeshPipelineError> {
         // WebGL2 structs must be 16 byte aligned.
-        let shader_defs = vec![
+        let mut shader_defs = vec![
             #[cfg(feature = "webgl")]
             "SIXTEEN_BYTE_ALIGNMENT".into(),
         ];
+
+        if layout.contains(Mesh::ATTRIBUTE_COLOR) {
+            shader_defs.push("VERTEX_COLORS".into());
+        }
+
         if let Some(fragment) = &mut descriptor.fragment {
             fragment.shader_defs = shader_defs;
         }
