@@ -15,11 +15,19 @@ use nalgebra::{Point3, Vector3};
 
 use curvo::prelude::*;
 use rand::Rng;
+use systems::screenshot_on_spacebar;
 mod materials;
+mod systems;
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                resolution: (640., 480.).into(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }))
         .add_plugins(LineMaterialPlugin)
         .add_plugins(InfiniteGridPlugin)
         .add_plugins(PanOrbitCameraPlugin)
@@ -33,7 +41,7 @@ struct AppPlugin;
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.add_systems(Startup, setup)
-            .add_systems(Update, close_on_esc);
+            .add_systems(Update, (screenshot_on_spacebar, close_on_esc));
     }
 }
 

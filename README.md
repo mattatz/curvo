@@ -18,23 +18,23 @@ The modeling operations for NURBS surfaces supported by this library currently i
 - Sweep
 - Revolve
 
-<img src="https://github.com/mattatz/curvo/assets/1085910/7a04901c-9edd-4780-b754-74a9518601be" width="360px" alt="Sweep the profile curve along the rail curve to create a surface" />
+<img src="https://github.com/mattatz/curvo/assets/1085910/1eecea06-5848-48f3-9b7d-916715082f09" width="360px" alt="Sweep the profile curve along the rail curve to create a surface" />
 
-<img width="360px" alt="Revolve the profile curve around an z-axis by PI radians to create a NURBS surface" src="https://github.com/mattatz/curvo/assets/1085910/c23148ae-6392-4855-bfc5-f7ebd8389a8e">
+<img width="360px" alt="Revolve the profile curve around an z-axis by PI radians to create a NURBS surface" src="https://github.com/mattatz/curvo/assets/1085910/3456dc46-9977-446e-8d5c-eafe109093a7">
 
 The supported features also include finding the closest point on NURBS curves, finding intersections between two NURBS curves, and dividing based on arc length.
 
-<img src="https://github.com/mattatz/curvo/assets/1085910/04cccd08-01c7-495d-b332-4ee2ed59644a" width="360px" alt="Find closest point on the NURBS curve" />
+<img src="https://github.com/mattatz/curvo/assets/1085910/f07cf1c4-3994-44d1-95a6-86a8feaf3d2e" width="360px" alt="Find closest point on the NURBS curve" />
 
-<img src="https://github.com/mattatz/curvo/assets/1085910/b2cabe4c-446b-40ff-8caf-a1fdd2d5d577" width="360px" alt="Divide the NURBS curve based on arc length" />
+<img src="https://github.com/mattatz/curvo/assets/1085910/dd453a50-46ca-4279-b547-c1a667d885a9" width="360px" alt="Divide the NURBS curve based on arc length" />
 
-<img src="https://github.com/mattatz/curvo/assets/1085910/acc2ca67-fc38-4529-a87e-021e62c6d504" width="360px" alt="Find intersection points between two NURBS curves" />
+<img src="https://github.com/mattatz/curvo/assets/1085910/8f29cb4b-d3d5-4553-9f41-deb8cc63b132" width="360px" alt="Find intersection points between two NURBS curves" />
 
 Additional features are as follows:
 
-<img src="https://github.com/mattatz/curvo/assets/1085910/08f6277d-1a62-495c-bd26-e5feeb90a258" width="360px" alt="Ellipse arc generation" />
+<img src="https://github.com/mattatz/curvo/assets/1085910/87ebdb66-f0df-46cc-8cb4-01f597080ffb" width="360px" alt="Ellipse arc generation" />
 
-<img src="https://github.com/mattatz/curvo/assets/1085910/4aa841bc-ad97-4dcf-9257-2b0c0adce376" width="360px" alt="Iso-curves on a surface" />
+<img src="https://github.com/mattatz/curvo/assets/1085910/55f214ec-668a-4d18-8fa8-bfa5ca23b3a2" width="360px" alt="Iso-curves on a surface" />
 
 ## Usage
 
