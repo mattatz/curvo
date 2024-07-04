@@ -1,6 +1,6 @@
 [package]
 name = "curvo"
-version = "0.1.24"
+version = "0.1.25"
 authors = ["Masatatsu Nakamura <masatatsu.nakamura@gmail.com"]
 edition = "2021"
 keywords = ["nurbs", "modeling", "graphics", "3d"]
@@ -56,6 +56,11 @@ log = ["dep:log"]
 [[example]]
 name = "interpolate_curve"
 path = "examples/interpolate_curve.rs"
+required-features = ["bevy"]
+
+[[example]]
+name = "periodic_interpolate_curve"
+path = "examples/periodic_interpolate_curve.rs"
 required-features = ["bevy"]
 
 [[example]]

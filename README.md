@@ -32,6 +32,8 @@ The supported features also include finding the closest point on NURBS curves, f
 
 Additional features are as follows:
 
+<img src="https://github.com/mattatz/curvo/assets/1085910/754d2a96-0f6b-40f7-b6b1-106789d585b7" width="360px" alt="Smooth periodic points interpolation with knot styles" />
+
 <img src="https://github.com/mattatz/curvo/assets/1085910/87ebdb66-f0df-46cc-8cb4-01f597080ffb" width="360px" alt="Ellipse arc generation" />
 
 <img src="https://github.com/mattatz/curvo/assets/1085910/55f214ec-668a-4d18-8fa8-bfa5ca23b3a2" width="360px" alt="Iso-curves on a surface" />
