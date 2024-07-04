@@ -40,7 +40,12 @@ impl KnotStyle {
                         .collect()
                 };
 
+                // println!("params: {:?}", params);
                 params
+
+                // normalize params
+                // let max = params.iter().fold(T::zero(), |acc, &x| acc.max(x));
+                // params.iter().map(|&x| x / max).collect()
             }
         }
     }

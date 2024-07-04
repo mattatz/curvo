@@ -641,8 +641,6 @@ where
                         .collect::<Vec<_>>(),
                     degree_v,
                     false,
-                    None,
-                    None,
                 )?;
                 NurbsCurve::try_new(
                     degree_v,

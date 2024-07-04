@@ -26,6 +26,8 @@ use crate::misc::Ray;
 use crate::prelude::{BoundingBoxTraversal, CurveLengthParameter, Invertible, KnotVector};
 use crate::{misc::FloatingPoint, ClosestParameterNewton, ClosestParameterProblem};
 
+use super::KnotStyle;
+
 /// NURBS curve representation
 /// By generics, it can be used for 2D or 3D curves with f32 or f64 scalar types
 #[derive(Clone, Debug)]
@@ -676,21 +678,6 @@ where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
-        Self::try_interpolate_with_tangents(points, degree, None, None)
-    }
-
-    /// Try to create an interpolated NURBS curve from a set of points with start and end tangents
-    pub fn try_interpolate_with_tangents(
-        points: &[OPoint<T, DimNameDiff<D, U1>>],
-        degree: usize,
-        start_tangent: Option<OVector<T, DimNameDiff<D, U1>>>,
-        end_tangent: Option<OVector<T, DimNameDiff<D, U1>>>,
-    ) -> anyhow::Result<Self>
-    where
-        DefaultAllocator: Allocator<D>,
-        D: DimNameSub<U1>,
-        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
-    {
         let (control_points, knots) = try_interpolate_control_points(
             &points
                 .iter()
@@ -698,8 +685,6 @@ where
                 .collect::<Vec<_>>(),
             degree,
             true,
-            start_tangent.map(|v| DVector::from_vec(v.iter().copied().collect())),
-            end_tangent.map(|v| DVector::from_vec(v.iter().copied().collect())),
         )?;
         Ok(Self {
             degree,
@@ -709,6 +694,36 @@ where
                 .collect(),
             knots,
         })
+    }
+
+    ///
+    pub fn try_periodic_interpolate(
+        points: &[OPoint<T, DimNameDiff<D, U1>>],
+        knot_style: KnotStyle,
+    ) -> anyhow::Result<Self>
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<D>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+        <D as DimNameSub<U1>>::Output: DimNameAdd<U1>,
+        DefaultAllocator: Allocator<<<D as DimNameSub<U1>>::Output as DimNameAdd<U1>>::Output>,
+    {
+        let degree = 3;
+
+        let input = points
+            .iter()
+            .map(|p| DVector::from_vec(p.iter().copied().collect()))
+            .collect::<Vec<_>>();
+        let (pts, knots) =
+            try_periodic_interpolate_control_points(&input, degree, knot_style, true)?;
+
+        Self::try_new(
+            degree,
+            pts.iter()
+                .map(|v| OPoint::from_slice(v.as_slice()))
+                .collect(),
+            knots.to_vec(),
+        )
     }
 
     /// Try to create a circle curve
@@ -1852,8 +1867,6 @@ pub fn try_interpolate_control_points<T: FloatingPoint>(
     points: &[DVector<T>],
     degree: usize,
     homogeneous: bool,
-    start_tangent: Option<DVector<T>>,
-    end_tangent: Option<DVector<T>>,
 ) -> anyhow::Result<(Vec<DVector<T>>, KnotVector<T>)> {
     let n = points.len();
     if n < degree + 1 {
@@ -1876,12 +1889,8 @@ pub fn try_interpolate_control_points<T: FloatingPoint>(
 
     let mut knots_start = vec![T::zero(); degree + 1];
 
-    let has_tangent = start_tangent.is_some() && end_tangent.is_some();
-    let (start, end) = if has_tangent {
-        (0, us.len() - degree + 1)
-    } else {
-        (1, us.len() - degree)
-    };
+    let start = 1;
+    let end = us.len() - degree;
 
     for i in start..end {
         let mut weight_sums = T::zero();
@@ -1894,15 +1903,13 @@ pub fn try_interpolate_control_points<T: FloatingPoint>(
     let knots = KnotVector::new([knots_start, vec![T::one(); degree + 1]].concat());
     let plen = points.len();
 
-    let (n, ld) = if has_tangent {
-        (plen + 1, plen - (degree - 1))
-    } else {
-        (plen - 1, plen - (degree + 1))
-    };
+    let n = plen - 1;
+    let ld = plen - (degree + 1);
 
     // build basis function coefficients matrix
 
     let mut m_a = DMatrix::<T>::zeros(us.len(), degree + 1 + ld);
+
     for i in 0..us.len() {
         let u = us[i];
         let knot_span_index = knots.find_knot_span_index(n, degree, u);
@@ -1912,62 +1919,161 @@ pub fn try_interpolate_control_points<T: FloatingPoint>(
         let row_start = vec![T::zero(); ls];
         let row_end = vec![T::zero(); ld - ls];
         let e = [row_start, basis, row_end].concat();
+        // println!("e = {:?}", &e);
         for j in 0..e.len() {
             m_a[(i, j)] = e[j];
         }
     }
 
     // dbg!(&mA);
+    let control_points = try_solve_interpolation(m_a, points, homogeneous)?;
 
-    if has_tangent {
-        let cols = m_a.ncols();
-        let ln = cols - 2;
-        let tan_row0 = [vec![-T::one(), T::one()], vec![T::zero(); ln]].concat();
-        let tan_row1 = [vec![T::zero(); ln], vec![-T::one(), T::one()]].concat();
-        // dbg!(&tan_row0);
-        // dbg!(&tan_row1);
-        m_a = m_a.insert_row(1, T::zero());
-        let rows = m_a.nrows();
-        m_a = m_a.insert_row(rows - 1, T::zero());
-        for i in 0..cols {
-            m_a[(1, i)] = tan_row0[i];
-            m_a[(rows - 1, i)] = tan_row1[i];
+    Ok((control_points, knots))
+}
+
+pub fn try_periodic_interpolate_control_points<T: FloatingPoint>(
+    points: &[DVector<T>],
+    degree: usize,
+    knot_style: KnotStyle,
+    homogeneous: bool,
+) -> anyhow::Result<(Vec<DVector<T>>, KnotVector<T>)> {
+    let n = points.len();
+    if n < degree + 1 {
+        anyhow::bail!("Too few control points for curve");
+    }
+    anyhow::ensure!(
+        degree % 2 != 0,
+        "Degree must be odd for periodic interpolation"
+    );
+
+    let parameters = knot_style.parameterize(&points, true);
+
+    /*
+    let head = &parameters[0..(degree + 1)];
+    let tail = &parameters[(parameters.len() - degree)..];
+    let start_parameters = tail.iter().cloned().collect::<Vec<_>>();
+
+    let knots = [
+        start_parameters,
+        parameters.clone(),
+        head.iter().cloned().collect(),
+    ]
+    .concat()
+    .iter()
+    .scan(T::zero(), |p, x| {
+        *p += *x;
+        Some(*p)
+    })
+    .collect::<Vec<_>>();
+    */
+
+    // works well for uniform only
+    let n = parameters.len();
+    let cycled = (0..(parameters.len() + degree * 2)).map(|i| &parameters[i % n]);
+    let knots: Vec<_> = [
+        vec![T::zero()],
+        cycled
+            .scan(T::zero(), |p, x| {
+                *p += *x;
+                Some(*p)
+            })
+            .collect(),
+    ]
+    .concat();
+
+    println!("knots = {:?}", &knots);
+
+    /*
+    println!(
+        "# of points = {}, degree = {}, knots = {:?}",
+        points.len(),
+        degree,
+        &knots
+    );
+    */
+
+    let knots_vec = KnotVector::new(knots.clone());
+    let plen = points.len();
+
+    let n = knots_vec.len() - degree - 2;
+
+    println!("knots domain: {:?}", knots_vec.domain(degree));
+
+    // build basis function coefficients matrix
+
+    let mut m_a = DMatrix::<T>::zeros(plen, plen);
+    let basis_end = vec![T::zero(); plen - (degree + 1)];
+
+    let acc: Vec<_> = parameters.iter().scan(T::zero(), |p, x| {
+        *p = *x;
+        Some(*p)
+    }).collect();
+    let acc = [vec![T::zero()], acc].concat();
+
+    for i in 0..plen {
+        // let u = knots[i + degree]; // from start domain
+        let u = knots[i + degree];
+        let knot_span_index = knots_vec.find_knot_span_index(n, degree, u);
+        let basis = knots_vec.basis_functions(knot_span_index, u, degree);
+        let basis = [basis, basis_end.clone()].concat();
+
+        let ls = knot_span_index - degree;
+        println!("i = {}, ls = {}", i, ls);
+
+        // cycle coefficients due to periodicity
+        let mut e = basis[ls..].to_vec();
+        e.extend_from_slice(&basis[..ls]);
+
+        /*
+        println!(
+            "u = {}, knot_span_index = {}, basis = {:?}, e = {:?}",
+            u, knot_span_index, basis, e
+        );
+        */
+
+        for j in 0..e.len() {
+            m_a[(i, j)] = e[j];
         }
     }
 
-    let dim = points[0].len();
-    let mult0 = knots[degree + 1] / T::from_usize(degree).unwrap();
-    let mult1 = (T::one() - knots[knots.len() - degree - 2]) / T::from_usize(degree).unwrap();
+    let points = points
+        .iter()
+        .cloned()
+        .cycle()
+        .skip(0)
+        .take(plen)
+        .collect::<Vec<_>>();
 
-    // solve Ax = b with LU decomposition
+    let mut control_points = try_solve_interpolation(m_a, &points, homogeneous)?;
+
+    // periodic
+    for i in 0..degree {
+        control_points.push(control_points[i].clone());
+    }
+
+    Ok((control_points, knots_vec))
+}
+
+fn try_solve_interpolation<T: FloatingPoint>(
+    m_a: DMatrix<T>,
+    points: &[DVector<T>],
+    homogeneous: bool,
+) -> anyhow::Result<Vec<DVector<T>>> {
+    let n = points.len();
+    let dim = points[0].len();
+
     let lu = m_a.lu();
-    let mut m_x = DMatrix::<T>::identity(if has_tangent { plen + 2 } else { plen }, dim);
+    let mut m_x = DMatrix::<T>::identity(n, dim);
     let rows = m_x.nrows();
     for i in 0..dim {
-        let b: Vec<_> = if has_tangent {
-            let st = start_tangent.as_ref().unwrap()[i];
-            let et = end_tangent.as_ref().unwrap()[i];
-            let mut b = vec![points[0][i]];
-            b.push(mult0 * st);
-            for j in 1..(plen - 1) {
-                b.push(points[j][i]);
-            }
-            b.push(mult1 * et);
-            b.push(points[plen - 1][i]);
-            b
-        } else {
-            points.iter().map(|p| p[i]).collect()
-        };
-
+        let b: Vec<_> = points.iter().map(|p| p[i]).collect();
         let b = DVector::from_vec(b);
-        // dbg!(&b);
+        // println!("b = {:?}", &b);
         let xs = lu.solve(&b).ok_or(anyhow::anyhow!("Solve failed"))?;
         for j in 0..rows {
             m_x[(j, i)] = xs[j];
         }
     }
-
-    // dbg!(&mX.shape());
 
     // extract control points from solved x
     let mut control_points = vec![];
@@ -1982,5 +2088,5 @@ pub fn try_interpolate_control_points<T: FloatingPoint>(
         control_points.push(DVector::from_vec(coords));
     }
 
-    Ok((control_points, knots))
+    Ok(control_points)
 }
