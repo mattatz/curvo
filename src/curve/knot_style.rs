@@ -1,8 +1,10 @@
 use itertools::Itertools;
-use nalgebra::{allocator::Allocator, DVector, DefaultAllocator, DimName, OPoint};
+use nalgebra::DVector;
 
 use crate::misc::FloatingPoint;
 
+/// Knot parameterization for points interpolation
+/// https://en.wikipedia.org/wiki/Centripetal_Catmull%E2%80%93Rom_spline
 #[derive(Debug, Clone)]
 pub enum KnotStyle {
     Uniform,
@@ -25,7 +27,6 @@ impl KnotStyle {
             }
             KnotStyle::Chordal | KnotStyle::Centripetal => {
                 let alpha = self.alpha();
-
                 let params: Vec<T> = if closed {
                     points
                         .iter()
@@ -52,8 +53,9 @@ impl KnotStyle {
 
     pub fn alpha<T: FloatingPoint>(&self) -> T {
         match self {
-            KnotStyle::Uniform | KnotStyle::Chordal => T::one(),
+            KnotStyle::Chordal => T::one(),
             KnotStyle::Centripetal => T::from_f64(0.5).unwrap(),
+            _ => unimplemented!(),
         }
     }
 }

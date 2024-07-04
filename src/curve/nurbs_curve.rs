@@ -615,21 +615,11 @@ where
             anyhow::bail!("Too few control points for curve");
         }
 
-        let pts: Vec<_> = (0..(n + degree))
-            .map(|i| {
-                if i < n {
-                    points[i].clone()
-                } else {
-                    points[i - n].clone()
-                }
-            })
-            .collect();
-
+        let pts = points.iter().cycle().take(n + degree);
         let knots = (0..(n + 1 + degree * 2)).map(|i| T::from_usize(i).unwrap());
 
         Ok(Self {
             control_points: pts
-                .iter()
                 .map(|p| {
                     let coords = p.to_homogeneous();
                     OPoint::from_slice(coords.as_slice())
@@ -696,9 +686,34 @@ where
         })
     }
 
+    /// Try to create an periodic interpolated NURBS curve from a set of points
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::Point3;
+    /// use approx::assert_relative_eq;
     ///
+    /// // Create periodic interpolated NURBS curve by a set of points
+    /// let points: Vec<Point3<f64>> = vec![
+    ///     Point3::new(-1.0, -1.0, 0.),
+    ///     Point3::new(1.0, -1.0, 0.),
+    ///     Point3::new(1.0, 1.0, 0.),
+    ///     Point3::new(-1.0, 1.0, 0.),
+    /// ];
+    /// let closed = NurbsCurve3D::try_periodic_interpolate(&points, 3, KnotStyle::Centripetal).unwrap();
+    ///
+    /// let (start, end) = closed.knots_domain();
+    ///
+    /// // Check equality of the first and last points
+    /// let head = closed.point_at(start);
+    /// assert_relative_eq!(points[0], head, epsilon = 1e-10);
+    ///
+    /// let tail = closed.point_at(end);
+    /// assert_relative_eq!(points[0], tail, epsilon = 1e-10);
+    /// ```
     pub fn try_periodic_interpolate(
         points: &[OPoint<T, DimNameDiff<D, U1>>],
+        degree: usize,
         knot_style: KnotStyle,
     ) -> anyhow::Result<Self>
     where
@@ -708,8 +723,6 @@ where
         <D as DimNameSub<U1>>::Output: DimNameAdd<U1>,
         DefaultAllocator: Allocator<<<D as DimNameSub<U1>>::Output as DimNameAdd<U1>>::Output>,
     {
-        let degree = 3;
-
         let input = points
             .iter()
             .map(|p| DVector::from_vec(p.iter().copied().collect()))
@@ -1907,7 +1920,6 @@ pub fn try_interpolate_control_points<T: FloatingPoint>(
     let ld = plen - (degree + 1);
 
     // build basis function coefficients matrix
-
     let mut m_a = DMatrix::<T>::zeros(us.len(), degree + 1 + ld);
 
     for i in 0..us.len() {
@@ -1925,7 +1937,6 @@ pub fn try_interpolate_control_points<T: FloatingPoint>(
         }
     }
 
-    // dbg!(&mA);
     let control_points = try_solve_interpolation(m_a, points, homogeneous)?;
 
     Ok((control_points, knots))
@@ -1941,113 +1952,76 @@ pub fn try_periodic_interpolate_control_points<T: FloatingPoint>(
     if n < degree + 1 {
         anyhow::bail!("Too few control points for curve");
     }
-    anyhow::ensure!(
-        degree % 2 != 0,
-        "Degree must be odd for periodic interpolation"
-    );
 
-    let parameters = knot_style.parameterize(&points, true);
+    // build periodic knot vector
+    let parameters = knot_style.parameterize(points, true);
 
-    /*
-    let head = &parameters[0..(degree + 1)];
-    let tail = &parameters[(parameters.len() - degree)..];
-    let start_parameters = tail.iter().cloned().collect::<Vec<_>>();
+    let head = &parameters[0..(degree - 1)];
+    let tail = &parameters[(parameters.len() - degree + 1)..];
+    let start_parameters = tail.to_vec();
+
+    let knots = [start_parameters, parameters.clone(), head.to_vec()].concat();
+
+    let m = points.len() + degree;
 
     let knots = [
-        start_parameters,
-        parameters.clone(),
-        head.iter().cloned().collect(),
-    ]
-    .concat()
-    .iter()
-    .scan(T::zero(), |p, x| {
-        *p += *x;
-        Some(*p)
-    })
-    .collect::<Vec<_>>();
-    */
-
-    // works well for uniform only
-    let n = parameters.len();
-    let cycled = (0..(parameters.len() + degree * 2)).map(|i| &parameters[i % n]);
-    let knots: Vec<_> = [
         vec![T::zero()],
-        cycled
+        knots
+            .iter()
             .scan(T::zero(), |p, x| {
                 *p += *x;
                 Some(*p)
             })
-            .collect(),
+            .collect::<Vec<_>>(),
     ]
     .concat();
 
-    println!("knots = {:?}", &knots);
-
-    /*
-    println!(
-        "# of points = {}, degree = {}, knots = {:?}",
-        points.len(),
-        degree,
-        &knots
-    );
-    */
+    // translate knot vectors to fit NURBS requirements
+    let k0 = if degree > 2 {
+        knots[0] - (knots[m + 1] - knots[m])
+    } else {
+        knots[0]
+    };
+    let k1 = if degree > 2 {
+        knots[knots.len() - 1] + (knots[degree + 1] - knots[degree])
+    } else {
+        knots[knots.len() - 1]
+    };
+    let knots = [vec![k0], knots, vec![k1]].concat();
 
     let knots_vec = KnotVector::new(knots.clone());
     let plen = points.len();
 
-    let n = knots_vec.len() - degree - 2;
-
-    println!("knots domain: {:?}", knots_vec.domain(degree));
-
     // build basis function coefficients matrix
-
     let mut m_a = DMatrix::<T>::zeros(plen, plen);
-    let basis_end = vec![T::zero(); plen - (degree + 1)];
+    let zero_pad = vec![T::zero(); plen - (degree + 1)];
 
-    let acc: Vec<_> = parameters.iter().scan(T::zero(), |p, x| {
-        *p = *x;
-        Some(*p)
-    }).collect();
-    let acc = [vec![T::zero()], acc].concat();
-
+    let n = knots_vec.len() - degree - 2;
     for i in 0..plen {
-        // let u = knots[i + degree]; // from start domain
-        let u = knots[i + degree];
+        let u = knots[i + degree]; // from start domain
         let knot_span_index = knots_vec.find_knot_span_index(n, degree, u);
+
         let basis = knots_vec.basis_functions(knot_span_index, u, degree);
-        let basis = [basis, basis_end.clone()].concat();
+        let basis_padded = [basis, zero_pad.clone()].concat();
 
         let ls = knot_span_index - degree;
-        println!("i = {}, ls = {}", i, ls);
 
-        // cycle coefficients due to periodicity
-        let mut e = basis[ls..].to_vec();
-        e.extend_from_slice(&basis[..ls]);
-
-        /*
-        println!(
-            "u = {}, knot_span_index = {}, basis = {:?}, e = {:?}",
-            u, knot_span_index, basis, e
-        );
-        */
+        // In a closed periodic NURBS curve, the control points loop.
+        // The solver only solves for the control points that are not looping,
+        // so the coefficient matrix is looped to represent the duplicated control points.
+        let n = basis_padded.len() - ls;
+        let mut e = basis_padded[n..].to_vec();
+        e.extend_from_slice(&basis_padded[0..n]);
 
         for j in 0..e.len() {
             m_a[(i, j)] = e[j];
         }
     }
 
-    let points = points
-        .iter()
-        .cloned()
-        .cycle()
-        .skip(0)
-        .take(plen)
-        .collect::<Vec<_>>();
-
-    let mut control_points = try_solve_interpolation(m_a, &points, homogeneous)?;
+    let mut control_points = try_solve_interpolation(m_a, points, homogeneous)?;
 
     // periodic
-    for i in 0..degree {
+    for i in 0..(degree) {
         control_points.push(control_points[i].clone());
     }
 
