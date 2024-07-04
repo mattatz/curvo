@@ -38,8 +38,8 @@ log = { version = "0.4.21", optional = true }
 approx = { version = "0.5", default-features = false }
 
 [features]
-default = []
-# default = ["bevy"] # for debugging example
+# default = []
+default = ["bevy"] # for debugging example
 bevy = [
   "dep:easer",
   "dep:rand_distr",
@@ -56,6 +56,11 @@ log = ["dep:log"]
 [[example]]
 name = "interpolate_curve"
 path = "examples/interpolate_curve.rs"
+required-features = ["bevy"]
+
+[[example]]
+name = "periodic_interpolate_curve"
+path = "examples/periodic_interpolate_curve.rs"
 required-features = ["bevy"]
 
 [[example]]
