@@ -30,7 +30,7 @@ use super::KnotStyle;
 
 /// NURBS curve representation
 /// By generics, it can be used for 2D or 3D curves with f32 or f64 scalar types
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct NurbsCurve<T: FloatingPoint, D: DimName>
 where
     DefaultAllocator: Allocator<D>,
@@ -2063,4 +2063,143 @@ fn try_solve_interpolation<T: FloatingPoint>(
     }
 
     Ok(control_points)
+}
+
+#[cfg(feature = "serde")]
+impl<T, D: DimName> serde::Serialize for NurbsCurve<T, D>
+where
+    T: FloatingPoint + serde::Serialize,
+    DefaultAllocator: Allocator<D>,
+    <DefaultAllocator as nalgebra::allocator::Allocator<D>>::Buffer<T>: serde::Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("NurbsCurve", 3)?;
+        state.serialize_field("control_points", &self.control_points)?;
+        state.serialize_field("degree", &self.degree)?;
+        state.serialize_field("knots", &self.knots)?;
+        state.end()
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, T, D: DimName> serde::Deserialize<'de> for NurbsCurve<T, D>
+where
+    T: FloatingPoint + serde::Deserialize<'de>,
+    DefaultAllocator: Allocator<D>,
+    <DefaultAllocator as nalgebra::allocator::Allocator<D>>::Buffer<T>: serde::Deserialize<'de>,
+{
+    fn deserialize<S>(deserializer: S) -> Result<Self, S::Error>
+    where
+        S: serde::Deserializer<'de>,
+    {
+        use serde::de::{self, MapAccess, Visitor};
+
+        #[derive(Debug)]
+        enum Field {
+            ControlPoints,
+            Degree,
+            Knots,
+        }
+
+        impl<'de> serde::Deserialize<'de> for Field {
+            fn deserialize<S>(deserializer: S) -> Result<Self, S::Error>
+            where
+                S: serde::Deserializer<'de>,
+            {
+                struct FieldVisitor;
+
+                impl<'de> Visitor<'de> for FieldVisitor {
+                    type Value = Field;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                        formatter.write_str("`control_points` or `degree` or `knots`")
+                    }
+
+                    fn visit_str<E>(self, value: &str) -> Result<Field, E>
+                    where
+                        E: de::Error,
+                    {
+                        match value {
+                            "control_points" => Ok(Field::ControlPoints),
+                            "degree" => Ok(Field::Degree),
+                            "knots" => Ok(Field::Knots),
+                            _ => Err(de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+
+                deserializer.deserialize_identifier(FieldVisitor)
+            }
+        }
+
+        struct NurbsCurveVisitor<T, D>(std::marker::PhantomData<(T, D)>);
+
+        impl<T, D> NurbsCurveVisitor<T, D> {
+            pub fn new() -> Self {
+                NurbsCurveVisitor(std::marker::PhantomData)
+            }
+        }
+
+        impl<'de, T, D: DimName> Visitor<'de> for NurbsCurveVisitor<T, D>
+        where
+            T: FloatingPoint + serde::Deserialize<'de>,
+            DefaultAllocator: Allocator<D>,
+            <DefaultAllocator as nalgebra::allocator::Allocator<D>>::Buffer<T>:
+                serde::Deserialize<'de>,
+        {
+            type Value = NurbsCurve<T, D>;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("struct NurbsCurve")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<Self::Value, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                let mut control_points = None;
+                let mut degree = None;
+                let mut knots = None;
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::ControlPoints => {
+                            if control_points.is_some() {
+                                return Err(de::Error::duplicate_field("control_points"));
+                            }
+                            control_points = Some(map.next_value()?);
+                        }
+                        Field::Degree => {
+                            if degree.is_some() {
+                                return Err(de::Error::duplicate_field("degree"));
+                            }
+                            degree = Some(map.next_value()?);
+                        }
+                        Field::Knots => {
+                            if knots.is_some() {
+                                return Err(de::Error::duplicate_field("knots"));
+                            }
+                            knots = Some(map.next_value()?);
+                        }
+                    }
+                }
+                let control_points =
+                    control_points.ok_or_else(|| de::Error::missing_field("control_points"))?;
+                let degree = degree.ok_or_else(|| de::Error::missing_field("degree"))?;
+                let knots = knots.ok_or_else(|| de::Error::missing_field("knots"))?;
+
+                Ok(Self::Value {
+                    control_points,
+                    degree,
+                    knots,
+                })
+            }
+        }
+
+        const FIELDS: &[&str] = &["control_points", "degree", "knots"];
+        deserializer.deserialize_struct("NurbsCurve", FIELDS, NurbsCurveVisitor::<T, D>::new())
+    }
 }
