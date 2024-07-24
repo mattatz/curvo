@@ -73,8 +73,12 @@ where
         self.v_degree
     }
 
-    pub fn control_points(&self) -> &Vec<Vec<OPoint<T, D>>> {
-        &self.control_points
+    pub fn u_knots(&self) -> &KnotVector<T> {
+        &self.u_knots
+    }
+
+    pub fn v_knots(&self) -> &KnotVector<T> {
+        &self.v_knots
     }
 
     /// Get the u domain of the knot vector by degree
@@ -85,6 +89,10 @@ where
     /// Get the v domain of the knot vector by degree
     pub fn v_knots_domain(&self) -> (T, T) {
         self.v_knots.domain(self.v_degree)
+    }
+
+    pub fn control_points(&self) -> &Vec<Vec<OPoint<T, D>>> {
+        &self.control_points
     }
 
     /// Evaluate the surface at the given u, v parameters to get a point
@@ -541,17 +549,19 @@ where
     }
 
     /// Extrude a NURBS curve to create a NURBS surface
-    pub fn extrude(profile: &NurbsCurve<T, D>, axis: OVector<T, DimNameDiff<D, U1>>) -> Self {
+    pub fn extrude(
+        profile: &NurbsCurve<T, D>,
+        translation: &OVector<T, DimNameDiff<D, U1>>,
+    ) -> Self {
         let prof_points = profile.dehomogenized_control_points();
         let prof_weights = profile.weights();
 
-        let translation = axis.clone();
-        let half_translation = &translation * T::from_f64(0.5).unwrap();
+        let half_translation = translation * T::from_f64(0.5).unwrap();
 
         let mut control_points = vec![vec![], vec![], vec![]];
 
         for i in 0..prof_points.len() {
-            let p0 = &prof_points[i] + &translation;
+            let p0 = &prof_points[i] + translation;
             let p1 = &prof_points[i] + &half_translation;
             let p2 = &prof_points[i];
 
@@ -1319,5 +1329,152 @@ where
         state.serialize_field("u_knots", &self.u_knots)?;
         state.serialize_field("v_knots", &self.v_knots)?;
         state.end()
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, T, D: DimName> serde::Deserialize<'de> for NurbsSurface<T, D>
+where
+    T: FloatingPoint + serde::Deserialize<'de>,
+    DefaultAllocator: Allocator<D>,
+    <DefaultAllocator as nalgebra::allocator::Allocator<D>>::Buffer<T>: serde::Deserialize<'de>,
+{
+    fn deserialize<S>(deserializer: S) -> Result<Self, S::Error>
+    where
+        S: serde::Deserializer<'de>,
+    {
+        use serde::de::{self, MapAccess, Visitor};
+
+        #[derive(Debug)]
+        enum Field {
+            ControlPoints,
+            UDegree,
+            VDegree,
+            UKnots,
+            VKnots,
+        }
+
+        impl<'de> serde::Deserialize<'de> for Field {
+            fn deserialize<S>(deserializer: S) -> Result<Self, S::Error>
+            where
+                S: serde::Deserializer<'de>,
+            {
+                struct FieldVisitor;
+
+                impl<'de> Visitor<'de> for FieldVisitor {
+                    type Value = Field;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                        formatter.write_str("`control_points` or `u_degree` or `v_degree` or `u_knots` or `v_knots`")
+                    }
+
+                    fn visit_str<E>(self, value: &str) -> Result<Field, E>
+                    where
+                        E: de::Error,
+                    {
+                        match value {
+                            "control_points" => Ok(Field::ControlPoints),
+                            "u_degree" => Ok(Field::UDegree),
+                            "v_degree" => Ok(Field::VDegree),
+                            "u_knots" => Ok(Field::UKnots),
+                            "v_knots" => Ok(Field::VKnots),
+                            _ => Err(de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+
+                deserializer.deserialize_identifier(FieldVisitor)
+            }
+        }
+
+        struct NurbsSurfaceVisitor<T, D>(std::marker::PhantomData<(T, D)>);
+
+        impl<T, D> NurbsSurfaceVisitor<T, D> {
+            pub fn new() -> Self {
+                NurbsSurfaceVisitor(std::marker::PhantomData)
+            }
+        }
+
+        impl<'de, T, D: DimName> Visitor<'de> for NurbsSurfaceVisitor<T, D>
+        where
+            T: FloatingPoint + serde::Deserialize<'de>,
+            DefaultAllocator: Allocator<D>,
+            <DefaultAllocator as nalgebra::allocator::Allocator<D>>::Buffer<T>:
+                serde::Deserialize<'de>,
+        {
+            type Value = NurbsSurface<T, D>;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("struct NurbsSurface")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<Self::Value, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                let mut control_points = None;
+                let mut u_degree = None;
+                let mut v_degree = None;
+                let mut u_knots = None;
+                let mut v_knots = None;
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::ControlPoints => {
+                            if control_points.is_some() {
+                                return Err(de::Error::duplicate_field("control_points"));
+                            }
+                            control_points = Some(map.next_value()?);
+                        }
+                        Field::UDegree => {
+                            if u_degree.is_some() {
+                                return Err(de::Error::duplicate_field("u_degree"));
+                            }
+                            u_degree = Some(map.next_value()?);
+                        }
+                        Field::VDegree => {
+                            if v_degree.is_some() {
+                                return Err(de::Error::duplicate_field("v_degree"));
+                            }
+                            v_degree = Some(map.next_value()?);
+                        }
+                        Field::UKnots => {
+                            if u_knots.is_some() {
+                                return Err(de::Error::duplicate_field("u_knots"));
+                            }
+                            u_knots = Some(map.next_value()?);
+                        }
+                        Field::VKnots => {
+                            if v_knots.is_some() {
+                                return Err(de::Error::duplicate_field("v_knots"));
+                            }
+                            v_knots = Some(map.next_value()?);
+                        }
+                    }
+                }
+                let control_points =
+                    control_points.ok_or_else(|| de::Error::missing_field("control_points"))?;
+                let u_degree = u_degree.ok_or_else(|| de::Error::missing_field("u_degree"))?;
+                let v_degree = v_degree.ok_or_else(|| de::Error::missing_field("v_degree"))?;
+                let u_knots = u_knots.ok_or_else(|| de::Error::missing_field("u_knots"))?;
+                let v_knots = v_knots.ok_or_else(|| de::Error::missing_field("v_knots"))?;
+
+                Ok(Self::Value {
+                    control_points,
+                    u_degree,
+                    v_degree,
+                    u_knots,
+                    v_knots,
+                })
+            }
+        }
+
+        const FIELDS: &[&str] = &[
+            "control_points",
+            "u_degree",
+            "v_degree",
+            "u_knots",
+            "v_knots",
+        ];
+        deserializer.deserialize_struct("NurbsSurface", FIELDS, NurbsSurfaceVisitor::<T, D>::new())
     }
 }
