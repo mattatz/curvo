@@ -1,8 +1,11 @@
+#![allow(unused_imports)]
+
 use approx::assert_relative_eq;
 use curvo::prelude::{NurbsCurve3D, NurbsSurface, NurbsSurface3D};
 use nalgebra::{Point3, Vector3};
 
 #[test]
+#[cfg(feature = "serde")]
 fn test_curve_serialization() {
     let curve =
         NurbsCurve3D::try_circle(&Point3::origin(), &Vector3::x(), &Vector3::y(), 1.).unwrap();
@@ -26,6 +29,7 @@ fn test_curve_serialization() {
 }
 
 #[test]
+#[cfg(feature = "serde")]
 fn test_surface_serialization() {
     let curve =
         NurbsCurve3D::try_circle(&Point3::origin(), &Vector3::x(), &Vector3::y(), 1.).unwrap();

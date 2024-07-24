@@ -685,7 +685,7 @@ where
     /// use nalgebra::{Point3, Vector3};
     /// use approx::assert_relative_eq;
     /// let circle = NurbsCurve3D::try_circle(&Point3::origin(), &Vector3::x(), &Vector3::y(), 1.).unwrap();
-    /// let extruded = NurbsSurface3D::extrude(&circle, Vector3::z());
+    /// let extruded = NurbsSurface3D::extrude(&circle, &Vector3::z());
     ///
     /// // Create an iso curve at the start of the u direction
     /// let (start, _) = extruded.u_knots_domain();
@@ -1311,6 +1311,7 @@ impl<'a, T: FloatingPoint, const D: usize> Transformable<&'a OMatrix<T, Const<D>
     }
 }
 
+#[cfg(feature = "serde")]
 impl<T, D: DimName> serde::Serialize for NurbsSurface<T, D>
 where
     T: FloatingPoint + serde::Serialize,
