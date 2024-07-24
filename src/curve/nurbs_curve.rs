@@ -30,7 +30,7 @@ use super::KnotStyle;
 
 /// NURBS curve representation
 /// By generics, it can be used for 2D or 3D curves with f32 or f64 scalar types
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct NurbsCurve<T: FloatingPoint, D: DimName>
 where
     DefaultAllocator: Allocator<D>,
@@ -2063,4 +2063,24 @@ fn try_solve_interpolation<T: FloatingPoint>(
     }
 
     Ok(control_points)
+}
+
+#[cfg(feature = "serde")]
+impl<T, D: DimName> serde::Serialize for NurbsCurve<T, D>
+where
+    T: FloatingPoint + serde::Serialize,
+    DefaultAllocator: Allocator<D>,
+    <DefaultAllocator as nalgebra::allocator::Allocator<D>>::Buffer<T>: serde::Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("NurbsCurve", 3)?;
+        state.serialize_field("control_points", &self.control_points)?;
+        state.serialize_field("degree", &self.degree)?;
+        state.serialize_field("knots", &self.knots)?;
+        state.end()
+    }
 }

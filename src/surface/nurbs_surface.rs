@@ -1301,25 +1301,23 @@ impl<'a, T: FloatingPoint, const D: usize> Transformable<&'a OMatrix<T, Const<D>
     }
 }
 
-/*
-impl<T: FloatingPoint + SubsetOf<F>, F: FloatingPoint, D: DimName> Castible<NurbsSurface<F, D>>
-    for NurbsSurface<T, D>
+impl<T, D: DimName> serde::Serialize for NurbsSurface<T, D>
 where
+    T: FloatingPoint + serde::Serialize,
     DefaultAllocator: Allocator<D>,
-    DefaultAllocator: Allocator<F, D>,
+    <DefaultAllocator as nalgebra::allocator::Allocator<D>>::Buffer<T>: serde::Serialize,
 {
-    fn cast(&self) -> NurbsSurface<F, D> {
-        NurbsSurface {
-            control_points: self
-                .control_points
-                .iter()
-                .map(|row| row.iter().map(|p| p.clone().cast()).collect())
-                .collect(),
-            u_degree: self.u_degree,
-            v_degree: self.v_degree,
-            u_knots: self.u_knots.cast(),
-            v_knots: self.v_knots.cast(),
-        }
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("NurbsSurface", 5)?;
+        state.serialize_field("control_points", &self.control_points)?;
+        state.serialize_field("u_degree", &self.u_degree)?;
+        state.serialize_field("v_degree", &self.v_degree)?;
+        state.serialize_field("u_knots", &self.u_knots)?;
+        state.serialize_field("v_knots", &self.v_knots)?;
+        state.end()
     }
 }
-*/

@@ -6,14 +6,13 @@ use simba::scalar::SupersetOf;
 use crate::prelude::{FloatingPoint, Invertible, KnotMultiplicity};
 
 /// Knot vector representation
-#[derive(Clone, Debug)]
-pub struct KnotVector<T> {
-    knots: Vec<T>,
-}
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct KnotVector<T>(Vec<T>);
 
 impl<T: RealField + Copy> KnotVector<T> {
     pub fn new(knots: Vec<T>) -> Self {
-        Self { knots }
+        Self(knots)
     }
 
     /// Create an uniform knot vector
@@ -32,47 +31,44 @@ impl<T: RealField + Copy> KnotVector<T> {
             knots.push(T::from_usize(i).unwrap());
         }
         knots.extend(std::iter::repeat(T::from_usize(n - 1).unwrap()).take(m));
-        Self { knots }
+        Self(knots)
     }
 
     pub fn len(&self) -> usize {
-        self.knots.len()
+        self.0.len()
     }
 
     pub fn is_empty(&self) -> bool {
-        self.knots.is_empty()
+        self.0.is_empty()
     }
 
     pub fn to_vec(&self) -> Vec<T> {
-        self.knots.clone()
+        self.0.clone()
     }
 
     pub fn first(&self) -> T {
-        self.knots[0]
+        self.0[0]
     }
 
     pub fn last(&self) -> T {
-        self.knots[self.knots.len() - 1]
+        self.0[self.0.len() - 1]
     }
 
     pub fn as_slice(&self) -> &[T] {
-        &self.knots
+        &self.0
     }
 
     pub fn iter(&self) -> std::slice::Iter<T> {
-        self.knots.iter()
+        self.0.iter()
     }
 
     pub fn iter_mut(&mut self) -> std::slice::IterMut<T> {
-        self.knots.iter_mut()
+        self.0.iter_mut()
     }
 
     /// Get the domain of the knot vector by degree
     pub fn domain(&self, degree: usize) -> (T, T) {
-        (
-            self.knots[degree],
-            self.knots[self.knots.len() - 1 - degree],
-        )
+        (self.0[degree], self.0[self.0.len() - 1 - degree])
     }
 
     pub fn constrain(&self, degree: usize, u: T) -> T {
@@ -89,11 +85,11 @@ impl<T: RealField + Copy> KnotVector<T> {
     pub fn add(&mut self, knot: T) -> usize {
         match self.floor(knot) {
             Some(idx) => {
-                self.knots.insert(idx + 1, knot);
+                self.0.insert(idx + 1, knot);
                 idx + 1
             }
             None => {
-                self.knots.insert(0, knot);
+                self.0.insert(0, knot);
                 0
             }
         }
@@ -113,8 +109,8 @@ impl<T: RealField + Copy> KnotVector<T> {
     pub fn multiplicity(&self) -> Vec<KnotMultiplicity<T>> {
         let mut mult = vec![];
 
-        let mut current = KnotMultiplicity::new(self.knots[0], 0);
-        self.knots.iter().for_each(|knot| {
+        let mut current = KnotMultiplicity::new(self.0[0], 0);
+        self.0.iter().for_each(|knot| {
             if (*knot - *current.knot()).abs() > T::default_epsilon() {
                 mult.push(current.clone());
                 current = KnotMultiplicity::new(*knot, 0);
@@ -144,7 +140,7 @@ impl<T: RealField + Copy> KnotVector<T> {
     /// Find the knot span index by linear search
     pub fn find_knot_span_linear(&self, n: usize, degree: usize, u: T) -> usize {
         let mut span = degree + 1;
-        while span < n && u >= self.knots[span] {
+        while span < n && u >= self.0[span] {
             span += 1;
         }
         span - 1
@@ -160,11 +156,11 @@ impl<T: RealField + Copy> KnotVector<T> {
     /// assert_eq!(idx, 4);
     /// ```
     pub fn find_knot_span_index(&self, n: usize, degree: usize, u: T) -> usize {
-        if u > self.knots[n + 1] - T::default_epsilon() {
+        if u > self[n + 1] - T::default_epsilon() {
             return n;
         }
 
-        if u < self.knots[degree] + T::default_epsilon() {
+        if u < self[degree] + T::default_epsilon() {
             return degree;
         }
 
@@ -172,8 +168,8 @@ impl<T: RealField + Copy> KnotVector<T> {
         let mut low = degree;
         let mut high = n + 1;
         let mut mid = ((low + high) as f64 / 2.).floor() as usize;
-        while u < self.knots[mid] || self.knots[mid + 1] <= u {
-            if u < self.knots[mid] {
+        while u < self[mid] || self[mid + 1] <= u {
+            if u < self[mid] {
                 high = mid;
             } else {
                 low = mid;
@@ -198,8 +194,8 @@ impl<T: RealField + Copy> KnotVector<T> {
         basis_functions[0] = T::one();
 
         for j in 1..=degree {
-            left[j] = u - self.knots[knot_span_index + 1 - j];
-            right[j] = self.knots[knot_span_index + j] - u;
+            left[j] = u - self[knot_span_index + 1 - j];
+            right[j] = self[knot_span_index + j] - u;
             let mut saved = T::zero();
 
             for r in 0..j {
@@ -230,8 +226,8 @@ impl<T: RealField + Copy> KnotVector<T> {
         ndu[0][0] = T::one();
 
         for j in 1..=degree {
-            left[j] = u - self.knots[knot_index + 1 - j];
-            right[j] = self.knots[knot_index + j] - u;
+            left[j] = u - self[knot_index + 1 - j];
+            right[j] = self[knot_index + j] - u;
 
             let mut saved = T::zero();
             for r in 0..j {
@@ -324,7 +320,7 @@ impl<T: RealField + Copy> KnotVector<T> {
 
         // compute all of the basis functions
         for _i in 0..=divs {
-            while u >= self.knots[knot_index + 1] && knot_index < n {
+            while u >= self[knot_index + 1] && knot_index < n {
                 knot_index += 1;
             }
             knot_spans.push(knot_index);
@@ -351,7 +347,7 @@ impl<T: RealField + Copy> KnotVector<T> {
 
         // compute all of the basis functions
         for _i in 0..=divs {
-            while u >= self.knots[knot_index + 1] && knot_index < n {
+            while u >= self[knot_index + 1] && knot_index < n {
                 knot_index += 1;
             }
             knot_spans.push(knot_index);
@@ -364,7 +360,7 @@ impl<T: RealField + Copy> KnotVector<T> {
 
     /// Compute a regularly spaced span & domain with a given degree and number of divisions
     pub fn regularly_spaced_span(&self, degree: usize, divs: usize) -> (T, T, T, usize) {
-        let n = self.knots.len() - degree - 2;
+        let n = self.len() - degree - 2;
         let (start, end) = self.domain(degree);
         let span = (end - start) / T::from_usize(divs).unwrap();
         (start, end, span, n)
@@ -379,22 +375,20 @@ impl<T: RealField + Copy> KnotVector<T> {
     /// assert_eq!(knots.first(), 1.0);
     /// ```
     pub fn cast<F: FloatingPoint + SupersetOf<T>>(&self) -> KnotVector<F> {
-        KnotVector::new(self.knots.iter().map(|v| convert(*v)).collect())
+        KnotVector::new(self.0.iter().map(|v| convert(*v)).collect())
     }
 }
 
 impl<T> Index<usize> for KnotVector<T> {
     type Output = T;
     fn index(&self, index: usize) -> &Self::Output {
-        &self.knots[index]
+        &self.0[index]
     }
 }
 
 impl<T> FromIterator<T> for KnotVector<T> {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
-        Self {
-            knots: iter.into_iter().collect(),
-        }
+        Self(iter.into_iter().collect())
     }
 }
 
@@ -412,15 +406,15 @@ impl<T: FloatingPoint> Invertible for KnotVector<T> {
     /// });
     /// ```
     fn invert(&mut self) {
-        let min = self.knots.first().unwrap();
+        let min = self.0.first().unwrap();
 
         let mut next = vec![*min];
-        let len = self.knots.len();
+        let len = self.len();
         for i in 1..len {
-            next.push(next[i - 1] + (self.knots[len - i] - self.knots[len - i - 1]));
+            next.push(next[i - 1] + (self[len - i] - self[len - i - 1]));
         }
 
-        self.knots = next;
+        self.0 = next;
     }
 }
 
