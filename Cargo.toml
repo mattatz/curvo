@@ -1,6 +1,6 @@
 [package]
 name = "curvo"
-version = "0.1.26"
+version = "0.1.27"
 authors = ["Masatatsu Nakamura <masatatsu.nakamura@gmail.com"]
 edition = "2021"
 keywords = ["nurbs", "modeling", "graphics", "3d"]
@@ -34,6 +34,9 @@ argmin = "0.10.0"
 itertools = "0.13.0"
 log = { version = "0.4.21", optional = true }
 serde = { version = "1.0.204", optional = true }
+
+[target.wasm32-unknown-unknown.dependencies]
+argmin = { version = "0.10.0", features = ["wasm-bindgen"] }
 
 [dev-dependencies]
 approx = { version = "0.5", default-features = false }
