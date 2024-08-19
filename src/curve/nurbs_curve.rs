@@ -1281,6 +1281,63 @@ where
         self.knots.is_clamped(self.degree)
     }
 
+    /// Check if the curve is closed
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point2, Point3, Vector3};
+    /// let circle = NurbsCurve3D::try_circle(
+    ///     &Point3::origin(),
+    ///     &Vector3::x(),
+    ///     &Vector3::y(),
+    ///    1.,
+    /// ).unwrap();
+    /// assert!(circle.is_closed());
+    ///
+    /// let polyline = NurbsCurve3D::polyline(
+    ///     &vec![
+    ///         Point3::new(-1., -1., 0.),
+    ///         Point3::new(1., -1., 0.),
+    ///         Point3::new(1., 1., 0.),
+    ///         Point3::new(-1., 1., 0.),
+    ///         Point3::new(-1., -1., 0.),
+    ///     ],
+    /// );
+    /// assert!(polyline.is_closed());
+    ///
+    /// let unclosed = NurbsCurve3D::polyline(
+    ///     &vec![
+    ///         Point3::new(-1., -1., 0.),
+    ///         Point3::new(1., -1., 0.),
+    ///         Point3::new(1., 1., 0.),
+    ///         Point3::new(-1., 1., 0.),
+    ///     ],
+    /// );
+    /// assert!(!unclosed.is_closed());
+    /// ```
+    pub fn is_closed(&self) -> bool
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+    {
+        let eps = T::default_epsilon() * T::from_usize(4).unwrap();
+        match self.knots.is_clamped(self.degree) {
+            true => {
+                self.dehomogenized_control_points();
+                let delta =
+                    &self.control_points[0] - &self.control_points[self.control_points.len() - 1];
+                delta.norm() < eps
+            }
+            false => {
+                let (s, e) = self.knots_domain();
+                let s = self.point_at(s);
+                let e = self.point_at(e);
+                let delta = s - e;
+                delta.norm() < eps
+            }
+        }
+    }
+
     /// Try to refine the curve by inserting knots
     pub fn try_refine_knot(&mut self, knots_to_insert: Vec<T>) -> anyhow::Result<()> {
         anyhow::ensure!(self.is_clamped(), "Curve must be clamped to refine knots");
