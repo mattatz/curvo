@@ -15,7 +15,7 @@ use nalgebra::Point3;
 use curvo::prelude::*;
 
 mod materials;
-pub mod systems;
+mod systems;
 
 use materials::*;
 use rand_distr::{Distribution, UnitSphere};
