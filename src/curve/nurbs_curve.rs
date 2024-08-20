@@ -330,6 +330,22 @@ where
         deriv[1].clone()
     }
 
+    /// Evaluate the curve at a given parameter to get a point & tangent vector at the same time
+    pub fn point_tangent_at(
+        &self,
+        u: T,
+    ) -> (
+        OPoint<T, DimNameDiff<D, U1>>,
+        OVector<T, DimNameDiff<D, U1>>,
+    )
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+    {
+        let deriv = self.rational_derivatives(u, 1);
+        (deriv[0].clone().into(), deriv[1].clone())
+    }
+
     /// Evaluate the rational derivatives at a given parameter
     pub(crate) fn rational_derivatives(
         &self,

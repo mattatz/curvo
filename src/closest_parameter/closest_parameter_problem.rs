@@ -40,9 +40,9 @@ where
 
     /// C'(u) * ( C(u) - P )
     fn gradient(&self, param: &Self::Param) -> Result<Self::Gradient, anyhow::Error> {
-        let e = self.curve.rational_derivatives(*param, 1);
-        let d = &e[0] - &self.point.coords;
-        let f = e[1].dot(&d);
+        let (p, v) = self.curve.point_tangent_at(*param);
+        let d = p - self.point;
+        let f = v.dot(&d);
         Ok(f)
     }
 }

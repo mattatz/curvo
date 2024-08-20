@@ -2,6 +2,7 @@
 
 mod bounding_box;
 mod closest_parameter;
+mod contains;
 mod curve;
 mod intersection;
 mod knot;
@@ -12,6 +13,7 @@ use closest_parameter::*;
 
 pub mod prelude {
     pub use crate::bounding_box::*;
+    pub use crate::contains::*;
     pub use crate::curve::*;
     pub use crate::intersection::*;
     pub use crate::knot::*;
