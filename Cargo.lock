@@ -2048,9 +2048,9 @@ dependencies = [
 
 [[package]]
 name = "gauss-quad"
-version = "0.1.9"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff26d658d1572fbb8ac2bf1d233eac782d531afa022ec4c95b23d75e062e0e08"
+checksum = "3651220c731d380338f924cd078968a2f4808f6732141beb1a56e2acec75d9be"
 dependencies = [
  "nalgebra",
 ]

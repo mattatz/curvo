@@ -478,7 +478,7 @@ where
         let segments = &segments[i..j];
 
         let (_, u) = self.knots_domain();
-        let gauss = GaussLegendre::init(16 + self.degree);
+        let gauss = GaussLegendre::new(16 + self.degree)?;
         let length = segments
             .iter()
             .map(|s| compute_bezier_segment_length(s, u, &gauss))
@@ -535,7 +535,7 @@ where
         let mut acc = T::zero();
         let mut acc_prev = T::zero();
 
-        let gauss = GaussLegendre::init(16 + self.degree);
+        let gauss = GaussLegendre::new(16 + self.degree)?;
         let eps = T::from_f64(1e-6).unwrap();
         let tolerance = T::from_f64(1e-3 * 2.5).unwrap();
 
