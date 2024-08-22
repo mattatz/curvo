@@ -688,7 +688,7 @@ where
             &points
                 .iter()
                 .map(|p| DVector::from_vec(p.iter().copied().collect()))
-                .collect::<Vec<_>>(),
+                .collect_vec(),
             degree,
             true,
         )?;
@@ -742,7 +742,7 @@ where
         let input = points
             .iter()
             .map(|p| DVector::from_vec(p.iter().copied().collect()))
-            .collect::<Vec<_>>();
+            .collect_vec();
         let (pts, knots) =
             try_periodic_interpolate_control_points(&input, degree, knot_style, true)?;
 
@@ -2045,7 +2045,7 @@ pub fn try_periodic_interpolate_control_points<T: FloatingPoint>(
                 *p += *x;
                 Some(*p)
             })
-            .collect::<Vec<_>>(),
+            .collect_vec(),
     ]
     .concat();
 

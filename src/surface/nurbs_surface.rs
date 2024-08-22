@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use itertools::Itertools;
 use nalgebra::{
     allocator::Allocator, Const, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff,
     DimNameSub, DimNameSum, OMatrix, OPoint, OVector, Point3, Point4, RealField, Vector2, Vector3,
@@ -643,12 +644,12 @@ where
                 let points = unified_curves
                     .iter()
                     .map(|c| c.control_points()[i].clone())
-                    .collect::<Vec<_>>();
+                    .collect_vec();
                 let (control_points, knots) = try_interpolate_control_points(
                     &points
                         .iter()
                         .map(|p| DVector::from_vec(p.iter().copied().collect()))
-                        .collect::<Vec<_>>(),
+                        .collect_vec(),
                     degree_v,
                     false,
                 )?;
@@ -884,12 +885,12 @@ where
                     }
                     OVector::<T, DimNameDiff<D, U1>>::from_vec(a_ders)
                 })
-                .collect::<Vec<_>>()
+                .collect_vec()
         })
         .collect();
     let w_ders: Vec<_> = ders
         .iter()
-        .map(|row| row.iter().map(|d| d[D::dim() - 1]).collect::<Vec<_>>())
+        .map(|row| row.iter().map(|d| d[D::dim() - 1]).collect_vec())
         .collect();
 
     let mut skl: Vec<Vec<OVector<T, DimNameDiff<D, U1>>>> = vec![];
@@ -1185,7 +1186,7 @@ where
             let max = knots[knots.len() - 1];
             (min, max)
         })
-        .collect::<Vec<_>>();
+        .collect_vec();
 
     //shift all knot vectors to start at 0.0
     curves.iter_mut().enumerate().for_each(|(i, c)| {
@@ -1197,7 +1198,7 @@ where
     let knot_spans = knot_intervals
         .iter()
         .map(|(min, max)| *max - *min)
-        .collect::<Vec<_>>();
+        .collect_vec();
     let max_knot_span = knot_spans.iter().fold(T::zero(), |x, a| a.max(x));
 
     //scale all of the knot vectors to match
