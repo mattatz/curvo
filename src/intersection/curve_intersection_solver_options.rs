@@ -1,6 +1,7 @@
 use crate::misc::FloatingPoint;
 
 /// Hyperparameters for the curve intersection solver.
+#[derive(Clone, Debug)]
 pub struct CurveIntersectionSolverOptions<T: FloatingPoint> {
     /// Minimum distance between two points to consider them as intersecting.
     pub minimum_distance: T,
