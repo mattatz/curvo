@@ -1,5 +1,4 @@
 use argmin::core::ArgminFloat;
-use bevy::utils::dbg;
 use itertools::Itertools;
 use nalgebra::{allocator::Allocator, Const, DefaultAllocator, DimName};
 
@@ -64,13 +63,32 @@ where
 
         intersections.sort_by(|i0, i1| i0.a().1.partial_cmp(&i1.a().1).unwrap());
 
-        // anyhow::ensure!(!intersections.is_empty(), "No intersections found");
-        // anyhow::ensure!(intersections.len() % 2 == 0, "Odd number of intersections found");
+        let params = intersections.iter().map(|it| it.a().1).collect_vec();
+        // println!("params: {:?}", params.len());
 
-        let other_contains_self_start =
-            other.contains(&self.point_at(self.knots_domain().0), option.clone())?;
-        let self_contains_other_start =
-            self.contains(&other.point_at(other.knots_domain().0), option.clone())?;
+        anyhow::ensure!(
+            intersections.len() % 2 == 0,
+            "Odd number of intersections found"
+        );
+
+        let self_mid_parameter =
+            (intersections[0].a().1 + intersections[1].a().1) / T::from_f64(2.).unwrap();
+        let other_mid_parameter =
+            (intersections[0].b().1 + intersections[1].b().1) / T::from_f64(2.).unwrap();
+
+        let other_contains_self_mid =
+            other.contains(&self.point_at(self_mid_parameter), option.clone())?;
+        let self_contains_other_mid =
+            self.contains(&other.point_at(other_mid_parameter), option.clone())?;
+
+        /*
+        println!(
+            "self_start: {:?}, parameter: {:?}, contains: {:?}",
+            self_start,
+            self.knots().clamp(self.degree(), self_start - eps),
+            other_contains_self_start
+        );
+        */
 
         let mut regions = vec![];
 
@@ -86,9 +104,9 @@ where
                 for (i, it) in windows.enumerate() {
                     let (i0, i1) = (&it[0], &it[1]);
                     let s = if i % 2 == 0 {
-                        try_trim(self, (i0.a().1, i1.a().1), other_contains_self_start)?
+                        try_trim(self, (i0.a().1, i1.a().1), !other_contains_self_mid)?
                     } else {
-                        try_trim(other, (i0.b().1, i1.b().1), self_contains_other_start)?
+                        try_trim(other, (i0.b().1, i1.b().1), !self_contains_other_mid)?
                     };
                     spans.extend(s);
                 }
@@ -105,9 +123,9 @@ where
                 for (i, it) in windows.enumerate() {
                     let (i0, i1) = (&it[0], &it[1]);
                     let s = if i % 2 == 0 {
-                        try_trim(other, (i0.b().1, i1.b().1), !self_contains_other_start)?
+                        try_trim(other, (i0.b().1, i1.b().1), self_contains_other_mid)?
                     } else {
-                        try_trim(self, (i0.a().1, i1.a().1), !other_contains_self_start)?
+                        try_trim(self, (i0.a().1, i1.a().1), other_contains_self_mid)?
                     };
                     spans.extend(s);
                 }
@@ -117,8 +135,8 @@ where
                 let chunks = intersections.chunks(2);
                 for it in chunks {
                     let (i0, i1) = (&it[0], &it[1]);
-                    let s0 = try_trim(self, (i0.a().1, i1.a().1), other_contains_self_start)?;
-                    let s1 = try_trim(other, (i0.b().1, i1.b().1), !self_contains_other_start)?;
+                    let s0 = try_trim(self, (i0.a().1, i1.a().1), !other_contains_self_mid)?;
+                    let s1 = try_trim(other, (i0.b().1, i1.b().1), self_contains_other_mid)?;
                     let exterior = [s0, s1].concat();
                     regions.push(Region::new(CompoundCurve::from_iter(exterior), vec![]));
                 }

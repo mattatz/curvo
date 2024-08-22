@@ -447,7 +447,7 @@ where
     }
 
     pub fn knots_constrain(&self, u: T) -> T {
-        self.knots.constrain(self.degree, u)
+        self.knots.clamp(self.degree, u)
     }
 
     /// Compute the length of the curve by gauss-legendre quadrature
@@ -1554,7 +1554,9 @@ where
                     / T::from_usize(options.knot_domain_division).unwrap(),
             ),
         )?;
-        let eps = options.minimum_distance * T::from_f64(5.).unwrap();
+
+        // let eps = options.minimum_distance * T::from_f64(5.).unwrap();
+        let eps = T::from_f64(1e-2).unwrap();
 
         let pts = traversed
             .into_pairs_iter()
@@ -1630,7 +1632,8 @@ where
 
     /// Trim the curve into two curves before and after the parameter
     pub fn try_trim(&self, u: T) -> anyhow::Result<(Self, Self)> {
-        let knots_to_insert: Vec<_> = (0..=self.degree).map(|_| u).collect();
+        let u = self.knots.clamp(self.degree, u);
+        let knots_to_insert = (0..=self.degree).map(|_| u).collect_vec();
         let mut cloned = self.clone();
         cloned.try_refine_knot(knots_to_insert)?;
 

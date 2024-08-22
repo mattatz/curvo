@@ -1,3 +1,5 @@
+use std::f64::consts::{FRAC_PI_2, FRAC_PI_4, FRAC_PI_8};
+
 use bevy::{
     prelude::*,
     render::{
@@ -69,12 +71,21 @@ fn setup(
         NurbsCurve2D::<f64>::try_circle(&Point2::origin(), &Vector2::x(), &Vector2::y(), 1.)
             .unwrap();
 
+    /*
     let rectangle = NurbsCurve2D::<f64>::polyline(&vec![
         Point2::new(0., 0.5),
         Point2::new(2., 0.5),
         Point2::new(2., -0.5),
         Point2::new(0., -0.5),
         Point2::new(0., 0.5),
+    ]);
+    */
+    let rectangle = NurbsCurve2D::<f64>::polyline(&vec![
+        Point2::new(0., 0.0),
+        Point2::new(2., 0.0),
+        Point2::new(2., 1.0),
+        Point2::new(0., 1.0),
+        Point2::new(0., 0.0),
     ]);
 
     commands.spawn((ProfileCurves(circle, rectangle),));
@@ -210,12 +221,26 @@ fn setup(
 }
 
 fn boolean(mut gizmos: Gizmos, time: Res<Time>, profile: Query<&ProfileCurves>) {
-    let delta = time.elapsed_seconds_f64();
+    let delta = time.elapsed_seconds_f64() * 0.78;
+    // let delta = 0.;
 
-    let trans = Rotation2::new(delta * 0.3);
+    let trans = Rotation2::new(delta);
     if let Ok(profile) = profile.get_single() {
         let source = &profile.0;
         let other = profile.1.transformed(&trans.into());
+
+        let tr = Transform::from_xyz(-4., 0., 0.);
+
+        [source, &other].iter().for_each(|curve| {
+            let color = Color::rgba(1., 1., 1., 0.2);
+            let pts = curve
+                .tessellate(None)
+                .iter()
+                .map(|pt| pt.cast::<f32>())
+                .map(|pt| tr * Vec3::new(pt.x, pt.y, 0.))
+                .collect_vec();
+            gizmos.linestrip(pts, color);
+        });
 
         let ops = [
             BooleanOperation::Union,
@@ -227,8 +252,29 @@ fn boolean(mut gizmos: Gizmos, time: Res<Time>, profile: Query<&ProfileCurves>) 
         let on = inv_n * 0.5;
         let h = n as f32 * 2.5;
 
+        let option = CurveIntersectionSolverOptions {
+            knot_domain_division: 500,
+            max_iters: 1000,
+            ..Default::default()
+        };
+
+        let intersections = source.find_intersections(&other, Some(option.clone()));
+        if let Ok(intersections) = intersections {
+            let points = intersections
+                .iter()
+                .map(|it| {
+                    let pt = it.a().0.cast::<f32>();
+                    tr * Vec3::new(pt.x, pt.y, 0.)
+                })
+                .collect_vec();
+            // println!("intersections: {:?}", points.len());
+            points.into_iter().for_each(|pt| {
+                gizmos.circle(pt, Direction3d::Z, 0.1, Color::WHITE);
+            });
+        }
+
         ops.into_iter().enumerate().for_each(|(i, op)| {
-            let regions = source.boolean(op, &other, None);
+            let regions = source.boolean(op, &other, Some(option.clone()));
             if let Ok(regions) = regions {
                 let fi = i as f32 * inv_n + on - 0.5;
                 let tr = Transform::from_xyz(0., fi * h, 0.);
