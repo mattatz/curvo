@@ -81,7 +81,7 @@ fn setup(
     ]);
     */
 
-    let dx = 1.;
+    let dx = 2.;
     let dy = 0.5;
     let rectangle = NurbsCurve2D::<f64>::polyline(&vec![
         Point2::new(-dx, -dy),
@@ -96,10 +96,10 @@ fn setup(
 
 fn boolean(mut gizmos: Gizmos, time: Res<Time>, profile: Query<&ProfileCurves>) {
     let delta = time.elapsed_seconds_f64() * 0.78;
-    // let delta = 0.;
-    // let delta = FRAC_PI_2 - 1e-1 * 4.;
-    // let delta = PI + FRAC_PI_2 ;
-    // let delta = 3.30601908_f64;
+    // let delta = 0_f64;
+    // let delta: f64 = FRAC_PI_2 - 1e-1 * 4.;
+    // let delta = PI + FRAC_PI_2;
+    // let delta: f64 = 0.68785281474; // error case
     // println!("delta: {}", delta);
 
     let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);
@@ -108,7 +108,7 @@ fn boolean(mut gizmos: Gizmos, time: Res<Time>, profile: Query<&ProfileCurves>) 
         let source = &profile.0;
         let other = profile.1.transformed(&trans.into());
 
-        let tr = Transform::from_xyz(-4., 0., 0.);
+        let tr = Transform::from_xyz(0., 5., 0.);
 
         [source, &other].iter().for_each(|curve| {
             let color = Color::rgba(1., 1., 1., 0.2);
@@ -122,100 +122,47 @@ fn boolean(mut gizmos: Gizmos, time: Res<Time>, profile: Query<&ProfileCurves>) 
         });
 
         let ops = [
-            BooleanOperation::Union,
             BooleanOperation::Intersection,
+            BooleanOperation::Union,
             BooleanOperation::Difference,
         ];
         let n = ops.len();
         let inv_n = 1. / n as f32;
         let on = inv_n * 0.5;
-        let h = n as f32 * 2.5;
+        let h = n as f32 * 5.0;
 
         let option = CurveIntersectionSolverOptions {
-            minimum_distance: 1e-2,
+            minimum_distance: 1e-4,
             knot_domain_division: 500,
             max_iters: 1000,
             ..Default::default()
         };
 
-        /*
-        let intersections = source.find_intersections(&other, Some(option.clone()));
-        if let Ok(intersections) = intersections {
-            let self_mid_parameter = (intersections[0].a().1 + intersections[1].a().1) / 2.;
-            let mid = source.point_at(self_mid_parameter).cast::<f32>();
-            gizmos.sphere(
-                tr * Vec3::new(mid.x, mid.y, 0.),
-                Quat::IDENTITY,
-                1e-2,
-                Color::BLUE,
-            );
-
-            let other_mid_parameter = (intersections[0].b().1 + intersections[1].b().1) / 2.;
-            let mid2 = other.point_at(other_mid_parameter);
-            let mid2_casted = mid2.cast::<f32>();
-            gizmos.sphere(
-                tr * Vec3::new(mid2_casted.x, mid2_casted.y, 0.),
-                Quat::IDENTITY,
-                1e-2,
-                Color::ORANGE,
-            );
-
-            let ray = NurbsCurve::polyline(&vec![mid2.clone(), mid2 + Vector2::x() * 1e1]);
-            let its = source.find_intersections(&ray, Some(option.clone()));
-            if let Ok(its) = its {
-                // println!("its: {:?}", its.len());
-                its.iter()
-                    .map(|it| {
-                        let pt = it.a().0.cast::<f32>();
-                        tr * Vec3::new(pt.x, pt.y, 0.)
-                    })
-                    .for_each(|pt| {
-                        gizmos.sphere(pt, Quat::IDENTITY, 1e-2 * 3., Color::PINK);
-                    });
-            }
-
-            intersections
-                .iter()
-                .map(|it| {
-                    let pt = it.a().0.cast::<f32>();
-                    tr * Vec3::new(pt.x, pt.y, 0.)
-                })
-                .for_each(|pt| {
-                    gizmos.sphere(pt, Quat::IDENTITY, 1e-2, Color::RED);
-                });
-
-            intersections
-                .iter()
-                .map(|it| {
-                    let pt = it.b().0.cast::<f32>();
-                    tr * Vec3::new(pt.x, pt.y, 0.)
-                })
-                .for_each(|pt| {
-                    gizmos.sphere(pt, Quat::IDENTITY, 1e-2, Color::GREEN);
-                });
-        }
-        */
-
         ops.into_iter().enumerate().for_each(|(i, op)| {
             let regions = source.boolean(op, &other, Some(option.clone()));
-            if let Ok(regions) = regions {
-                let fi = i as f32 * inv_n + on - 0.5;
-                let tr = Transform::from_xyz(0., fi * h, 0.);
-                regions.iter().for_each(|region| {
-                    region.exterior().spans().iter().for_each(|curve| {
-                        let pts = curve
-                            .tessellate(None)
-                            .iter()
-                            .map(|pt| pt.cast::<f32>())
-                            .map(|pt| tr * Vec3::new(pt.x, pt.y, 0.))
-                            .collect_vec();
-                        gizmos.linestrip(pts, Color::TOMATO);
+            match regions {
+                Ok((regions, _)) => {
+                    let fi = i as f32 * inv_n + on - 0.5;
+                    let tr = Transform::from_xyz(fi * h, 0., 0.);
+                    regions.iter().for_each(|region| {
+                        region.exterior().spans().iter().for_each(|curve| {
+                            let pts = curve
+                                .tessellate(None)
+                                .iter()
+                                .map(|pt| pt.cast::<f32>())
+                                .map(|pt| tr * Vec3::new(pt.x, pt.y, 0.))
+                                .collect_vec();
+                            gizmos.linestrip(pts, Color::TOMATO);
+                        });
+                        region.interiors().iter().for_each(|interior| {
+                            interior.spans().iter().for_each(|curve| {});
+                        });
                     });
-                    region.interiors().iter().for_each(|interior| {
-                        interior.spans().iter().for_each(|curve| {});
-                    });
-                });
-            }
+                }
+                Err(e) => {
+                    println!("op: {}, error: {:?}, delta: {}", op, e, delta);
+                }
+            };
         });
     }
 }

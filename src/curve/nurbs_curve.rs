@@ -1556,7 +1556,7 @@ where
         )?;
 
         // let eps = options.minimum_distance * T::from_f64(5.).unwrap();
-        let eps = T::from_f64(1e-2).unwrap();
+        let parameter_minimum_distance = T::from_f64(1e-2).unwrap();
 
         let pts = traversed
             .into_pairs_iter()
@@ -1596,10 +1596,18 @@ where
                 match res {
                     Ok(r) => {
                         // println!("{}", r.state().get_termination_status());
-                        r.state().get_best_param().map(|param| {
-                            let p0 = ca.point_at(param[0]);
-                            let p1 = cb.point_at(param[1]);
-                            CurveIntersection::new((p0, param[0]), (p1, param[1]))
+                        r.state().get_best_param().and_then(|param| {
+                            let a_domain = ca.knots_domain();
+                            let b_domain = cb.knots_domain();
+                            if (a_domain.0..=a_domain.1).contains(&param[0])
+                                && (b_domain.0..=b_domain.1).contains(&param[1])
+                            {
+                                let p0 = ca.point_at(param[0]);
+                                let p1 = cb.point_at(param[1]);
+                                Some(CurveIntersection::new((p0, param[0]), (p1, param[1])))
+                            } else {
+                                None
+                            }
                         })
                     }
                     Err(_e) => {
@@ -1619,7 +1627,7 @@ where
                 // merge intersections that are close in parameter space
                 let da = ComplexField::abs(x.a().1 - y.a().1);
                 let db = ComplexField::abs(x.b().1 - y.b().1);
-                if da < eps || db < eps {
+                if da < parameter_minimum_distance || db < parameter_minimum_distance {
                     Ok(x)
                 } else {
                     Err((x, y))

@@ -2,12 +2,14 @@ use std::fmt::Display;
 
 use argmin::core::ArgminFloat;
 use itertools::Itertools;
-use nalgebra::{allocator::Allocator, Const, DefaultAllocator, DimName};
+use nalgebra::{
+    allocator::Allocator, ComplexField, Const, DefaultAllocator, DimName, Point2, Vector2,
+};
 
 use crate::{
     curve::NurbsCurve,
     misc::FloatingPoint,
-    prelude::{Contains, CurveIntersectionSolverOptions},
+    prelude::{Contains, CurveIntersection, CurveIntersectionSolverOptions},
     region::{CompoundCurve, Region},
 };
 
@@ -44,7 +46,8 @@ impl<'a, T: FloatingPoint + ArgminFloat> Boolean<&'a NurbsCurve<T, Const<3>>>
 where
     DefaultAllocator: Allocator<Const<3>>,
 {
-    type Output = anyhow::Result<Vec<Region<T>>>;
+    // type Output = anyhow::Result<Vec<Region<T>>>;
+    type Output = anyhow::Result<(Vec<Region<T>>, Vec<CurveIntersection<Point2<T>, T>>)>;
     type Option = Option<CurveIntersectionSolverOptions<T>>;
 
     fn union(&self, other: &'a NurbsCurve<T, Const<3>>, option: Self::Option) -> Self::Output {
@@ -69,17 +72,72 @@ where
         other: &'a NurbsCurve<T, Const<3>>,
         option: Self::Option,
     ) -> Self::Output {
-        let mut intersections = self.find_intersections(other, option.clone())?;
+        let intersections = self.find_intersections(other, option.clone())?;
+        let origin = intersections.clone();
+
+        let near_zero_eps = T::from_f64(1e-2).unwrap();
+        let is_point_on_boundary =
+            |point: &Point2<T>, normal: &Vector2<T>, a: Point2<T>, b: Point2<T>| -> bool {
+                let da = (a - point).normalize();
+                let db = (b - point).normalize();
+                // check if a point lies on the a & b segment
+                // println!("dot: {:?}", da.dot(&db));
+                let is_opposite = ComplexField::abs(da.dot(&db) - -T::one()) <= near_zero_eps;
+                if is_opposite {
+                    return true;
+                }
+                let a_dot = da.dot(&normal);
+                let b_dot = db.dot(&normal);
+                a_dot * b_dot > T::zero()
+            };
+
+        let a_delta = self.knots_domain_interval() * T::from_f64(1e-1 * 0.5).unwrap();
+        let b_delta = other.knots_domain_interval() * T::from_f64(1e-1 * 0.5).unwrap();
+
+        // TODO: filtering intersections at vertex in curves
+        let mut intersections = intersections
+            .into_iter()
+            .filter(|it| {
+                let a_pt = &it.a().0;
+                let a_tan = self.tangent_at(it.a().1).normalize();
+                let a_normal = Vector2::new(-a_tan.y, a_tan.x);
+
+                let a_vertex = is_point_on_boundary(
+                    a_pt,
+                    &a_normal,
+                    other.point_at(it.b().1 - b_delta),
+                    other.point_at(it.b().1 + b_delta),
+                );
+
+                if !a_vertex {
+                    return true;
+                }
+
+                let b_pt = &it.b().0;
+                let b_tan = other.tangent_at(it.b().1).normalize();
+                let b_normal = Vector2::new(-b_tan.y, b_tan.x);
+
+                let b_vertex = is_point_on_boundary(
+                    b_pt,
+                    &b_normal,
+                    self.point_at(it.a().1 - a_delta),
+                    self.point_at(it.a().1 + a_delta),
+                );
+                // println!("a_vertex: {}, b_vertex: {}", a_vertex, b_vertex);
+
+                !b_vertex
+            })
+            .collect_vec();
+
+        // println!("origin: {}, filtered: {}", origin.len(), intersections.len());
+
         if intersections.is_empty() {
             anyhow::bail!("Todo: no intersections case");
         }
 
         intersections.sort_by(|i0, i1| i0.a().1.partial_cmp(&i1.a().1).unwrap());
 
-        anyhow::ensure!(
-            intersections.len() % 2 == 0,
-            "Odd number of intersections found"
-        );
+        // anyhow::ensure!(intersections.len() % 2 == 0, "Odd number of intersections found");
 
         let mut regions = vec![];
 
@@ -169,16 +227,18 @@ where
                     .collect_vec();
                 let chunks = cycled.chunks(2);
                 for it in chunks {
-                    let (i0, i1) = (&it[0], &it[1]);
-                    let s0 = try_trim(self, (i0.a().1, i1.a().1))?;
-                    let s1 = try_trim(other, (i0.b().1, i1.b().1))?;
-                    let exterior = [s0, s1].concat();
-                    regions.push(Region::new(CompoundCurve::from_iter(exterior), vec![]));
+                    if it.len() == 2 {
+                        let (i0, i1) = (&it[0], &it[1]);
+                        let s0 = try_trim(self, (i0.a().1, i1.a().1))?;
+                        let s1 = try_trim(other, (i0.b().1, i1.b().1))?;
+                        let exterior = [s0, s1].concat();
+                        regions.push(Region::new(CompoundCurve::from_iter(exterior), vec![]));
+                    }
                 }
             }
         }
 
-        Ok(regions)
+        Ok((regions, origin))
     }
 }
 

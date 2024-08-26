@@ -68,16 +68,6 @@ fn setup(
         NurbsCurve2D::<f64>::try_circle(&Point2::origin(), &Vector2::x(), &Vector2::y(), 1.)
             .unwrap();
 
-    /*
-    let rectangle = NurbsCurve2D::<f64>::polyline(&vec![
-        Point2::new(0., 0.5),
-        Point2::new(2., 0.5),
-        Point2::new(2., -0.5),
-        Point2::new(0., -0.5),
-        Point2::new(0., 0.5),
-    ]);
-    */
-
     let dx = 2.;
     let dy = 0.5;
     let rectangle = NurbsCurve2D::<f64>::polyline(&vec![
@@ -87,6 +77,12 @@ fn setup(
         Point2::new(-dx, dy),
         Point2::new(-dx, -dy),
     ]);
+
+    // let delta: f64 = 5.53018797552;
+    // let delta: f64 = 1.1112463049999999;
+    let delta: f64 = 18.84813495474;
+    let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);
+    let rectangle = rectangle.transformed(&trans.into());
 
     let spawn_curve = |commands: &mut Commands,
                        meshes: &mut ResMut<Assets<Mesh>>,
@@ -133,9 +129,18 @@ fn setup(
         None,
     );
 
+    let option = CurveIntersectionSolverOptions {
+        minimum_distance: 1e-4,
+        knot_domain_division: 500,
+        max_iters: 1000,
+        ..Default::default()
+    };
+
+    /*
     let mut intersections = circle
-        .find_intersections(&rectangle, Default::default())
+        .find_intersections(&rectangle, Some(option.clone()))
         .unwrap();
+    println!("intersections: {}", intersections.len());
     intersections.sort_by(|i0, i1| i0.a().1.partial_cmp(&i1.a().1).unwrap());
 
     let points = intersections
@@ -171,11 +176,12 @@ fn setup(
         }),
         ..Default::default()
     });
+    */
 
     let ops = [
         BooleanOperation::Union,
-        BooleanOperation::Intersection,
-        BooleanOperation::Difference,
+        // BooleanOperation::Intersection,
+        // BooleanOperation::Difference,
     ];
     let n = ops.len();
     let inv_n = 1. / n as f32;
@@ -183,9 +189,51 @@ fn setup(
     let h = n as f32 * 2.5;
 
     ops.into_iter().enumerate().for_each(|(i, op)| {
-        let regions = circle.boolean(op, &rectangle, None).unwrap();
+        let (regions, intersections) = circle
+            .boolean(op, &rectangle, Some(option.clone()))
+            .unwrap();
         let fi = i as f32 * inv_n + on - 0.5;
-        let tr = Transform::from_xyz(0., fi * h, 0.);
+        let tr = Transform::from_xyz(fi * h, 0., 0.);
+
+        intersections.iter().for_each(|it| {
+            // println!("intersection: {:?}", it);
+        });
+
+        let points = intersections
+            .iter()
+            .enumerate()
+            .map(|(i, it)| {
+                let pt = it.a().0.cast::<f32>();
+                tr * Vec3::new(pt.x, pt.y, i as f32 * 1e-1)
+            })
+            .collect();
+
+        commands.spawn(MaterialMeshBundle {
+            mesh: meshes.add(PointsMesh {
+                vertices: points,
+                colors: Some(
+                    intersections
+                        .iter()
+                        .enumerate()
+                        .map(|(i, _)| {
+                            let hue = i as f32 / intersections.len() as f32;
+                            Color::hsl(hue * 360., 0.5, 0.5)
+                        })
+                        .collect(),
+                ),
+            }),
+            material: points_materials.add(PointsMaterial {
+                settings: bevy_points::material::PointsShaderSettings {
+                    color: Color::WHITE,
+                    point_size: 0.05,
+                    ..Default::default()
+                },
+                circle: true,
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
+
         regions.iter().for_each(|region| {
             region.exterior().spans().iter().for_each(|curve| {
                 spawn_curve(
