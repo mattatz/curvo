@@ -36,7 +36,8 @@ impl<T: FloatingPoint + ArgminFloat> Contains<T, Const<2>> for NurbsCurve<T, Con
 
         let closest = self.find_closest_point(point)?;
         let delta = closest - point;
-        if delta.norm()
+        let distance = delta.norm();
+        if distance
             < option
                 .as_ref()
                 .map(|opt| opt.minimum_distance)
@@ -52,13 +53,13 @@ impl<T: FloatingPoint + ArgminFloat> Contains<T, Const<2>> for NurbsCurve<T, Con
 
         let ray = NurbsCurve::polyline(&vec![
             point.clone(),
-            point + dx * sx * T::from_f64(5.).unwrap(),
+            point + dx * (distance + sx * T::from_f64(2.).unwrap()),
         ]);
 
         let delta = self.knots_domain_interval() * T::from_f64(1e-1).unwrap();
         self.find_intersections(&ray, option).map(|intersections| {
             // filter out the case where the ray passes through a `vertex` of the curve
-            let filtered = intersections.into_iter().filter(|it| {
+            let filtered = intersections.iter().filter(|it| {
                 let parameter = it.a().1;
                 let p0 = self.knots().clamp(self.degree(), parameter - delta);
                 let p1 = self.knots().clamp(self.degree(), parameter + delta);
@@ -67,13 +68,9 @@ impl<T: FloatingPoint + ArgminFloat> Contains<T, Const<2>> for NurbsCurve<T, Con
                 f0 != f1
             });
             let count = filtered.count();
+            // println!("origin: {}, count: {}", intersections.len(), count);
             count % 2 == 1
         })
-
-        /*
-        self.find_intersections(&ray, option)
-            .map(|intersections| intersections.len() % 2 == 1)
-        */
     }
 }
 

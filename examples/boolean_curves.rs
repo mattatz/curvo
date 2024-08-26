@@ -1,4 +1,4 @@
-use std::f64::consts::{FRAC_PI_2, FRAC_PI_4, FRAC_PI_8};
+use std::f64::consts::{FRAC_PI_2, FRAC_PI_4, FRAC_PI_8, PI};
 
 use bevy::{
     prelude::*,
@@ -25,9 +25,6 @@ mod systems;
 use curvo::prelude::*;
 use systems::screenshot_on_spacebar;
 
-#[derive(Component)]
-struct ProfileCurves(NurbsCurve2D<f64>, NurbsCurve2D<f64>);
-
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
@@ -50,7 +47,7 @@ struct AppPlugin;
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.add_systems(Startup, setup)
-            .add_systems(Update, (boolean, screenshot_on_spacebar, close_on_esc));
+            .add_systems(Update, (screenshot_on_spacebar, close_on_esc));
     }
 }
 
@@ -80,17 +77,17 @@ fn setup(
         Point2::new(0., 0.5),
     ]);
     */
+
+    let dx = 2.;
+    let dy = 0.5;
     let rectangle = NurbsCurve2D::<f64>::polyline(&vec![
-        Point2::new(0., 0.0),
-        Point2::new(2., 0.0),
-        Point2::new(2., 1.0),
-        Point2::new(0., 1.0),
-        Point2::new(0., 0.0),
+        Point2::new(-dx, -dy),
+        Point2::new(dx, -dy),
+        Point2::new(dx, dy),
+        Point2::new(-dx, dy),
+        Point2::new(-dx, -dy),
     ]);
 
-    commands.spawn((ProfileCurves(circle, rectangle),));
-
-    /*
     let spawn_curve = |commands: &mut Commands,
                        meshes: &mut ResMut<Assets<Mesh>>,
                        line_materials: &mut ResMut<Assets<LineMaterial>>,
@@ -139,9 +136,6 @@ fn setup(
     let mut intersections = circle
         .find_intersections(&rectangle, Default::default())
         .unwrap();
-    assert!(!intersections.is_empty());
-    assert!(intersections.len() % 2 == 0);
-
     intersections.sort_by(|i0, i1| i0.a().1.partial_cmp(&i1.a().1).unwrap());
 
     let points = intersections
@@ -217,82 +211,4 @@ fn setup(
             });
         });
     });
-    */
-}
-
-fn boolean(mut gizmos: Gizmos, time: Res<Time>, profile: Query<&ProfileCurves>) {
-    let delta = time.elapsed_seconds_f64() * 0.78;
-    // let delta = 0.;
-
-    let trans = Rotation2::new(delta);
-    if let Ok(profile) = profile.get_single() {
-        let source = &profile.0;
-        let other = profile.1.transformed(&trans.into());
-
-        let tr = Transform::from_xyz(-4., 0., 0.);
-
-        [source, &other].iter().for_each(|curve| {
-            let color = Color::rgba(1., 1., 1., 0.2);
-            let pts = curve
-                .tessellate(None)
-                .iter()
-                .map(|pt| pt.cast::<f32>())
-                .map(|pt| tr * Vec3::new(pt.x, pt.y, 0.))
-                .collect_vec();
-            gizmos.linestrip(pts, color);
-        });
-
-        let ops = [
-            BooleanOperation::Union,
-            BooleanOperation::Intersection,
-            BooleanOperation::Difference,
-        ];
-        let n = ops.len();
-        let inv_n = 1. / n as f32;
-        let on = inv_n * 0.5;
-        let h = n as f32 * 2.5;
-
-        let option = CurveIntersectionSolverOptions {
-            knot_domain_division: 500,
-            max_iters: 1000,
-            ..Default::default()
-        };
-
-        let intersections = source.find_intersections(&other, Some(option.clone()));
-        if let Ok(intersections) = intersections {
-            let points = intersections
-                .iter()
-                .map(|it| {
-                    let pt = it.a().0.cast::<f32>();
-                    tr * Vec3::new(pt.x, pt.y, 0.)
-                })
-                .collect_vec();
-            // println!("intersections: {:?}", points.len());
-            points.into_iter().for_each(|pt| {
-                gizmos.circle(pt, Direction3d::Z, 0.1, Color::WHITE);
-            });
-        }
-
-        ops.into_iter().enumerate().for_each(|(i, op)| {
-            let regions = source.boolean(op, &other, Some(option.clone()));
-            if let Ok(regions) = regions {
-                let fi = i as f32 * inv_n + on - 0.5;
-                let tr = Transform::from_xyz(0., fi * h, 0.);
-                regions.iter().for_each(|region| {
-                    region.exterior().spans().iter().for_each(|curve| {
-                        let pts = curve
-                            .tessellate(None)
-                            .iter()
-                            .map(|pt| pt.cast::<f32>())
-                            .map(|pt| tr * Vec3::new(pt.x, pt.y, 0.))
-                            .collect_vec();
-                        gizmos.linestrip(pts, Color::TOMATO);
-                    });
-                    region.interiors().iter().for_each(|interior| {
-                        interior.spans().iter().for_each(|curve| {});
-                    });
-                });
-            }
-        });
-    }
 }
