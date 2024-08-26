@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use argmin::core::ArgminFloat;
 use itertools::Itertools;
 use nalgebra::{allocator::Allocator, Const, DefaultAllocator, DimName};
@@ -9,10 +11,21 @@ use crate::{
     region::{CompoundCurve, Region},
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BooleanOperation {
     Union,
     Intersection,
     Difference,
+}
+
+impl Display for BooleanOperation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BooleanOperation::Union => write!(f, "Union"),
+            BooleanOperation::Intersection => write!(f, "Intersection"),
+            BooleanOperation::Difference => write!(f, "Difference"),
+        }
+    }
 }
 
 /// A trait for boolean operations.
