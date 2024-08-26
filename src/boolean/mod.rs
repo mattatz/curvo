@@ -63,9 +63,6 @@ where
 
         intersections.sort_by(|i0, i1| i0.a().1.partial_cmp(&i1.a().1).unwrap());
 
-        let params = intersections.iter().map(|it| it.a().1).collect_vec();
-        // println!("params: {:?}", params.len());
-
         anyhow::ensure!(
             intersections.len() % 2 == 0,
             "Odd number of intersections found"
@@ -81,14 +78,7 @@ where
         let self_contains_other_mid =
             self.contains(&other.point_at(other_mid_parameter), option.clone())?;
 
-        /*
-        println!(
-            "self_start: {:?}, parameter: {:?}, contains: {:?}",
-            self_start,
-            self.knots().clamp(self.degree(), self_start - eps),
-            other_contains_self_start
-        );
-        */
+        // println!("other_contains_self_mid: {:?}, self_contains_other_mid: {:?}", other_contains_self_mid, self_contains_other_mid, );
 
         let mut regions = vec![];
 
