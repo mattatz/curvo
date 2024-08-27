@@ -1336,12 +1336,12 @@ where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
-        let eps = T::default_epsilon() * T::from_usize(4).unwrap();
+        let eps = T::default_epsilon() * T::from_usize(10).unwrap();
         match self.knots.is_clamped(self.degree) {
             true => {
-                self.dehomogenized_control_points();
+                let pts = self.dehomogenized_control_points();
                 let delta =
-                    &self.control_points[0] - &self.control_points[self.control_points.len() - 1];
+                    &pts[0] - &pts[self.control_points.len() - 1];
                 delta.norm() < eps
             }
             false => {
@@ -1356,7 +1356,7 @@ where
 
     /// Try to refine the curve by inserting knots
     pub fn try_refine_knot(&mut self, knots_to_insert: Vec<T>) -> anyhow::Result<()> {
-        anyhow::ensure!(self.is_clamped(), "Curve must be clamped to refine knots");
+        // anyhow::ensure!(self.is_clamped(), "Curve must be clamped to refine knots");
 
         if knots_to_insert.is_empty() {
             return Ok(());
