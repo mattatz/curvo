@@ -67,23 +67,13 @@ fn setup(
     };
     commands.spawn((camera, PanOrbitCamera::default()));
 
-    let circle =
+    let dx = 2.25;
+    let dy = 0.5;
+
+    let source =
         NurbsCurve2D::<f64>::try_circle(&Point2::origin(), &Vector2::x(), &Vector2::y(), 1.)
             .unwrap();
-
-    /*
-    let rectangle = NurbsCurve2D::<f64>::polyline(&vec![
-        Point2::new(0., 0.5),
-        Point2::new(2., 0.5),
-        Point2::new(2., -0.5),
-        Point2::new(0., -0.5),
-        Point2::new(0., 0.5),
-    ]);
-    */
-
-    let dx = 2.;
-    let dy = 0.5;
-    let rectangle = NurbsCurve2D::<f64>::polyline(&vec![
+    let target = NurbsCurve2D::<f64>::polyline(&vec![
         Point2::new(-dx, -dy),
         Point2::new(dx, -dy),
         Point2::new(dx, dy),
@@ -91,16 +81,45 @@ fn setup(
         Point2::new(-dx, -dy),
     ]);
 
-    commands.spawn((ProfileCurves(circle, rectangle),));
+    /*
+    let source =
+        NurbsCurve2D::<f64>::try_ellipse(&Point2::origin(), &Vector2::x(), &(Vector2::y() * 1.5))
+            .unwrap();
+    let source = NurbsCurve2D::<f64>::try_periodic_interpolate(
+        &vec![
+            Point2::new(-dx, -dy),
+            Point2::new(dx, -dy),
+            Point2::new(dx, dy),
+            Point2::new(-dx, dy),
+        ],
+        3,
+        KnotStyle::Centripetal,
+    )
+    .unwrap();
+
+    let target = NurbsCurve2D::<f64>::try_periodic_interpolate(
+        &vec![
+            Point2::new(-dx, -dy),
+            Point2::new(0., -dy * 0.5),
+            Point2::new(dx, -dy),
+            Point2::new(dx, dy),
+            Point2::new(0., dy * 0.5),
+            Point2::new(-dx, dy),
+        ],
+        3,
+        KnotStyle::Centripetal,
+    )
+    .unwrap();
+    */
+
+    commands.spawn((ProfileCurves(source, target),));
 }
 
 fn boolean(mut gizmos: Gizmos, time: Res<Time>, profile: Query<&ProfileCurves>) {
     let delta = time.elapsed_seconds_f64() * 0.78;
     // let delta = 0_f64;
-    // let delta: f64 = FRAC_PI_2 - 1e-1 * 4.;
-    // let delta = PI + FRAC_PI_2;
-    // let delta: f64 = 0.68785281474; // error case
-    // println!("delta: {}", delta);
+    // let delta: f64 = 5.5449795;
+    println!("delta: {}", delta);
 
     let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);
 
@@ -122,9 +141,9 @@ fn boolean(mut gizmos: Gizmos, time: Res<Time>, profile: Query<&ProfileCurves>) 
         });
 
         let ops = [
-            BooleanOperation::Intersection,
+            // BooleanOperation::Intersection,
             BooleanOperation::Union,
-            BooleanOperation::Difference,
+            // BooleanOperation::Difference,
         ];
         let n = ops.len();
         let inv_n = 1. / n as f32;
@@ -132,7 +151,7 @@ fn boolean(mut gizmos: Gizmos, time: Res<Time>, profile: Query<&ProfileCurves>) 
         let h = n as f32 * 5.0;
 
         let option = CurveIntersectionSolverOptions {
-            minimum_distance: 1e-4,
+            minimum_distance: 1e-5,
             knot_domain_division: 500,
             max_iters: 1000,
             ..Default::default()
@@ -141,7 +160,7 @@ fn boolean(mut gizmos: Gizmos, time: Res<Time>, profile: Query<&ProfileCurves>) 
         ops.into_iter().enumerate().for_each(|(i, op)| {
             let regions = source.boolean(op, &other, Some(option.clone()));
             match regions {
-                Ok((regions, _)) => {
+                Ok((regions, its)) => {
                     let fi = i as f32 * inv_n + on - 0.5;
                     let tr = Transform::from_xyz(fi * h, 0., 0.);
                     regions.iter().for_each(|region| {
@@ -152,7 +171,7 @@ fn boolean(mut gizmos: Gizmos, time: Res<Time>, profile: Query<&ProfileCurves>) 
                                 .map(|pt| pt.cast::<f32>())
                                 .map(|pt| tr * Vec3::new(pt.x, pt.y, 0.))
                                 .collect_vec();
-                            gizmos.linestrip(pts, Color::TOMATO);
+                            gizmos.linestrip(pts, Color::TOMATO.with_a(0.5));
                         });
                         region.interiors().iter().for_each(|interior| {
                             interior.spans().iter().for_each(|curve| {});

@@ -78,9 +78,11 @@ fn setup(
         Point2::new(-dx, -dy),
     ]);
 
+    let delta: f64 = 0.;
     // let delta: f64 = 5.53018797552;
     // let delta: f64 = 1.1112463049999999;
-    let delta: f64 = 18.84813495474;
+    // let delta: f64 = 18.84813495474;
+    let delta: f64 = 5.52497952474;
     let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);
     let rectangle = rectangle.transformed(&trans.into());
 
@@ -130,9 +132,9 @@ fn setup(
     );
 
     let option = CurveIntersectionSolverOptions {
-        minimum_distance: 1e-4,
-        knot_domain_division: 500,
-        max_iters: 1000,
+        minimum_distance: 1e-5,
+        // knot_domain_division: 500,
+        // max_iters: 1000,
         ..Default::default()
     };
 
@@ -203,24 +205,24 @@ fn setup(
             .iter()
             .enumerate()
             .map(|(i, it)| {
-                let pt = it.a().0.cast::<f32>();
+                let pt = it.vertex().position().cast::<f32>();
                 tr * Vec3::new(pt.x, pt.y, i as f32 * 1e-1)
+            })
+            .collect();
+
+        let colors = intersections
+            .iter()
+            .map(|it| match it.status() {
+                Status::None => Color::WHITE,
+                Status::Enter => Color::GREEN,
+                Status::Exit => Color::RED,
             })
             .collect();
 
         commands.spawn(MaterialMeshBundle {
             mesh: meshes.add(PointsMesh {
                 vertices: points,
-                colors: Some(
-                    intersections
-                        .iter()
-                        .enumerate()
-                        .map(|(i, _)| {
-                            let hue = i as f32 / intersections.len() as f32;
-                            Color::hsl(hue * 360., 0.5, 0.5)
-                        })
-                        .collect(),
-                ),
+                colors: Some(colors),
             }),
             material: points_materials.add(PointsMaterial {
                 settings: bevy_points::material::PointsShaderSettings {

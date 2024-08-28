@@ -1,4 +1,8 @@
-use std::fmt::Display;
+use std::{
+    cell::RefCell,
+    fmt::Display,
+    rc::{Rc, Weak},
+};
 
 use argmin::core::ArgminFloat;
 use itertools::Itertools;
@@ -8,7 +12,7 @@ use nalgebra::{
 
 use crate::{
     curve::NurbsCurve,
-    misc::FloatingPoint,
+    misc::{FloatingPoint, Line},
     prelude::{Contains, CurveIntersection, CurveIntersectionSolverOptions},
     region::{CompoundCurve, Region},
 };
@@ -47,7 +51,7 @@ where
     DefaultAllocator: Allocator<Const<3>>,
 {
     // type Output = anyhow::Result<Vec<Region<T>>>;
-    type Output = anyhow::Result<(Vec<Region<T>>, Vec<CurveIntersection<Point2<T>, T>>)>;
+    type Output = anyhow::Result<(Vec<Region<T>>, Vec<Node<T>>)>;
     type Option = Option<CurveIntersectionSolverOptions<T>>;
 
     fn union(&self, other: &'a NurbsCurve<T, Const<3>>, option: Self::Option) -> Self::Output {
@@ -72,173 +76,240 @@ where
         other: &'a NurbsCurve<T, Const<3>>,
         option: Self::Option,
     ) -> Self::Output {
-        let intersections = self.find_intersections(other, option.clone())?;
-        let origin = intersections.clone();
-
-        let near_zero_eps = T::from_f64(1e-2).unwrap();
-        let is_point_on_boundary =
-            |point: &Point2<T>, normal: &Vector2<T>, a: Point2<T>, b: Point2<T>| -> bool {
-                let da = (a - point).normalize();
-                let db = (b - point).normalize();
-                // check if a point lies on the a & b segment
-                // println!("dot: {:?}", da.dot(&db));
-                let is_opposite = ComplexField::abs(da.dot(&db) - -T::one()) <= near_zero_eps;
-                if is_opposite {
-                    return true;
-                }
-                let a_dot = da.dot(&normal);
-                let b_dot = db.dot(&normal);
-                a_dot * b_dot > T::zero()
-            };
-
-        let a_delta = self.knots_domain_interval() * T::from_f64(1e-1 * 0.5).unwrap();
-        let b_delta = other.knots_domain_interval() * T::from_f64(1e-1 * 0.5).unwrap();
-
-        // TODO: filtering intersections at vertex in curves
-        let mut intersections = intersections
+        let intersections = self
+            .find_intersections(other, option.clone())?
             .into_iter()
-            .filter(|it| {
-                let a_pt = &it.a().0;
-                let a_tan = self.tangent_at(it.a().1).normalize();
-                let a_normal = Vector2::new(-a_tan.y, a_tan.x);
-
-                let a_vertex = is_point_on_boundary(
-                    a_pt,
-                    &a_normal,
-                    other.point_at(it.b().1 - b_delta),
-                    other.point_at(it.b().1 + b_delta),
-                );
-
-                if !a_vertex {
-                    return true;
-                }
-
-                let b_pt = &it.b().0;
-                let b_tan = other.tangent_at(it.b().1).normalize();
-                let b_normal = Vector2::new(-b_tan.y, b_tan.x);
-
-                let b_vertex = is_point_on_boundary(
-                    b_pt,
-                    &b_normal,
-                    self.point_at(it.a().1 - a_delta),
-                    self.point_at(it.a().1 + a_delta),
-                );
-                // println!("a_vertex: {}, b_vertex: {}", a_vertex, b_vertex);
-
-                !b_vertex
-            })
+            .enumerate()
             .collect_vec();
-
-        // println!("origin: {}, filtered: {}", origin.len(), intersections.len());
 
         if intersections.is_empty() {
             anyhow::bail!("Todo: no intersections case");
         }
 
-        intersections.sort_by(|i0, i1| i0.a().1.partial_cmp(&i1.a().1).unwrap());
+        // create linked list
+        let mut a = intersections
+            .iter()
+            .sorted_by(|(_, i0), (_, i1)| i0.a().1.partial_cmp(&i1.a().1).unwrap())
+            .map(|(i, it)| (*i, Rc::new(RefCell::new(Node::new(true, it.a().into())))))
+            .collect_vec();
 
-        // anyhow::ensure!(intersections.len() % 2 == 0, "Odd number of intersections found");
+        let mut b = intersections
+            .iter()
+            .sorted_by(|(_, i0), (_, i1)| i0.b().1.partial_cmp(&i1.b().1).unwrap())
+            .map(|(i, it)| (*i, Rc::new(RefCell::new(Node::new(false, it.b().into())))))
+            .collect_vec();
+
+        // connect neighbors
+        a.iter_mut().for_each(|(index, node)| {
+            b.iter().find(|(i, _)| i == index).map(|(_, neighbor)| {
+                node.borrow_mut().neighbor = Some(Rc::downgrade(neighbor));
+            });
+        });
+        b.iter_mut().for_each(|(index, node)| {
+            a.iter().find(|(i, _)| i == index).map(|(_, neighbor)| {
+                node.borrow_mut().neighbor = Some(Rc::downgrade(neighbor));
+            });
+        });
+
+        // remove indices
+        let mut a = a.into_iter().map(|(_, n)| n).collect_vec();
+        let mut b = b.into_iter().map(|(_, n)| n).collect_vec();
+
+        /*
+        let a_domain = self.knots_domain();
+        let b_domain = other.knots_domain();
+
+        // enloop a & b
+        if a_domain.0 < a[0].borrow().vertex.parameter {
+            a.insert(
+                0,
+                Rc::new(RefCell::new(
+                    Node::new(Vertex::new(self.point_at(a_domain.0), a_domain.0))
+                        .with_alpha(T::zero()),
+                )),
+            );
+        }
+        if a[a.len() - 1].borrow().vertex.parameter < a_domain.1 {
+            a.push(Rc::new(RefCell::new(
+                Node::new(Vertex::new(self.point_at(a_domain.1), a_domain.1)).with_alpha(T::one()),
+            )));
+        }
+        if b_domain.0 < b[0].borrow().vertex.parameter {
+            b.insert(
+                0,
+                Rc::new(RefCell::new(
+                    Node::new(Vertex::new(other.point_at(b_domain.0), b_domain.0))
+                        .with_alpha(T::zero()),
+                )),
+            );
+        }
+        if b[b.len() - 1].borrow().vertex.parameter < b_domain.1 {
+            b.push(Rc::new(RefCell::new(
+                Node::new(Vertex::new(other.point_at(b_domain.1), b_domain.1)).with_alpha(T::one()),
+            )));
+        }
+        */
+
+        [&a, &b].iter().for_each(|list| {
+            list.iter()
+                .cycle()
+                .take(list.len() + 1)
+                .collect_vec()
+                .windows(2)
+                .for_each(|w| {
+                    w[0].borrow_mut().next = Some(Rc::downgrade(w[1]));
+                    w[1].borrow_mut().prev = Some(Rc::downgrade(w[0]));
+                });
+        });
+
+        let mut a_flag = other.contains(&self.point_at(self.knots_domain().0), option.clone())?;
+        if matches!(operation, BooleanOperation::Intersection) {
+            a_flag = !a_flag;
+        }
+        a.iter().for_each(|list| {
+            let mut node = list.borrow_mut();
+            if node.intersects() {
+                node.status = if a_flag { Status::Enter } else { Status::Exit };
+                a_flag = !a_flag;
+            }
+        });
+
+        let mut b_flag = !self.contains(&other.point_at(other.knots_domain().0), option.clone())?;
+        if matches!(operation, BooleanOperation::Union) {
+            b_flag = !b_flag;
+        }
+        b.iter().for_each(|list| {
+            let mut node = list.borrow_mut();
+            if node.intersects() {
+                node.status = if b_flag { Status::Enter } else { Status::Exit };
+                b_flag = !b_flag;
+            }
+        });
+
+        // Efficient clipping of arbitrary polygons
+        // https://www.inf.usi.ch/hormann/papers/Greiner.1998.ECO.pdf
 
         let mut regions = vec![];
 
-        let start = self.point_at(self.knots_domain().0);
-        let other_contains_self_start = other.contains(&start, option.clone())?;
-        let mut curves = [self, other].into_iter().enumerate().cycle();
+        let non_visited = |node: Rc<RefCell<Node<T>>>| -> Option<Rc<RefCell<Node<T>>>> {
+            let mut non_visited = node.clone();
 
-        match operation {
-            BooleanOperation::Union => {
-                let cycled = intersections
-                    .iter()
-                    .cycle()
-                    .take(intersections.len() + 1)
-                    .collect_vec();
-                let windows = cycled.windows(2);
-
-                let mut spans = vec![];
-
-                if !other_contains_self_start {
-                    curves.next();
+            if non_visited.borrow().visited {
+                loop {
+                    let next = non_visited.borrow().next()?;
+                    non_visited = next;
+                    if Rc::ptr_eq(&node, &non_visited) || !non_visited.borrow().visited {
+                        break;
+                    }
                 }
+            }
 
-                for it in windows {
-                    let (i0, i1) = (&it[0], &it[1]);
-                    let c = curves.next();
-                    if let Some((idx, c)) = c {
-                        let params = match idx % 2 {
-                            0 => (i0.a().1, i1.a().1),
-                            1 => (i0.b().1, i1.b().1),
-                            _ => unreachable!(),
+            if non_visited.borrow().visited {
+                None
+            } else {
+                Some(non_visited)
+            }
+        };
+
+        let subject = &a[0];
+        println!(
+            "a statues: {:?}",
+            a.iter().map(|n| n.borrow().status()).collect_vec()
+        );
+        println!(
+            "a parameters: {:?}",
+            a.iter()
+                .map(|n| n.borrow().vertex().parameter())
+                .collect_vec()
+        );
+        println!(
+            "b statues: {:?}",
+            b.iter().map(|n| n.borrow().status()).collect_vec()
+        );
+
+        loop {
+            match non_visited(subject.clone()) {
+                Some(start) => {
+                    println!("start: {:?}", start.borrow().vertex.parameter());
+                    let mut nodes = vec![];
+                    let mut current = start.clone();
+                    loop {
+                        if current.borrow().visited {
+                            break;
+                        }
+
+                        // let forward = matches!(current.borrow().status(), Status::Enter);
+                        current.borrow_mut().visit();
+                        nodes.push(current.clone());
+
+                        let node = current.borrow().clone();
+                        let next = match node.status() {
+                            Status::Enter => node.next(),
+                            Status::Exit => node.prev(),
+                            Status::None => todo!(),
                         };
-                        if idx % 2 == 0 {
-                            let s = try_trim(c, params)?;
-                            spans.extend(s);
+
+                        if let Some(next) = next {
+                            next.borrow_mut().visit();
+                            nodes.push(next.clone());
+                            if let Some(neighbor) = next.borrow().neighbor() {
+                                current = neighbor.clone();
+                            } else {
+                                break;
+                            }
                         } else {
-                            let s = try_trim(c, params)?;
-                            spans.extend(s);
+                            break;
                         }
                     }
-                }
 
-                regions.push(Region::new(CompoundCurve::from_iter(spans), vec![]));
-            }
-            BooleanOperation::Intersection => {
-                let cycled = intersections
-                    .iter()
-                    .cycle()
-                    .take(intersections.len() + 1)
-                    .collect_vec();
-                let windows = cycled.windows(2);
+                    println!("nodes: {:?}", nodes.len());
+                    let mut spans = vec![];
+                    for chunk in nodes.chunks(2) {
+                        if chunk.len() != 2 {
+                            break;
+                        }
+                        let n0 = chunk[0].borrow();
+                        let n1 = chunk[1].borrow();
+                        println!("{:?} {:?} -> {:?}", n0.subject(), n0.status(), n1.status());
 
-                let mut spans = vec![];
-
-                if other_contains_self_start {
-                    curves.next();
-                }
-
-                for it in windows {
-                    let (i0, i1) = (&it[0], &it[1]);
-                    let c = curves.next();
-                    if let Some((idx, c)) = c {
-                        let params = match idx % 2 {
-                            0 => (i0.a().1, i1.a().1),
-                            1 => (i0.b().1, i1.b().1),
-                            _ => unreachable!(),
+                        let params = match (n0.status(), n1.status()) {
+                            (Status::Enter, Status::Exit) => {
+                                (n0.vertex().parameter(), n1.vertex().parameter())
+                            }
+                            (Status::Exit, Status::Enter) => {
+                                (n1.vertex().parameter(), n0.vertex().parameter())
+                            }
+                            _ => {
+                                anyhow::bail!("Invalid status");
+                            }
                         };
-                        if idx % 2 == 0 {
-                            let s = try_trim(c, params)?;
-                            spans.extend(s);
-                        } else {
-                            let s = try_trim(c, params)?;
-                            spans.extend(s);
+
+                        match (n0.subject(), n1.subject()) {
+                            (true, true) => {
+                                let trimmed = try_trim(self, params)?;
+                                spans.extend(trimmed);
+                            }
+                            (false, false) => {
+                                let trimmed = try_trim(other, params)?;
+                                spans.extend(trimmed);
+                            }
+                            _ => {
+                                println!("subject & clip case");
+                            }
                         }
                     }
-                }
 
-                regions.push(Region::new(CompoundCurve::from_iter(spans), vec![]));
-            }
-            BooleanOperation::Difference => {
-                let skip_count = if other_contains_self_start { 0 } else { 1 };
-                let n = intersections.len();
-                let cycled = intersections
-                    .into_iter()
-                    .cycle()
-                    .skip(skip_count)
-                    .take(n)
-                    .collect_vec();
-                let chunks = cycled.chunks(2);
-                for it in chunks {
-                    if it.len() == 2 {
-                        let (i0, i1) = (&it[0], &it[1]);
-                        let s0 = try_trim(self, (i0.a().1, i1.a().1))?;
-                        let s1 = try_trim(other, (i0.b().1, i1.b().1))?;
-                        let exterior = [s0, s1].concat();
-                        regions.push(Region::new(CompoundCurve::from_iter(exterior), vec![]));
-                    }
+                    let region = Region::new(CompoundCurve::new(spans), vec![]);
+                    regions.push(region);
+                }
+                None => {
+                    break;
                 }
             }
+            break;
         }
 
-        Ok((regions, origin))
+        Ok((regions, a.iter().map(|n| n.borrow().clone()).collect_vec()))
     }
 }
 
@@ -269,4 +340,106 @@ where
     };
 
     Ok(curves)
+}
+
+#[derive(Debug, Clone)]
+pub struct Vertex<T: FloatingPoint> {
+    position: Point2<T>,
+    parameter: T,
+}
+
+impl<T: FloatingPoint> Vertex<T> {
+    pub fn new(position: Point2<T>, parameter: T) -> Self {
+        Self {
+            position,
+            parameter,
+        }
+    }
+
+    pub fn position(&self) -> &Point2<T> {
+        &self.position
+    }
+
+    pub fn parameter(&self) -> T {
+        self.parameter
+    }
+}
+
+impl<'a, T: FloatingPoint> From<&'a (Point2<T>, T)> for Vertex<T> {
+    fn from(v: &'a (Point2<T>, T)) -> Self {
+        Self {
+            position: v.0,
+            parameter: v.1,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Node<T: FloatingPoint> {
+    subject: bool,
+    vertex: Vertex<T>,
+    prev: Option<Weak<RefCell<Node<T>>>>,
+    next: Option<Weak<RefCell<Node<T>>>>,
+    neighbor: Option<Weak<RefCell<Node<T>>>>,
+    status: Status,
+    visited: bool,
+    alpha: T,
+}
+
+impl<T: FloatingPoint> Node<T> {
+    pub fn new(subject: bool, vertex: Vertex<T>) -> Self {
+        Self {
+            subject,
+            vertex,
+            alpha: T::zero(),
+            prev: None,
+            next: None,
+            neighbor: None,
+            status: Status::None,
+            visited: false,
+        }
+    }
+
+    pub fn subject(&self) -> bool {
+        self.subject
+    }
+
+    pub fn vertex(&self) -> &Vertex<T> {
+        &self.vertex
+    }
+
+    pub fn prev(&self) -> Option<Rc<RefCell<Self>>> {
+        self.prev.clone().and_then(|p| p.upgrade())
+    }
+
+    pub fn next(&self) -> Option<Rc<RefCell<Self>>> {
+        self.next.clone().and_then(|n| n.upgrade())
+    }
+
+    pub fn neighbor(&self) -> Option<Rc<RefCell<Self>>> {
+        self.neighbor.clone().and_then(|n| n.upgrade())
+    }
+
+    pub fn status(&self) -> Status {
+        self.status
+    }
+
+    pub fn with_alpha(self, alpha: T) -> Self {
+        Self { alpha, ..self }
+    }
+
+    pub fn visit(&mut self) {
+        self.visited = true;
+    }
+
+    pub fn intersects(&self) -> bool {
+        self.neighbor.is_some()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Status {
+    None,
+    Enter,
+    Exit,
 }
