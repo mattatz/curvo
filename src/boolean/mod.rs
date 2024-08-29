@@ -151,7 +151,7 @@ where
 
         let mut a_flag = !other.contains(&self.point_at(self.knots_domain().0), option.clone())?;
         let mut b_flag = !self.contains(&other.point_at(other.knots_domain().0), option.clone())?;
-        // println!("a flag: {}, b flag: {}", a_flag, b_flag);
+        println!("a flag: {}, b flag: {}", a_flag, b_flag);
 
         a.iter().for_each(|list| {
             let mut node = list.borrow_mut();
@@ -264,7 +264,7 @@ where
                         }
                     }
 
-                    println!("nodes: {:?}", nodes.len());
+                    // println!("nodes: {:?}", nodes.len());
                     let mut spans = vec![];
                     for chunk in nodes.chunks(2) {
                         if chunk.len() != 2 {
@@ -318,7 +318,6 @@ where
                     break;
                 }
             }
-            break;
         }
 
         Ok((regions, a.iter().map(|n| n.borrow().clone()).collect_vec()))
