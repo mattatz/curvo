@@ -1,4 +1,4 @@
-use nalgebra::{Const, Point2};
+use nalgebra::{Const, Point2, Vector2};
 use num_traits::NumCast;
 use robust::{orient2d, Coord};
 
@@ -25,6 +25,10 @@ impl<T: FloatingPoint> Line<T> {
         &self.end
     }
 
+    pub fn tangent(&self) -> Vector2<T> {
+        self.end - self.start
+    }
+
     /// Robust intersection test between two lines.
     pub fn intersects(&self, other: &Line<T>) -> bool {
         if !self
@@ -47,6 +51,9 @@ impl<T: FloatingPoint> Line<T> {
 
         let q_p1 = orientation(other.start(), other.end(), self.start());
         let q_p2 = orientation(other.start(), other.end(), self.end());
+
+        // println!("{:?} {:?} {:?} {:?}", p_q1, p_q2, q_p1, q_p2);
+
         if matches!(
             (q_p1, q_p2),
             (Orientation::Clockwise, Orientation::Clockwise)
@@ -57,12 +64,15 @@ impl<T: FloatingPoint> Line<T> {
 
         if matches!(
             (p_q1, p_q2, q_p1, q_p2),
-            (Orientation::Collinear, Orientation::Collinear, Orientation::Collinear, Orientation::Collinear)
+            (
+                Orientation::Collinear,
+                Orientation::Collinear,
+                Orientation::Collinear,
+                Orientation::Collinear
+            )
         ) {
             return false;
         }
-
-        // println!("{:?} {:?} {:?} {:?}", p_q1, p_q2, q_p1, q_p2);
 
         true
     }
