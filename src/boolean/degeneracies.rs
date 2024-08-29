@@ -14,9 +14,10 @@ pub fn find_intersections_without_degeneracies<T: FloatingPoint + ArgminFloat>(
     option: Option<CurveIntersectionSolverOptions<T>>,
 ) -> anyhow::Result<Vec<CurveIntersection<Point2<T>, T>>> {
     let intersections = a.find_intersections(b, option)?;
+    // println!("# of origin: {}", intersections.len());
 
     let parameter_eps = T::from_f64(1e-3).unwrap();
-    let tangent_threshold = T::one() - T::from_f64(1e-2).unwrap();
+    let tangent_threshold = T::one() - T::from_f64(1e-3).unwrap();
     let filtered = intersections
         .into_iter()
         .filter(|it| {
@@ -27,9 +28,14 @@ pub fn find_intersections_without_degeneracies<T: FloatingPoint + ArgminFloat>(
             let b1 = b.point_at(it.b().1 + parameter_eps);
             let lb = Line::new(b0, b1);
             let intersected = la.intersects(&lb);
-            let dot = ComplexField::abs(la.tangent().normalize().dot(&lb.tangent().normalize()));
-            // println!("intersected: {}, dot: {}, ({}, {}) - ({}, {})", intersected, dot, a0, a1, b0, b1);
-            intersected && dot < tangent_threshold
+            if !intersected {
+                false
+            } else {
+                let dot =
+                    ComplexField::abs(la.tangent().normalize().dot(&lb.tangent().normalize()));
+                // println!("intersected: {}, dot: {}, {}", intersected, dot, dot < tangent_threshold);
+                dot < tangent_threshold
+            }
         })
         .collect();
 
@@ -39,7 +45,7 @@ pub fn find_intersections_without_degeneracies<T: FloatingPoint + ArgminFloat>(
 #[cfg(test)]
 mod tests {
     use crate::{boolean::degeneracies::find_intersections_without_degeneracies, prelude::*};
-    use nalgebra::{Point2, Vector2};
+    use nalgebra::{Point2, Rotation2, Translation2, Vector2};
 
     const OPTIONS: CurveIntersectionSolverOptions<f64> = CurveIntersectionSolverOptions {
         minimum_distance: 1e-4,
@@ -72,8 +78,42 @@ mod tests {
             Point2::new(-0.5, -1.),
             Point2::new(-0.5, 2.),
         ]);
-        let intersections =
+        let intersections_2 =
             find_intersections_without_degeneracies(&circle, &rectangle_2, Some(OPTIONS)).unwrap();
+        assert_eq!(intersections_2.len(), 4);
+    }
+
+    #[test]
+    fn test_problem_case() {
+        let dx = 2.25;
+        let dy = 0.5;
+
+        let subject = NurbsCurve2D::<f64>::try_periodic_interpolate(
+            &vec![
+                Point2::new(-dx, -dy),
+                Point2::new(0., -dy * 0.5),
+                Point2::new(dx, -dy),
+                Point2::new(dx, dy),
+                Point2::new(0., dy * 0.5),
+                Point2::new(-dx, dy),
+            ],
+            3,
+            KnotStyle::Centripetal,
+        )
+        .unwrap();
+
+        let delta: f64 = 2.6065769597400004;
+        let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);
+        let clip = subject.transformed(&trans.into());
+        let intersections =
+            find_intersections_without_degeneracies(&subject, &clip, Some(OPTIONS)).unwrap();
         assert_eq!(intersections.len(), 4);
+
+        let delta_2: f64 = 3.28621257276;
+        let trans_2 = Translation2::new(delta_2.cos(), 0.) * Rotation2::new(delta_2);
+        let clip_2 = subject.transformed(&trans_2.into());
+        let intersections_2 =
+            find_intersections_without_degeneracies(&subject, &clip_2, Some(OPTIONS)).unwrap();
+        assert_eq!(intersections_2.len(), 6);
     }
 }
