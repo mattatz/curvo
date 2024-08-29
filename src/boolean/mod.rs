@@ -5,6 +5,7 @@ use std::{
 };
 
 use argmin::core::ArgminFloat;
+use degeneracies::find_intersections_without_degeneracies;
 use itertools::Itertools;
 use nalgebra::{
     allocator::Allocator, ComplexField, Const, DefaultAllocator, DimName, Point2, Vector2,
@@ -20,10 +21,11 @@ use crate::{
     region::{CompoundCurve, Region},
 };
 
+mod degeneracies;
 pub mod node;
 pub mod operation;
 pub mod status;
-pub mod vertex;
+mod vertex;
 
 pub use operation::*;
 
@@ -69,30 +71,11 @@ where
         other: &'a NurbsCurve<T, Const<3>>,
         option: Self::Option,
     ) -> Self::Output {
-        let intersections = self.find_intersections(other, option.clone())?;
-        println!("intersections: {}", intersections.len());
-
-        let parameter_eps = T::from_f64(1e-3).unwrap();
-        let tangent_threshold = T::one() - T::from_f64(1e-2).unwrap();
-        let intersections = intersections
+        let intersections = find_intersections_without_degeneracies(self, other, option.clone())?
             .into_iter()
-            .filter(|it| {
-                let a0 = self.point_at(it.a().1 - parameter_eps);
-                let a1 = self.point_at(it.a().1 + parameter_eps);
-                let la = Line::new(a0, a1);
-                let b0 = other.point_at(it.b().1 - parameter_eps);
-                let b1 = other.point_at(it.b().1 + parameter_eps);
-                let lb = Line::new(b0, b1);
-                let intersected = la.intersects(&lb);
-                let dot =
-                    ComplexField::abs(la.tangent().normalize().dot(&lb.tangent().normalize()));
-                // println!("intersected: {}, dot: {}, ({}, {}) - ({}, {})", intersected, dot, a0, a1, b0, b1);
-                intersected && dot < tangent_threshold
-            })
             .enumerate()
             .collect_vec();
-
-        println!("intersections: {}", intersections.len());
+        // println!("intersections: {}", intersections.len());
 
         if intersections.is_empty() {
             anyhow::bail!("Todo: no intersections case");
@@ -281,7 +264,7 @@ where
                                 (n1.vertex().parameter(), n0.vertex().parameter())
                             }
                             _ => {
-                                println!("Invalid status");
+                                // println!("Invalid status");
                                 break;
                             }
                         };
@@ -296,7 +279,7 @@ where
                                 spans.extend(trimmed);
                             }
                             _ => {
-                                println!("subject & clip case");
+                                // println!("subject & clip case");
                             }
                         }
                     }
