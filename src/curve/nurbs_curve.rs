@@ -1340,8 +1340,7 @@ where
         match self.knots.is_clamped(self.degree) {
             true => {
                 let pts = self.dehomogenized_control_points();
-                let delta =
-                    &pts[0] - &pts[self.control_points.len() - 1];
+                let delta = &pts[0] - &pts[self.control_points.len() - 1];
                 delta.norm() < eps
             }
             false => {
@@ -1504,8 +1503,8 @@ where
     /// let line = NurbsCurve2D::try_new(
     ///     1,
     ///     vec![
-    ///         Point3::new(0.0, -2.0, 1.),
-    ///         Point3::new(0.0, 2.0, 1.),
+    ///         Point3::new(-2.0, 0.0, 1.),
+    ///         Point3::new(2.0, 0.0, 1.),
     ///     ],
     ///     vec![0., 0., 1., 1.],
     /// ).unwrap();
@@ -1522,12 +1521,12 @@ where
     /// assert_eq!(intersections.len(), 2);
     ///
     /// intersections.sort_by(|i0, i1| {
-    ///     i0.a().0.y.partial_cmp(&i1.a().0.y).unwrap()
+    ///     i0.a().0.x.partial_cmp(&i1.a().0.x).unwrap()
     /// });
     /// let p0 = &intersections[0];
-    /// assert_relative_eq!(p0.a().0, Point2::new(0.0, -1.0), epsilon = 1e-5);
+    /// assert_relative_eq!(p0.a().0, Point2::new(-1.0, 0.0), epsilon = 1e-5);
     /// let p1 = &intersections[1];
-    /// assert_relative_eq!(p1.a().0, Point2::new(0.0, 1.0), epsilon = 1e-5);
+    /// assert_relative_eq!(p1.a().0, Point2::new(1.0, 0.0), epsilon = 1e-5);
     ///
     /// ```
     #[allow(clippy::type_complexity)]
@@ -1566,16 +1565,16 @@ where
 
                 let problem = CurveIntersectionProblem::new(&ca, &cb);
 
-                let inv = T::from_f64(0.5).unwrap();
-                let d0 = ca.knots_domain();
-                let d1 = cb.knots_domain();
+                // let inv = T::from_f64(0.5).unwrap();
+                // let d0 = ca.knots_domain();
+                // let d1 = cb.knots_domain();
 
                 // Define initial parameter vector
                 let init_param = Vector2::<T>::new(
-                    // ca.knots_domain().0,
-                    // cb.knots_domain().0,
-                    (d0.0 + d0.1) * inv,
-                    (d1.0 + d1.1) * inv,
+                    ca.knots_domain().0,
+                    cb.knots_domain().0,
+                    // (d0.0 + d0.1) * inv,
+                    // (d1.0 + d1.1) * inv,
                 );
 
                 // Set up solver
