@@ -60,20 +60,24 @@ mod tests {
         let circle =
             NurbsCurve2D::<f64>::try_circle(&Point2::origin(), &Vector2::x(), &Vector2::y(), 1.)
                 .unwrap();
-        let rectangle = NurbsCurve2D::<f64>::polyline(&[Point2::new(0., 2.),
+        let rectangle = NurbsCurve2D::<f64>::polyline(&[
+            Point2::new(0., 2.),
             Point2::new(1., 2.),
             Point2::new(1., -2.),
             Point2::new(0., -2.),
-            Point2::new(0., 2.)]);
+            Point2::new(0., 2.),
+        ]);
         let intersections =
             find_intersections_without_degeneracies(&circle, &rectangle, Some(OPTIONS)).unwrap();
         assert_eq!(intersections.len(), 2);
 
-        let rectangle_2 = NurbsCurve2D::<f64>::polyline(&[Point2::new(-0.5, 2.),
+        let rectangle_2 = NurbsCurve2D::<f64>::polyline(&[
+            Point2::new(-0.5, 2.),
             Point2::new(0.5, 2.),
             Point2::new(0.5, -1.),
             Point2::new(-0.5, -1.),
-            Point2::new(-0.5, 2.)]);
+            Point2::new(-0.5, 2.),
+        ]);
         let intersections_2 =
             find_intersections_without_degeneracies(&circle, &rectangle_2, Some(OPTIONS)).unwrap();
         assert_eq!(intersections_2.len(), 4);
@@ -85,12 +89,14 @@ mod tests {
         let dy = 0.5;
 
         let subject = NurbsCurve2D::<f64>::try_periodic_interpolate(
-            &[Point2::new(-dx, -dy),
+            &[
+                Point2::new(-dx, -dy),
                 Point2::new(0., -dy * 0.5),
                 Point2::new(dx, -dy),
                 Point2::new(dx, dy),
                 Point2::new(0., dy * 0.5),
-                Point2::new(-dx, dy)],
+                Point2::new(-dx, dy),
+            ],
             3,
             KnotStyle::Centripetal,
         )

@@ -23,11 +23,13 @@ fn test_circle_boundary_case() {
 fn test_rectangle_boundary_case() {
     let dx = 2.;
     let dy = 1.;
-    let rectangle = NurbsCurve2D::<f64>::polyline(&[Point2::new(0., 0.),
+    let rectangle = NurbsCurve2D::<f64>::polyline(&[
+        Point2::new(0., 0.),
         Point2::new(dx, 0.),
         Point2::new(dx, dy),
         Point2::new(0., dy),
-        Point2::new(0., 0.)]);
+        Point2::new(0., 0.),
+    ]);
     assert!(rectangle.contains(&Point2::new(0., 0.), None).unwrap());
     assert!(rectangle.contains(&Point2::new(dx, 0.), None).unwrap());
     assert!(rectangle.contains(&Point2::new(dx, dy), None).unwrap());
@@ -51,12 +53,14 @@ fn test_problem_case() {
     let dy = 0.5;
 
     let subject = NurbsCurve2D::<f64>::try_periodic_interpolate(
-        &[Point2::new(-dx, -dy),
+        &[
+            Point2::new(-dx, -dy),
             Point2::new(0., -dy * 0.5),
             Point2::new(dx, -dy),
             Point2::new(dx, dy),
             Point2::new(0., dy * 0.5),
-            Point2::new(-dx, dy)],
+            Point2::new(-dx, dy),
+        ],
         3,
         KnotStyle::Centripetal,
     )
@@ -66,8 +70,6 @@ fn test_problem_case() {
     let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);
     let clip = subject.transformed(&trans.into());
     let point = clip.point_at(clip.knots_domain().0);
-    let contains = subject
-        .contains(&point, Some(OPTIONS))
-        .unwrap();
+    let contains = subject.contains(&point, Some(OPTIONS)).unwrap();
     assert!(contains);
 }

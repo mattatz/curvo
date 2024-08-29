@@ -56,8 +56,10 @@ impl<T: FloatingPoint + ArgminFloat> Contains<T, Const<2>> for NurbsCurve<T, Con
         let sx = ComplexField::abs(size.dot(&dx));
 
         // TODO: create curve & ray intersection method for better result
-        let ray = NurbsCurve::polyline(&[*point,
-            point + dx * (distance + sx * T::from_f64(2.).unwrap())]);
+        let ray = NurbsCurve::polyline(&[
+            *point,
+            point + dx * (distance + sx * T::from_f64(2.).unwrap()),
+        ]);
 
         let delta = T::from_f64(1e-3).unwrap();
         self.find_intersections(&ray, option).map(|intersections| {
