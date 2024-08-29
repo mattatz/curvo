@@ -28,11 +28,11 @@ where
     /// Create a new bounding box from a minimum and maximum point.
     pub fn new(min: OVector<T, D>, max: OVector<T, D>) -> Self {
         let mut tmin = OVector::<T, D>::from_element(T::max_value().unwrap());
-        let mut tmax = OVector::<T, D>::from_element(T::min_value().unwrap());
+        let mut tmax = -tmin.clone();
 
         for i in 0..D::dim() {
-            tmin[i] = tmin[i].min(min[i]);
-            tmax[i] = tmax[i].max(max[i]);
+            tmin[i] = tmin[i].min(min[i]).min(max[i]);
+            tmax[i] = tmax[i].max(max[i]).max(min[i]);
         }
 
         BoundingBox {
