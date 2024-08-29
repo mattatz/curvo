@@ -23,6 +23,7 @@ mod materials;
 mod systems;
 
 use curvo::prelude::*;
+use operation::BooleanOperation;
 use systems::screenshot_on_spacebar;
 
 #[derive(Component)]
@@ -70,10 +71,10 @@ fn setup(
     let dx = 2.25;
     let dy = 0.5;
 
-    let source =
+    let subject =
         NurbsCurve2D::<f64>::try_circle(&Point2::origin(), &Vector2::x(), &Vector2::y(), 1.)
             .unwrap();
-    let target = NurbsCurve2D::<f64>::polyline(&vec![
+    let clip = NurbsCurve2D::<f64>::polyline(&vec![
         Point2::new(-dx, -dy),
         Point2::new(dx, -dy),
         Point2::new(dx, dy),
@@ -81,23 +82,22 @@ fn setup(
         Point2::new(-dx, -dy),
     ]);
 
-    /*
-    let source =
+    let subject =
         NurbsCurve2D::<f64>::try_ellipse(&Point2::origin(), &Vector2::x(), &(Vector2::y() * 1.5))
             .unwrap();
-    let source = NurbsCurve2D::<f64>::try_periodic_interpolate(
+    let subject = NurbsCurve2D::<f64>::try_periodic_interpolate(
         &vec![
-            Point2::new(-dx, -dy),
-            Point2::new(dx, -dy),
-            Point2::new(dx, dy),
-            Point2::new(-dx, dy),
+            Point2::new(-dy, -dx),
+            Point2::new(dy, -dx),
+            Point2::new(dy, dx),
+            Point2::new(-dy, dx),
         ],
         3,
         KnotStyle::Centripetal,
     )
     .unwrap();
 
-    let target = NurbsCurve2D::<f64>::try_periodic_interpolate(
+    let subject = NurbsCurve2D::<f64>::try_periodic_interpolate(
         &vec![
             Point2::new(-dx, -dy),
             Point2::new(0., -dy * 0.5),
@@ -110,26 +110,40 @@ fn setup(
         KnotStyle::Centripetal,
     )
     .unwrap();
-    */
 
-    commands.spawn((ProfileCurves(source, target),));
+    let clip = NurbsCurve2D::<f64>::try_periodic_interpolate(
+        &vec![
+            Point2::new(-dx, -dy),
+            Point2::new(0., -dy * 0.5),
+            Point2::new(dx, -dy),
+            Point2::new(dx, dy),
+            Point2::new(0., dy * 0.5),
+            Point2::new(-dx, dy),
+        ],
+        3,
+        KnotStyle::Centripetal,
+    )
+    .unwrap();
+
+    commands.spawn((ProfileCurves(subject, clip),));
 }
 
 fn boolean(mut gizmos: Gizmos, time: Res<Time>, profile: Query<&ProfileCurves>) {
     let delta = time.elapsed_seconds_f64() * 0.78;
     // let delta = 0_f64;
     // let delta: f64 = 5.5449795;
+    // let delta: f64 = 6.491389612500001;
     println!("delta: {}", delta);
 
     let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);
 
     if let Ok(profile) = profile.get_single() {
-        let source = &profile.0;
+        let subject = &profile.0;
         let other = profile.1.transformed(&trans.into());
 
         let tr = Transform::from_xyz(0., 5., 0.);
 
-        [source, &other].iter().for_each(|curve| {
+        [subject, &other].iter().for_each(|curve| {
             let color = Color::rgba(1., 1., 1., 0.2);
             let pts = curve
                 .tessellate(None)
@@ -141,9 +155,9 @@ fn boolean(mut gizmos: Gizmos, time: Res<Time>, profile: Query<&ProfileCurves>) 
         });
 
         let ops = [
-            // BooleanOperation::Intersection,
+            BooleanOperation::Intersection,
             BooleanOperation::Union,
-            // BooleanOperation::Difference,
+            BooleanOperation::Difference,
         ];
         let n = ops.len();
         let inv_n = 1. / n as f32;
@@ -151,14 +165,25 @@ fn boolean(mut gizmos: Gizmos, time: Res<Time>, profile: Query<&ProfileCurves>) 
         let h = n as f32 * 5.0;
 
         let option = CurveIntersectionSolverOptions {
-            minimum_distance: 1e-5,
-            knot_domain_division: 500,
-            max_iters: 1000,
+            minimum_distance: 1e-4,
+            // knot_domain_division: 500,
+            // max_iters: 1000,
             ..Default::default()
         };
 
+        /*
+        let intersections = subject
+            .find_intersections(&other, Some(option.clone()))
+            .unwrap();
+
+        intersections.iter().for_each(|it| {
+            let position = it.a().0.cast::<f32>().coords.to_homogeneous().into();
+            gizmos.sphere(position, Quat::IDENTITY, 1e-1, Color::TOMATO);
+        });
+        */
+
         ops.into_iter().enumerate().for_each(|(i, op)| {
-            let regions = source.boolean(op, &other, Some(option.clone()));
+            let regions = subject.boolean(op, &other, Some(option.clone()));
             match regions {
                 Ok((regions, its)) => {
                     let fi = i as f32 * inv_n + on - 0.5;

@@ -9,6 +9,9 @@ use itertools::Itertools;
 use nalgebra::{
     allocator::Allocator, ComplexField, Const, DefaultAllocator, DimName, Point2, Vector2,
 };
+use node::Node;
+use operation::BooleanOperation;
+use status::Status;
 
 use crate::{
     curve::NurbsCurve,
@@ -17,22 +20,12 @@ use crate::{
     region::{CompoundCurve, Region},
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BooleanOperation {
-    Union,
-    Intersection,
-    Difference,
-}
+pub mod node;
+pub mod operation;
+pub mod status;
+pub mod vertex;
 
-impl Display for BooleanOperation {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            BooleanOperation::Union => write!(f, "Union"),
-            BooleanOperation::Intersection => write!(f, "Intersection"),
-            BooleanOperation::Difference => write!(f, "Difference"),
-        }
-    }
-}
+pub use operation::*;
 
 /// A trait for boolean operations.
 pub trait Boolean<T> {
@@ -76,14 +69,11 @@ where
         other: &'a NurbsCurve<T, Const<3>>,
         option: Self::Option,
     ) -> Self::Output {
-        // let a_knot_domain = self.knots_domain();
-        // let b_knot_domain = other.knots_domain();
+        let intersections = self.find_intersections(other, option.clone())?;
+        println!("intersections: {}", intersections.len());
+
         let parameter_eps = T::from_f64(1e-3).unwrap();
         let tangent_threshold = T::one() - T::from_f64(1e-2).unwrap();
-
-        let intersections = self.find_intersections(other, option.clone())?;
-        // println!("intersections: {}", intersections.len());
-
         let intersections = intersections
             .into_iter()
             .filter(|it| {
@@ -124,12 +114,12 @@ where
         // connect neighbors
         a.iter_mut().for_each(|(index, node)| {
             b.iter().find(|(i, _)| i == index).map(|(_, neighbor)| {
-                node.borrow_mut().neighbor = Some(Rc::downgrade(neighbor));
+                node.borrow_mut().set_neighbor(Rc::downgrade(neighbor));
             });
         });
         b.iter_mut().for_each(|(index, node)| {
             a.iter().find(|(i, _)| i == index).map(|(_, neighbor)| {
-                node.borrow_mut().neighbor = Some(Rc::downgrade(neighbor));
+                node.borrow_mut().set_neighbor(Rc::downgrade(neighbor));
             });
         });
 
@@ -144,24 +134,24 @@ where
                 .collect_vec()
                 .windows(2)
                 .for_each(|w| {
-                    w[0].borrow_mut().next = Some(Rc::downgrade(w[1]));
-                    w[1].borrow_mut().prev = Some(Rc::downgrade(w[0]));
+                    w[0].borrow_mut().set_next(Rc::downgrade(w[1]));
+                    w[1].borrow_mut().set_prev(Rc::downgrade(w[0]));
                 });
         });
 
         let mut a_flag = !other.contains(&self.point_at(self.knots_domain().0), option.clone())?;
         let mut b_flag = !self.contains(&other.point_at(other.knots_domain().0), option.clone())?;
-        println!("a flag: {}, b flag: {}", a_flag, b_flag);
+        // println!("a flag: {}, b flag: {}", a_flag, b_flag);
 
         a.iter().for_each(|list| {
             let mut node = list.borrow_mut();
-            node.status = if a_flag { Status::Enter } else { Status::Exit };
+            *node.status_mut() = if a_flag { Status::Enter } else { Status::Exit };
             a_flag = !a_flag;
         });
 
         b.iter().for_each(|list| {
             let mut node = list.borrow_mut();
-            node.status = if b_flag { Status::Enter } else { Status::Exit };
+            *node.status_mut() = if b_flag { Status::Enter } else { Status::Exit };
             b_flag = !b_flag;
         });
 
@@ -169,7 +159,7 @@ where
             BooleanOperation::Union | BooleanOperation::Difference => {
                 // invert a status
                 a.iter().for_each(|node| {
-                    node.borrow_mut().status.invert();
+                    node.borrow_mut().status_mut().invert();
                 });
             }
             _ => {}
@@ -179,7 +169,7 @@ where
             BooleanOperation::Union => {
                 // invert b status
                 b.iter().for_each(|node| {
-                    node.borrow_mut().status.invert();
+                    node.borrow_mut().status_mut().invert();
                 });
             }
             _ => {}
@@ -193,17 +183,17 @@ where
         let non_visited = |node: Rc<RefCell<Node<T>>>| -> Option<Rc<RefCell<Node<T>>>> {
             let mut non_visited = node.clone();
 
-            if non_visited.borrow().visited {
+            if non_visited.borrow().visited() {
                 loop {
                     let next = non_visited.borrow().next()?;
                     non_visited = next;
-                    if Rc::ptr_eq(&node, &non_visited) || !non_visited.borrow().visited {
+                    if Rc::ptr_eq(&node, &non_visited) || !non_visited.borrow().visited() {
                         break;
                     }
                 }
             }
 
-            if non_visited.borrow().visited {
+            if non_visited.borrow().visited() {
                 None
             } else {
                 Some(non_visited)
@@ -236,7 +226,7 @@ where
                     let mut nodes = vec![];
                     let mut current = start.clone();
                     loop {
-                        if current.borrow().visited {
+                        if current.borrow().visited() {
                             break;
                         }
 
@@ -353,104 +343,5 @@ where
     Ok(curves)
 }
 
-#[derive(Debug, Clone)]
-pub struct Vertex<T: FloatingPoint> {
-    position: Point2<T>,
-    parameter: T,
-}
-
-impl<T: FloatingPoint> Vertex<T> {
-    pub fn new(position: Point2<T>, parameter: T) -> Self {
-        Self {
-            position,
-            parameter,
-        }
-    }
-
-    pub fn position(&self) -> &Point2<T> {
-        &self.position
-    }
-
-    pub fn parameter(&self) -> T {
-        self.parameter
-    }
-}
-
-impl<'a, T: FloatingPoint> From<&'a (Point2<T>, T)> for Vertex<T> {
-    fn from(v: &'a (Point2<T>, T)) -> Self {
-        Self {
-            position: v.0,
-            parameter: v.1,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Node<T: FloatingPoint> {
-    subject: bool,
-    vertex: Vertex<T>,
-    prev: Option<Weak<RefCell<Node<T>>>>,
-    next: Option<Weak<RefCell<Node<T>>>>,
-    neighbor: Option<Weak<RefCell<Node<T>>>>,
-    status: Status,
-    visited: bool,
-}
-
-impl<T: FloatingPoint> Node<T> {
-    pub fn new(subject: bool, vertex: Vertex<T>) -> Self {
-        Self {
-            subject,
-            vertex,
-            prev: None,
-            next: None,
-            neighbor: None,
-            status: Status::None,
-            visited: false,
-        }
-    }
-
-    pub fn subject(&self) -> bool {
-        self.subject
-    }
-
-    pub fn vertex(&self) -> &Vertex<T> {
-        &self.vertex
-    }
-
-    pub fn prev(&self) -> Option<Rc<RefCell<Self>>> {
-        self.prev.clone().and_then(|p| p.upgrade())
-    }
-
-    pub fn next(&self) -> Option<Rc<RefCell<Self>>> {
-        self.next.clone().and_then(|n| n.upgrade())
-    }
-
-    pub fn neighbor(&self) -> Option<Rc<RefCell<Self>>> {
-        self.neighbor.clone().and_then(|n| n.upgrade())
-    }
-
-    pub fn status(&self) -> Status {
-        self.status
-    }
-
-    pub fn visit(&mut self) {
-        self.visited = true;
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Status {
-    None,
-    Enter,
-    Exit,
-}
-
-impl Status {
-    pub fn invert(&mut self) {
-        *self = match self {
-            Status::Enter => Status::Exit,
-            Status::Exit => Status::Enter,
-            Status::None => Status::None,
-        };
-    }
-}
+#[cfg(test)]
+mod tests;

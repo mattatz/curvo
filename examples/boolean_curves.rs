@@ -23,6 +23,8 @@ mod materials;
 mod systems;
 
 use curvo::prelude::*;
+use operation::BooleanOperation;
+use status::Status;
 use systems::screenshot_on_spacebar;
 
 fn main() {
@@ -64,27 +66,64 @@ fn setup(
     };
     commands.spawn((camera, PanOrbitCamera::default()));
 
-    let circle =
+    let dx = 2.25;
+    let dy = 0.5;
+
+    /*
+    let subject =
         NurbsCurve2D::<f64>::try_circle(&Point2::origin(), &Vector2::x(), &Vector2::y(), 1.)
             .unwrap();
-
-    let dx = 2.;
-    let dy = 0.5;
-    let rectangle = NurbsCurve2D::<f64>::polyline(&vec![
+    let clip = NurbsCurve2D::<f64>::polyline(&vec![
         Point2::new(-dx, -dy),
         Point2::new(dx, -dy),
         Point2::new(dx, dy),
         Point2::new(-dx, dy),
         Point2::new(-dx, -dy),
     ]);
+    */
 
-    let delta: f64 = 0.;
+    let subject = NurbsCurve2D::<f64>::try_periodic_interpolate(
+        &vec![
+            Point2::new(-dx, -dy),
+            Point2::new(0., -dy * 0.5),
+            Point2::new(dx, -dy),
+            Point2::new(dx, dy),
+            Point2::new(0., dy * 0.5),
+            Point2::new(-dx, dy),
+        ],
+        3,
+        KnotStyle::Centripetal,
+    )
+    .unwrap();
+
+    let clip = NurbsCurve2D::<f64>::try_periodic_interpolate(
+        &vec![
+            Point2::new(-dx, -dy),
+            Point2::new(0., -dy * 0.5),
+            Point2::new(dx, -dy),
+            Point2::new(dx, dy),
+            Point2::new(0., dy * 0.5),
+            Point2::new(-dx, dy),
+        ],
+        3,
+        KnotStyle::Centripetal,
+    )
+    .unwrap();
+
+    // let delta: f64 = 0.;
+    let delta: f64 = 0.9066810530447318;
+    // let delta: f64 = 1.;
     // let delta: f64 = 5.53018797552;
     // let delta: f64 = 1.1112463049999999;
-    // let delta: f64 = 18.84813495474;
     let delta: f64 = 5.52497952474;
+    let delta: f64 = 5.39335530474;
+    // let delta: f64 = 6.491389612500001;
+    // let delta: f64 = 0.59434638198;
+    let delta: f64 = 7.372849087500001;
+    let delta: f64 = 4.8583862605200006;
+    let delta: f64 = 2.6065769597400004;
     let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);
-    let rectangle = rectangle.transformed(&trans.into());
+    let clip = clip.transformed(&trans.into());
 
     let spawn_curve = |commands: &mut Commands,
                        meshes: &mut ResMut<Assets<Mesh>>,
@@ -114,12 +153,13 @@ fn setup(
             ..Default::default()
         });
     };
+
     spawn_curve(
         &mut commands,
         &mut meshes,
         &mut line_materials,
         Transform::default(),
-        &circle,
+        &subject,
         None,
     );
     spawn_curve(
@@ -127,35 +167,28 @@ fn setup(
         &mut meshes,
         &mut line_materials,
         Transform::default(),
-        &rectangle,
+        &clip,
         None,
     );
 
     let option = CurveIntersectionSolverOptions {
-        minimum_distance: 1e-5,
+        minimum_distance: 1e-4,
         // knot_domain_division: 500,
         // max_iters: 1000,
         ..Default::default()
     };
 
-    /*
-    let mut intersections = circle
-        .find_intersections(&rectangle, Some(option.clone()))
+    let intersections = subject
+        .find_intersections(&clip, Some(option.clone()))
         .unwrap();
-    println!("intersections: {}", intersections.len());
-    intersections.sort_by(|i0, i1| i0.a().1.partial_cmp(&i1.a().1).unwrap());
-
-    let points = intersections
-        .iter()
-        .map(|it| {
-            let pt = it.a().0.cast::<f32>();
-            [pt.x, pt.y, 0.].into()
-        })
-        .collect();
+    // println!("intersections: {:?}", intersections.len());
 
     commands.spawn(MaterialMeshBundle {
         mesh: meshes.add(PointsMesh {
-            vertices: points,
+            vertices: intersections
+                .iter()
+                .map(|it| it.a().0.cast::<f32>().to_homogeneous().into())
+                .collect(),
             colors: Some(
                 intersections
                     .iter()
@@ -178,12 +211,39 @@ fn setup(
         }),
         ..Default::default()
     });
-    */
+
+    let parameter_eps: f64 = 1e-4;
+    intersections.iter().for_each(|it| {
+        let a0 = subject.point_at(it.a().1 - parameter_eps);
+        let a1 = subject.point_at(it.a().1 + parameter_eps);
+        let b0 = clip.point_at(it.b().1 - parameter_eps);
+        let b1 = clip.point_at(it.b().1 + parameter_eps);
+        let lines = [Line::new(a0, a1), Line::new(b0, b1)];
+        lines.iter().enumerate().for_each(|(i, line)| {
+            let mesh = Mesh::new(PrimitiveTopology::LineStrip, default()).with_inserted_attribute(
+                Mesh::ATTRIBUTE_POSITION,
+                VertexAttributeValues::Float32x3(vec![
+                    line.start().coords.cast::<f32>().to_homogeneous().into(),
+                    line.end().coords.cast::<f32>().to_homogeneous().into(),
+                ]),
+            );
+            commands.spawn(MaterialMeshBundle {
+                mesh: meshes.add(mesh),
+                material: line_materials.add(LineMaterial {
+                    color: if i == 0 { Color::RED } else { Color::BLUE },
+                    opacity: 1.0,
+                    alpha_mode: AlphaMode::Blend,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            });
+        });
+    });
 
     let ops = [
-        BooleanOperation::Union,
+        // BooleanOperation::Union,
         // BooleanOperation::Intersection,
-        // BooleanOperation::Difference,
+        BooleanOperation::Difference,
     ];
     let n = ops.len();
     let inv_n = 1. / n as f32;
@@ -191,9 +251,7 @@ fn setup(
     let h = n as f32 * 2.5;
 
     ops.into_iter().enumerate().for_each(|(i, op)| {
-        let (regions, intersections) = circle
-            .boolean(op, &rectangle, Some(option.clone()))
-            .unwrap();
+        let (regions, intersections) = subject.boolean(op, &clip, Some(option.clone())).unwrap();
         let fi = i as f32 * inv_n + on - 0.5;
         let tr = Transform::from_xyz(fi * h, 0., 0.);
 
@@ -214,7 +272,7 @@ fn setup(
             .iter()
             .map(|it| match it.status() {
                 Status::None => Color::WHITE,
-                Status::Enter => Color::GREEN,
+                Status::Enter => Color::BLUE,
                 Status::Exit => Color::RED,
             })
             .collect();
