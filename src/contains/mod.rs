@@ -34,6 +34,11 @@ impl<T: FloatingPoint + ArgminFloat> Contains<T, Const<2>> for NurbsCurve<T, Con
     fn contains(&self, point: &Point2<T>, option: Self::Option) -> anyhow::Result<bool> {
         anyhow::ensure!(self.is_closed(), "Curve must be closed");
 
+        let bb: BoundingBox<T, Const<2>> = self.into();
+        if !bb.contains(point) {
+            return Ok(false);
+        }
+
         let closest = self.find_closest_point(point)?;
         let delta = closest - point;
         let distance = delta.norm();
@@ -46,7 +51,6 @@ impl<T: FloatingPoint + ArgminFloat> Contains<T, Const<2>> for NurbsCurve<T, Con
             return Ok(true);
         }
 
-        let bb: BoundingBox<T, Const<2>> = self.into();
         let size = bb.size();
         let dx = Vector2::x();
         let sx = ComplexField::abs(size.dot(&dx));

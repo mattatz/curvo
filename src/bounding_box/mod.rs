@@ -116,6 +116,20 @@ where
         true
     }
 
+    /// Check if the bounding box contains a point.
+    /// # Examples
+    /// ```
+    /// use nalgebra::{Point3, Vector3};
+    /// use curvo::prelude::BoundingBox;
+    /// let bb = BoundingBox::new(Vector3::from_element(0.), Vector3::from_element(1.));
+    /// assert!(bb.contains(&Point3::new(0.5, 0.5, 0.5)));
+    /// assert!(bb.contains(&Point3::new(0., 0.5, 1.0)));
+    /// assert!(!bb.contains(&Point3::new(-1e-8, 0.5, 0.5)));
+    /// ```
+    pub fn contains(&self, point: &OPoint<T, D>) -> bool {
+        (0..D::dim()).all(|i| self.min[i] <= point[i] && point[i] <= self.max[i])
+    }
+
     /// Cast the bounding box to a curve with another floating point type
     pub fn cast<F: FloatingPoint + SupersetOf<T>>(&self) -> BoundingBox<F, D>
     where
