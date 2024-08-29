@@ -76,11 +76,33 @@ where
         other: &'a NurbsCurve<T, Const<3>>,
         option: Self::Option,
     ) -> Self::Output {
-        let intersections = self
-            .find_intersections(other, option.clone())?
+        // let a_knot_domain = self.knots_domain();
+        // let b_knot_domain = other.knots_domain();
+        let parameter_eps = T::from_f64(1e-3).unwrap();
+        let tangent_threshold = T::one() - T::from_f64(1e-2).unwrap();
+
+        let intersections = self.find_intersections(other, option.clone())?;
+        // println!("intersections: {}", intersections.len());
+
+        let intersections = intersections
             .into_iter()
+            .filter(|it| {
+                let a0 = self.point_at(it.a().1 - parameter_eps);
+                let a1 = self.point_at(it.a().1 + parameter_eps);
+                let la = Line::new(a0, a1);
+                let b0 = other.point_at(it.b().1 - parameter_eps);
+                let b1 = other.point_at(it.b().1 + parameter_eps);
+                let lb = Line::new(b0, b1);
+                let intersected = la.intersects(&lb);
+                let dot =
+                    ComplexField::abs(la.tangent().normalize().dot(&lb.tangent().normalize()));
+                // println!("intersected: {}, dot: {}, ({}, {}) - ({}, {})", intersected, dot, a0, a1, b0, b1);
+                intersected && dot < tangent_threshold
+            })
             .enumerate()
             .collect_vec();
+
+        println!("intersections: {}", intersections.len());
 
         if intersections.is_empty() {
             anyhow::bail!("Todo: no intersections case");
@@ -112,43 +134,8 @@ where
         });
 
         // remove indices
-        let mut a = a.into_iter().map(|(_, n)| n).collect_vec();
-        let mut b = b.into_iter().map(|(_, n)| n).collect_vec();
-
-        /*
-        let a_domain = self.knots_domain();
-        let b_domain = other.knots_domain();
-
-        // enloop a & b
-        if a_domain.0 < a[0].borrow().vertex.parameter {
-            a.insert(
-                0,
-                Rc::new(RefCell::new(
-                    Node::new(Vertex::new(self.point_at(a_domain.0), a_domain.0))
-                        .with_alpha(T::zero()),
-                )),
-            );
-        }
-        if a[a.len() - 1].borrow().vertex.parameter < a_domain.1 {
-            a.push(Rc::new(RefCell::new(
-                Node::new(Vertex::new(self.point_at(a_domain.1), a_domain.1)).with_alpha(T::one()),
-            )));
-        }
-        if b_domain.0 < b[0].borrow().vertex.parameter {
-            b.insert(
-                0,
-                Rc::new(RefCell::new(
-                    Node::new(Vertex::new(other.point_at(b_domain.0), b_domain.0))
-                        .with_alpha(T::zero()),
-                )),
-            );
-        }
-        if b[b.len() - 1].borrow().vertex.parameter < b_domain.1 {
-            b.push(Rc::new(RefCell::new(
-                Node::new(Vertex::new(other.point_at(b_domain.1), b_domain.1)).with_alpha(T::one()),
-            )));
-        }
-        */
+        let a = a.into_iter().map(|(_, n)| n).collect_vec();
+        let b = b.into_iter().map(|(_, n)| n).collect_vec();
 
         [&a, &b].iter().for_each(|list| {
             list.iter()
@@ -162,29 +149,41 @@ where
                 });
         });
 
-        let mut a_flag = other.contains(&self.point_at(self.knots_domain().0), option.clone())?;
-        if matches!(operation, BooleanOperation::Intersection) {
-            a_flag = !a_flag;
-        }
+        let mut a_flag = !other.contains(&self.point_at(self.knots_domain().0), option.clone())?;
+        let mut b_flag = !self.contains(&other.point_at(other.knots_domain().0), option.clone())?;
+        // println!("a flag: {}, b flag: {}", a_flag, b_flag);
+
         a.iter().for_each(|list| {
             let mut node = list.borrow_mut();
-            if node.intersects() {
-                node.status = if a_flag { Status::Enter } else { Status::Exit };
-                a_flag = !a_flag;
-            }
+            node.status = if a_flag { Status::Enter } else { Status::Exit };
+            a_flag = !a_flag;
         });
 
-        let mut b_flag = !self.contains(&other.point_at(other.knots_domain().0), option.clone())?;
-        if matches!(operation, BooleanOperation::Union) {
-            b_flag = !b_flag;
-        }
         b.iter().for_each(|list| {
             let mut node = list.borrow_mut();
-            if node.intersects() {
-                node.status = if b_flag { Status::Enter } else { Status::Exit };
-                b_flag = !b_flag;
-            }
+            node.status = if b_flag { Status::Enter } else { Status::Exit };
+            b_flag = !b_flag;
         });
+
+        match operation {
+            BooleanOperation::Union | BooleanOperation::Difference => {
+                // invert a status
+                a.iter().for_each(|node| {
+                    node.borrow_mut().status.invert();
+                });
+            }
+            _ => {}
+        }
+
+        match operation {
+            BooleanOperation::Union => {
+                // invert b status
+                b.iter().for_each(|node| {
+                    node.borrow_mut().status.invert();
+                });
+            }
+            _ => {}
+        }
 
         // Efficient clipping of arbitrary polygons
         // https://www.inf.usi.ch/hormann/papers/Greiner.1998.ECO.pdf
@@ -212,6 +211,8 @@ where
         };
 
         let subject = &a[0];
+
+        /*
         println!(
             "a statues: {:?}",
             a.iter().map(|n| n.borrow().status()).collect_vec()
@@ -226,11 +227,12 @@ where
             "b statues: {:?}",
             b.iter().map(|n| n.borrow().status()).collect_vec()
         );
+        */
 
         loop {
             match non_visited(subject.clone()) {
                 Some(start) => {
-                    println!("start: {:?}", start.borrow().vertex.parameter());
+                    // println!("start: {:?}", start.borrow().vertex.parameter());
                     let mut nodes = vec![];
                     let mut current = start.clone();
                     loop {
@@ -270,7 +272,16 @@ where
                         }
                         let n0 = chunk[0].borrow();
                         let n1 = chunk[1].borrow();
-                        println!("{:?} {:?} -> {:?}", n0.subject(), n0.status(), n1.status());
+
+                        /*
+                        println!(
+                            "{:?} {:?} -> {:?} {:?}",
+                            n0.subject(),
+                            n0.status(),
+                            n1.subject(),
+                            n1.status()
+                        );
+                        */
 
                         let params = match (n0.status(), n1.status()) {
                             (Status::Enter, Status::Exit) => {
@@ -280,7 +291,8 @@ where
                                 (n1.vertex().parameter(), n0.vertex().parameter())
                             }
                             _ => {
-                                anyhow::bail!("Invalid status");
+                                println!("Invalid status");
+                                break;
                             }
                         };
 
@@ -383,7 +395,6 @@ pub struct Node<T: FloatingPoint> {
     neighbor: Option<Weak<RefCell<Node<T>>>>,
     status: Status,
     visited: bool,
-    alpha: T,
 }
 
 impl<T: FloatingPoint> Node<T> {
@@ -391,7 +402,6 @@ impl<T: FloatingPoint> Node<T> {
         Self {
             subject,
             vertex,
-            alpha: T::zero(),
             prev: None,
             next: None,
             neighbor: None,
@@ -424,16 +434,8 @@ impl<T: FloatingPoint> Node<T> {
         self.status
     }
 
-    pub fn with_alpha(self, alpha: T) -> Self {
-        Self { alpha, ..self }
-    }
-
     pub fn visit(&mut self) {
         self.visited = true;
-    }
-
-    pub fn intersects(&self) -> bool {
-        self.neighbor.is_some()
     }
 }
 
@@ -442,4 +444,14 @@ pub enum Status {
     None,
     Enter,
     Exit,
+}
+
+impl Status {
+    pub fn invert(&mut self) {
+        *self = match self {
+            Status::Enter => Status::Exit,
+            Status::Exit => Status::Enter,
+            Status::None => Status::None,
+        };
+    }
 }
