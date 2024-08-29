@@ -1,4 +1,4 @@
-use nalgebra::{allocator::Allocator, DefaultAllocator, DimName};
+use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, U1};
 
 use crate::{curve::NurbsCurve, misc::FloatingPoint};
 
@@ -24,6 +24,18 @@ where
 
     pub fn spans_mut(&mut self) -> &mut [NurbsCurve<T, D>] {
         &mut self.spans
+    }
+
+    /// Returns the total length of the compound curve.
+    pub fn try_length(&self) -> anyhow::Result<T>
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+    {
+        let lengthes: anyhow::Result<Vec<T>> =
+            self.spans.iter().map(|span| span.try_length()).collect();
+        let total = lengthes?.iter().fold(T::zero(), |a, b| a + *b);
+        Ok(total)
     }
 }
 
