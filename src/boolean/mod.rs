@@ -1,14 +1,13 @@
 use std::{
     cell::RefCell,
-    fmt::Display,
-    rc::{Rc, Weak},
+    rc::Rc,
 };
 
 use argmin::core::ArgminFloat;
 use degeneracies::find_intersections_without_degeneracies;
 use itertools::Itertools;
 use nalgebra::{
-    allocator::Allocator, ComplexField, Const, DefaultAllocator, DimName, Point2, Vector2,
+    allocator::Allocator, Const, DefaultAllocator, DimName,
 };
 use node::Node;
 use operation::BooleanOperation;
@@ -16,8 +15,8 @@ use status::Status;
 
 use crate::{
     curve::NurbsCurve,
-    misc::{FloatingPoint, Line},
-    prelude::{Contains, CurveIntersection, CurveIntersectionSolverOptions},
+    misc::FloatingPoint,
+    prelude::{Contains, CurveIntersectionSolverOptions},
     region::{CompoundCurve, Region},
 };
 
@@ -27,7 +26,6 @@ pub mod operation;
 pub mod status;
 mod vertex;
 
-pub use operation::*;
 
 /// A trait for boolean operations.
 pub trait Boolean<T> {
@@ -65,6 +63,8 @@ where
         self.boolean(BooleanOperation::Difference, other, option)
     }
 
+    /// Boolean operation for two curves.
+    /// Base algorithm reference: Efficient clipping of arbitrary polygons (https://www.inf.usi.ch/hormann/papers/Greiner.1998.ECO.pdf)
     fn boolean(
         &self,
         operation: BooleanOperation,
@@ -96,14 +96,10 @@ where
 
         // connect neighbors
         a.iter_mut().for_each(|(index, node)| {
-            b.iter().find(|(i, _)| i == index).map(|(_, neighbor)| {
-                node.borrow_mut().set_neighbor(Rc::downgrade(neighbor));
-            });
+            if let Some((_, neighbor)) = b.iter().find(|(i, _)| i == index) { node.borrow_mut().set_neighbor(Rc::downgrade(neighbor)); }
         });
         b.iter_mut().for_each(|(index, node)| {
-            a.iter().find(|(i, _)| i == index).map(|(_, neighbor)| {
-                node.borrow_mut().set_neighbor(Rc::downgrade(neighbor));
-            });
+            if let Some((_, neighbor)) = a.iter().find(|(i, _)| i == index) { node.borrow_mut().set_neighbor(Rc::downgrade(neighbor)); }
         });
 
         // remove indices
@@ -148,18 +144,12 @@ where
             _ => {}
         }
 
-        match operation {
-            BooleanOperation::Union => {
-                // invert b status
-                b.iter().for_each(|node| {
-                    node.borrow_mut().status_mut().invert();
-                });
-            }
-            _ => {}
+        if operation == BooleanOperation::Union {
+            // invert b status
+            b.iter().for_each(|node| {
+                node.borrow_mut().status_mut().invert();
+            });
         }
-
-        // Efficient clipping of arbitrary polygons
-        // https://www.inf.usi.ch/hormann/papers/Greiner.1998.ECO.pdf
 
         let mut regions = vec![];
 
@@ -293,6 +283,13 @@ where
             }
         }
 
+        /*
+        let length = regions.iter().map(|r| {
+            r.exterior().try_length().unwrap()
+        }).fold(T::zero(), |a, b| a + b);
+        println!("length: {}", length);
+        */
+
         Ok((regions, a.iter().map(|n| n.borrow().clone()).collect_vec()))
     }
 }
@@ -308,11 +305,7 @@ where
         parameters.0.min(parameters.1),
         parameters.0.max(parameters.1),
     );
-    let inside = if parameters.0 < parameters.1 {
-        true
-    } else {
-        false
-    };
+    let inside = parameters.0 < parameters.1;
     let curves = if inside {
         let (_, tail) = curve.try_trim(min)?;
         let (head, _) = tail.try_trim(max)?;

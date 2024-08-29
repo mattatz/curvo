@@ -1,6 +1,4 @@
 use nalgebra::{Const, Point2, Vector2};
-use num_traits::NumCast;
-use robust::{orient2d, Coord};
 
 use crate::prelude::BoundingBox;
 

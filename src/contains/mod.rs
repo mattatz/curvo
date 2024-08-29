@@ -56,12 +56,10 @@ impl<T: FloatingPoint + ArgminFloat> Contains<T, Const<2>> for NurbsCurve<T, Con
         let sx = ComplexField::abs(size.dot(&dx));
 
         // TODO: create curve & ray intersection method for better result
-        let ray = NurbsCurve::polyline(&vec![
-            point.clone(),
-            point + dx * (distance + sx * T::from_f64(2.).unwrap()),
-        ]);
+        let ray = NurbsCurve::polyline(&[*point,
+            point + dx * (distance + sx * T::from_f64(2.).unwrap())]);
 
-        let delta = self.knots_domain_interval() * T::from_f64(1e-1).unwrap();
+        let delta = T::from_f64(1e-3).unwrap();
         self.find_intersections(&ray, option).map(|intersections| {
             // filter out the case where the ray passes through a `vertex` of the curve
             let filtered = intersections.iter().filter(|it| {
@@ -80,49 +78,4 @@ impl<T: FloatingPoint + ArgminFloat> Contains<T, Const<2>> for NurbsCurve<T, Con
 }
 
 #[cfg(test)]
-mod tests {
-    use crate::prelude::*;
-    use nalgebra::{Point2, Vector2};
-
-    #[test]
-    fn test_circle_boundary_case() {
-        let radius = 1.;
-        let circle = NurbsCurve2D::<f64>::try_circle(
-            &Point2::origin(),
-            &Vector2::x(),
-            &Vector2::y(),
-            radius,
-        )
-        .unwrap();
-        assert!(circle.contains(&Point2::new(radius, 0.0), None).unwrap());
-        assert!(circle.contains(&Point2::new(0., radius), None).unwrap());
-        assert!(circle.contains(&Point2::new(-radius, 0.), None).unwrap());
-        assert!(circle.contains(&Point2::new(0., -radius), None).unwrap());
-        assert!(!circle
-            .contains(&Point2::new(-radius * 5., radius), None)
-            .unwrap());
-        assert!(!circle
-            .contains(&Point2::new(-radius * 5., -radius), None)
-            .unwrap());
-    }
-
-    #[test]
-    fn test_rectangle_boundary_case() {
-        let dx = 2.;
-        let dy = 1.;
-        let rectangle = NurbsCurve2D::<f64>::polyline(&vec![
-            Point2::new(0., 0.),
-            Point2::new(dx, 0.),
-            Point2::new(dx, dy),
-            Point2::new(0., dy),
-            Point2::new(0., 0.),
-        ]);
-        assert!(rectangle.contains(&Point2::new(0., 0.), None).unwrap());
-        assert!(rectangle.contains(&Point2::new(dx, 0.), None).unwrap());
-        assert!(rectangle.contains(&Point2::new(dx, dy), None).unwrap());
-        assert!(rectangle.contains(&Point2::new(0., dy), None).unwrap());
-
-        assert!(!rectangle.contains(&Point2::new(-dx, 0.), None).unwrap());
-        assert!(!rectangle.contains(&Point2::new(-dx, dy), None).unwrap());
-    }
-}
+mod tests;

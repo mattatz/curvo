@@ -2,11 +2,8 @@ use std::f64::consts::FRAC_PI_2;
 
 use bevy::{
     prelude::*,
-    render::{
-        mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
-        view::screenshot::ScreenshotManager,
-    },
-    window::{close_on_esc, PrimaryWindow},
+    render::mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
+    window::close_on_esc,
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
 
