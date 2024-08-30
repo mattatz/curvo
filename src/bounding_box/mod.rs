@@ -44,7 +44,7 @@ where
     /// Create a new bounding box from point iterator.
     pub fn new_with_points<I: IntoIterator<Item = OPoint<T, D>>>(iter: I) -> Self {
         let mut min = OVector::<T, D>::from_element(T::max_value().unwrap());
-        let mut max = OVector::<T, D>::from_element(-T::max_value().unwrap());
+        let mut max = -min.clone();
 
         for point in iter {
             for i in 0..D::dim() {

@@ -73,3 +73,58 @@ fn test_problem_case() {
     let contains = subject.contains(&point, Some(OPTIONS)).unwrap();
     assert!(contains);
 }
+
+#[test]
+fn test_problem_case_2() {
+    let dx = 2.25;
+    let dy = 0.5;
+
+    let subject = NurbsCurve2D::<f64>::try_periodic_interpolate(
+        &[
+            Point2::new(-dx, -dy),
+            Point2::new(0., -dy * 0.5),
+            Point2::new(dx, -dy),
+            Point2::new(dx, dy),
+            Point2::new(0., dy * 0.5),
+            Point2::new(-dx, dy),
+        ],
+        3,
+        KnotStyle::Centripetal,
+    )
+    .unwrap();
+
+    let delta: f64 = 5.80492045224;
+    let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);
+    let clip = subject.transformed(&trans.into());
+    let point = clip.point_at(clip.knots_domain().0);
+
+    let contains = subject.contains(&point, Some(OPTIONS)).unwrap();
+    assert!(!contains);
+}
+
+#[test]
+fn test_problem_case_3() {
+    let dx = 2.25;
+    let dy = 0.5;
+
+    let subject = NurbsCurve2D::<f64>::try_periodic_interpolate(
+        &[
+            Point2::new(-dx, -dy),
+            Point2::new(0., -dy * 0.5),
+            Point2::new(dx, -dy),
+            Point2::new(dx, dy),
+            Point2::new(0., dy * 0.5),
+            Point2::new(-dx, dy),
+        ],
+        3,
+        KnotStyle::Centripetal,
+    )
+    .unwrap();
+
+    let delta: f64 = 3.1613637252600006;
+    let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);
+    let clip = subject.transformed(&trans.into());
+    let point = subject.point_at(subject.knots_domain().0);
+    let contains = clip.contains(&point, Some(OPTIONS)).unwrap();
+    assert!(!contains);
+}

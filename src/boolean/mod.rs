@@ -66,10 +66,14 @@ where
         option: Self::Option,
     ) -> Self::Output {
         let intersections = find_intersections_without_degeneracies(self, other, option.clone())?
+            // let intersections = self.find_intersections(other, option.clone())?
             .into_iter()
             .enumerate()
             .collect_vec();
         // println!("intersections: {}", intersections.len());
+        if intersections.len() % 2 == 1 {
+            println!("odd number of intersections");
+        }
 
         if intersections.is_empty() {
             anyhow::bail!("Todo: no intersections case");
@@ -118,7 +122,7 @@ where
 
         let mut a_flag = !other.contains(&self.point_at(self.knots_domain().0), option.clone())?;
         let mut b_flag = !self.contains(&other.point_at(other.knots_domain().0), option.clone())?;
-        // println!("a flag: {}, b flag: {}", a_flag, b_flag);
+        // println!("clip: {}, subject: {}", !a_flag, !b_flag);
 
         a.iter().for_each(|list| {
             let mut node = list.borrow_mut();
@@ -226,6 +230,7 @@ where
                     }
 
                     // println!("nodes: {:?}", nodes.len());
+
                     let mut spans = vec![];
                     for chunk in nodes.chunks(2) {
                         if chunk.len() != 2 {
@@ -252,7 +257,7 @@ where
                                 (n1.vertex().parameter(), n0.vertex().parameter())
                             }
                             _ => {
-                                // println!("Invalid status");
+                                println!("Invalid status");
                                 break;
                             }
                         };
