@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::f64::consts::{FRAC_PI_2, TAU};
 use std::vec;
 
@@ -1557,7 +1558,7 @@ where
         // let eps = options.minimum_distance * T::from_f64(5.).unwrap();
         let parameter_minimum_distance = T::from_f64(1e-2).unwrap();
 
-        let pts = traversed
+        let intersections = traversed
             .into_pairs_iter()
             .filter_map(|(a, b)| {
                 let ca = a.curve_owned();
@@ -1622,18 +1623,43 @@ where
                 let d = (p0 - p1).norm();
                 d < options.minimum_distance
             })
-            // TODO: group near parameter results & return the closest one
+            .collect_vec();
+
+        // group near parameter results & extract the closest one in each group
+        let pts = intersections
+            .into_iter()
+            .map(|pt| vec![pt])
             .coalesce(|x, y| {
-                // merge intersections that are close in parameter space
-                let da = ComplexField::abs(x.a().1 - y.a().1);
-                let db = ComplexField::abs(x.b().1 - y.b().1);
+                let x0 = &x[x.len() - 1];
+                let y0 = &y[y.len() - 1];
+                let da = ComplexField::abs(x0.a().1 - y0.a().1);
+                let db = ComplexField::abs(x0.b().1 - y0.b().1);
                 if da < parameter_minimum_distance || db < parameter_minimum_distance {
-                    Ok(x)
+                    // merge near parameter results
+                    let group = [x, y].concat();
+                    Ok(group)
                 } else {
                     Err((x, y))
                 }
             })
-            .collect();
+            .collect::<Vec<Vec<CurveIntersection<OPoint<T, DimNameDiff<D, U1>>, T>>>>()
+            .into_iter()
+            .filter_map(|group| match group.len() {
+                1 => Some(group[0].clone()),
+                _ => {
+                    // find the closest intersection in the group
+                    group
+                        .iter()
+                        .map(|it| {
+                            let delta = &it.a().0 - &it.b().0;
+                            let norm = delta.norm_squared();
+                            (it, norm)
+                        })
+                        .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(Ordering::Equal))
+                        .map(|closest| closest.0.clone())
+                }
+            })
+            .collect_vec();
 
         Ok(pts)
     }
