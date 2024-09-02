@@ -1,12 +1,50 @@
 use argmin::core::ArgminFloat;
 use itertools::Itertools;
 use nalgebra::{ComplexField, Const, Point2};
+use num_traits::Float;
 
 use crate::{
     curve::NurbsCurve,
     misc::{FloatingPoint, Line},
-    prelude::{CurveIntersection, CurveIntersectionSolverOptions},
+    prelude::{Contains, CurveIntersection, CurveIntersectionSolverOptions},
 };
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Degeneracy<T: FloatingPoint> {
+    Angle(T),
+    None,
+}
+
+impl<T: FloatingPoint> Degeneracy<T> {
+    pub fn new(
+        it: &CurveIntersection<Point2<T>, T>,
+        a: &NurbsCurve<T, Const<3>>,
+        b: &NurbsCurve<T, Const<3>>,
+    ) -> Self {
+        let parameter_eps = T::from_f64(1e-4).unwrap();
+        let collinear_dot_threshold = T::from_f64(0.9975).unwrap();
+        let a0 = a.point_at(it.a().1 - parameter_eps);
+        let a1 = a.point_at(it.a().1 + parameter_eps);
+        let la = Line::new(a0, a1);
+        let b0 = b.point_at(it.b().1 - parameter_eps);
+        let b1 = b.point_at(it.b().1 + parameter_eps);
+        let lb = Line::new(b0, b1);
+        let intersected = la.intersects(&lb);
+        // println!("intersected: {}", intersected);
+        if !intersected {
+            Degeneracy::None
+        } else {
+            let ta = a.tangent_at(it.a().1).normalize();
+            let tb = b.tangent_at(it.b().1).normalize();
+            let dot = ta.dot(&tb);
+            if ComplexField::abs(dot) < collinear_dot_threshold {
+                Degeneracy::None
+            } else {
+                Degeneracy::Angle(dot)
+            }
+        }
+    }
+}
 
 /// Find intersections between two curves without degeneracies for clipping algorithm.
 pub fn find_intersections_without_degeneracies<T: FloatingPoint + ArgminFloat>(
@@ -14,34 +52,14 @@ pub fn find_intersections_without_degeneracies<T: FloatingPoint + ArgminFloat>(
     b: &NurbsCurve<T, Const<3>>,
     option: Option<CurveIntersectionSolverOptions<T>>,
 ) -> anyhow::Result<Vec<CurveIntersection<Point2<T>, T>>> {
-    let intersections = a.find_intersections(b, option)?;
-    // let n = intersections.len();
-
-    let parameter_eps = T::from_f64(1e-3).unwrap();
-    // let collinear_dot_threshold = T::one() - T::from_f64(1e-2 / 2.).unwrap();
-    let collinear_dot_threshold = T::from_f64(0.9975).unwrap();
+    let intersections = a.find_intersections(b, option.clone())?;
+    let n = intersections.len();
     let filtered = intersections
         .into_iter()
-        .filter(|it| {
-            let a0 = a.point_at(it.a().1 - parameter_eps);
-            let a1 = a.point_at(it.a().1 + parameter_eps);
-            let la = Line::new(a0, a1);
-            let b0 = b.point_at(it.b().1 - parameter_eps);
-            let b1 = b.point_at(it.b().1 + parameter_eps);
-            let lb = Line::new(b0, b1);
-            let intersected = la.intersects(&lb);
-            if !intersected {
-                false
-            } else {
-                let dot =
-                    ComplexField::abs(la.tangent().normalize().dot(&lb.tangent().normalize()));
-                // println!("dot: {}, {}", dot, dot < collinear_dot_threshold);
-                dot < collinear_dot_threshold
-            }
-        })
+        .filter(|it| matches!(Degeneracy::new(it, a, b), Degeneracy::None))
         .collect_vec();
 
-    // println!("# of origin: {}, # of filtered: {}", n, filtered.len());
+    println!("# of origin: {}, # of filtered: {}", n, filtered.len());
 
     Ok(filtered)
 }
