@@ -46,7 +46,11 @@ where
         let interval = self.curve.knots_domain_interval();
         interval > self.tolerance || {
             match self.curve.degree() {
-                1 => self.curve.control_points().len() >= 3, // avoid degeneracy for polyline curves
+                1 => {
+                    // avoid degeneracy for polyline curves
+                    // println!("interval: {}, # of points: {}", interval, self.curve.control_points().len());
+                    interval >= T::default_epsilon() && self.curve.control_points().len() >= 3
+                }
                 _ => false,
             }
         }
