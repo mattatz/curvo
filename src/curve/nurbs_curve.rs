@@ -1558,6 +1558,9 @@ where
         // let eps = options.minimum_distance * T::from_f64(5.).unwrap();
         let parameter_minimum_distance = T::from_f64(1e-2).unwrap();
 
+        let a_domain = self.knots_domain();
+        let b_domain = other.knots_domain();
+
         let intersections = traversed
             .into_pairs_iter()
             .filter_map(|(a, b)| {
@@ -1597,13 +1600,13 @@ where
                     Ok(r) => {
                         // println!("{}", r.state().get_termination_status());
                         r.state().get_best_param().and_then(|param| {
-                            let a_domain = ca.knots_domain();
-                            let b_domain = cb.knots_domain();
+                            // let a_domain = ca.knots_domain();
+                            // let b_domain = cb.knots_domain();
                             if (a_domain.0..=a_domain.1).contains(&param[0])
                                 && (b_domain.0..=b_domain.1).contains(&param[1])
                             {
-                                let p0 = ca.point_at(param[0]);
-                                let p1 = cb.point_at(param[1]);
+                                let p0 = self.point_at(param[0]);
+                                let p1 = other.point_at(param[1]);
                                 Some(CurveIntersection::new((p0, param[0]), (p1, param[1])))
                             } else {
                                 None
@@ -1625,9 +1628,12 @@ where
             })
             .collect_vec();
 
-        // group near parameter results & extract the closest one in each group
-        let pts = intersections
+        let sorted = intersections
             .into_iter()
+            .sorted_by(|x, y| x.a().1.partial_cmp(&y.a().1).unwrap_or(Ordering::Equal));
+
+        // group near parameter results & extract the closest one in each group
+        let pts = sorted
             .map(|pt| vec![pt])
             .coalesce(|x, y| {
                 let x0 = &x[x.len() - 1];
