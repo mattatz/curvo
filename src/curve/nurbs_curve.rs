@@ -1555,9 +1555,6 @@ where
             ),
         )?;
 
-        // let eps = options.minimum_distance * T::from_f64(5.).unwrap();
-        let parameter_minimum_distance = T::from_f64(1e-2).unwrap();
-
         let a_domain = self.knots_domain();
         let b_domain = other.knots_domain();
 
@@ -1602,8 +1599,7 @@ where
                         r.state().get_best_param().and_then(|param| {
                             // let a_domain = ca.knots_domain();
                             // let b_domain = cb.knots_domain();
-                            if (a_domain.0..=a_domain.1).contains(&param[0])
-                                && (b_domain.0..=b_domain.1).contains(&param[1])
+                            if (a_domain.0..=a_domain.1).contains(&param[0]) && (b_domain.0..=b_domain.1).contains(&param[1])
                             {
                                 let p0 = self.point_at(param[0]);
                                 let p1 = other.point_at(param[1]);
@@ -1630,17 +1626,22 @@ where
 
         let sorted = intersections
             .into_iter()
-            .sorted_by(|x, y| x.a().1.partial_cmp(&y.a().1).unwrap_or(Ordering::Equal));
+            .sorted_by(|x, y| x.a().1.partial_cmp(&y.a().1).unwrap_or(Ordering::Equal))
+            .collect_vec();
+
+        // println!("sorted: {:?}", sorted.iter().map(|it| it.a()).collect_vec());
 
         // group near parameter results & extract the closest one in each group
-        let pts = sorted
+        let parameter_minimum_distance = T::from_f64(1e-3).unwrap();
+        let groups = sorted
+            .into_iter()
             .map(|pt| vec![pt])
             .coalesce(|x, y| {
                 let x0 = &x[x.len() - 1];
                 let y0 = &y[y.len() - 1];
                 let da = ComplexField::abs(x0.a().1 - y0.a().1);
-                let db = ComplexField::abs(x0.b().1 - y0.b().1);
-                if da < parameter_minimum_distance || db < parameter_minimum_distance {
+                // let db = ComplexField::abs(x0.b().1 - y0.b().1);
+                if da < parameter_minimum_distance {
                     // merge near parameter results
                     let group = [x, y].concat();
                     Ok(group)
@@ -1649,6 +1650,17 @@ where
                 }
             })
             .collect::<Vec<Vec<CurveIntersection<OPoint<T, DimNameDiff<D, U1>>, T>>>>()
+            .into_iter()
+            .collect_vec();
+
+        /*
+        println!("groups: {:?}", groups.len());
+        groups.iter().for_each(|group| {
+            println!("group: {:?}", group.iter().map(|v| &v.b().0).collect_vec());
+        });
+        */
+
+        let pts = groups
             .into_iter()
             .filter_map(|group| match group.len() {
                 1 => Some(group[0].clone()),
@@ -1666,6 +1678,8 @@ where
                 }
             })
             .collect_vec();
+
+        // println!("pts: {:?}", pts.len());
 
         Ok(pts)
     }

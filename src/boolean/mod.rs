@@ -1,7 +1,7 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, cmp::Ordering, rc::Rc};
 
 use argmin::core::ArgminFloat;
-use degeneracies::find_intersections_without_degeneracies;
+use degeneracies::{find_intersections_without_degeneracies, Degeneracy};
 use itertools::Itertools;
 use nalgebra::{allocator::Allocator, Const, DefaultAllocator, DimName};
 use node::Node;
@@ -65,28 +65,94 @@ where
         other: &'a NurbsCurve<T, Const<3>>,
         option: Self::Option,
     ) -> Self::Output {
-        let intersections = find_intersections_without_degeneracies(self, other, option.clone())?
-            // let intersections = self.find_intersections(other, option.clone())?
+        let intersections = self.find_intersections(other, option.clone())?;
+        // println!("intersections in boolean: {}", intersections.len());
+
+        let deg = intersections
             .into_iter()
-            .enumerate()
+            .map(|it| {
+                let deg = Degeneracy::new(&it, self, other);
+                (it, deg)
+            })
             .collect_vec();
-        // println!("intersections: {}", intersections.len());
+
+        let (regular, deg): (Vec<_>, Vec<_>) = deg
+            .into_iter()
+            .partition(|(_, deg)| matches!(deg, Degeneracy::None));
+
+        let regular = regular.into_iter().map(|(it, _)| it).collect_vec();
+        // println!("regular: {}, degenerate: {}", regular.len(), deg.len());
+        let intersections = if regular.len() % 2 == 0 {
+            regular
+        } else {
+            let max = deg.into_iter().max_by(|x, y| match (x.1, y.1) {
+                (Degeneracy::Angle(x), Degeneracy::Angle(y)) => {
+                    x.partial_cmp(&y).unwrap_or(Ordering::Equal)
+                }
+                _ => Ordering::Equal,
+            });
+            match max {
+                Some((max, _)) => [regular, vec![max]].concat(),
+                _ => regular,
+            }
+        };
+
         if intersections.len() % 2 == 1 {
             println!("odd number of intersections");
         }
 
-        if intersections.is_empty() {
-            anyhow::bail!("Todo: no intersections case");
+        let indexed = intersections.into_iter().enumerate().collect_vec();
+
+        let other_contains_self =
+            other.contains(&self.point_at(self.knots_domain().0), option.clone())?;
+        let self_contains_other =
+            self.contains(&other.point_at(other.knots_domain().0), option.clone())?;
+
+        if indexed.is_empty() {
+            let res = match (self_contains_other, other_contains_self) {
+                (true, false) => match operation {
+                    BooleanOperation::Union => vec![Region::new(self.clone().into(), vec![])],
+                    BooleanOperation::Intersection => {
+                        vec![Region::new(other.clone().into(), vec![])]
+                    }
+                    BooleanOperation::Difference => {
+                        vec![Region::new(self.clone().into(), vec![other.clone().into()])]
+                    }
+                },
+                (false, true) => match operation {
+                    BooleanOperation::Union => vec![Region::new(other.clone().into(), vec![])],
+                    BooleanOperation::Intersection => {
+                        vec![Region::new(self.clone().into(), vec![])]
+                    }
+                    BooleanOperation::Difference => {
+                        vec![]
+                    }
+                },
+                (false, false) => match operation {
+                    BooleanOperation::Union => vec![
+                        Region::new(self.clone().into(), vec![]),
+                        Region::new(other.clone().into(), vec![]),
+                    ],
+                    BooleanOperation::Intersection => vec![],
+                    BooleanOperation::Difference => {
+                        vec![Region::new(self.clone().into(), vec![])]
+                    }
+                },
+                _ => {
+                    anyhow::bail!("Invalid case");
+                }
+            };
+            return Ok((res, vec![]));
         }
 
         // create linked list
-        let mut a = intersections
+        let mut a = indexed
             .iter()
             .sorted_by(|(_, i0), (_, i1)| i0.a().1.partial_cmp(&i1.a().1).unwrap())
             .map(|(i, it)| (*i, Rc::new(RefCell::new(Node::new(true, it.a().into())))))
             .collect_vec();
 
-        let mut b = intersections
+        let mut b = indexed
             .iter()
             .sorted_by(|(_, i0), (_, i1)| i0.b().1.partial_cmp(&i1.b().1).unwrap())
             .map(|(i, it)| (*i, Rc::new(RefCell::new(Node::new(false, it.b().into())))))
@@ -120,8 +186,8 @@ where
                 });
         });
 
-        let mut a_flag = !other.contains(&self.point_at(self.knots_domain().0), option.clone())?;
-        let mut b_flag = !self.contains(&other.point_at(other.knots_domain().0), option.clone())?;
+        let mut a_flag = !other_contains_self;
+        let mut b_flag = !self_contains_other;
         // println!("clip: {}, subject: {}", !a_flag, !b_flag);
 
         a.iter().for_each(|list| {

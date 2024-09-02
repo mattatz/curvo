@@ -43,20 +43,24 @@ where
 
     /// Check if the curve is dividable or not.
     pub fn is_dividable(&self) -> bool {
-        let i = self.curve.knots_domain_interval();
-        i > self.tolerance
+        let interval = self.curve.knots_domain_interval();
+        interval > self.tolerance || {
+            match self.curve.degree() {
+                1 => self.curve.control_points().len() >= 3, // avoid degeneracy for polyline curves
+                _ => false,
+            }
+        }
     }
 
     /// Try to divide the curve into two parts.
     pub fn try_divide(&self) -> anyhow::Result<(Self, Self)> {
-        // let min = self.curve.knots().first();
-        // let max = self.curve.knots().last();
         let (min, max) = self.curve.knots_domain();
         let interval = max - min;
         let mid = (min + max) / T::from_usize(2).unwrap();
 
         let mut rng = rand::thread_rng();
         let r = interval * T::from_f64(1e-1 * rng.gen::<f64>()).unwrap();
+        // let r = T::zero(); // non random
 
         let (head, tail) = self.curve.try_trim(mid + r)?;
         Ok((

@@ -12,6 +12,7 @@ use crate::{
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Degeneracy<T: FloatingPoint> {
     Angle(T),
+    LineIntersection,
     None,
 }
 
@@ -30,14 +31,15 @@ impl<T: FloatingPoint> Degeneracy<T> {
         let b1 = b.point_at(it.b().1 + parameter_eps);
         let lb = Line::new(b0, b1);
         let intersected = la.intersects(&lb);
-        // println!("intersected: {}", intersected);
         if !intersected {
-            Degeneracy::None
+            Degeneracy::LineIntersection
         } else {
-            let ta = a.tangent_at(it.a().1).normalize();
-            let tb = b.tangent_at(it.b().1).normalize();
-            let dot = ta.dot(&tb);
-            if ComplexField::abs(dot) < collinear_dot_threshold {
+            // let ta = a.tangent_at(it.a().1).normalize();
+            // let tb = b.tangent_at(it.b().1).normalize();
+            let ta = la.tangent().normalize();
+            let tb = lb.tangent().normalize();
+            let dot = ComplexField::abs(ta.dot(&tb));
+            if dot < collinear_dot_threshold {
                 Degeneracy::None
             } else {
                 Degeneracy::Angle(dot)
@@ -59,7 +61,7 @@ pub fn find_intersections_without_degeneracies<T: FloatingPoint + ArgminFloat>(
         .filter(|it| matches!(Degeneracy::new(it, a, b), Degeneracy::None))
         .collect_vec();
 
-    println!("# of origin: {}, # of filtered: {}", n, filtered.len());
+    // println!("# of origin: {}, # of filtered: {}", n, filtered.len());
 
     Ok(filtered)
 }
