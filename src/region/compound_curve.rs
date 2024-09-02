@@ -49,3 +49,12 @@ where
         }
     }
 }
+
+impl<T: FloatingPoint, D: DimName> From<NurbsCurve<T, D>> for CompoundCurve<T, D>
+where
+    DefaultAllocator: Allocator<D>,
+{
+    fn from(value: NurbsCurve<T, D>) -> Self {
+        Self::new(vec![value])
+    }
+}
