@@ -1,12 +1,11 @@
 use argmin::core::ArgminFloat;
 use itertools::Itertools;
 use nalgebra::{ComplexField, Const, Point2};
-use num_traits::Float;
 
 use crate::{
     curve::NurbsCurve,
     misc::{FloatingPoint, Line},
-    prelude::{Contains, CurveIntersection, CurveIntersectionSolverOptions},
+    prelude::{CurveIntersection, CurveIntersectionSolverOptions},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]

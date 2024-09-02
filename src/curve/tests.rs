@@ -1,4 +1,4 @@
-use nalgebra::{Point2, Rotation2, Translation2, Vector2};
+use nalgebra::{Point2, Rotation2, Translation2};
 
 use crate::{curve::NurbsCurve2D, misc::Transformable, prelude::CurveIntersectionSolverOptions};
 

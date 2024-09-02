@@ -1,7 +1,7 @@
 use std::{cell::RefCell, cmp::Ordering, rc::Rc};
 
 use argmin::core::ArgminFloat;
-use degeneracies::{find_intersections_without_degeneracies, Degeneracy};
+use degeneracies::Degeneracy;
 use itertools::Itertools;
 use nalgebra::{allocator::Allocator, Const, DefaultAllocator, DimName};
 use node::Node;

@@ -63,7 +63,7 @@ where
         let mid = (min + max) / T::from_usize(2).unwrap();
 
         let mut rng = rand::thread_rng();
-        let r = interval * T::from_f64(1e-1 * rng.gen::<f64>()).unwrap();
+        let r = interval * T::from_f64(1e-1 * (rng.gen::<f64>() - 0.5)).unwrap();
         // let r = T::zero(); // non random
 
         let (head, tail) = self.curve.try_trim(mid + r)?;

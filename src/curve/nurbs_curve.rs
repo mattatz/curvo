@@ -1599,7 +1599,8 @@ where
                         r.state().get_best_param().and_then(|param| {
                             // let a_domain = ca.knots_domain();
                             // let b_domain = cb.knots_domain();
-                            if (a_domain.0..=a_domain.1).contains(&param[0]) && (b_domain.0..=b_domain.1).contains(&param[1])
+                            if (a_domain.0..=a_domain.1).contains(&param[0])
+                                && (b_domain.0..=b_domain.1).contains(&param[1])
                             {
                                 let p0 = self.point_at(param[0]);
                                 let p1 = other.point_at(param[1]);
