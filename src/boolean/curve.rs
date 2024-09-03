@@ -15,31 +15,14 @@ use crate::{
     region::{CompoundCurve, Region},
 };
 
-/// Boolean operation for two curves.
+/// Boolean operation for two nurbs curves.
 impl<'a, T: FloatingPoint + ArgminFloat> Boolean<&'a NurbsCurve<T, Const<3>>>
     for NurbsCurve<T, Const<3>>
 where
     DefaultAllocator: Allocator<Const<3>>,
 {
-    // type Output = anyhow::Result<Vec<Region<T>>>;
-    type Output = anyhow::Result<(Vec<Region<T>>, Vec<Node<T>>)>;
+    type Output = anyhow::Result<Vec<Region<T>>>;
     type Option = Option<CurveIntersectionSolverOptions<T>>;
-
-    fn union(&self, other: &'a NurbsCurve<T, Const<3>>, option: Self::Option) -> Self::Output {
-        self.boolean(BooleanOperation::Union, other, option)
-    }
-
-    fn intersection(
-        &self,
-        other: &'a NurbsCurve<T, Const<3>>,
-        option: Self::Option,
-    ) -> Self::Output {
-        self.boolean(BooleanOperation::Intersection, other, option)
-    }
-
-    fn difference(&self, other: &'a NurbsCurve<T, Const<3>>, option: Self::Option) -> Self::Output {
-        self.boolean(BooleanOperation::Difference, other, option)
-    }
 
     /// Boolean operation for two curves.
     /// Base algorithm reference: Efficient clipping of arbitrary polygons (https://www.inf.usi.ch/hormann/papers/Greiner.1998.ECO.pdf)
@@ -126,7 +109,7 @@ where
                     anyhow::bail!("Invalid case");
                 }
             };
-            return Ok((res, vec![]));
+            return Ok(res);
         }
 
         // create linked list
@@ -346,7 +329,7 @@ where
         println!("length: {}", length);
         */
 
-        Ok((regions, a.iter().map(|n| n.borrow().clone()).collect_vec()))
+        Ok(regions)
     }
 }
 
