@@ -48,15 +48,18 @@ impl<T: FloatingPoint + SpadeNum> Tessellation for Region<T> {
                     })
                     .collect_vec();
 
-                handles.into_iter().circular_tuple_windows().for_each(|(a, b)| {
-                    if let (Ok(a), Ok(b)) = (a, b) {
-                        let can_add_constraint = t.can_add_constraint(a, b);
-                        // println!("{:?}", can_add_constraint);
-                        if can_add_constraint {
-                            t.add_constraint(a, b);
+                handles
+                    .into_iter()
+                    .circular_tuple_windows()
+                    .for_each(|(a, b)| {
+                        if let (Ok(a), Ok(b)) = (a, b) {
+                            let can_add_constraint = t.can_add_constraint(a, b);
+                            // println!("{:?}", can_add_constraint);
+                            if can_add_constraint {
+                                t.add_constraint(a, b);
+                            }
                         }
-                    }
-                });
+                    });
             });
 
         let mut vertices = vec![];

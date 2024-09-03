@@ -1,5 +1,6 @@
 use nalgebra::Const;
 pub mod compound_curve;
+mod curve_direction;
 pub use compound_curve::*;
 
 use crate::misc::FloatingPoint;
