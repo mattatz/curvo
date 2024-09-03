@@ -80,8 +80,8 @@ impl<T: FloatingPoint + ArgminFloat> Contains<T, Const<2>> for NurbsCurve<T, Con
             .filter_map(|(item, _)| {
                 let curve = item.curve();
                 let (start, end) = curve.knots_domain();
-                let p_start = curve.point_at(start);
-                let p_end = curve.point_at(end);
+                let p_start = self.point_at(start);
+                let p_end = self.point_at(end);
 
                 if p_start.x < point.x && p_end.x < point.x {
                     return None;
@@ -115,6 +115,7 @@ impl<T: FloatingPoint + ArgminFloat> Contains<T, Const<2>> for NurbsCurve<T, Con
                         min = t;
                     }
                 }
+
                 None
             })
             .filter(|(p, _)| point.x <= p.x)

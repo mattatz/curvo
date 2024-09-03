@@ -62,16 +62,16 @@ where
     fn boolean(
         &self,
         operation: BooleanOperation,
-        other: &'a NurbsCurve<T, Const<3>>,
+        clip: &'a NurbsCurve<T, Const<3>>,
         option: Self::Option,
     ) -> Self::Output {
-        let intersections = self.find_intersections(other, option.clone())?;
+        let intersections = self.find_intersections(clip, option.clone())?;
         // println!("intersections in boolean: {}", intersections.len());
 
         let deg = intersections
             .into_iter()
             .map(|it| {
-                let deg = Degeneracy::new(&it, self, other);
+                let deg = Degeneracy::new(&it, self, clip);
                 (it, deg)
             })
             .collect_vec();
@@ -103,24 +103,24 @@ where
 
         let indexed = intersections.into_iter().enumerate().collect_vec();
 
-        let other_contains_self =
-            other.contains(&self.point_at(self.knots_domain().0), option.clone())?;
-        let self_contains_other =
-            self.contains(&other.point_at(other.knots_domain().0), option.clone())?;
+        let clip_contains_subject =
+            clip.contains(&self.point_at(self.knots_domain().0), option.clone())?;
+        let subject_contains_clip =
+            self.contains(&clip.point_at(clip.knots_domain().0), option.clone())?;
 
         if indexed.is_empty() {
-            let res = match (self_contains_other, other_contains_self) {
+            let res = match (subject_contains_clip, clip_contains_subject) {
                 (true, false) => match operation {
                     BooleanOperation::Union => vec![Region::new(self.clone().into(), vec![])],
                     BooleanOperation::Intersection => {
-                        vec![Region::new(other.clone().into(), vec![])]
+                        vec![Region::new(clip.clone().into(), vec![])]
                     }
                     BooleanOperation::Difference => {
-                        vec![Region::new(self.clone().into(), vec![other.clone().into()])]
+                        vec![Region::new(self.clone().into(), vec![clip.clone().into()])]
                     }
                 },
                 (false, true) => match operation {
-                    BooleanOperation::Union => vec![Region::new(other.clone().into(), vec![])],
+                    BooleanOperation::Union => vec![Region::new(clip.clone().into(), vec![])],
                     BooleanOperation::Intersection => {
                         vec![Region::new(self.clone().into(), vec![])]
                     }
@@ -131,7 +131,7 @@ where
                 (false, false) => match operation {
                     BooleanOperation::Union => vec![
                         Region::new(self.clone().into(), vec![]),
-                        Region::new(other.clone().into(), vec![]),
+                        Region::new(clip.clone().into(), vec![]),
                     ],
                     BooleanOperation::Intersection => vec![],
                     BooleanOperation::Difference => {
@@ -186,9 +186,10 @@ where
                 });
         });
 
-        let mut a_flag = !other_contains_self;
-        let mut b_flag = !self_contains_other;
-        // println!("clip: {}, subject: {}", !a_flag, !b_flag);
+        // println!("clip contains subject: {}, subject contains clip: {}", clip_contains_subject, subject_contains_clip);
+
+        let mut a_flag = !clip_contains_subject;
+        let mut b_flag = !subject_contains_clip;
 
         a.iter().for_each(|list| {
             let mut node = list.borrow_mut();
@@ -334,7 +335,7 @@ where
                                 spans.extend(trimmed);
                             }
                             (false, false) => {
-                                let trimmed = try_trim(other, params)?;
+                                let trimmed = try_trim(clip, params)?;
                                 spans.extend(trimmed);
                             }
                             _ => {
