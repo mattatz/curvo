@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use itertools::Itertools;
-use nalgebra::{Const, Point2};
+use nalgebra::{ComplexField, Const, Point2};
 use spade::{
     handles::FixedVertexHandle, ConstrainedDelaunayTriangulation, Point2 as SP2, SpadeNum,
     Triangulation,
@@ -31,6 +31,8 @@ impl<T: FloatingPoint + SpadeNum> Tessellation for Region<T> {
             .map(|c| c.tessellate(tolerance))
             .collect_vec();
 
+        // println!("#{}, #{}", exterior.len(), interiors.len());
+
         [&[&exterior], interiors.iter().collect_vec().as_slice()]
             .concat()
             .into_iter()
@@ -46,7 +48,7 @@ impl<T: FloatingPoint + SpadeNum> Tessellation for Region<T> {
                     })
                     .collect_vec();
 
-                handles.into_iter().tuple_windows().for_each(|(a, b)| {
+                handles.into_iter().circular_tuple_windows().for_each(|(a, b)| {
                     if let (Ok(a), Ok(b)) = (a, b) {
                         let can_add_constraint = t.can_add_constraint(a, b);
                         // println!("{:?}", can_add_constraint);
@@ -75,6 +77,8 @@ impl<T: FloatingPoint + SpadeNum> Tessellation for Region<T> {
             .map(|c| PolygonBoundary::new(c))
             .collect_vec();
 
+        let inv_3 = T::from_f64(1. / 3.).unwrap();
+
         let faces = t
             .inner_faces()
             .filter_map(|f| {
@@ -87,13 +91,19 @@ impl<T: FloatingPoint + SpadeNum> Tessellation for Region<T> {
 
                 let (a, b) = (tri[1] - tri[0], tri[2] - tri[1]);
                 let area = a.x * b.y - a.y * b.x;
-                if area < T::default_epsilon() {
+                if ComplexField::abs(area) < T::default_epsilon() {
                     return None;
                 }
 
-                let center: Point2<T> = ((tri[0].coords + tri[1].coords + tri[2].coords)
-                    / T::from_f64(3.).unwrap())
-                .into();
+                /*
+                    let a = vmap[&vs[0].fix()];
+                    let b = vmap[&vs[1].fix()];
+                    let c = vmap[&vs[2].fix()];
+                    return Some([a, b, c]);
+                */
+
+                let center: Point2<T> =
+                    ((tri[0].coords + tri[1].coords + tri[2].coords) * inv_3).into();
                 if exterior_boundary.contains(&center, ()).unwrap()
                     && interior_boundaries
                         .iter()
