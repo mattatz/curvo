@@ -343,8 +343,10 @@ where
                         }
                     }
 
-                    let region = Region::new(CompoundCurve::new(spans), vec![]);
-                    regions.push(region);
+                    if !spans.is_empty() {
+                        let region = Region::new(CompoundCurve::new(spans), vec![]);
+                        regions.push(region);
+                    }
                 }
                 None => {
                     break;
