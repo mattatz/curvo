@@ -1,3 +1,6 @@
+use std::cmp::Ordering;
+
+use itertools::Itertools;
 use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, U1};
 
 use crate::{
@@ -18,7 +21,7 @@ impl<T: FloatingPoint, D: DimName> CompoundCurve<T, D>
 where
     DefaultAllocator: Allocator<D>,
 {
-    pub fn new(mut spans: Vec<NurbsCurve<T, D>>) -> Self
+    pub fn new(spans: Vec<NurbsCurve<T, D>>) -> Self
     where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
@@ -26,27 +29,49 @@ where
         let eps = T::from_f64(1e-5).unwrap();
 
         // Ensure the adjacent spans are connected in the forward direction.
-        let n = spans.len();
-        for i in 0..(n - 1) {
-            let a = &spans[i];
-            let b = &spans[i + 1];
-            let direction = Direction::new(a, b, eps);
-            match direction {
-                Direction::Forward => {}
-                Direction::Backward => {
-                    spans[i].invert();
-                    spans[i + 1].invert();
+        let mut curves = spans.clone();
+        let mut connected = vec![curves.remove(0)];
+        while !curves.is_empty() {
+            let current = connected.len() - 1;
+            let last = &connected[current];
+            let found =
+                curves
+                    .iter()
+                    .enumerate()
+                    .find_map(|(i, c)| match Direction::new(last, c, eps) {
+                        Some(direction) => Some((i, direction)),
+                        None => None,
+                    });
+            match found {
+                Some((index, direction)) => {
+                    let next = curves.remove(index);
+                    match direction {
+                        Direction::Forward => {
+                            connected.push(next);
+                        }
+                        Direction::Backward => {
+                            connected.insert(current, next);
+                        }
+                        Direction::Facing => {
+                            connected.push(next.inverse());
+                        }
+                        Direction::Opposite => {
+                            if current == 0 {
+                                connected.insert(current, next.inverse());
+                            } else {
+                                println!("Cannot handle opposite direction");
+                            }
+                        }
+                    }
                 }
-                Direction::Facing => {
-                    spans[i + 1].invert();
-                }
-                Direction::Opposite => {
-                    spans[i].invert();
+                None => {
+                    println!("No connection found");
+                    break;
                 }
             }
         }
 
-        Self { spans }
+        Self { spans: connected }
     }
 
     pub fn spans(&self) -> &[NurbsCurve<T, D>] {
@@ -93,7 +118,7 @@ where
 }
 
 /// Direction of the two connected curves.
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 enum Direction {
     Forward,  // -> ->
     Backward, // <- <-
@@ -106,7 +131,7 @@ impl Direction {
         a: &NurbsCurve<T, D>,
         b: &NurbsCurve<T, D>,
         epsilon: T,
-    ) -> Self
+    ) -> Option<Self>
     where
         DefaultAllocator: Allocator<D>,
         D: DimNameSub<U1>,
@@ -116,18 +141,16 @@ impl Direction {
         let bd = b.knots_domain();
         let (a0, a1) = (a.point_at(ad.0), a.point_at(ad.1));
         let (b0, b1) = (b.point_at(bd.0), b.point_at(bd.1));
-        let d10 = &a1 - &b0;
-        if d10.norm() < epsilon {
-            return Self::Forward;
-        }
-        let d01 = &a0 - &b1;
-        if d01.norm() < epsilon {
-            return Self::Backward;
-        }
-        let d11 = &a1 - &b1;
-        if d11.norm() < epsilon {
-            return Self::Facing;
-        }
-        Self::Opposite
+        let directions = [
+            ((&a1 - &b0).norm(), Self::Forward),
+            ((&a0 - &b1).norm(), Self::Backward),
+            ((&a1 - &b1).norm(), Self::Facing),
+            ((&a0 - &b0).norm(), Self::Opposite),
+        ];
+
+        directions
+            .iter()
+            .min_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal))
+            .and_then(|min| if min.0 < epsilon { Some(min.1) } else { None })
     }
 }
