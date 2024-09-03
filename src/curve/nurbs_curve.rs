@@ -11,8 +11,6 @@ use nalgebra::{
     DimNameSub, DimNameSum, Matrix2, OMatrix, OPoint, OVector, RealField, Rotation3, UnitVector3,
     Vector2, Vector3, U1,
 };
-use rand::rngs::ThreadRng;
-use rand::Rng;
 use simba::scalar::SupersetOf;
 
 use crate::intersection::curve_intersection::CurveIntersection;
@@ -22,7 +20,7 @@ use crate::intersection::{
 use crate::misc::binomial::Binomial;
 use crate::misc::frenet_frame::FrenetFrame;
 use crate::misc::transformable::Transformable;
-use crate::misc::trigonometry::{segment_closest_point, three_points_are_flat};
+use crate::misc::trigonometry::segment_closest_point;
 use crate::misc::Ray;
 use crate::prelude::{BoundingBoxTraversal, CurveLengthParameter, Invertible, KnotVector};
 use crate::{misc::FloatingPoint, ClosestParameterNewton, ClosestParameterProblem};
@@ -249,63 +247,6 @@ where
             points.push((t, self.point_at(t)));
         }
         points
-    }
-
-    /// Tessellate the curve using an adaptive algorithm
-    /// this `adaptive` means that the curve will be tessellated based on the curvature of the curve
-    pub fn tessellate(&self, tolerance: Option<T>) -> Vec<OPoint<T, DimNameDiff<D, U1>>>
-    where
-        D: DimNameSub<U1>,
-        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
-    {
-        if self.degree == 1 {
-            return self.dehomogenized_control_points();
-        }
-
-        let mut rng = rand::thread_rng();
-        let tol = tolerance.unwrap_or(T::from_f64(1e-3).unwrap());
-        let (start, end) = self.knots_domain();
-        self.tessellate_adaptive(start, end, tol, &mut rng)
-    }
-
-    /// Tessellate the curve using an adaptive algorithm recursively
-    /// if the curve between [start ~ end] is flat enough, it will return the two end points
-    fn tessellate_adaptive(
-        &self,
-        start: T,
-        end: T,
-        tol: T,
-        rng: &mut ThreadRng,
-    ) -> Vec<OPoint<T, DimNameDiff<D, U1>>>
-    where
-        D: DimNameSub<U1>,
-        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
-    {
-        let p1 = self.point_at(start);
-        let p3 = self.point_at(end);
-
-        let t = 0.5_f64 + 0.2_f64 * rng.gen::<f64>();
-        let delta = end - start;
-        if delta < T::from_f64(1e-8).unwrap() {
-            return vec![p1];
-        }
-
-        let mid = start + delta * T::from_f64(t).unwrap();
-        let p2 = self.point_at(mid);
-
-        let diff = &p1 - &p3;
-        let diff2 = &p1 - &p2;
-        if (diff.dot(&diff) < tol && diff2.dot(&diff2) > tol)
-            || !three_points_are_flat(&p1, &p2, &p3, tol)
-        {
-            let exact_mid = start + (end - start) * T::from_f64(0.5).unwrap();
-            let mut left_pts = self.tessellate_adaptive(start, exact_mid, tol, rng);
-            let right_pts = self.tessellate_adaptive(exact_mid, end, tol, rng);
-            left_pts.pop();
-            [left_pts, right_pts].concat()
-        } else {
-            vec![p1, p3]
-        }
     }
 
     /// Evaluate the curve at a given parameter to get a point

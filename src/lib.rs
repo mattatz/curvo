@@ -23,6 +23,8 @@ pub mod prelude {
     pub use crate::misc::*;
     pub use crate::region::*;
     pub use crate::surface::*;
-    pub use crate::tessellation::adaptive_tessellation_option::AdaptiveTessellationOptions;
-    pub use crate::tessellation::surface_tessellation::*;
+    pub use crate::tessellation::{
+        adaptive_tessellation_option::AdaptiveTessellationOptions, surface_tessellation::*,
+        Tessellation,
+    };
 }
