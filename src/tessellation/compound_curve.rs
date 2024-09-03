@@ -1,12 +1,9 @@
 use itertools::Itertools;
 use nalgebra::{
-    allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, Point2, U1,
+    allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, U1,
 };
 
-use crate::{
-    misc::FloatingPoint,
-    region::{CompoundCurve, Region},
-};
+use crate::{misc::FloatingPoint, region::CompoundCurve};
 
 use super::Tessellation;
 

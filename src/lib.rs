@@ -8,6 +8,7 @@ mod curve;
 mod intersection;
 mod knot;
 mod misc;
+mod polygon_mesh;
 mod region;
 mod surface;
 mod tessellation;
@@ -21,6 +22,7 @@ pub mod prelude {
     pub use crate::intersection::*;
     pub use crate::knot::*;
     pub use crate::misc::*;
+    pub use crate::polygon_mesh::*;
     pub use crate::region::*;
     pub use crate::surface::*;
     pub use crate::tessellation::{

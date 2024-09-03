@@ -1,6 +1,5 @@
 use std::cmp::Ordering;
 
-use itertools::Itertools;
 use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, U1};
 
 use crate::{
@@ -34,14 +33,10 @@ where
         while !curves.is_empty() {
             let current = connected.len() - 1;
             let last = &connected[current];
-            let found =
-                curves
-                    .iter()
-                    .enumerate()
-                    .find_map(|(i, c)| match Direction::new(last, c, eps) {
-                        Some(direction) => Some((i, direction)),
-                        None => None,
-                    });
+            let found = curves
+                .iter()
+                .enumerate()
+                .find_map(|(i, c)| Direction::new(last, c, eps).map(|direction| (i, direction)));
             match found {
                 Some((index, direction)) => {
                     let next = curves.remove(index);
