@@ -1,8 +1,10 @@
-use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, U1};
+use nalgebra::{
+    allocator::Allocator, Const, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OMatrix, U1,
+};
 
 use crate::{
     curve::NurbsCurve,
-    misc::{FloatingPoint, Invertible},
+    misc::{FloatingPoint, Invertible, Transformable},
 };
 
 use super::curve_direction::CurveDirection;
@@ -108,5 +110,25 @@ where
 {
     fn from(value: NurbsCurve<T, D>) -> Self {
         Self::new(vec![value])
+    }
+}
+
+impl<'a, T: FloatingPoint, const D: usize> Transformable<&'a OMatrix<T, Const<D>, Const<D>>>
+    for CompoundCurve<T, Const<D>>
+{
+    fn transform(&mut self, transform: &'a OMatrix<T, Const<D>, Const<D>>) {
+        self.spans
+            .iter_mut()
+            .for_each(|span| span.transform(transform));
+    }
+}
+
+impl<T: FloatingPoint, D: DimName> Invertible for CompoundCurve<T, D>
+where
+    DefaultAllocator: Allocator<D>,
+{
+    fn invert(&mut self) {
+        self.spans.iter_mut().for_each(|span| span.invert());
+        self.spans.reverse();
     }
 }
