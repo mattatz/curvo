@@ -26,4 +26,17 @@ where
     pub fn faces(&self) -> &[[usize; 3]] {
         &self.faces
     }
+
+    pub fn triangles(&self) -> Vec<[OPoint<T, D>; 3]> {
+        self.faces
+            .iter()
+            .map(|[a, b, c]| {
+                [
+                    self.vertices[*a].clone(),
+                    self.vertices[*b].clone(),
+                    self.vertices[*c].clone(),
+                ]
+            })
+            .collect()
+    }
 }

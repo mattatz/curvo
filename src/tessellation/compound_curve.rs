@@ -20,7 +20,11 @@ where
         let tessellated = self
             .spans()
             .iter()
-            .flat_map(|span| span.tessellate(tolerance))
+            .flat_map(|span| {
+                let mut tess = span.tessellate(tolerance);
+                tess.pop();
+                tess
+            })
             .collect_vec();
         tessellated
     }
