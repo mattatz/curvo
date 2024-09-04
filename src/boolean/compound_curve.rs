@@ -10,7 +10,7 @@ use crate::{
 
 use super::Boolean;
 
-/// Boolean operation for compound curve & nurbs curve
+/// Boolean operation for compound curve & NURBS curve
 impl<'a, T: FloatingPoint + ArgminFloat> Boolean<&'a NurbsCurve<T, Const<3>>>
     for CompoundCurve<T, Const<3>>
 where

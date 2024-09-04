@@ -19,4 +19,8 @@ impl<P, T> CurveIntersection<P, T> {
     pub fn b(&self) -> &(P, T) {
         &self.b
     }
+
+    pub fn as_tuple(self) -> ((P, T), (P, T)) {
+        (self.a, self.b)
+    }
 }

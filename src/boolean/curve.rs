@@ -15,7 +15,7 @@ use crate::{
     region::{CompoundCurve, Region},
 };
 
-/// Boolean operation for two nurbs curves.
+/// Boolean operation for two NURBS curves.
 impl<'a, T: FloatingPoint + ArgminFloat> Boolean<&'a NurbsCurve<T, Const<3>>>
     for NurbsCurve<T, Const<3>>
 where
@@ -64,9 +64,11 @@ where
             }
         };
 
-        if intersections.len() % 2 == 1 {
-            println!("odd number of intersections");
-        }
+        anyhow::ensure!(
+            intersections.len() % 2 == 0,
+            "found odd number of intersections: {}",
+            intersections.len()
+        );
 
         let indexed = intersections.into_iter().enumerate().collect_vec();
 
