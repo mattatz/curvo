@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use argmin::core::ArgminFloat;
 use itertools::Itertools;
-use nalgebra::{ComplexField, Const, Point2, Vector2};
+use nalgebra::{Const, Point2, Vector2, U3};
 use num_traits::Float;
 
 use crate::{
@@ -51,85 +51,93 @@ impl<T: FloatingPoint + ArgminFloat> Contains<T, Const<2>> for NurbsCurve<T, Con
         }
 
         let size = bb.size();
-        let dx = Vector2::x();
-        let sx = Float::abs(size.dot(&dx));
 
         // curve & ray intersections
-        let ray = NurbsCurve::polyline(&[*point, point + dx * sx * T::from_f64(2.).unwrap()]);
+        match x_ray_intersection(self, point, size.x * T::from_f64(2.).unwrap(), option) {
+            Ok(its) => Ok(its.len() % 2 == 1),
+            Err(e) => Err(e),
+        }
+    }
+}
 
-        let option = option.unwrap_or_default();
-        let traversed = BoundingBoxTraversal::try_traverse(
-            self,
-            &ray,
-            Some(
-                self.knots_domain_interval() / T::from_usize(option.knot_domain_division).unwrap(),
-            ),
-            Some(ray.knots_domain_interval() / T::from_usize(option.knot_domain_division).unwrap()),
-        )?;
+pub fn x_ray_intersection<T: FloatingPoint + ArgminFloat>(
+    curve: &NurbsCurve<T, U3>,
+    point: &Point2<T>,
+    ray_length: T,
+    option: Option<CurveIntersectionSolverOptions<T>>,
+) -> anyhow::Result<Vec<Point2<T>>> {
+    let option = option.unwrap_or_default();
+    let ray = NurbsCurve::polyline(&[*point, point + Vector2::x() * ray_length]);
+    let traversed = BoundingBoxTraversal::try_traverse(
+        curve,
+        &ray,
+        Some(curve.knots_domain_interval() / T::from_usize(option.knot_domain_division).unwrap()),
+        Some(ray.knots_domain_interval() / T::from_usize(1).unwrap()),
+    )?;
 
-        let mut intersections = traversed
-            .pairs()
-            .iter()
-            .filter_map(|(item, _)| {
-                let curve = item.curve();
-                let (start, end) = curve.knots_domain();
-                let p_start = self.point_at(start);
-                let p_end = self.point_at(end);
+    let mut intersections = traversed
+        .pairs()
+        .iter()
+        .filter_map(|(item, _)| {
+            let curve = item.curve();
+            let (start, end) = curve.knots_domain();
+            let p_start = curve.point_at(start);
+            let p_end = curve.point_at(end);
 
-                if p_start.x < point.x && p_end.x < point.x {
+            if p_start.x < point.x && p_end.x < point.x {
+                return None;
+            }
+
+            let y_forward = match (point.y < p_start.y, point.y < p_end.y) {
+                (true, true) | (false, false) => {
                     return None;
                 }
+                (false, true) => true,
+                (true, false) => false,
+            };
 
-                let y_forward = match (point.y < p_start.y, point.y < p_end.y) {
-                    (true, true) | (false, false) => {
-                        return None;
-                    }
-                    (false, true) => true,
-                    (true, false) => false,
-                };
+            // binary search for the intersection
+            let mut min = start;
+            let mut max = end;
+            for _i in 0..option.max_iters {
+                let t = (min + max) / T::from_f64(2.).unwrap();
+                let p = curve.point_at(t);
+                let dy = p.y - point.y;
 
-                // binary search for the intersection
-                let mut min = start;
-                let mut max = end;
-                for _i in 0..option.max_iters {
-                    let t = (min + max) / T::from_f64(2.).unwrap();
-                    let p = curve.point_at(t);
-                    let dy = p.y - point.y;
-
-                    if ComplexField::abs(dy) < option.minimum_distance {
-                        return Some((p, t));
-                    }
-
-                    let over = dy > T::zero();
-                    let over = if y_forward { over } else { !over };
-                    if over {
-                        max = t;
-                    } else {
-                        min = t;
-                    }
+                if Float::abs(dy) < option.minimum_distance {
+                    return Some((p, t));
                 }
 
-                None
-            })
-            .filter(|(p, _)| point.x <= p.x)
-            .collect_vec();
-
-        intersections.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(Ordering::Equal));
-
-        let parameter_minimum_distance = T::from_f64(1e-2).unwrap();
-        let filtered = intersections
-            .iter()
-            .coalesce(|x, y| {
-                // merge intersections that are close in parameter space
-                let dt = y.1 - x.1;
-                if dt < parameter_minimum_distance {
-                    Ok(x)
+                let over = dy > T::zero();
+                let over = if y_forward { over } else { !over };
+                if over {
+                    max = t;
                 } else {
-                    Err((x, y))
+                    min = t;
                 }
-            })
-            .collect_vec();
+            }
 
-        Ok(filtered.len() % 2 == 1)
-    }
+            None
+        })
+        .filter(|(p, _)| point.x <= p.x)
+        .collect_vec();
+
+    intersections.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(Ordering::Equal));
+
+    let parameter_minimum_distance = T::from_f64(1e-2).unwrap();
+    let filtered = intersections
+        .into_iter()
+        .coalesce(|x, y| {
+            // merge intersections that are close in parameter space
+            let dt = y.1 - x.1;
+            if dt < parameter_minimum_distance {
+                Ok(x)
+            } else {
+                Err((x, y))
+            }
+        })
+        .map(|p| p.0)
+        .collect_vec();
+
+    Ok(filtered)
 }

@@ -7,7 +7,7 @@ use gauss_quad::GaussLegendre;
 use itertools::Itertools;
 use nalgebra::allocator::Allocator;
 use nalgebra::{
-    ComplexField, Const, DMatrix, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff,
+    Const, DMatrix, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff,
     DimNameSub, DimNameSum, Matrix2, OMatrix, OPoint, OVector, RealField, Rotation3, UnitVector3,
     Vector2, Vector3, U1,
 };

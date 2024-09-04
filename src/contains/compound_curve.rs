@@ -3,6 +3,7 @@ use itertools::Itertools;
 use nalgebra::{Const, Point2};
 
 use crate::{
+    contains::curve::x_ray_intersection,
     misc::FloatingPoint,
     prelude::{BoundingBox, CurveIntersectionSolverOptions},
     region::CompoundCurve,
@@ -38,105 +39,31 @@ impl<T: FloatingPoint + ArgminFloat> Contains<T, Const<2>> for CompoundCurve<T, 
             return Ok(false);
         }
 
-        let closest = self.find_closest_point(point)?;
-        let delta = closest - point;
-        let distance = delta.norm();
-        if distance
-            < option
-                .as_ref()
-                .map(|opt| opt.minimum_distance)
-                .unwrap_or(T::from_f64(1e-6).unwrap())
-        {
+        let on_boundary = self
+            .find_closest_point(point)
+            .map(|closest| {
+                let delta = closest - point;
+                let distance = delta.norm();
+                distance
+                    < option
+                        .as_ref()
+                        .map(|opt| opt.minimum_distance)
+                        .unwrap_or(T::from_f64(1e-6).unwrap())
+            })
+            .unwrap_or(false);
+        if on_boundary {
             return Ok(true);
         }
 
-        /*
         let size = bb.size();
-        let dx = Vector2::x();
-        let sx = ComplexField::abs(size.dot(&dx));
-
-        // curve & ray intersections
-        let ray = NurbsCurve::polyline(&[
-            *point,
-            point + dx * (ComplexField::abs(delta.x) + sx * T::from_f64(2.).unwrap()),
-        ]);
-
-        let option = option.unwrap_or_default();
-        let traversed = BoundingBoxTraversal::try_traverse(
-            self,
-            &ray,
-            Some(
-                self.knots_domain_interval() / T::from_usize(option.knot_domain_division).unwrap(),
-            ),
-            Some(ray.knots_domain_interval() / T::from_usize(option.knot_domain_division).unwrap()),
-        )?;
-
-        let mut intersections = traversed
-            .pairs()
+        let sx = size.x * T::from_f64(2.).unwrap();
+        let intersections: anyhow::Result<Vec<_>> = self
+            .spans()
             .iter()
-            .filter_map(|(item, _)| {
-                let curve = item.curve();
-                let (start, end) = curve.knots_domain();
-                let p_start = self.point_at(start);
-                let p_end = self.point_at(end);
+            .map(|span| x_ray_intersection(span, point, sx, option.clone()))
+            .collect();
 
-                if p_start.x < point.x && p_end.x < point.x {
-                    return None;
-                }
-
-                let y_forward = match (point.y < p_start.y, point.y < p_end.y) {
-                    (true, true) | (false, false) => {
-                        return None;
-                    }
-                    (false, true) => true,
-                    (true, false) => false,
-                };
-
-                // binary search for the intersection
-                let mut min = start;
-                let mut max = end;
-                for _i in 0..option.max_iters {
-                    let t = (min + max) / T::from_f64(2.).unwrap();
-                    let p = curve.point_at(t);
-                    let dy = p.y - point.y;
-
-                    if ComplexField::abs(dy) < option.minimum_distance {
-                        return Some((p, t));
-                    }
-
-                    let over = dy > T::zero();
-                    let over = if y_forward { over } else { !over };
-                    if over {
-                        max = t;
-                    } else {
-                        min = t;
-                    }
-                }
-
-                None
-            })
-            .filter(|(p, _)| point.x <= p.x)
-            .collect_vec();
-
-        intersections.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(Ordering::Equal));
-
-        let parameter_minimum_distance = T::from_f64(1e-2).unwrap();
-        let filtered = intersections
-            .iter()
-            .coalesce(|x, y| {
-                // merge intersections that are close in parameter space
-                let dt = y.1 - x.1;
-                if dt < parameter_minimum_distance {
-                    Ok(x)
-                } else {
-                    Err((x, y))
-                }
-            })
-            .collect_vec();
-
-        Ok(filtered.len() % 2 == 1)
-        */
-
-        todo!();
+        let count = intersections?.iter().map(|its| its.len()).sum::<usize>();
+        Ok(count % 2 == 1)
     }
 }
