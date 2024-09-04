@@ -1399,9 +1399,7 @@ where
         let mut min = <T as RealField>::max_value().unwrap();
         let mut u = min_u;
 
-        let closed =
-            (&self.control_points[0] - &self.control_points[self.control_points.len() - 1]).norm()
-                < T::default_epsilon();
+        let closed = self.is_closed();
 
         for i in 0..pts.len() - 1 {
             let u0 = pts[i].0;
@@ -1423,10 +1421,16 @@ where
         let res = Executor::new(ClosestParameterProblem::new(point, self), solver)
             .configure(|state| state.param(u).max_iters(5))
             .run()?;
-        res.state()
-            .get_best_param()
-            .cloned()
-            .ok_or(anyhow::anyhow!("No best parameter found"))
+        match res.state().get_best_param().cloned() {
+            Some(t) => {
+                if t.is_finite() {
+                    Ok(t)
+                } else {
+                    Err(anyhow::anyhow!("No best parameter found"))
+                }
+            }
+            _ => Err(anyhow::anyhow!("No best parameter found")),
+        }
     }
 
     /// Find the intersection points with another curve by gauss-newton line search
