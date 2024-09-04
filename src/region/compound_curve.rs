@@ -1,8 +1,10 @@
+use std::cmp::Ordering;
+
 use argmin::core::ArgminFloat;
 use itertools::Itertools;
 use nalgebra::{
-    allocator::Allocator, ComplexField, Const, DefaultAllocator, DimName, DimNameDiff, DimNameSub,
-    OMatrix, OPoint, U1,
+    allocator::Allocator, Const, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OMatrix,
+    OPoint, U1,
 };
 use num_traits::Float;
 
@@ -10,8 +12,7 @@ use crate::{
     curve::NurbsCurve,
     misc::{FloatingPoint, Invertible, Transformable},
     prelude::{
-        compound_curve_intersection::CompoundCurveIntersection, CurveIntersection,
-        CurveIntersectionSolverOptions,
+        compound_curve_intersection::CompoundCurveIntersection, CurveIntersectionSolverOptions,
     },
 };
 
@@ -111,6 +112,51 @@ where
             self.spans.iter().map(|span| span.try_length()).collect();
         let total = lengthes?.iter().fold(T::zero(), |a, b| a + *b);
         Ok(total)
+    }
+
+    /// Find the closest point on the curve to a given point
+    /// # Example
+    /// ```
+    /// use nalgebra::{Point2, Vector2};
+    /// use curvo::prelude::*;
+    /// use std::f64::consts::{PI, TAU};
+    /// use approx::assert_relative_eq;
+    /// let o = Point2::origin();
+    /// let dx = Vector2::x();
+    /// let dy = Vector2::y();
+    /// let compound = CompoundCurve::new(vec![
+    ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., 0., PI).unwrap(),
+    ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., PI, TAU).unwrap(),
+    /// ]);
+    /// assert_relative_eq!(compound.find_closest_point(&Point2::new(3.0, 0.0)).unwrap(), Point2::new(1., 0.));
+    /// ```
+    pub fn find_closest_point(
+        &self,
+        point: &OPoint<T, DimNameDiff<D, U1>>,
+    ) -> anyhow::Result<OPoint<T, DimNameDiff<D, U1>>>
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+        T: ArgminFloat,
+    {
+        let res: anyhow::Result<Vec<_>> = self
+            .spans
+            .iter()
+            .map(|span| span.find_closest_point(point))
+            .collect();
+        let res = res?;
+        let closest = res
+            .into_iter()
+            .map(|pt| {
+                let delta = &pt - point;
+                let distance = delta.norm_squared();
+                (pt, distance)
+            })
+            .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(Ordering::Equal));
+        match closest {
+            Some(closest) => Ok(closest.0),
+            _ => Err(anyhow::anyhow!("Failed to find the closest point")),
+        }
     }
 
     /// Find the intersection points with another curve
@@ -218,9 +264,7 @@ where
 mod tests {
     use std::f64::consts::{PI, TAU};
 
-    use approx::assert_relative_eq;
-    use itertools::Itertools;
-    use nalgebra::{Point2, Vector2, U2, U3};
+    use nalgebra::{Point2, Vector2, U3};
 
     use crate::prelude::*;
 
@@ -253,7 +297,7 @@ mod tests {
             NurbsCurve2D::try_arc(&o, &dx, &dy, 1., 0., PI).unwrap(),
             NurbsCurve2D::try_arc(&o, &dx, &dy, 1., PI, TAU).unwrap(),
         ]);
-        let rectangle = NurbsCurve2D::polyline(&vec![
+        let rectangle = NurbsCurve2D::polyline(&[
             Point2::new(0., 2.),
             Point2::new(0., -2.),
             Point2::new(2., -2.),
@@ -270,7 +314,7 @@ mod tests {
             1e-2
         ));
 
-        let square = NurbsCurve2D::polyline(&vec![
+        let square = NurbsCurve2D::polyline(&[
             Point2::new(-1., 1.),
             Point2::new(-1., -1.),
             Point2::new(1., -1.),

@@ -1,15 +1,11 @@
-use std::cmp::Ordering;
-
 use argmin::core::ArgminFloat;
 use itertools::Itertools;
-use nalgebra::{
-    allocator::Allocator, ComplexField, Const, DefaultAllocator, DimName, OPoint, Point2, Vector2,
-};
+use nalgebra::{Const, Point2};
 
 use crate::{
-    curve::NurbsCurve,
     misc::FloatingPoint,
-    prelude::{BoundingBox, BoundingBoxTraversal, CurveIntersectionSolverOptions}, region::CompoundCurve,
+    prelude::{BoundingBox, CurveIntersectionSolverOptions},
+    region::CompoundCurve,
 };
 
 use super::Contains;
@@ -22,6 +18,17 @@ impl<T: FloatingPoint + ArgminFloat> Contains<T, Const<2>> for CompoundCurve<T, 
     /// ```
     /// use nalgebra::{Point2, Vector2};
     /// use curvo::prelude::*;
+    /// use std::f64::consts::{PI, TAU};
+    /// let o = Point2::origin();
+    /// let dx = Vector2::x();
+    /// let dy = Vector2::y();
+    /// let compound = CompoundCurve::new(vec![
+    ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., 0., PI).unwrap(),
+    ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., PI, TAU).unwrap(),
+    /// ]);
+    /// assert!(compound.contains(&Point2::new(0.0, 0.0), None).unwrap());
+    /// assert!(!compound.contains(&Point2::new(3.0, 0.), None).unwrap());
+    /// assert!(compound.contains(&Point2::new(1.0, 0.0), None).unwrap());
     /// ```
     fn contains(&self, point: &Point2<T>, option: Self::Option) -> anyhow::Result<bool> {
         // anyhow::ensure!(self.is_closed(), "Curve must be closed");
@@ -31,7 +38,6 @@ impl<T: FloatingPoint + ArgminFloat> Contains<T, Const<2>> for CompoundCurve<T, 
             return Ok(false);
         }
 
-        /*
         let closest = self.find_closest_point(point)?;
         let delta = closest - point;
         let distance = delta.norm();
@@ -44,6 +50,7 @@ impl<T: FloatingPoint + ArgminFloat> Contains<T, Const<2>> for CompoundCurve<T, 
             return Ok(true);
         }
 
+        /*
         let size = bb.size();
         let dx = Vector2::x();
         let sx = ComplexField::abs(size.dot(&dx));

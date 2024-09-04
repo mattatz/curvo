@@ -34,7 +34,7 @@ where
         let deg = intersections
             .into_iter()
             .map(|it| {
-                let deg = Degeneracy::new(&it, &it.a().0, &it.b().0);
+                let deg = Degeneracy::new(&it, it.a().0, it.b().0);
                 (it, deg)
             })
             .collect_vec();

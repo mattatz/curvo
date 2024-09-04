@@ -1,8 +1,6 @@
 pub mod compound_curve;
 pub mod curve;
 
-pub use compound_curve::*;
-pub use curve::*;
 use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, OPoint};
 
 use crate::misc::FloatingPoint;

@@ -1,6 +1,6 @@
 use argmin::core::ArgminFloat;
 use itertools::Itertools;
-use nalgebra::{ComplexField, Const, Point2, U2, U3};
+use nalgebra::{ComplexField, Const, Point2};
 
 use crate::{
     curve::NurbsCurve,

@@ -2,9 +2,7 @@ use std::cmp::Ordering;
 
 use argmin::core::ArgminFloat;
 use itertools::Itertools;
-use nalgebra::{
-    allocator::Allocator, ComplexField, Const, DefaultAllocator, DimName, OPoint, Point2, Vector2,
-};
+use nalgebra::{ComplexField, Const, Point2, Vector2};
 
 use crate::{
     curve::NurbsCurve,
