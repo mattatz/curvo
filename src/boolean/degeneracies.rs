@@ -1,11 +1,14 @@
 use argmin::core::ArgminFloat;
 use itertools::Itertools;
-use nalgebra::{ComplexField, Const, Point2};
+use nalgebra::{ComplexField, Const, Point2, U2, U3};
 
 use crate::{
     curve::NurbsCurve,
     misc::{FloatingPoint, Line},
-    prelude::{CurveIntersection, CurveIntersectionSolverOptions},
+    prelude::{
+        has_intersection_parameter::HasIntersectionParameter, CurveIntersection,
+        CurveIntersectionSolverOptions,
+    },
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -16,18 +19,18 @@ pub enum Degeneracy<T: FloatingPoint> {
 }
 
 impl<T: FloatingPoint> Degeneracy<T> {
-    pub fn new(
-        it: &CurveIntersection<Point2<T>, T>,
+    pub fn new<I: HasIntersectionParameter<T>>(
+        it: &I,
         a: &NurbsCurve<T, Const<3>>,
         b: &NurbsCurve<T, Const<3>>,
     ) -> Self {
         let parameter_eps = T::from_f64(1e-4).unwrap();
         let collinear_dot_threshold = T::from_f64(0.9975).unwrap();
-        let a0 = a.point_at(it.a().1 - parameter_eps);
-        let a1 = a.point_at(it.a().1 + parameter_eps);
+        let a0 = a.point_at(it.a_parameter() - parameter_eps);
+        let a1 = a.point_at(it.a_parameter() + parameter_eps);
         let la = Line::new(a0, a1);
-        let b0 = b.point_at(it.b().1 - parameter_eps);
-        let b1 = b.point_at(it.b().1 + parameter_eps);
+        let b0 = b.point_at(it.b_parameter() - parameter_eps);
+        let b1 = b.point_at(it.b_parameter() + parameter_eps);
         let lb = Line::new(b0, b1);
         let intersected = la.intersects(&lb);
         if !intersected {

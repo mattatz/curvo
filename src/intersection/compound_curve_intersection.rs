@@ -4,7 +4,7 @@ use nalgebra::{
 
 use crate::{curve::NurbsCurve, misc::FloatingPoint};
 
-use super::CurveIntersection;
+use super::{has_intersection_parameter::HasIntersectionParameter, CurveIntersection};
 
 type Intersection<'a, T, D> = (&'a NurbsCurve<T, D>, OPoint<T, DimNameDiff<D, U1>>, T);
 
@@ -44,5 +44,21 @@ where
 
     pub fn b(&self) -> &Intersection<'a, T, D> {
         &self.b
+    }
+}
+
+impl<'a, T: FloatingPoint, D: DimName> HasIntersectionParameter<T>
+    for CompoundCurveIntersection<'a, T, D>
+where
+    D: DimNameSub<U1>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+{
+    fn a_parameter(&self) -> T {
+        self.a.2
+    }
+
+    fn b_parameter(&self) -> T {
+        self.b.2
     }
 }

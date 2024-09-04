@@ -48,7 +48,6 @@ where
             .partition(|(_, deg)| matches!(deg, Degeneracy::None));
 
         let regular = regular.into_iter().map(|(it, _)| it).collect_vec();
-        // println!("regular: {}, degenerate: {}", regular.len(), deg.len());
         let intersections = if regular.len() % 2 == 0 {
             regular
         } else {
