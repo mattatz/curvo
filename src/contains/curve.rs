@@ -3,6 +3,7 @@ use std::cmp::Ordering;
 use argmin::core::ArgminFloat;
 use itertools::Itertools;
 use nalgebra::{ComplexField, Const, Point2, Vector2};
+use num_traits::Float;
 
 use crate::{
     curve::NurbsCurve,
@@ -33,27 +34,28 @@ impl<T: FloatingPoint + ArgminFloat> Contains<T, Const<2>> for NurbsCurve<T, Con
             return Ok(false);
         }
 
-        let closest = self.find_closest_point(point)?;
-        let delta = closest - point;
-        let distance = delta.norm();
-        if distance
-            < option
-                .as_ref()
-                .map(|opt| opt.minimum_distance)
-                .unwrap_or(T::from_f64(1e-6).unwrap())
-        {
+        let on_boundary = self
+            .find_closest_point(point)
+            .map(|closest| {
+                let delta = closest - point;
+                let distance = delta.norm();
+                distance
+                    < option
+                        .as_ref()
+                        .map(|opt| opt.minimum_distance)
+                        .unwrap_or(T::from_f64(1e-6).unwrap())
+            })
+            .unwrap_or(false);
+        if on_boundary {
             return Ok(true);
         }
 
         let size = bb.size();
         let dx = Vector2::x();
-        let sx = ComplexField::abs(size.dot(&dx));
+        let sx = Float::abs(size.dot(&dx));
 
         // curve & ray intersections
-        let ray = NurbsCurve::polyline(&[
-            *point,
-            point + dx * (ComplexField::abs(delta.x) + sx * T::from_f64(2.).unwrap()),
-        ]);
+        let ray = NurbsCurve::polyline(&[*point, point + dx * sx * T::from_f64(2.).unwrap()]);
 
         let option = option.unwrap_or_default();
         let traversed = BoundingBoxTraversal::try_traverse(
