@@ -11,6 +11,7 @@ use nalgebra::{
     DimNameSub, DimNameSum, Matrix2, OMatrix, OPoint, OVector, RealField, Rotation3, UnitVector3,
     Vector2, Vector3, U1,
 };
+use num_traits::Float;
 use simba::scalar::SupersetOf;
 
 use crate::intersection::curve_intersection::CurveIntersection;
@@ -1538,8 +1539,6 @@ where
                     Ok(r) => {
                         // println!("{}", r.state().get_termination_status());
                         r.state().get_best_param().and_then(|param| {
-                            // let a_domain = ca.knots_domain();
-                            // let b_domain = cb.knots_domain();
                             if (a_domain.0..=a_domain.1).contains(&param[0])
                                 && (b_domain.0..=b_domain.1).contains(&param[1])
                             {
@@ -1581,9 +1580,9 @@ where
             .coalesce(|x, y| {
                 let x0 = &x[x.len() - 1];
                 let y0 = &y[y.len() - 1];
-                let da = ComplexField::abs(x0.a().1 - y0.a().1);
-                // let db = ComplexField::abs(x0.b().1 - y0.b().1);
-                if da < parameter_minimum_distance {
+                let da = Float::abs(x0.a().1 - y0.a().1);
+                let db = Float::abs(x0.b().1 - y0.b().1);
+                if da < parameter_minimum_distance || db < parameter_minimum_distance {
                     // merge near parameter results
                     let group = [x, y].concat();
                     Ok(group)

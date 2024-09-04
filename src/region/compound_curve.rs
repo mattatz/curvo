@@ -1,9 +1,10 @@
 use argmin::core::ArgminFloat;
 use itertools::Itertools;
 use nalgebra::{
-    allocator::Allocator, Const, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OMatrix,
-    OPoint, U1,
+    allocator::Allocator, ComplexField, Const, DefaultAllocator, DimName, DimNameDiff, DimNameSub,
+    OMatrix, OPoint, U1,
 };
+use num_traits::Float;
 
 use crate::{
     curve::NurbsCurve,
@@ -137,7 +138,37 @@ where
                     })
             })
             .collect();
-        Ok(res?.into_iter().flatten().collect())
+
+        let mut res = res?;
+        let eps = T::from_f64(1e-2).unwrap();
+
+        /*
+        res.iter().for_each(|it| {
+            let pts = it.iter().map(|i| &i.a().1).collect_vec();
+            println!("{:?}", pts);
+        });
+        */
+
+        (0..res.len()).circular_tuple_windows().for_each(|(a, b)| {
+            if a != b {
+                let ia = res[a].last();
+                let ib = res[b].first();
+                let cull = match (ia, ib) {
+                    (Some(ia), Some(ib)) => {
+                        // cull the last point in res[a] if it is too close to the first point in res[b]
+                        let da = Float::abs(ia.a().0.knots_domain().1 - ia.a().2);
+                        let db = Float::abs(ib.a().0.knots_domain().0 - ib.a().2);
+                        da < eps && db < eps
+                    }
+                    _ => false,
+                };
+                if cull {
+                    res[a].pop();
+                }
+            }
+        });
+
+        Ok(res.into_iter().flatten().collect())
     }
 }
 
@@ -188,9 +219,30 @@ mod tests {
     use std::f64::consts::{PI, TAU};
 
     use approx::assert_relative_eq;
-    use nalgebra::{Point2, Vector2};
+    use itertools::Itertools;
+    use nalgebra::{Point2, Vector2, U2, U3};
 
     use crate::prelude::*;
+
+    const OPTIONS: CurveIntersectionSolverOptions<f64> = CurveIntersectionSolverOptions {
+        minimum_distance: 1e-4,
+        knot_domain_division: 500,
+        max_iters: 1000,
+        step_size_tolerance: 1e-8,
+        cost_tolerance: 1e-10,
+    };
+
+    fn contains(
+        intersections: &[CompoundCurveIntersection<f64, U3>],
+        points: &[Point2<f64>],
+        epsilon: f64,
+    ) -> bool {
+        intersections.iter().all(|it| {
+            points
+                .iter()
+                .any(|pt| (it.a().1 - pt).norm() < epsilon || (&it.b().1 - pt).norm() < epsilon)
+        })
+    }
 
     #[test]
     fn compound_x_curve_intersection() {
@@ -201,5 +253,41 @@ mod tests {
             NurbsCurve2D::try_arc(&o, &dx, &dy, 1., 0., PI).unwrap(),
             NurbsCurve2D::try_arc(&o, &dx, &dy, 1., PI, TAU).unwrap(),
         ]);
+        let rectangle = NurbsCurve2D::polyline(&vec![
+            Point2::new(0., 2.),
+            Point2::new(0., -2.),
+            Point2::new(2., -2.),
+            Point2::new(2., 2.),
+            Point2::new(0., 2.),
+        ]);
+        let intersections = compound
+            .find_intersections(&rectangle, Some(OPTIONS))
+            .unwrap();
+        assert_eq!(intersections.len(), 2);
+        assert!(contains(
+            &intersections,
+            &[Point2::new(0., 1.), Point2::new(0., -1.)],
+            1e-2
+        ));
+
+        let square = NurbsCurve2D::polyline(&vec![
+            Point2::new(-1., 1.),
+            Point2::new(-1., -1.),
+            Point2::new(1., -1.),
+            Point2::new(1., 1.),
+            Point2::new(-1., 1.),
+        ]);
+        let intersections = compound.find_intersections(&square, Some(OPTIONS)).unwrap();
+        assert_eq!(intersections.len(), 4);
+        assert!(contains(
+            &intersections,
+            &[
+                Point2::new(1., 0.),
+                Point2::new(0., 1.),
+                Point2::new(-1., 0.),
+                Point2::new(0., -1.)
+            ],
+            1e-2
+        ));
     }
 }

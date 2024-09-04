@@ -6,6 +6,8 @@ use crate::{curve::NurbsCurve, misc::FloatingPoint};
 
 use super::CurveIntersection;
 
+type Intersection<'a, T, D> = (&'a NurbsCurve<T, D>, OPoint<T, DimNameDiff<D, U1>>, T);
+
 /// A struct representing the intersection of two curves.
 #[derive(Debug)]
 pub struct CompoundCurveIntersection<'a, T: FloatingPoint, D: DimName>
@@ -14,8 +16,8 @@ where
     DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
-    a: (&'a NurbsCurve<T, D>, OPoint<T, DimNameDiff<D, U1>>, T),
-    b: (&'a NurbsCurve<T, D>, OPoint<T, DimNameDiff<D, U1>>, T),
+    a: Intersection<'a, T, D>,
+    b: Intersection<'a, T, D>,
 }
 
 impl<'a, T: FloatingPoint, D: DimName> CompoundCurveIntersection<'a, T, D>
@@ -34,5 +36,13 @@ where
             a: (a, pa, ta),
             b: (b, pb, tb),
         }
+    }
+
+    pub fn a(&self) -> &Intersection<'a, T, D> {
+        &self.a
+    }
+
+    pub fn b(&self) -> &Intersection<'a, T, D> {
+        &self.b
     }
 }
