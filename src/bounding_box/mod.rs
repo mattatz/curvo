@@ -9,7 +9,7 @@ use nalgebra::{
 };
 use simba::scalar::SupersetOf;
 
-use crate::{curve::nurbs_curve::NurbsCurve, misc::FloatingPoint};
+use crate::{curve::nurbs_curve::NurbsCurve, misc::FloatingPoint, region::CompoundCurve};
 
 /// A struct representing a bounding box in D space.
 #[derive(Clone, Debug)]
@@ -194,5 +194,21 @@ where
     fn from(value: &'a NurbsCurve<T, D>) -> Self {
         let pts = value.dehomogenized_control_points();
         Self::new_with_points(pts)
+    }
+}
+
+impl<'a, T: FloatingPoint, D: DimName> From<&'a CompoundCurve<T, D>>
+    for BoundingBox<T, DimNameDiff<D, U1>>
+where
+    DefaultAllocator: Allocator<D>,
+    D: DimNameSub<U1>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+{
+    fn from(value: &'a CompoundCurve<T, D>) -> Self {
+        let pts = value
+            .spans()
+            .iter()
+            .flat_map(|span| span.dehomogenized_control_points());
+        Self::from_iter(pts)
     }
 }
