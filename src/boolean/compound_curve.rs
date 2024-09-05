@@ -8,6 +8,7 @@ use crate::{
     region::{CompoundCurve, Region},
 };
 
+use super::clip::clip;
 use super::Boolean;
 
 /// Boolean operation for compound curve & NURBS curve
@@ -22,11 +23,10 @@ where
     fn boolean(
         &self,
         operation: super::operation::BooleanOperation,
-        clip: &'a NurbsCurve<T, Const<3>>,
+        other: &'a NurbsCurve<T, Const<3>>,
         option: Self::Option,
     ) -> Self::Output {
-        let intersections = self.find_intersections(clip, option.clone())?;
-
-        todo!()
+        let intersections = self.find_intersections(other, option.clone())?;
+        clip(self, other, operation, option, intersections)
     }
 }
