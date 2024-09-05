@@ -26,8 +26,8 @@ pub fn clip<'a, T: FloatingPoint, S, C, O: Clone>(
     intersections: Vec<CompoundCurveIntersection<'a, T, U3>>,
 ) -> anyhow::Result<Vec<Region<T>>>
 where
-    S: Clone + Contains<T, U2, O> + EndPoints<T, U2> + Into<CompoundCurve<T, U3>>,
-    C: Clone + Contains<T, U2, O> + EndPoints<T, U2> + Into<CompoundCurve<T, U3>>,
+    S: Clone + Contains<T, U2, Option = O> + EndPoints<T, U2> + Into<CompoundCurve<T, U3>>,
+    C: Clone + Contains<T, U2, Option = O> + EndPoints<T, U2> + Into<CompoundCurve<T, U3>>,
 {
     let deg = intersections
         .into_iter()

@@ -11,10 +11,9 @@ use crate::{
 
 use super::Contains;
 
-impl<T: FloatingPoint + ArgminFloat>
-    Contains<T, Const<2>, Option<CurveIntersectionSolverOptions<T>>>
-    for CompoundCurve<T, Const<3>>
-{
+impl<T: FloatingPoint + ArgminFloat> Contains<T, Const<2>> for CompoundCurve<T, Const<3>> {
+    type Option = Option<CurveIntersectionSolverOptions<T>>;
+
     /// Determine if a point is inside a closed curve by ray casting method.
     /// # Example
     /// ```
@@ -32,11 +31,7 @@ impl<T: FloatingPoint + ArgminFloat>
     /// assert!(!compound.contains(&Point2::new(3.0, 0.), None).unwrap());
     /// assert!(compound.contains(&Point2::new(1.0, 0.0), None).unwrap());
     /// ```
-    fn contains(
-        &self,
-        point: &Point2<T>,
-        option: Option<CurveIntersectionSolverOptions<T>>,
-    ) -> anyhow::Result<bool> {
+    fn contains(&self, point: &Point2<T>, option: Self::Option) -> anyhow::Result<bool> {
         // anyhow::ensure!(self.is_closed(), "Curve must be closed");
 
         let bb: BoundingBox<T, Const<2>> = self.into();
