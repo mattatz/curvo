@@ -1,7 +1,13 @@
-use curvo::prelude::{KnotStyle, NurbsCurve2D};
+use std::f64::consts::{PI, TAU};
+
+use curvo::prelude::{CompoundCurve, KnotStyle, NurbsCurve2D};
 use nalgebra::{Point2, Vector2};
 
-pub fn circle_rectangle_case() -> (NurbsCurve2D<f64>, NurbsCurve2D<f64>) {
+use super::CurveVariant;
+
+pub type CurveVariants = (CurveVariant, CurveVariant);
+
+pub fn circle_rectangle_case() -> CurveVariants {
     let dx = 2.25;
     let dy = 0.5;
     let subject =
@@ -15,10 +21,10 @@ pub fn circle_rectangle_case() -> (NurbsCurve2D<f64>, NurbsCurve2D<f64>) {
         Point2::new(-dx, -dy),
     ]);
 
-    (subject, clip)
+    (subject.into(), clip.into())
 }
 
-pub fn periodic_interpolation_case() -> (NurbsCurve2D<f64>, NurbsCurve2D<f64>) {
+pub fn periodic_interpolation_case() -> CurveVariants {
     let dx = 2.25;
     let dy = 0.5;
     let subject = NurbsCurve2D::<f64>::try_periodic_interpolate(
@@ -34,10 +40,10 @@ pub fn periodic_interpolation_case() -> (NurbsCurve2D<f64>, NurbsCurve2D<f64>) {
         KnotStyle::Centripetal,
     )
     .unwrap();
-    (subject.clone(), subject)
+    (subject.clone().into(), subject.into())
 }
 
-pub fn island_case() -> (NurbsCurve2D<f64>, NurbsCurve2D<f64>) {
+pub fn island_case() -> CurveVariants {
     let dx = 1.25;
     let dy = 1.5;
     let subject = NurbsCurve2D::<f64>::try_periodic_interpolate(
@@ -60,5 +66,23 @@ pub fn island_case() -> (NurbsCurve2D<f64>, NurbsCurve2D<f64>) {
         Point2::new(-1., 1.),
         Point2::new(-1., -1.),
     ]);
-    (subject, clip)
+    (subject.into(), clip.into())
+}
+
+pub fn compound_circle_and_rectangle_case() -> CurveVariants {
+    let o = Point2::origin();
+    let dx = Vector2::x();
+    let dy = Vector2::y();
+    let compound = CompoundCurve::new(vec![
+        NurbsCurve2D::try_arc(&o, &dx, &dy, 1., 0., PI).unwrap(),
+        NurbsCurve2D::try_arc(&o, &dx, &dy, 1., PI, TAU).unwrap(),
+    ]);
+    let rectangle = NurbsCurve2D::polyline(&[
+        Point2::new(0., 2.),
+        Point2::new(0., -2.),
+        Point2::new(2., -2.),
+        Point2::new(2., 2.),
+        Point2::new(0., 2.),
+    ]);
+    (compound.into(), rectangle.into())
 }

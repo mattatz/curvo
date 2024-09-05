@@ -1,13 +1,15 @@
 use bevy::{
     prelude::*,
-    render::mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
+    render::mesh::{PrimitiveTopology, VertexAttributeValues},
     window::close_on_esc,
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
 
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_normal_material::{material::NormalMaterial, plugin::NormalMaterialPlugin};
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use bevy_points::{mesh::PointsMesh, plugin::PointsPlugin, prelude::PointsMaterial};
+use boolean::CurveVariant;
 use itertools::Itertools;
 use materials::*;
 use nalgebra::{Rotation2, Translation2};
@@ -18,7 +20,6 @@ mod systems;
 
 use curvo::prelude::*;
 use operation::BooleanOperation;
-use status::Status;
 use systems::screenshot_on_spacebar;
 
 fn main() {
@@ -35,6 +36,7 @@ fn main() {
         .add_plugins(PanOrbitCameraPlugin)
         .add_plugins(PointsPlugin)
         .add_plugins(NormalMaterialPlugin)
+        .add_plugins(WorldInspectorPlugin::new())
         .add_plugins(AppPlugin)
         .run();
 }
@@ -47,12 +49,20 @@ impl Plugin for AppPlugin {
     }
 }
 
+const OPTION: CurveIntersectionSolverOptions<f64> = CurveIntersectionSolverOptions {
+    minimum_distance: 1e-4,
+    knot_domain_division: 500,
+    max_iters: 1000,
+    step_size_tolerance: 1e-8,
+    cost_tolerance: 1e-10,
+};
+
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut line_materials: ResMut<Assets<LineMaterial>>,
     mut points_materials: ResMut<Assets<PointsMaterial>>,
-    mut normal_materials: ResMut<'_, Assets<NormalMaterial>>,
+    normal_materials: ResMut<'_, Assets<NormalMaterial>>,
 ) {
     let camera = Camera3dBundle {
         projection: Projection::Perspective(PerspectiveProjection {
@@ -67,6 +77,7 @@ fn setup(
     let (subject, clip) = boolean::circle_rectangle_case();
     let (subject, clip) = boolean::periodic_interpolation_case();
     let (subject, clip) = boolean::island_case();
+    let (subject, clip) = boolean::compound_circle_and_rectangle_case();
 
     /*
     let delta: f64 = 0.46303153026000005;
@@ -75,8 +86,10 @@ fn setup(
     let delta: f64 = 1.27497772974;
     */
 
-    // let delta: f64 = 0.0;
-    let delta: f64 = 0.75;
+    let delta: f64 = 0.0;
+    // let delta: f64 = 1.25;
+    // let delta: f64 = 11.535516751980001;
+    // let delta: f64 = 10.24571248974;
     let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);
     // let clip = clip.transformed(&trans.into());
 
@@ -84,49 +97,56 @@ fn setup(
                        meshes: &mut ResMut<Assets<Mesh>>,
                        line_materials: &mut ResMut<Assets<LineMaterial>>,
                        transform: Transform,
-                       curve: &NurbsCurve2D<f64>,
+                       curve: &CurveVariant,
                        color: Option<Color>,
                        sequence: bool| {
-        let samples = curve.tessellate(Some(1e-8));
-        let line_vertices = samples
-            .iter()
-            .map(|p| p.cast::<f32>())
-            .map(|p| [p.x, p.y, 0.])
-            .collect_vec();
-        let n = line_vertices.len();
-        let line = Mesh::new(PrimitiveTopology::LineStrip, default()).with_inserted_attribute(
-            Mesh::ATTRIBUTE_POSITION,
-            VertexAttributeValues::Float32x3(line_vertices),
-        );
-        let line = if sequence {
-            let start = Color::RED;
-            let end = Color::GREEN;
-            line.with_inserted_attribute(
-                Mesh::ATTRIBUTE_COLOR,
-                VertexAttributeValues::Float32x4(
-                    (0..n)
-                        .map(|i| {
-                            let t = i as f32 / (n - 1) as f32;
-                            let c0 = start * (1. - t);
-                            let c1 = end * t;
-                            (c0 + c1).as_rgba_f32()
-                        })
-                        .collect(),
-                ),
-            )
-        } else {
-            line
+        let curves: Vec<&NurbsCurve2D<f64>> = match curve {
+            CurveVariant::Curve(c) => vec![c],
+            CurveVariant::Compound(c) => c.spans().iter().collect_vec(),
+            CurveVariant::Region(r) => todo!(),
         };
-        commands.spawn(MaterialMeshBundle {
-            mesh: meshes.add(line),
-            material: line_materials.add(LineMaterial {
-                color: color.unwrap_or(Color::WHITE.with_a(0.25)),
-                opacity: 0.6,
-                alpha_mode: AlphaMode::Blend,
+        curves.iter().for_each(|curve| {
+            let samples = curve.tessellate(Some(1e-8));
+            let line_vertices = samples
+                .iter()
+                .map(|p| p.cast::<f32>())
+                .map(|p| [p.x, p.y, 0.])
+                .collect_vec();
+            let n = line_vertices.len();
+            let line = Mesh::new(PrimitiveTopology::LineStrip, default()).with_inserted_attribute(
+                Mesh::ATTRIBUTE_POSITION,
+                VertexAttributeValues::Float32x3(line_vertices),
+            );
+            let line = if sequence {
+                let start = Color::RED;
+                let end = Color::GREEN;
+                line.with_inserted_attribute(
+                    Mesh::ATTRIBUTE_COLOR,
+                    VertexAttributeValues::Float32x4(
+                        (0..n)
+                            .map(|i| {
+                                let t = i as f32 / (n - 1) as f32;
+                                let c0 = start * (1. - t);
+                                let c1 = end * t;
+                                (c0 + c1).as_rgba_f32()
+                            })
+                            .collect(),
+                    ),
+                )
+            } else {
+                line
+            };
+            commands.spawn(MaterialMeshBundle {
+                mesh: meshes.add(line),
+                material: line_materials.add(LineMaterial {
+                    color: color.unwrap_or(Color::WHITE.with_a(0.25)),
+                    opacity: 0.6,
+                    alpha_mode: AlphaMode::Blend,
+                    ..Default::default()
+                }),
+                transform,
                 ..Default::default()
-            }),
-            transform,
-            ..Default::default()
+            });
         });
     };
 
@@ -139,6 +159,7 @@ fn setup(
         None,
         false,
     );
+
     spawn_curve(
         &mut commands,
         &mut meshes,
@@ -149,11 +170,65 @@ fn setup(
         false,
     );
 
-    let option = CurveIntersectionSolverOptions {
-        // minimum_distance: 1e-5,
-        // knot_domain_division: 1000,
-        // max_iters: 2000,
-        ..Default::default()
+    if let (CurveVariant::Curve(subject), CurveVariant::Curve(clip)) = (&subject, &clip) {
+        commands
+            .spawn(MaterialMeshBundle {
+                mesh: meshes.add(PointsMesh {
+                    vertices: [
+                        subject.point_at(subject.knots_domain().0),
+                        clip.point_at(clip.knots_domain().0),
+                    ]
+                    .iter()
+                    .map(|p| p.cast::<f32>().coords.to_homogeneous().into())
+                    .collect(),
+                    colors: Some(vec![Color::RED, Color::BLUE]),
+                    ..Default::default()
+                }),
+                material: points_materials.add(PointsMaterial {
+                    settings: bevy_points::material::PointsShaderSettings {
+                        color: Color::WHITE,
+                        point_size: 0.025,
+                        ..Default::default()
+                    },
+                    circle: true,
+                    ..Default::default()
+                }),
+                // visibility: Visibility::Hidden,
+                ..Default::default()
+            })
+            .insert(Name::new("End points"));
+
+        let intersections = subject
+            .find_intersections(clip, Some(OPTION.clone()))
+            .unwrap();
+        println!("intersections: {:?}", intersections.len());
+
+        let points = intersections
+            .iter()
+            .enumerate()
+            .flat_map(|(i, it)| {
+                let pa = it.a().0.cast::<f32>();
+                let pb = it.b().0.cast::<f32>();
+                vec![Vec3::new(pa.x, pa.y, 0.), Vec3::new(pb.x, pb.y, 0.)]
+            })
+            .collect();
+
+        commands.spawn(MaterialMeshBundle {
+            mesh: meshes.add(PointsMesh {
+                vertices: points,
+                ..Default::default()
+            }),
+            material: points_materials.add(PointsMaterial {
+                settings: bevy_points::material::PointsShaderSettings {
+                    color: Color::WHITE,
+                    point_size: 0.0025,
+                    ..Default::default()
+                },
+                circle: true,
+                ..Default::default()
+            }),
+            ..Default::default()
+        });
     };
 
     /*
@@ -236,30 +311,6 @@ fn setup(
     }
     */
 
-    commands.spawn(MaterialMeshBundle {
-        mesh: meshes.add(PointsMesh {
-            vertices: [
-                subject.point_at(subject.knots_domain().0),
-                clip.point_at(clip.knots_domain().0),
-            ]
-            .iter()
-            .map(|p| p.cast::<f32>().coords.to_homogeneous().into())
-            .collect(),
-            colors: Some(vec![Color::RED, Color::BLUE]),
-            ..Default::default()
-        }),
-        material: points_materials.add(PointsMaterial {
-            settings: bevy_points::material::PointsShaderSettings {
-                color: Color::WHITE,
-                point_size: 0.025,
-                ..Default::default()
-            },
-            circle: true,
-            ..Default::default()
-        }),
-        ..Default::default()
-    });
-
     let ops = [
         // BooleanOperation::Union,
         // BooleanOperation::Intersection,
@@ -269,38 +320,6 @@ fn setup(
     let inv_n = 1. / n as f32;
     let on = inv_n * 0.5;
     let h = n as f32 * 2.5;
-
-    let intersections = subject
-        .find_intersections(&clip, Some(option.clone()))
-        .unwrap();
-    println!("intersections: {:?}", intersections.len());
-
-    let points = intersections
-        .iter()
-        .enumerate()
-        .flat_map(|(i, it)| {
-            let pa = it.a().0.cast::<f32>();
-            let pb = it.b().0.cast::<f32>();
-            vec![Vec3::new(pa.x, pa.y, 0.), Vec3::new(pb.x, pb.y, 0.)]
-        })
-        .collect();
-
-    commands.spawn(MaterialMeshBundle {
-        mesh: meshes.add(PointsMesh {
-            vertices: points,
-            ..Default::default()
-        }),
-        material: points_materials.add(PointsMaterial {
-            settings: bevy_points::material::PointsShaderSettings {
-                color: Color::WHITE,
-                point_size: 0.0025,
-                ..Default::default()
-            },
-            circle: true,
-            ..Default::default()
-        }),
-        ..Default::default()
-    });
 
     /*
     let parameter_eps = 1e-3;
@@ -346,51 +365,14 @@ fn setup(
     */
 
     ops.into_iter().enumerate().for_each(|(i, op)| {
-        let (regions, intersections) = subject.boolean(op, &clip, Some(option.clone())).unwrap();
+        let regions = subject.boolean(op, &clip, Some(OPTION.clone())).unwrap();
         let fi = i as f32 * inv_n + on - 0.5;
         let tr = Transform::from_xyz(fi * h, 0., 0.);
-
-        let points = intersections
-            .iter()
-            .enumerate()
-            .map(|(i, it)| {
-                let pt = it.vertex().position().cast::<f32>();
-                // tr * Vec3::new(pt.x, pt.y, i as f32 * 1e-1)
-                tr * Vec3::new(pt.x, pt.y, 0.)
-            })
-            .collect();
-
-        let colors = intersections
-            .iter()
-            .map(|it| match it.status() {
-                Status::None => Color::WHITE,
-                Status::Enter => Color::BLUE,
-                Status::Exit => Color::RED,
-            })
-            .collect();
-
-        commands.spawn(MaterialMeshBundle {
-            mesh: meshes.add(PointsMesh {
-                vertices: points,
-                colors: Some(colors),
-            }),
-            material: points_materials.add(PointsMaterial {
-                settings: bevy_points::material::PointsShaderSettings {
-                    color: Color::WHITE,
-                    // point_size: 0.025,
-                    point_size: 0.05,
-                    ..Default::default()
-                },
-                circle: true,
-                ..Default::default()
-            }),
-            visibility: Visibility::Hidden,
-            ..Default::default()
-        });
 
         regions.iter().for_each(|region| {
             let tess = region.tessellate(None);
             if let Ok(tess) = tess {
+                /*
                 let mesh = Mesh::new(PrimitiveTopology::TriangleList, default())
                     .with_inserted_attribute(
                         Mesh::ATTRIBUTE_POSITION,
@@ -413,7 +395,6 @@ fn setup(
                             .flat_map(|f| f.iter().map(|i| *i as u32))
                             .collect(),
                     ));
-
                 commands
                     .spawn(MaterialMeshBundle {
                         mesh: meshes.add(mesh),
@@ -424,7 +405,8 @@ fn setup(
                         // visibility: Visibility::Hidden,
                         ..Default::default()
                     })
-                    .insert(Name::new("lofted"));
+                    .insert(Name::new("Triangulation"));
+                */
             }
 
             region
@@ -439,7 +421,7 @@ fn setup(
                         &mut line_materials,
                         tr * Transform::from_xyz(0., 0., i as f32 * 1e-1),
                         // tr,
-                        curve,
+                        &curve.clone().into(),
                         Some(Color::GREEN),
                         true,
                     );
@@ -451,7 +433,7 @@ fn setup(
                         &mut meshes,
                         &mut line_materials,
                         tr,
-                        curve,
+                        &curve.clone().into(),
                         Some(Color::RED),
                         false,
                     );

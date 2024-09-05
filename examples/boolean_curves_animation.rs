@@ -1,5 +1,3 @@
-use std::f32::consts::PI;
-
 use bevy::{
     prelude::*,
     render::mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
@@ -10,6 +8,7 @@ use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 use bevy_normal_material::{material::NormalMaterial, plugin::NormalMaterialPlugin};
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use bevy_points::{plugin::PointsPlugin, prelude::PointsMaterial};
+use boolean::CurveVariant;
 use itertools::Itertools;
 use materials::*;
 use nalgebra::{Rotation2, Translation2};
@@ -23,10 +22,18 @@ use operation::BooleanOperation;
 use systems::screenshot_on_spacebar;
 
 #[derive(Component)]
-struct ProfileCurves(NurbsCurve2D<f64>, NurbsCurve2D<f64>);
+struct ProfileCurves(CurveVariant, CurveVariant);
 
 #[derive(Component)]
 struct BooleanMesh(BooleanOperation);
+
+const OPTION: CurveIntersectionSolverOptions<f64> = CurveIntersectionSolverOptions {
+    minimum_distance: 1e-4,
+    knot_domain_division: 500,
+    max_iters: 1000,
+    step_size_tolerance: 1e-8,
+    cost_tolerance: 1e-10,
+};
 
 fn main() {
     App::new()
@@ -106,7 +113,7 @@ fn boolean(
     mut gizmos: Gizmos,
     time: Res<Time>,
     profile: Query<&ProfileCurves>,
-    booleans: Query<(&BooleanMesh, &Handle<Mesh>)>,
+    booleans: Query<(&BooleanMesh, &Handle<Mesh>, &Transform)>,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
     let delta = time.elapsed_seconds_f64() * 0.78;
@@ -120,67 +127,85 @@ fn boolean(
     if let Ok(profile) = profile.get_single() {
         let subject = &profile.0;
         let clip = profile.1.transformed(&trans.into());
-
         let tr = Transform::from_xyz(0., 5., 0.);
 
-        [subject, &clip].iter().for_each(|curve| {
-            let color = Color::rgba(1., 1., 1., 0.2);
-            let pts = curve
-                .tessellate(None)
-                .iter()
-                .map(|pt| pt.cast::<f32>())
-                .map(|pt| tr * Vec3::new(pt.x, pt.y, 0.))
-                .collect_vec();
-            gizmos.linestrip(pts, color);
+        if let (CurveVariant::Curve(subject), CurveVariant::Curve(clip)) = (subject, clip) {
+            [subject, &clip].iter().for_each(|curve| {
+                let color = Color::rgba(1., 1., 1., 0.2);
+                let pts = curve
+                    .tessellate(None)
+                    .iter()
+                    .map(|pt| pt.cast::<f32>())
+                    .map(|pt| tr * Vec3::new(pt.x, pt.y, 0.))
+                    .collect_vec();
+                gizmos.linestrip(pts, color);
 
-            let pt = curve.point_at(curve.knots_domain().0);
-            gizmos.sphere(
-                pt.coords.cast::<f32>().to_homogeneous().into(),
-                Quat::IDENTITY,
-                1e-2,
-                Color::WHITE,
-            );
-        });
+                let pt = curve.point_at(curve.knots_domain().0);
+                gizmos.sphere(
+                    pt.coords.cast::<f32>().to_homogeneous().into(),
+                    Quat::IDENTITY,
+                    1e-2,
+                    Color::WHITE,
+                );
+            });
 
-        let option = CurveIntersectionSolverOptions {
-            // minimum_distance: 1e-4,
-            // knot_domain_division: 500,
-            max_iters: 1000,
-            ..Default::default()
-        };
-
-        booleans.iter().for_each(|(BooleanMesh(op), mesh)| {
-            let regions = subject.boolean(*op, &clip, Some(option.clone()));
-            if let Ok((regions, _)) = regions {
-                let r = regions.first();
-                let m = r.and_then(|r| r.tessellate(None).ok());
-                if let Some(tess) = m {
-                    if let Some(mesh) = meshes.get_mut(mesh) {
-                        mesh.insert_attribute(
-                            Mesh::ATTRIBUTE_POSITION,
-                            VertexAttributeValues::Float32x3(
-                                tess.vertices()
+            booleans.iter().for_each(|(BooleanMesh(op), mesh, trans)| {
+                let regions = subject.boolean(*op, &clip, Some(OPTION.clone()));
+                if let Ok(regions) = regions {
+                    let r = regions.first();
+                    let m = r.and_then(|r| r.tessellate(None).ok());
+                    if let Some(tess) = m {
+                        if let Some(mesh) = meshes.get_mut(mesh) {
+                            mesh.insert_attribute(
+                                Mesh::ATTRIBUTE_POSITION,
+                                VertexAttributeValues::Float32x3(
+                                    tess.vertices()
+                                        .iter()
+                                        .map(|p| p.cast::<f32>().coords.to_homogeneous().into())
+                                        .collect(),
+                                ),
+                            );
+                            mesh.insert_attribute(
+                                Mesh::ATTRIBUTE_NORMAL,
+                                VertexAttributeValues::Float32x3(
+                                    tess.vertices().iter().map(|p| [0., 0., 1.]).collect(),
+                                ),
+                            );
+                            mesh.insert_indices(Indices::U32(
+                                tess.faces()
                                     .iter()
-                                    .map(|p| p.cast::<f32>().coords.to_homogeneous().into())
+                                    .flat_map(|f| f.iter().map(|i| *i as u32))
                                     .collect(),
-                            ),
-                        );
-                        mesh.insert_attribute(
-                            Mesh::ATTRIBUTE_NORMAL,
-                            VertexAttributeValues::Float32x3(
-                                tess.vertices().iter().map(|p| [0., 0., 1.]).collect(),
-                            ),
-                        );
-                        mesh.insert_indices(Indices::U32(
-                            tess.faces()
-                                .iter()
-                                .flat_map(|f| f.iter().map(|i| *i as u32))
-                                .collect(),
-                        ));
+                            ));
+                        }
                     }
+
+                    let trans = *trans * Transform::from_xyz(0., 0., 0.5);
+                    regions.iter().for_each(|region| {
+                        let exterior = region.exterior().tessellate(None);
+                        let pts = exterior
+                            .iter()
+                            .cycle()
+                            .take(exterior.len() + 1)
+                            .map(|pt| pt.cast::<f32>())
+                            .map(|pt| trans * Vec3::new(pt.x, pt.y, 0.))
+                            .collect_vec();
+                        gizmos.linestrip(pts, Color::TOMATO.with_a(0.5));
+                        region.interiors().iter().for_each(|interior| {
+                            let interior = interior.tessellate(None);
+                            let pts = interior
+                                .iter()
+                                .cycle()
+                                .take(interior.len() + 1)
+                                .map(|pt| pt.cast::<f32>())
+                                .map(|pt| trans * Vec3::new(pt.x, pt.y, 0.))
+                                .collect_vec();
+                            gizmos.linestrip(pts, Color::TURQUOISE.with_a(0.5));
+                        });
+                    });
                 }
-            }
-        });
+            });
+        };
 
         /*
         let intersections = subject
