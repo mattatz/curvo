@@ -1,14 +1,10 @@
-use std::{cell::RefCell, cmp::Ordering, rc::Rc};
-
 use argmin::core::ArgminFloat;
-use itertools::Itertools;
 use nalgebra::{allocator::Allocator, Const, DefaultAllocator};
 
 use crate::{
-    boolean::{degeneracies::Degeneracy, node::Node, operation::BooleanOperation},
     curve::NurbsCurve,
     misc::FloatingPoint,
-    prelude::{Contains, CurveIntersectionSolverOptions, HasIntersection},
+    prelude::CurveIntersectionSolverOptions,
     region::{CompoundCurve, Region},
 };
 

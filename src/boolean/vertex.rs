@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::borrow::{Borrow, Cow};
 
 use nalgebra::{Point2, U3};
 
@@ -20,6 +20,10 @@ impl<'a, T: FloatingPoint> Vertex<'a, T> {
             position,
             parameter,
         }
+    }
+
+    pub fn curve(&self) -> &NurbsCurve<T, U3> {
+        self.curve.borrow()
     }
 
     pub fn position(&self) -> &Point2<T> {

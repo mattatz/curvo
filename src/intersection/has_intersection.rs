@@ -1,5 +1,3 @@
-use crate::misc::FloatingPoint;
-
 ///
 pub trait HasIntersection<V, T>: HasIntersectionParameter<T> {
     fn a(&self) -> &V;

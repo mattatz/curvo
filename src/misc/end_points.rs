@@ -1,5 +1,5 @@
 use nalgebra::{
-    allocator::Allocator, DefaultAllocator, Dim, DimName, DimNameDiff, DimNameSub, OPoint, U1,
+    allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, U1,
 };
 
 use crate::{curve::NurbsCurve, region::CompoundCurve};
