@@ -1,5 +1,6 @@
 use operation::BooleanOperation;
 
+mod clip;
 pub mod compound_curve;
 pub mod curve;
 mod degeneracies;
@@ -7,6 +8,7 @@ pub mod node;
 pub mod operation;
 pub mod status;
 mod vertex;
+mod has_parameter;
 
 /// A trait for boolean operations.
 pub trait Boolean<T> {

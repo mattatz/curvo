@@ -1,15 +1,17 @@
+use std::borrow::{Borrow, Cow};
+
 use nalgebra::{
     allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, U1,
 };
 
 use crate::{curve::NurbsCurve, misc::FloatingPoint};
 
-use super::{has_intersection_parameter::HasIntersectionParameter, CurveIntersection};
+use super::{has_intersection::HasIntersection, CurveIntersection, HasIntersectionParameter};
 
-type Intersection<'a, T, D> = (&'a NurbsCurve<T, D>, OPoint<T, DimNameDiff<D, U1>>, T);
+type Intersection<'a, T, D> = (Cow<'a, NurbsCurve<T, D>>, OPoint<T, DimNameDiff<D, U1>>, T);
 
 /// A struct representing the intersection of two curves.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CompoundCurveIntersection<'a, T: FloatingPoint, D: DimName>
 where
     D: DimNameSub<U1>,
@@ -33,17 +35,17 @@ where
     ) -> Self {
         let ((pa, ta), (pb, tb)) = intersection.as_tuple();
         Self {
-            a: (a, pa, ta),
-            b: (b, pb, tb),
+            a: (Cow::Borrowed(a), pa, ta),
+            b: (Cow::Borrowed(b), pb, tb),
         }
     }
 
-    pub fn a(&self) -> &Intersection<'a, T, D> {
-        &self.a
+    pub fn a_curve(&self) -> &NurbsCurve<T, D> {
+        self.a.0.borrow()
     }
 
-    pub fn b(&self) -> &Intersection<'a, T, D> {
-        &self.b
+    pub fn b_curve(&self) -> &NurbsCurve<T, D> {
+        self.b.0.borrow()
     }
 }
 
@@ -60,5 +62,21 @@ where
 
     fn b_parameter(&self) -> T {
         self.b.2
+    }
+}
+
+impl<'a, T: FloatingPoint, D: DimName> HasIntersection<Intersection<'a, T, D>, T>
+    for CompoundCurveIntersection<'a, T, D>
+where
+    D: DimNameSub<U1>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+{
+    fn a(&self) -> &Intersection<'a, T, D> {
+        &self.a
+    }
+
+    fn b(&self) -> &Intersection<'a, T, D> {
+        &self.b
     }
 }

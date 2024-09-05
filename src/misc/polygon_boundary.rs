@@ -51,10 +51,8 @@ where
 /// assert!(curve.contains(&Point2::new(0.5, 0.5), ()).unwrap());
 /// assert!(!curve.contains(&Point2::new(0.5, 1.5), ()).unwrap());
 /// ```
-impl<T: FloatingPoint> Contains<T, Const<2>> for PolygonBoundary<T, Const<2>> {
-    type Option = ();
-
-    fn contains(&self, c: &Point2<T>, _option: Self::Option) -> anyhow::Result<bool> {
+impl<T: FloatingPoint> Contains<T, Const<2>, ()> for PolygonBoundary<T, Const<2>> {
+    fn contains(&self, c: &Point2<T>, _option: ()) -> anyhow::Result<bool> {
         let winding_number = self.vertices().iter().circular_tuple_windows().fold(
             0_i32,
             move |winding_number, (p0, p1)| {

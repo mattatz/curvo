@@ -6,8 +6,8 @@ use crate::{
     curve::NurbsCurve,
     misc::{FloatingPoint, Line},
     prelude::{
-        has_intersection_parameter::HasIntersectionParameter, CurveIntersection,
-        CurveIntersectionSolverOptions,
+        has_intersection::HasIntersection, CurveIntersection, CurveIntersectionSolverOptions,
+        HasIntersectionParameter,
     },
 };
 

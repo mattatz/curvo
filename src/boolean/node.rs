@@ -3,23 +3,21 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use crate::misc::FloatingPoint;
-
-use super::{status::Status, vertex::Vertex};
+use super::status::Status;
 
 #[derive(Debug, Clone)]
-pub struct Node<T: FloatingPoint> {
+pub struct Node<V> {
     subject: bool,
-    vertex: Vertex<T>,
-    prev: Option<Weak<RefCell<Node<T>>>>,
-    next: Option<Weak<RefCell<Node<T>>>>,
-    neighbor: Option<Weak<RefCell<Node<T>>>>,
+    vertex: V,
+    prev: Option<Weak<RefCell<Node<V>>>>,
+    next: Option<Weak<RefCell<Node<V>>>>,
+    neighbor: Option<Weak<RefCell<Node<V>>>>,
     status: Status,
     visited: bool,
 }
 
-impl<T: FloatingPoint> Node<T> {
-    pub fn new(subject: bool, vertex: Vertex<T>) -> Self {
+impl<V> Node<V> {
+    pub fn new(subject: bool, vertex: V) -> Self {
         Self {
             subject,
             vertex,
@@ -35,7 +33,7 @@ impl<T: FloatingPoint> Node<T> {
         self.subject
     }
 
-    pub fn vertex(&self) -> &Vertex<T> {
+    pub fn vertex(&self) -> &V {
         &self.vertex
     }
 

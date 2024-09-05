@@ -1,16 +1,22 @@
-use nalgebra::Point2;
+use std::borrow::Cow;
 
-use crate::misc::FloatingPoint;
+use nalgebra::{Point2, U3};
+
+use crate::{curve::NurbsCurve, misc::FloatingPoint};
+
+use super::has_parameter::HasParameter;
 
 #[derive(Debug, Clone)]
-pub struct Vertex<T: FloatingPoint> {
+pub struct Vertex<'a, T: FloatingPoint> {
+    curve: Cow<'a, NurbsCurve<T, U3>>,
     position: Point2<T>,
     parameter: T,
 }
 
-impl<T: FloatingPoint> Vertex<T> {
-    pub fn new(position: Point2<T>, parameter: T) -> Self {
+impl<'a, T: FloatingPoint> Vertex<'a, T> {
+    pub fn new(curve: &'a NurbsCurve<T, U3>, position: Point2<T>, parameter: T) -> Self {
         Self {
+            curve: Cow::Borrowed(curve),
             position,
             parameter,
         }
@@ -19,17 +25,10 @@ impl<T: FloatingPoint> Vertex<T> {
     pub fn position(&self) -> &Point2<T> {
         &self.position
     }
-
-    pub fn parameter(&self) -> T {
-        self.parameter
-    }
 }
 
-impl<'a, T: FloatingPoint> From<&'a (Point2<T>, T)> for Vertex<T> {
-    fn from(v: &'a (Point2<T>, T)) -> Self {
-        Self {
-            position: v.0,
-            parameter: v.1,
-        }
+impl<'a, T: FloatingPoint> HasParameter<T> for Vertex<'a, T> {
+    fn parameter(&self) -> T {
+        self.parameter
     }
 }

@@ -7,9 +7,9 @@ use gauss_quad::GaussLegendre;
 use itertools::Itertools;
 use nalgebra::allocator::Allocator;
 use nalgebra::{
-    Const, DMatrix, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff,
-    DimNameSub, DimNameSum, Matrix2, OMatrix, OPoint, OVector, RealField, Rotation3, UnitVector3,
-    Vector2, Vector3, U1,
+    Const, DMatrix, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff, DimNameSub,
+    DimNameSum, Matrix2, OMatrix, OPoint, OVector, RealField, Rotation3, UnitVector3, Vector2,
+    Vector3, U1,
 };
 use num_traits::Float;
 use simba::scalar::SupersetOf;
@@ -23,7 +23,9 @@ use crate::misc::frenet_frame::FrenetFrame;
 use crate::misc::transformable::Transformable;
 use crate::misc::trigonometry::segment_closest_point;
 use crate::misc::Ray;
-use crate::prelude::{BoundingBoxTraversal, CurveLengthParameter, Invertible, KnotVector};
+use crate::prelude::{
+    BoundingBoxTraversal, CurveLengthParameter, HasIntersection, Invertible, KnotVector,
+};
 use crate::{misc::FloatingPoint, ClosestParameterNewton, ClosestParameterProblem};
 
 use super::KnotStyle;

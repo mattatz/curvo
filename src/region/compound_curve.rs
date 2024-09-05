@@ -13,6 +13,7 @@ use crate::{
     misc::{FloatingPoint, Invertible, Transformable},
     prelude::{
         compound_curve_intersection::CompoundCurveIntersection, CurveIntersectionSolverOptions,
+        HasIntersection,
     },
 };
 
