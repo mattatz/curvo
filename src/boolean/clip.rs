@@ -26,8 +26,16 @@ pub fn clip<'a, T: FloatingPoint, S, C, O: Clone>(
     intersections: Vec<CompoundCurveIntersection<'a, T, U3>>,
 ) -> anyhow::Result<Vec<Region<T>>>
 where
-    S: Clone + Contains<T, U2, Option = O> + EndPoints<T, U2> + Into<CompoundCurve<T, U3>>,
-    C: Clone + Contains<T, U2, Option = O> + EndPoints<T, U2> + Into<CompoundCurve<T, U3>>,
+    S: Clone
+        + Contains<T, U2, Option = O>
+        + EndPoints<T, U2>
+        + Into<CompoundCurve<T, U3>>
+        + TrimRange<T, U3>,
+    C: Clone
+        + Contains<T, U2, Option = O>
+        + EndPoints<T, U2>
+        + Into<CompoundCurve<T, U3>>
+        + TrimRange<T, U3>,
 {
     let deg = intersections
         .into_iter()
@@ -145,6 +153,7 @@ where
     let a = a.into_iter().map(|(_, n)| n).collect_vec();
     let b = b.into_iter().map(|(_, n)| n).collect_vec();
 
+    // connect cyclically
     [&a, &b].iter().for_each(|list| {
         list.iter()
             .cycle()
@@ -237,7 +246,6 @@ where
     loop {
         match non_visited(subject.clone()) {
             Some(start) => {
-                // println!("start: {:?}", start.borrow().vertex.parameter());
                 let mut nodes = vec![];
                 let mut current = start.clone();
                 loop {
@@ -245,7 +253,6 @@ where
                         break;
                     }
 
-                    // let forward = matches!(current.borrow().status(), Status::Enter);
                     current.borrow_mut().visit();
                     nodes.push(current.clone());
 
@@ -268,8 +275,6 @@ where
                         break;
                     }
                 }
-
-                // println!("nodes: {:?}", nodes.len());
 
                 let mut spans = vec![];
                 for chunk in nodes.chunks(2) {
@@ -297,22 +302,21 @@ where
                             (n1.vertex().parameter(), n0.vertex().parameter())
                         }
                         _ => {
-                            println!("Invalid status");
-                            break;
+                            anyhow::bail!("Invalid status");
                         }
                     };
 
-                    match (n0.subject(), n1.subject()) {
-                        (true, true) => {
-                            let trimmed = try_trim(n0.vertex().curve(), params)?;
-                            spans.extend(trimmed);
-                        }
-                        (false, false) => {
-                            let trimmed = try_trim(n1.vertex().curve(), params)?;
-                            spans.extend(trimmed);
-                        }
-                        _ => {
-                            // println!("subject & clip case");
+                    anyhow::ensure!(n0.subject() == n1.subject(), "Invalid condition");
+
+                    let c0 = n0.vertex().curve();
+                    let c1 = n1.vertex().curve();
+                    if c0 == c1 {
+                        let trimmed = c0.try_trim_range(params)?;
+                        spans.extend(trimmed);
+                    } else {
+                        println!("params: {:?}", params);
+                        if n0.subject() {
+                        } else {
                         }
                     }
                 }
@@ -331,28 +335,43 @@ where
     Ok(regions)
 }
 
-/// Trim curve by parameters.
-fn try_trim<T: FloatingPoint, D: DimName>(
-    curve: &NurbsCurve<T, D>,
-    parameters: (T, T),
-) -> anyhow::Result<Vec<NurbsCurve<T, D>>>
+/// Trim curve by range parameters.
+trait TrimRange<T: FloatingPoint, D: DimName>
 where
     DefaultAllocator: Allocator<D>,
 {
-    let (min, max) = (
-        parameters.0.min(parameters.1),
-        parameters.0.max(parameters.1),
-    );
-    let inside = parameters.0 < parameters.1;
-    let curves = if inside {
-        let (_, tail) = curve.try_trim(min)?;
-        let (head, _) = tail.try_trim(max)?;
-        vec![head]
-    } else {
-        let (head, tail) = curve.try_trim(min)?;
-        let (_, tail2) = tail.try_trim(max)?;
-        vec![tail2, head]
-    };
+    fn try_trim_range(&self, parameters: (T, T)) -> anyhow::Result<Vec<NurbsCurve<T, D>>>;
+}
 
-    Ok(curves)
+impl<T: FloatingPoint, D: DimName> TrimRange<T, D> for NurbsCurve<T, D>
+where
+    DefaultAllocator: Allocator<D>,
+{
+    fn try_trim_range(&self, parameters: (T, T)) -> anyhow::Result<Vec<NurbsCurve<T, D>>> {
+        let (min, max) = (
+            parameters.0.min(parameters.1),
+            parameters.0.max(parameters.1),
+        );
+        let inside = parameters.0 < parameters.1;
+        let curves = if inside {
+            let (_, tail) = self.try_trim(min)?;
+            let (head, _) = tail.try_trim(max)?;
+            vec![head]
+        } else {
+            let (head, tail) = self.try_trim(min)?;
+            let (_, tail2) = tail.try_trim(max)?;
+            vec![tail2, head]
+        };
+
+        Ok(curves)
+    }
+}
+
+impl<T: FloatingPoint, D: DimName> TrimRange<T, D> for CompoundCurve<T, D>
+where
+    DefaultAllocator: Allocator<D>,
+{
+    fn try_trim_range(&self, parameters: (T, T)) -> anyhow::Result<Vec<NurbsCurve<T, D>>> {
+        todo!();
+    }
 }
