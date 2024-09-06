@@ -224,7 +224,7 @@ where
         }
     }
 
-    let subject = &a[0];
+    let subject_head_node = &a[0];
 
     /*
     println!(
@@ -244,7 +244,7 @@ where
     */
 
     loop {
-        match non_visited(subject.clone()) {
+        match non_visited(subject_head_node.clone()) {
             Some(start) => {
                 let mut nodes = vec![];
                 let mut current = start.clone();
@@ -314,10 +314,12 @@ where
                         let trimmed = c0.try_trim_range(params)?;
                         spans.extend(trimmed);
                     } else {
-                        println!("params: {:?}", params);
-                        if n0.subject() {
+                        let trimmed = if n0.subject() {
+                            subject.try_trim_range(params)
                         } else {
-                        }
+                            clip.try_trim_range(params)
+                        }?;
+                        spans.extend(trimmed);
                     }
                 }
 
@@ -372,6 +374,48 @@ where
     DefaultAllocator: Allocator<D>,
 {
     fn try_trim_range(&self, parameters: (T, T)) -> anyhow::Result<Vec<NurbsCurve<T, D>>> {
-        todo!();
+        let (min, max) = (
+            parameters.0.min(parameters.1),
+            parameters.0.max(parameters.1),
+        );
+        let start = self
+            .spans()
+            .iter()
+            .find_position(|span| {
+                let (d0, d1) = span.knots_domain();
+                (d0..=d1).contains(&min)
+            })
+            .ok_or(anyhow::anyhow!("Failed to find start span"))?;
+        let end = self
+            .spans()
+            .iter()
+            .find_position(|span| {
+                let (d0, d1) = span.knots_domain();
+                (d0..=d1).contains(&max)
+            })
+            .ok_or(anyhow::anyhow!("Failed to find end span"))?;
+
+        let inside = parameters.0 < parameters.1;
+        let curves = if inside {
+            (start.0..=end.0)
+                .map(|i| {
+                    let curve = &self.spans()[i];
+                    let (d0, d1) = curve.knots_domain();
+                    let range = d0..=d1;
+                    match (range.contains(&min), range.contains(&max)) {
+                        (true, true) => curve.try_trim_range((min, max)),
+                        (true, false) => curve.try_trim(min).map(|(_, tail)| vec![tail]),
+                        (false, true) => curve.try_trim(max).map(|(head, _)| vec![head]),
+                        (false, false) => Ok(vec![curve.clone()]),
+                    }
+                })
+                .collect::<anyhow::Result<Vec<_>>>()?
+                .into_iter()
+                .flatten()
+                .collect_vec()
+        } else {
+            todo!()
+        };
+        Ok(curves)
     }
 }
