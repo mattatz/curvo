@@ -1,9 +1,8 @@
-use bevy::prelude::Polygon;
 use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, OPoint, U2, U3};
-use num_traits::Float;
 
 use crate::misc::FloatingPoint;
 
+/// A struct representing a polygon mesh.
 #[derive(Clone, Debug)]
 pub struct PolygonMesh<T: FloatingPoint, D: DimName>
 where
@@ -74,6 +73,7 @@ impl<T: FloatingPoint> PolygonMesh<T, U3> {
     }
 }
 
+/// Merge two polygon meshes
 impl<T: FloatingPoint, D: DimName> std::ops::Add<PolygonMesh<T, D>> for PolygonMesh<T, D>
 where
     DefaultAllocator: Allocator<D>,
@@ -95,6 +95,7 @@ where
     }
 }
 
+/// Merge multiple polygon meshes
 impl<T: FloatingPoint, D: DimName> std::iter::Sum for PolygonMesh<T, D>
 where
     DefaultAllocator: Allocator<D>,
