@@ -44,33 +44,19 @@ where
             parameters.0.min(parameters.1),
             parameters.0.max(parameters.1),
         );
-        let start = self
-            .spans()
-            .iter()
-            .find_position(|span| {
-                let (d0, d1) = span.knots_domain();
-                (d0..=d1).contains(&min)
-            })
-            .ok_or(anyhow::anyhow!("Failed to find start span"))?;
-        let end = self
-            .spans()
-            .iter()
-            .find_position(|span| {
-                let (d0, d1) = span.knots_domain();
-                (d0..=d1).contains(&max)
-            })
-            .ok_or(anyhow::anyhow!("Failed to find end span"))?;
 
         let inside = parameters.0 < parameters.1;
         let range = min..=max;
         let eps = T::default_epsilon();
-        let curves = (start.0..=end.0)
-            .map(|i| {
-                let curve = &self.spans()[i];
+        let curves = self
+            .spans()
+            .iter()
+            .map(|curve| {
                 let (d0, d1) = curve.knots_domain();
 
                 // use epsilon to avoid to trim at the terminal (start / end) of the curve
                 let curve_domain = (d0 + eps)..=(d1 - eps);
+                // println!("match ({}, {})", curve_domain.contains(&min), curve_domain.contains(&max));
 
                 match (curve_domain.contains(&min), curve_domain.contains(&max)) {
                     (true, true) => {
