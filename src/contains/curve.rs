@@ -54,7 +54,9 @@ impl<T: FloatingPoint + ArgminFloat> Contains<T, Const<2>> for NurbsCurve<T, Con
 
         // curve & ray intersections
         match x_ray_intersection(self, point, size.x * T::from_f64(2.).unwrap(), option) {
-            Ok(its) => Ok(its.len() % 2 == 1),
+            Ok(its) => {
+                Ok(its.len() % 2 == 1)
+            }
             Err(e) => Err(e),
         }
     }
@@ -124,13 +126,13 @@ pub fn x_ray_intersection<T: FloatingPoint + ArgminFloat>(
 
     intersections.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(Ordering::Equal));
 
-    let parameter_minimum_distance = T::from_f64(1e-2).unwrap();
+    let eps = option.minimum_distance;
     let filtered = intersections
         .into_iter()
         .coalesce(|x, y| {
-            // merge intersections that are close in parameter space
-            let dt = y.1 - x.1;
-            if dt < parameter_minimum_distance {
+            // merge intersections that are close
+            let dt = x.0 - y.0;
+            if dt.norm() < eps {
                 Ok(x)
             } else {
                 Err((x, y))
