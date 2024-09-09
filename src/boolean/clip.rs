@@ -2,14 +2,13 @@ use std::{cell::RefCell, cmp::Ordering, rc::Rc};
 
 use itertools::Itertools;
 use nalgebra::{Point2, U2, U3};
-use num_traits::Float;
 
 use crate::{
     boolean::{
         degeneracies::Degeneracy, has_parameter::HasParameter, node::Node, status::Status,
         vertex::Vertex,
     },
-    curve::{NurbsCurve, NurbsCurve2D},
+    curve::NurbsCurve2D,
     misc::{EndPoints, FloatingPoint},
     prelude::{CompoundCurveIntersection, Contains, HasIntersection, HasIntersectionParameter},
     region::{CompoundCurve, Region},
@@ -330,8 +329,8 @@ where
                     let n1 = chunk[1].borrow();
 
                     info.add_node_chunk((
-                        (n0.vertex().position().clone(), n0.status()),
-                        (n1.vertex().position().clone(), n1.status()),
+                        (*n0.vertex().position(), n0.status()),
+                        (*n1.vertex().position(), n1.status()),
                     ));
 
                     /*
@@ -367,6 +366,12 @@ where
                 }
 
                 if !spans.is_empty() {
+                    /*
+                    println!("spans: {:?}", spans.len());
+                    spans.iter().for_each(|span| {
+                        info.add_span(span.clone());
+                    });
+                    */
                     let region = Region::new(CompoundCurve::new(spans), vec![]);
                     regions.push(region);
                 }

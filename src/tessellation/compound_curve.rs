@@ -1,5 +1,3 @@
-use std::f64::consts::E;
-
 use itertools::Itertools;
 use nalgebra::{
     allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, U1,

@@ -54,9 +54,7 @@ impl<T: FloatingPoint + ArgminFloat> Contains<T, Const<2>> for NurbsCurve<T, Con
 
         // curve & ray intersections
         match x_ray_intersection(self, point, size.x * T::from_f64(2.).unwrap(), option) {
-            Ok(its) => {
-                Ok(its.len() % 2 == 1)
-            }
+            Ok(its) => Ok(its.len() % 2 == 1),
             Err(e) => Err(e),
         }
     }

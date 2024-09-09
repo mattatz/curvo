@@ -6,9 +6,7 @@ use itertools::Itertools;
 use nalgebra::{allocator::Allocator, Const, DefaultAllocator};
 
 use crate::prelude::CompoundCurveIntersection;
-use crate::{
-    curve::NurbsCurve, misc::FloatingPoint, prelude::CurveIntersectionSolverOptions, region::Region,
-};
+use crate::{curve::NurbsCurve, misc::FloatingPoint, prelude::CurveIntersectionSolverOptions};
 
 /// Boolean operation for two NURBS curves.
 impl<'a, T: FloatingPoint + ArgminFloat> Boolean<&'a NurbsCurve<T, Const<3>>>

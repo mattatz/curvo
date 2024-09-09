@@ -2,10 +2,8 @@ use argmin::core::ArgminFloat;
 use nalgebra::{allocator::Allocator, Const, DefaultAllocator};
 
 use crate::{
-    curve::NurbsCurve,
-    misc::FloatingPoint,
-    prelude::CurveIntersectionSolverOptions,
-    region::{CompoundCurve, Region},
+    curve::NurbsCurve, misc::FloatingPoint, prelude::CurveIntersectionSolverOptions,
+    region::CompoundCurve,
 };
 
 use super::clip::{clip, Clipped};

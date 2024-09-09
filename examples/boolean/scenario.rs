@@ -110,10 +110,7 @@ fn compound_rounded_rectangle() -> CurveVariant {
             FRAC_PI_2,
         )
         .unwrap(),
-        NurbsCurve2D::polyline(&vec![
-            Point2::new(length, radius),
-            Point2::new(-length, radius),
-        ]),
+        NurbsCurve2D::polyline(&[Point2::new(length, radius), Point2::new(-length, radius)]),
         NurbsCurve2D::try_arc(
             &Point2::new(-length, 0.),
             &dx,
@@ -123,10 +120,7 @@ fn compound_rounded_rectangle() -> CurveVariant {
             PI + FRAC_PI_2,
         )
         .unwrap(),
-        NurbsCurve2D::polyline(&vec![
-            Point2::new(-length, -radius),
-            Point2::new(length, -radius),
-        ]),
+        NurbsCurve2D::polyline(&[Point2::new(-length, -radius), Point2::new(length, -radius)]),
     ])
     .into()
 }
@@ -147,7 +141,7 @@ fn compound_rounded_t_shape() -> CurveVariant {
             FRAC_PI_2,
         )
         .unwrap(),
-        NurbsCurve2D::polyline(&vec![
+        NurbsCurve2D::polyline(&[
             Point2::new(w_length, radius),
             Point2::new(-w_length, radius),
         ]),
@@ -160,7 +154,7 @@ fn compound_rounded_t_shape() -> CurveVariant {
             PI + FRAC_PI_2,
         )
         .unwrap(),
-        NurbsCurve2D::polyline(&vec![
+        NurbsCurve2D::polyline(&[
             Point2::new(-w_length, -radius),
             Point2::new(-radius, -radius),
             Point2::new(-radius, -h_length),
