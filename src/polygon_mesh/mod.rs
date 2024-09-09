@@ -1,4 +1,6 @@
-use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, OPoint};
+use bevy::prelude::Polygon;
+use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, OPoint, U2, U3};
+use num_traits::Float;
 
 use crate::misc::FloatingPoint;
 
@@ -38,5 +40,36 @@ where
                 ]
             })
             .collect()
+    }
+}
+
+impl<T: FloatingPoint> PolygonMesh<T, U2> {
+    pub fn area(&self) -> T {
+        let triangles = self.triangles();
+        triangles
+            .iter()
+            .map(|[a, b, c]| {
+                let ab = b - a;
+                let ac = c - a;
+                (ab.x * ac.y - ab.y * ac.x).abs()
+            })
+            .fold(T::zero(), |a, b| a + b)
+            / (T::from_usize(2).unwrap())
+    }
+}
+
+impl<T: FloatingPoint> PolygonMesh<T, U3> {
+    pub fn area(&self) -> T {
+        let triangles = self.triangles();
+        triangles
+            .iter()
+            .map(|[a, b, c]| {
+                let ab = b - a;
+                let ac = c - a;
+                let cross = ab.cross(&ac);
+                cross.norm()
+            })
+            .fold(T::zero(), |a, b| a + b)
+            / (T::from_usize(2).unwrap())
     }
 }
