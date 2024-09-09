@@ -396,17 +396,24 @@ where
             .ok_or(anyhow::anyhow!("Failed to find end span"))?;
 
         let inside = parameters.0 < parameters.1;
+        let range = min..=max;
         let curves = if inside {
             (start.0..=end.0)
                 .map(|i| {
                     let curve = &self.spans()[i];
                     let (d0, d1) = curve.knots_domain();
-                    let range = d0..=d1;
-                    match (range.contains(&min), range.contains(&max)) {
+                    let curve_domain = d0..=d1;
+                    match (curve_domain.contains(&min), curve_domain.contains(&max)) {
                         (true, true) => curve.try_trim_range((min, max)),
                         (true, false) => curve.try_trim(min).map(|(_, tail)| vec![tail]),
                         (false, true) => curve.try_trim(max).map(|(head, _)| vec![head]),
-                        (false, false) => Ok(vec![curve.clone()]),
+                        (false, false) => {
+                            if range.contains(&d0) {
+                                Ok(vec![curve.clone()])
+                            } else {
+                                Ok(vec![])
+                            }
+                        }
                     }
                 })
                 .collect::<anyhow::Result<Vec<_>>>()?
@@ -414,7 +421,32 @@ where
                 .flatten()
                 .collect_vec()
         } else {
-            todo!()
+            (start.0..=end.0)
+                .map(|i| {
+                    let curve = &self.spans()[i];
+                    let (d0, d1) = curve.knots_domain();
+                    let curve_domain = d0..=d1;
+                    match (curve_domain.contains(&min), curve_domain.contains(&max)) {
+                        (true, true) => {
+                            let (head, tail) = curve.try_trim(min)?;
+                            let (_, tail2) = tail.try_trim(max)?;
+                            Ok(vec![head, tail2])
+                        }
+                        (true, false) => curve.try_trim(min).map(|(head, _)| vec![head]),
+                        (false, true) => curve.try_trim(max).map(|(_, tail)| vec![tail]),
+                        (false, false) => {
+                            if range.contains(&d0) {
+                                Ok(vec![])
+                            } else {
+                                Ok(vec![curve.clone()])
+                            }
+                        }
+                    }
+                })
+                .collect::<anyhow::Result<Vec<_>>>()?
+                .into_iter()
+                .flatten()
+                .collect_vec()
         };
         Ok(curves)
     }
