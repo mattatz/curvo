@@ -1,8 +1,9 @@
 pub mod scenario;
 use curvo::prelude::{
-    operation::BooleanOperation, Boolean, Clipped, CompoundCurve, CurveIntersectionSolverOptions, NurbsCurve, Region, Transformable
+    operation::BooleanOperation, Boolean, Clipped, CompoundCurve, CurveIntersectionSolverOptions,
+    EndPoints, NurbsCurve, Region, Transformable,
 };
-use nalgebra::{Const, OMatrix, U3};
+use nalgebra::{Const, OMatrix, OPoint, U2, U3};
 pub use scenario::*;
 
 #[derive(Clone, Debug)]
@@ -33,6 +34,24 @@ impl<'a> Boolean<&'a CurveVariant> for CurveVariant {
             (CurveVariant::Region(_), CurveVariant::Curve(_)) => todo!(),
             (CurveVariant::Region(_), CurveVariant::Compound(_)) => todo!(),
             (CurveVariant::Region(_), CurveVariant::Region(_)) => todo!(),
+        }
+    }
+}
+
+impl EndPoints<f64, U2> for CurveVariant {
+    fn first_point(&self) -> OPoint<f64, U2> {
+        match self {
+            CurveVariant::Curve(c) => c.first_point(),
+            CurveVariant::Compound(c) => c.first_point(),
+            CurveVariant::Region(_) => todo!(),
+        }
+    }
+
+    fn end_point(&self) -> OPoint<f64, U2> {
+        match self {
+            CurveVariant::Curve(c) => c.end_point(),
+            CurveVariant::Compound(c) => c.end_point(),
+            CurveVariant::Region(_) => todo!(),
         }
     }
 }
