@@ -12,6 +12,7 @@ mod polygon_mesh;
 mod region;
 mod surface;
 mod tessellation;
+mod trim;
 use closest_parameter::*;
 
 pub mod prelude {
@@ -29,4 +30,5 @@ pub mod prelude {
         adaptive_tessellation_option::AdaptiveTessellationOptions, surface_tessellation::*,
         Tessellation,
     };
+    pub use crate::trim::*;
 }
