@@ -47,9 +47,15 @@ where
         interval > self.tolerance || {
             match self.curve.degree() {
                 1 => {
-                    // avoid degeneracy for polyline curves
-                    // println!("interval: {}, # of points: {}", interval, self.curve.control_points().len());
-                    interval >= T::default_epsilon() && self.curve.control_points().len() >= 3
+                    // Avoid degeneracy case for polyline curves as following:
+                    //   |     / 
+                    //   |    /
+                    // --+--+------- <- intersected at 2 points
+                    //   | /
+                    //   |/
+                    // In the case of a polyline, it may not be possible to detect two intersections when it crosses near a control point.
+                    // Therefore, when working with polylines, it is advisable to impose a constraint such that the bounding box contains two control points.
+                    interval >= T::from_f64(1e-4).unwrap() && self.curve.control_points().len() >= 3
                 }
                 _ => false,
             }
