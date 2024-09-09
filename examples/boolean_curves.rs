@@ -12,7 +12,7 @@ use bevy_points::{mesh::PointsMesh, plugin::PointsPlugin, prelude::PointsMateria
 use boolean::CurveVariant;
 use itertools::Itertools;
 use materials::*;
-use nalgebra::{Rotation2, Translation2};
+use nalgebra::{Isometry, Isometry2, Isometry3, Rotation2, Translation2};
 
 mod boolean;
 mod materials;
@@ -80,18 +80,8 @@ fn setup(
     let (subject, clip) = boolean::compound_circle_and_rectangle_case();
     let (subject, clip) = boolean::rounded_rectangle_case();
 
-    /*
-    let delta: f64 = 0.46303153026000005;
-    let delta: f64 = 0.46544134026; // error with degeneracies
-    let delta: f64 = 4.38834548724;
-    let delta: f64 = 1.27497772974;
-    */
-
     let delta: f64 = 0.0;
-    let delta: f64 = 1.25;
-    let delta: f64 = 1.4367686455200002;
-    // let delta: f64 = 11.535516751980001;
-    // let delta: f64 = 10.24571248974;
+    let delta: f64 = 2.2;
     let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);
     let clip = clip.transformed(&trans.into());
 
@@ -172,24 +162,26 @@ fn setup(
         false,
     );
 
-    if let (CurveVariant::Curve(subject), CurveVariant::Curve(clip)) = (&subject, &clip) {
+    [&subject, &clip].iter().enumerate().for_each(|(i, c)| {
+        let (start, end) = c.end_points();
         commands
             .spawn(MaterialMeshBundle {
                 mesh: meshes.add(PointsMesh {
-                    vertices: [
-                        subject.point_at(subject.knots_domain().0),
-                        clip.point_at(clip.knots_domain().0),
-                    ]
-                    .iter()
-                    .map(|p| p.cast::<f32>().coords.to_homogeneous().into())
-                    .collect(),
-                    colors: Some(vec![Color::RED, Color::BLUE]),
+                    vertices: [start, end]
+                        .iter()
+                        .map(|p| p.cast::<f32>().coords.to_homogeneous().into())
+                        .collect(),
+                    colors: Some(if i == 0 {
+                        vec![Color::ORANGE, Color::ORANGE]
+                    } else {
+                        vec![Color::PURPLE, Color::PURPLE]
+                    }),
                     ..Default::default()
                 }),
                 material: points_materials.add(PointsMaterial {
                     settings: bevy_points::material::PointsShaderSettings {
                         color: Color::WHITE,
-                        point_size: 0.025,
+                        point_size: 0.05,
                         ..Default::default()
                     },
                     circle: true,
@@ -199,172 +191,17 @@ fn setup(
                 ..Default::default()
             })
             .insert(Name::new("End points"));
-
-        let intersections = subject
-            .find_intersections(clip, Some(OPTION.clone()))
-            .unwrap();
-        println!("intersections: {:?}", intersections.len());
-
-        let points = intersections
-            .iter()
-            .enumerate()
-            .flat_map(|(i, it)| {
-                let pa = it.a().0.cast::<f32>();
-                let pb = it.b().0.cast::<f32>();
-                vec![Vec3::new(pa.x, pa.y, 0.), Vec3::new(pb.x, pb.y, 0.)]
-            })
-            .collect();
-
-        commands.spawn(MaterialMeshBundle {
-            mesh: meshes.add(PointsMesh {
-                vertices: points,
-                ..Default::default()
-            }),
-            material: points_materials.add(PointsMaterial {
-                settings: bevy_points::material::PointsShaderSettings {
-                    color: Color::WHITE,
-                    point_size: 0.0025,
-                    ..Default::default()
-                },
-                circle: true,
-                ..Default::default()
-            }),
-            ..Default::default()
-        });
-    };
-
-    /*
-    let traversed = BoundingBoxTraversal::try_traverse(
-        &subject,
-        &clip,
-        Some(subject.knots_domain_interval() / (option.knot_domain_division as f64)),
-        Some(clip.knots_domain_interval() / (option.knot_domain_division as f64)),
-    );
-    if let Ok(traversed) = traversed {
-        let n = traversed.pairs_iter().count();
-        traversed
-            .pairs_iter()
-            .enumerate()
-            .for_each(|(idx, (a, b))| {
-                let t = (idx as f32) / (n as f32);
-                let hue = t * 360. * 1e2 % 360.;
-                let color = Color::hsl(hue, 0.5, 0.5);
-                let b0 = a.bounding_box();
-                let b1 = b.bounding_box();
-                [&b0, &b1].iter().enumerate().for_each(|(j, bb)| {
-                    let color = if j == 0 { Color::RED } else { Color::BLUE };
-                    let vertices = bb
-                        .lines()
-                        .iter()
-                        // .chain(b1.lines().iter())
-                        .flat_map(|(a, b)| {
-                            [a, b]
-                                .iter()
-                                .map(|p| p.cast::<f32>())
-                                .map(|p| [p.x, p.y, 0.])
-                                .collect::<Vec<_>>()
-                        })
-                        .collect();
-                    let line = Mesh::new(PrimitiveTopology::LineList, default())
-                        .with_inserted_attribute(
-                            Mesh::ATTRIBUTE_POSITION,
-                            VertexAttributeValues::Float32x3(vertices),
-                        );
-                    commands
-                        .spawn(MaterialMeshBundle {
-                            mesh: meshes.add(line),
-                            material: line_materials.add(LineMaterial {
-                                // color: Color::WHITE,
-                                color,
-                                opacity: 0.5,
-                                alpha_mode: AlphaMode::Blend,
-                            }),
-                            // visibility: Visibility::Hidden,
-                            ..Default::default()
-                        })
-                        .insert(Name::new("bounding box"));
-                });
-
-                [a.curve(), b.curve()].iter().for_each(|curve| {
-                    let line_vertices = curve
-                        .tessellate(Some(1e-8))
-                        .iter()
-                        .map(|p| p.cast::<f32>())
-                        .map(|p| [p.x, p.y, 0.])
-                        .collect();
-                    let line = Mesh::new(PrimitiveTopology::LineStrip, default())
-                        .with_inserted_attribute(
-                            Mesh::ATTRIBUTE_POSITION,
-                            VertexAttributeValues::Float32x3(line_vertices),
-                        );
-                    commands
-                        .spawn(MaterialMeshBundle {
-                            mesh: meshes.add(line),
-                            material: line_materials.add(LineMaterial {
-                                color: Color::WHITE,
-                                ..Default::default()
-                            }),
-                            visibility: Visibility::Hidden,
-                            ..Default::default()
-                        })
-                        .insert(Name::new("segment"));
-                });
-            });
-    }
-    */
+    });
 
     let ops = [
-        BooleanOperation::Union,
+        // BooleanOperation::Union,
         // BooleanOperation::Intersection,
-        // BooleanOperation::Difference,
+        BooleanOperation::Difference,
     ];
     let n = ops.len();
     let inv_n = 1. / n as f32;
     let on = inv_n * 0.5;
     let h = n as f32 * 7.5;
-
-    /*
-    let parameter_eps = 1e-3;
-    intersections.iter().for_each(|it| {
-        let a0 = subject.point_at(it.a().1 - parameter_eps);
-        let a1 = subject.point_at(it.a().1 + parameter_eps);
-        let b0 = clip.point_at(it.b().1 - parameter_eps);
-        let b1 = clip.point_at(it.b().1 + parameter_eps);
-        let intersected = Line::new(a0, a1).intersects(&Line::new(b0, b1));
-        [[a0, a1], [b0, b1]]
-            .iter()
-            .enumerate()
-            .for_each(|(i, line)| {
-                let line = Mesh::new(PrimitiveTopology::LineStrip, default())
-                    .with_inserted_attribute(
-                        Mesh::ATTRIBUTE_POSITION,
-                        VertexAttributeValues::Float32x3(
-                            line.iter()
-                                .map(|pt| pt.coords.cast::<f32>().to_homogeneous().into())
-                                .collect(),
-                        ),
-                    );
-                commands.spawn(MaterialMeshBundle {
-                    mesh: meshes.add(line),
-                    material: line_materials.add(LineMaterial {
-                        color: if intersected {
-                            if i == 0 {
-                                Color::RED
-                            } else {
-                                Color::YELLOW
-                            }
-                        } else if i == 0 {
-                            Color::RED
-                        } else {
-                            Color::BLUE
-                        },
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                });
-            });
-    });
-    */
 
     ops.into_iter().enumerate().for_each(|(i, op)| {
         let fi = i as f32 * inv_n + on - 0.5;

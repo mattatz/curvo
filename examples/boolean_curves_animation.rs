@@ -11,7 +11,7 @@ use bevy_points::{plugin::PointsPlugin, prelude::PointsMaterial};
 use boolean::CurveVariant;
 use itertools::Itertools;
 use materials::*;
-use nalgebra::{Rotation2, Translation2};
+use nalgebra::{Rotation2, Translation2, U2};
 
 mod boolean;
 mod materials;
@@ -83,9 +83,9 @@ fn setup(
     commands.spawn((ProfileCurves(subject, clip),));
 
     let ops = [
-        // BooleanOperation::Intersection,
+        BooleanOperation::Intersection,
         BooleanOperation::Union,
-        // BooleanOperation::Difference,
+        BooleanOperation::Difference,
     ];
     let n = ops.len();
     let inv_n = 1. / n as f32;
@@ -122,6 +122,7 @@ fn boolean(
     // let delta: f64 = 3.1309608852600004;
     // let delta: f64 = 3.1613637252600006;
     // let delta: f64 = 4.39098702276;
+    // let delta = (delta / 1e-1).floor() * 1e-1;
     println!("delta: {}", delta);
 
     let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);
@@ -149,33 +150,32 @@ fn boolean(
         booleans.iter().for_each(|(BooleanMesh(op), mesh, trans)| {
             let regions = subject.boolean(*op, &clip, Some(OPTION.clone()));
             if let Ok((regions, _)) = regions {
-                regions.iter().for_each(|r| {
-                    if let Some(tess) = r.tessellate(None).ok() {
-                        if let Some(mesh) = meshes.get_mut(mesh) {
-                            mesh.insert_attribute(
-                                Mesh::ATTRIBUTE_POSITION,
-                                VertexAttributeValues::Float32x3(
-                                    tess.vertices()
-                                        .iter()
-                                        .map(|p| p.cast::<f32>().coords.to_homogeneous().into())
-                                        .collect(),
-                                ),
-                            );
-                            mesh.insert_attribute(
-                                Mesh::ATTRIBUTE_NORMAL,
-                                VertexAttributeValues::Float32x3(
-                                    tess.vertices().iter().map(|p| [0., 0., 1.]).collect(),
-                                ),
-                            );
-                            mesh.insert_indices(Indices::U32(
-                                tess.faces()
-                                    .iter()
-                                    .flat_map(|f| f.iter().map(|i| *i as u32))
-                                    .collect(),
-                            ));
-                        }
-                    }
-                });
+                let tess: PolygonMesh<f64, U2> =
+                    regions.iter().filter_map(|r| r.tessellate(None).ok()).sum();
+
+                if let Some(mesh) = meshes.get_mut(mesh) {
+                    mesh.insert_attribute(
+                        Mesh::ATTRIBUTE_POSITION,
+                        VertexAttributeValues::Float32x3(
+                            tess.vertices()
+                                .iter()
+                                .map(|p| p.cast::<f32>().coords.to_homogeneous().into())
+                                .collect(),
+                        ),
+                    );
+                    mesh.insert_attribute(
+                        Mesh::ATTRIBUTE_NORMAL,
+                        VertexAttributeValues::Float32x3(
+                            tess.vertices().iter().map(|p| [0., 0., 1.]).collect(),
+                        ),
+                    );
+                    mesh.insert_indices(Indices::U32(
+                        tess.faces()
+                            .iter()
+                            .flat_map(|f| f.iter().map(|i| *i as u32))
+                            .collect(),
+                    ));
+                }
 
                 let trans = *trans * Transform::from_xyz(0., 0., 0.5);
                 regions.iter().for_each(|region| {

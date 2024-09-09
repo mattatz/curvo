@@ -73,3 +73,33 @@ impl<T: FloatingPoint> PolygonMesh<T, U3> {
             / (T::from_usize(2).unwrap())
     }
 }
+
+impl<T: FloatingPoint, D: DimName> std::ops::Add<PolygonMesh<T, D>> for PolygonMesh<T, D>
+where
+    DefaultAllocator: Allocator<D>,
+{
+    type Output = PolygonMesh<T, D>;
+
+    fn add(self, rhs: PolygonMesh<T, D>) -> Self::Output {
+        let v0 = self.vertices.len();
+        let vertices = [self.vertices, rhs.vertices].concat();
+        let faces = [
+            self.faces,
+            rhs.faces
+                .iter()
+                .map(|[a, b, c]| [*a + v0, *b + v0, *c + v0])
+                .collect(),
+        ]
+        .concat();
+        Self::Output::new(vertices, faces)
+    }
+}
+
+impl<T: FloatingPoint, D: DimName> std::iter::Sum for PolygonMesh<T, D>
+where
+    DefaultAllocator: Allocator<D>,
+{
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.fold(Self::new(vec![], vec![]), |a, b| a + b)
+    }
+}
