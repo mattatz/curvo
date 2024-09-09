@@ -56,7 +56,6 @@ where
 
                 // use epsilon to avoid to trim at the terminal (start / end) of the curve
                 let curve_domain = (d0 + eps)..=(d1 - eps);
-                // println!("match ({}, {})", curve_domain.contains(&min), curve_domain.contains(&max));
 
                 match (curve_domain.contains(&min), curve_domain.contains(&max)) {
                     (true, true) => {

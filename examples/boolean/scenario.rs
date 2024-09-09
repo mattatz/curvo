@@ -70,13 +70,6 @@ pub fn island_case() -> CurveVariants {
 }
 
 pub fn compound_circle_and_rectangle_case() -> CurveVariants {
-    let o = Point2::origin();
-    let dx = Vector2::x();
-    let dy = Vector2::y();
-    let compound = CompoundCurve::new(vec![
-        NurbsCurve2D::try_arc(&o, &dx, &dy, 1., 0., PI).unwrap(),
-        NurbsCurve2D::try_arc(&o, &dx, &dy, 1., PI, TAU).unwrap(),
-    ]);
     let rectangle = NurbsCurve2D::polyline(&[
         Point2::new(0., 2.),
         Point2::new(0., -2.),
@@ -84,15 +77,37 @@ pub fn compound_circle_and_rectangle_case() -> CurveVariants {
         Point2::new(2., 2.),
         Point2::new(0., 2.),
     ]);
-    (compound.into(), rectangle.into())
+    (compound_circle(), rectangle.into())
 }
 
 pub fn rounded_rectangle_case() -> CurveVariants {
+    let rectangle = NurbsCurve2D::polyline(&[
+        Point2::new(0., 1.),
+        Point2::new(0., -1.),
+        Point2::new(2.5, -1.),
+        Point2::new(2.5, 1.),
+        Point2::new(0., 1.),
+    ]);
+    (compound_rounded_rectangle(), rectangle.into())
+}
+
+fn compound_circle() -> CurveVariant {
+    let o = Point2::origin();
+    let dx = Vector2::x();
+    let dy = Vector2::y();
+    CompoundCurve::new(vec![
+        NurbsCurve2D::try_arc(&o, &dx, &dy, 1., 0., PI).unwrap(),
+        NurbsCurve2D::try_arc(&o, &dx, &dy, 1., PI, TAU).unwrap(),
+    ])
+    .into()
+}
+
+fn compound_rounded_rectangle() -> CurveVariant {
     let length = 2.0;
     let radius = 1.0;
     let dx = Vector2::x();
     let dy = Vector2::y();
-    let compound = CompoundCurve::new(vec![
+    CompoundCurve::new(vec![
         NurbsCurve2D::try_arc(
             &Point2::new(length, 0.),
             &dx,
@@ -119,13 +134,6 @@ pub fn rounded_rectangle_case() -> CurveVariants {
             Point2::new(-length, -radius),
             Point2::new(length, -radius),
         ]),
-    ]);
-    let rectangle = NurbsCurve2D::polyline(&[
-        Point2::new(0., 2.),
-        Point2::new(0., -2.),
-        Point2::new(2., -2.),
-        Point2::new(2., 2.),
-        Point2::new(0., 2.),
-    ]);
-    (compound.into(), rectangle.into())
+    ])
+    .into()
 }

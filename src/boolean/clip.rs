@@ -9,6 +9,7 @@ use crate::{
         degeneracies::Degeneracy, has_parameter::HasParameter, node::Node, status::Status,
         vertex::Vertex,
     },
+    curve::{NurbsCurve, NurbsCurve2D},
     misc::{EndPoints, FloatingPoint},
     prelude::{CompoundCurveIntersection, Contains, HasIntersection, HasIntersectionParameter},
     region::{CompoundCurve, Region},
@@ -23,21 +24,33 @@ where
     T: FloatingPoint,
 {
     pub chunks: Vec<((Point2<T>, Status), (Point2<T>, Status))>,
+    pub spans: Vec<NurbsCurve2D<T>>,
 }
 
 impl<T: FloatingPoint> Default for ClipDebugInfo<T> {
     fn default() -> Self {
-        Self { chunks: vec![] }
+        Self {
+            chunks: vec![],
+            spans: vec![],
+        }
     }
 }
 
 impl<T: FloatingPoint> ClipDebugInfo<T> {
-    pub fn add(&mut self, chunk: ((Point2<T>, Status), (Point2<T>, Status))) {
+    pub fn add_node_chunk(&mut self, chunk: ((Point2<T>, Status), (Point2<T>, Status))) {
         self.chunks.push(chunk);
     }
 
-    pub fn chunks(&self) -> &Vec<((Point2<T>, Status), (Point2<T>, Status))> {
+    pub fn node_chunks(&self) -> &Vec<((Point2<T>, Status), (Point2<T>, Status))> {
         &self.chunks
+    }
+
+    pub fn add_span(&mut self, span: NurbsCurve2D<T>) {
+        self.spans.push(span);
+    }
+
+    pub fn spans(&self) -> &Vec<NurbsCurve2D<T>> {
+        &self.spans
     }
 }
 
@@ -101,6 +114,7 @@ where
 
     let clip_contains_subject = clip.contains(&subject.first_point(), option.clone())?;
     let subject_contains_clip = subject.contains(&clip.first_point(), option.clone())?;
+    // println!("clip contains subject: {}, subject contains clip: {}", clip_contains_subject, subject_contains_clip);
 
     let indexed = intersections.into_iter().enumerate().collect_vec();
 
@@ -315,7 +329,7 @@ where
                     let n0 = chunk[0].borrow();
                     let n1 = chunk[1].borrow();
 
-                    info.add((
+                    info.add_node_chunk((
                         (n0.vertex().position().clone(), n0.status()),
                         (n1.vertex().position().clone(), n1.status()),
                     ));
@@ -344,20 +358,12 @@ where
 
                     anyhow::ensure!(n0.subject() == n1.subject(), "Invalid condition");
 
-                    let c0 = n0.vertex().curve();
-                    let c1 = n1.vertex().curve();
-
-                    if c0 == c1 {
-                        let trimmed = c0.try_trim_range(params)?;
-                        spans.extend(trimmed);
+                    let trimmed = if n0.subject() {
+                        subject.try_trim_range(params)
                     } else {
-                        let trimmed = if n0.subject() {
-                            subject.try_trim_range(params)
-                        } else {
-                            clip.try_trim_range(params)
-                        }?;
-                        spans.extend(trimmed);
-                    }
+                        clip.try_trim_range(params)
+                    }?;
+                    spans.extend(trimmed);
                 }
 
                 if !spans.is_empty() {
