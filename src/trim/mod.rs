@@ -63,57 +63,70 @@ where
 
         let inside = parameters.0 < parameters.1;
         let range = min..=max;
-        let curves = if inside {
-            (start.0..=end.0)
-                .map(|i| {
-                    let curve = &self.spans()[i];
-                    let (d0, d1) = curve.knots_domain();
-                    let curve_domain = d0..=d1;
-                    match (curve_domain.contains(&min), curve_domain.contains(&max)) {
-                        (true, true) => curve.try_trim_range((min, max)),
-                        (true, false) => curve.try_trim(min).map(|(_, tail)| vec![tail]),
-                        (false, true) => curve.try_trim(max).map(|(head, _)| vec![head]),
-                        (false, false) => {
-                            if range.contains(&d0) {
-                                Ok(vec![curve.clone()])
-                            } else {
-                                Ok(vec![])
-                            }
-                        }
-                    }
-                })
-                .collect::<anyhow::Result<Vec<_>>>()?
-                .into_iter()
-                .flatten()
-                .collect_vec()
-        } else {
-            (start.0..=end.0)
-                .map(|i| {
-                    let curve = &self.spans()[i];
-                    let (d0, d1) = curve.knots_domain();
-                    let curve_domain = d0..=d1;
-                    match (curve_domain.contains(&min), curve_domain.contains(&max)) {
-                        (true, true) => {
+        let eps = T::default_epsilon();
+        let curves = (start.0..=end.0)
+            .map(|i| {
+                let curve = &self.spans()[i];
+                let (d0, d1) = curve.knots_domain();
+
+                // use epsilon to avoid to trim at the terminal (start / end) of the curve
+                let curve_domain = (d0 + eps)..=(d1 - eps);
+
+                match (curve_domain.contains(&min), curve_domain.contains(&max)) {
+                    (true, true) => {
+                        if inside {
+                            curve.try_trim_range((min, max))
+                        } else {
                             let (head, tail) = curve.try_trim(min)?;
                             let (_, tail2) = tail.try_trim(max)?;
                             Ok(vec![head, tail2])
                         }
-                        (true, false) => curve.try_trim(min).map(|(head, _)| vec![head]),
-                        (false, true) => curve.try_trim(max).map(|(_, tail)| vec![tail]),
-                        (false, false) => {
-                            if range.contains(&d0) {
+                    }
+                    (true, false) => {
+                        curve.try_trim(min).map(
+                            |(head, tail)| {
+                                if inside {
+                                    vec![tail]
+                                } else {
+                                    vec![head]
+                                }
+                            },
+                        )
+                    }
+                    (false, true) => {
+                        curve.try_trim(max).map(
+                            |(head, tail)| {
+                                if inside {
+                                    vec![head]
+                                } else {
+                                    vec![tail]
+                                }
+                            },
+                        )
+                    }
+                    (false, false) => {
+                        let contains = range.contains(&d0);
+                        if inside {
+                            if contains {
+                                Ok(vec![curve.clone()])
+                            } else {
+                                Ok(vec![])
+                            }
+                        } else {
+                            if contains {
                                 Ok(vec![])
                             } else {
                                 Ok(vec![curve.clone()])
                             }
                         }
                     }
-                })
-                .collect::<anyhow::Result<Vec<_>>>()?
-                .into_iter()
-                .flatten()
-                .collect_vec()
-        };
+                }
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?
+            .into_iter()
+            .flatten()
+            .collect_vec();
+
         Ok(curves)
     }
 }

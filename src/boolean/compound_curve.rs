@@ -8,7 +8,7 @@ use crate::{
     region::{CompoundCurve, Region},
 };
 
-use super::clip::clip;
+use super::clip::{clip, Clipped};
 use super::Boolean;
 
 /// Boolean operation for compound curve & NURBS curve
@@ -17,7 +17,8 @@ impl<'a, T: FloatingPoint + ArgminFloat> Boolean<&'a NurbsCurve<T, Const<3>>>
 where
     DefaultAllocator: Allocator<Const<3>>,
 {
-    type Output = anyhow::Result<Vec<Region<T>>>;
+    // type Output = anyhow::Result<Vec<Region<T>>>;
+    type Output = anyhow::Result<Clipped<T>>;
     type Option = Option<CurveIntersectionSolverOptions<T>>;
 
     fn boolean(

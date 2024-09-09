@@ -1,7 +1,8 @@
 use std::{cell::RefCell, cmp::Ordering, rc::Rc};
 
 use itertools::Itertools;
-use nalgebra::{U2, U3};
+use nalgebra::{Point2, U2, U3};
+use num_traits::Float;
 
 use crate::{
     boolean::{
@@ -16,6 +17,32 @@ use crate::{
 
 use super::operation::BooleanOperation;
 
+#[derive(Clone, Debug)]
+pub struct ClipDebugInfo<T>
+where
+    T: FloatingPoint,
+{
+    pub chunks: Vec<((Point2<T>, Status), (Point2<T>, Status))>,
+}
+
+impl<T: FloatingPoint> Default for ClipDebugInfo<T> {
+    fn default() -> Self {
+        Self { chunks: vec![] }
+    }
+}
+
+impl<T: FloatingPoint> ClipDebugInfo<T> {
+    pub fn add(&mut self, chunk: ((Point2<T>, Status), (Point2<T>, Status))) {
+        self.chunks.push(chunk);
+    }
+
+    pub fn chunks(&self) -> &Vec<((Point2<T>, Status), (Point2<T>, Status))> {
+        &self.chunks
+    }
+}
+
+pub type Clipped<T> = (Vec<Region<T>>, ClipDebugInfo<T>);
+
 /// Boolean operation for two curves.
 /// Base algorithm reference: Efficient clipping of arbitrary polygons (https://www.inf.usi.ch/hormann/papers/Greiner.1998.ECO.pdf)
 pub fn clip<'a, T: FloatingPoint, S, C, O: Clone>(
@@ -24,7 +51,8 @@ pub fn clip<'a, T: FloatingPoint, S, C, O: Clone>(
     operation: BooleanOperation,
     option: O,
     intersections: Vec<CompoundCurveIntersection<'a, T, U3>>,
-) -> anyhow::Result<Vec<Region<T>>>
+    // ) -> anyhow::Result<Vec<Region<T>>>
+) -> anyhow::Result<Clipped<T>>
 where
     S: Clone
         + Contains<T, U2, Option = O>
@@ -113,7 +141,8 @@ where
                 anyhow::bail!("Invalid case");
             }
         };
-        return Ok(res);
+        // return Ok(res);
+        return Ok((res, Default::default()));
     }
 
     // create linked list
@@ -243,6 +272,8 @@ where
     );
     */
 
+    let mut info = ClipDebugInfo::default();
+
     loop {
         match non_visited(subject_head_node.clone()) {
             Some(start) => {
@@ -284,6 +315,11 @@ where
                     let n0 = chunk[0].borrow();
                     let n1 = chunk[1].borrow();
 
+                    info.add((
+                        (n0.vertex().position().clone(), n0.status()),
+                        (n1.vertex().position().clone(), n1.status()),
+                    ));
+
                     /*
                     println!(
                         "{:?} {:?} -> {:?} {:?}",
@@ -310,6 +346,7 @@ where
 
                     let c0 = n0.vertex().curve();
                     let c1 = n1.vertex().curve();
+
                     if c0 == c1 {
                         let trimmed = c0.try_trim_range(params)?;
                         spans.extend(trimmed);
@@ -334,5 +371,5 @@ where
         }
     }
 
-    Ok(regions)
+    Ok((regions, info))
 }

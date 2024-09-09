@@ -78,12 +78,14 @@ fn setup(
     let (subject, clip) = boolean::circle_rectangle_case();
     let (subject, clip) = boolean::periodic_interpolation_case();
     let (subject, clip) = boolean::island_case();
+    let (subject, clip) = boolean::compound_circle_and_rectangle_case();
+    let (subject, clip) = boolean::rounded_rectangle_case();
     commands.spawn((ProfileCurves(subject, clip),));
 
     let ops = [
-        BooleanOperation::Intersection,
+        // BooleanOperation::Intersection,
         BooleanOperation::Union,
-        BooleanOperation::Difference,
+        // BooleanOperation::Difference,
     ];
     let n = ops.len();
     let inv_n = 1. / n as f32;
@@ -129,32 +131,26 @@ fn boolean(
         let clip = profile.1.transformed(&trans.into());
         let tr = Transform::from_xyz(0., 5., 0.);
 
-        if let (CurveVariant::Curve(subject), CurveVariant::Curve(clip)) = (subject, clip) {
-            [subject, &clip].iter().for_each(|curve| {
-                let color = Color::rgba(1., 1., 1., 0.2);
-                let pts = curve
-                    .tessellate(None)
-                    .iter()
-                    .map(|pt| pt.cast::<f32>())
-                    .map(|pt| tr * Vec3::new(pt.x, pt.y, 0.))
-                    .collect_vec();
-                gizmos.linestrip(pts, color);
+        [subject, &clip].iter().for_each(|curve| {
+            let color = Color::rgba(1., 1., 1., 0.2);
+            let pts = match curve {
+                CurveVariant::Curve(c) => c.tessellate(None),
+                CurveVariant::Compound(c) => c.tessellate(None),
+                CurveVariant::Region(r) => r.exterior().tessellate(None),
+            };
+            let pts = pts
+                .iter()
+                .map(|pt| pt.cast::<f32>())
+                .map(|pt| tr * Vec3::new(pt.x, pt.y, 0.))
+                .collect_vec();
+            gizmos.linestrip(pts, color);
+        });
 
-                let pt = curve.point_at(curve.knots_domain().0);
-                gizmos.sphere(
-                    pt.coords.cast::<f32>().to_homogeneous().into(),
-                    Quat::IDENTITY,
-                    1e-2,
-                    Color::WHITE,
-                );
-            });
-
-            booleans.iter().for_each(|(BooleanMesh(op), mesh, trans)| {
-                let regions = subject.boolean(*op, &clip, Some(OPTION.clone()));
-                if let Ok(regions) = regions {
-                    let r = regions.first();
-                    let m = r.and_then(|r| r.tessellate(None).ok());
-                    if let Some(tess) = m {
+        booleans.iter().for_each(|(BooleanMesh(op), mesh, trans)| {
+            let regions = subject.boolean(*op, &clip, Some(OPTION.clone()));
+            if let Ok((regions, _)) = regions {
+                regions.iter().for_each(|r| {
+                    if let Some(tess) = r.tessellate(None).ok() {
                         if let Some(mesh) = meshes.get_mut(mesh) {
                             mesh.insert_attribute(
                                 Mesh::ATTRIBUTE_POSITION,
@@ -179,33 +175,33 @@ fn boolean(
                             ));
                         }
                     }
+                });
 
-                    let trans = *trans * Transform::from_xyz(0., 0., 0.5);
-                    regions.iter().for_each(|region| {
-                        let exterior = region.exterior().tessellate(None);
-                        let pts = exterior
+                let trans = *trans * Transform::from_xyz(0., 0., 0.5);
+                regions.iter().for_each(|region| {
+                    let exterior = region.exterior().tessellate(None);
+                    let pts = exterior
+                        .iter()
+                        .cycle()
+                        .take(exterior.len() + 1)
+                        .map(|pt| pt.cast::<f32>())
+                        .map(|pt| trans * Vec3::new(pt.x, pt.y, 0.))
+                        .collect_vec();
+                    gizmos.linestrip(pts, Color::TOMATO.with_a(0.5));
+                    region.interiors().iter().for_each(|interior| {
+                        let interior = interior.tessellate(None);
+                        let pts = interior
                             .iter()
                             .cycle()
-                            .take(exterior.len() + 1)
+                            .take(interior.len() + 1)
                             .map(|pt| pt.cast::<f32>())
                             .map(|pt| trans * Vec3::new(pt.x, pt.y, 0.))
                             .collect_vec();
-                        gizmos.linestrip(pts, Color::TOMATO.with_a(0.5));
-                        region.interiors().iter().for_each(|interior| {
-                            let interior = interior.tessellate(None);
-                            let pts = interior
-                                .iter()
-                                .cycle()
-                                .take(interior.len() + 1)
-                                .map(|pt| pt.cast::<f32>())
-                                .map(|pt| trans * Vec3::new(pt.x, pt.y, 0.))
-                                .collect_vec();
-                            gizmos.linestrip(pts, Color::TURQUOISE.with_a(0.5));
-                        });
+                        gizmos.linestrip(pts, Color::TURQUOISE.with_a(0.5));
                     });
-                }
-            });
-        };
+                });
+            }
+        });
 
         /*
         let intersections = subject

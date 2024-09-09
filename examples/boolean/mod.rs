@@ -1,7 +1,6 @@
 pub mod scenario;
 use curvo::prelude::{
-    operation::BooleanOperation, Boolean, CompoundCurve, CurveIntersectionSolverOptions,
-    NurbsCurve, Region, Transformable,
+    operation::BooleanOperation, Boolean, Clipped, CompoundCurve, CurveIntersectionSolverOptions, NurbsCurve, Region, Transformable
 };
 use nalgebra::{Const, OMatrix, U3};
 pub use scenario::*;
@@ -14,7 +13,8 @@ pub enum CurveVariant {
 }
 
 impl<'a> Boolean<&'a CurveVariant> for CurveVariant {
-    type Output = anyhow::Result<Vec<Region<f64>>>;
+    // type Output = anyhow::Result<Vec<Region<f64>>>;
+    type Output = anyhow::Result<Clipped<f64>>;
     type Option = Option<CurveIntersectionSolverOptions<f64>>;
 
     fn boolean(

@@ -132,6 +132,38 @@ where
         span.map(|span| span.point_at(t))
     }
 
+    /// Check if the curve is closed.
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point2, Vector2};
+    /// use std::f64::consts::{PI, TAU};
+    /// use approx::{assert_relative_eq};
+    /// let o = Point2::origin();
+    /// let dx = Vector2::x();
+    /// let dy = Vector2::y();
+    /// let circle = CompoundCurve::new(vec![
+    ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., 0., PI).unwrap(),
+    ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., PI, TAU).unwrap(),
+    /// ]);
+    /// assert!(circle.is_closed());
+    /// ```
+    pub fn is_closed(&self) -> bool
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+    {
+        let start = self.spans.first().map(|s| s.point_at(s.knots_domain().0));
+        let end = self.spans.last().map(|s| s.point_at(s.knots_domain().1));
+        let eps = T::default_epsilon() * T::from_usize(10).unwrap();
+        match (start, end) {
+            (Some(start), Some(end)) => {
+                let delta = start - end;
+                delta.norm() < eps
+            }
+            _ => false,
+        }
+    }
+
     /// Returns the total length of the compound curve.
     /// ```
     /// use curvo::prelude::*;

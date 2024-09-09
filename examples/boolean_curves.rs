@@ -1,6 +1,6 @@
 use bevy::{
     prelude::*,
-    render::mesh::{PrimitiveTopology, VertexAttributeValues},
+    render::mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
     window::close_on_esc,
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
@@ -62,7 +62,7 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut line_materials: ResMut<Assets<LineMaterial>>,
     mut points_materials: ResMut<Assets<PointsMaterial>>,
-    normal_materials: ResMut<'_, Assets<NormalMaterial>>,
+    mut normal_materials: ResMut<'_, Assets<NormalMaterial>>,
 ) {
     let camera = Camera3dBundle {
         projection: Projection::Perspective(PerspectiveProjection {
@@ -78,6 +78,7 @@ fn setup(
     let (subject, clip) = boolean::periodic_interpolation_case();
     let (subject, clip) = boolean::island_case();
     let (subject, clip) = boolean::compound_circle_and_rectangle_case();
+    let (subject, clip) = boolean::rounded_rectangle_case();
 
     /*
     let delta: f64 = 0.46303153026000005;
@@ -87,11 +88,12 @@ fn setup(
     */
 
     let delta: f64 = 0.0;
-    // let delta: f64 = 1.25;
+    let delta: f64 = 1.25;
+    let delta: f64 = 1.4367686455200002;
     // let delta: f64 = 11.535516751980001;
     // let delta: f64 = 10.24571248974;
     let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);
-    // let clip = clip.transformed(&trans.into());
+    let clip = clip.transformed(&trans.into());
 
     let spawn_curve = |commands: &mut Commands,
                        meshes: &mut ResMut<Assets<Mesh>>,
@@ -312,14 +314,14 @@ fn setup(
     */
 
     let ops = [
-        // BooleanOperation::Union,
+        BooleanOperation::Union,
         // BooleanOperation::Intersection,
-        BooleanOperation::Difference,
+        // BooleanOperation::Difference,
     ];
     let n = ops.len();
     let inv_n = 1. / n as f32;
     let on = inv_n * 0.5;
-    let h = n as f32 * 2.5;
+    let h = n as f32 * 7.5;
 
     /*
     let parameter_eps = 1e-3;
@@ -365,14 +367,61 @@ fn setup(
     */
 
     ops.into_iter().enumerate().for_each(|(i, op)| {
-        let regions = subject.boolean(op, &clip, Some(OPTION.clone())).unwrap();
         let fi = i as f32 * inv_n + on - 0.5;
         let tr = Transform::from_xyz(fi * h, 0., 0.);
+
+        let (regions, info) = subject.boolean(op, &clip, Some(OPTION.clone())).unwrap();
+
+        info.chunks().iter().enumerate().for_each(|(i, (a, b))| {
+            let tr = Transform::from_xyz(0., 0., i as f32 * 1e-1);
+            commands.spawn(MaterialMeshBundle {
+                mesh: meshes.add(PointsMesh {
+                    vertices: [a.0, b.0]
+                        .iter()
+                        .map(|p| p.cast::<f32>().coords.to_homogeneous().into())
+                        .collect(),
+                    colors: Some(
+                        [Color::RED, Color::BLUE]
+                            .iter()
+                            .map(|c| c.clone())
+                            .collect(),
+                    ),
+                }),
+                material: points_materials.add(PointsMaterial {
+                    settings: bevy_points::material::PointsShaderSettings {
+                        point_size: 0.05,
+                        ..Default::default()
+                    },
+                    circle: true,
+                    ..Default::default()
+                }),
+                transform: tr,
+                ..Default::default()
+            });
+
+            let line = Mesh::new(PrimitiveTopology::LineStrip, default()).with_inserted_attribute(
+                Mesh::ATTRIBUTE_POSITION,
+                VertexAttributeValues::Float32x3(
+                    [a.0, b.0]
+                        .iter()
+                        .map(|pt| pt.coords.cast::<f32>().to_homogeneous().into())
+                        .collect(),
+                ),
+            );
+            commands.spawn(MaterialMeshBundle {
+                mesh: meshes.add(line),
+                material: line_materials.add(LineMaterial {
+                    color: Color::WHITE,
+                    ..Default::default()
+                }),
+                transform: tr,
+                ..Default::default()
+            });
+        });
 
         regions.iter().for_each(|region| {
             let tess = region.tessellate(None);
             if let Ok(tess) = tess {
-                /*
                 let mesh = Mesh::new(PrimitiveTopology::TriangleList, default())
                     .with_inserted_attribute(
                         Mesh::ATTRIBUTE_POSITION,
@@ -402,11 +451,11 @@ fn setup(
                             cull_mode: None,
                             ..Default::default()
                         }),
+                        transform: tr,
                         // visibility: Visibility::Hidden,
                         ..Default::default()
                     })
                     .insert(Name::new("Triangulation"));
-                */
             }
 
             region
@@ -420,7 +469,6 @@ fn setup(
                         &mut meshes,
                         &mut line_materials,
                         tr * Transform::from_xyz(0., 0., i as f32 * 1e-1),
-                        // tr,
                         &curve.clone().into(),
                         Some(Color::GREEN),
                         true,

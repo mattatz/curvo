@@ -1,4 +1,4 @@
-use std::f64::consts::{PI, TAU};
+use std::f64::consts::{FRAC_PI_2, PI, TAU};
 
 use curvo::prelude::{CompoundCurve, KnotStyle, NurbsCurve2D};
 use nalgebra::{Point2, Vector2};
@@ -76,6 +76,49 @@ pub fn compound_circle_and_rectangle_case() -> CurveVariants {
     let compound = CompoundCurve::new(vec![
         NurbsCurve2D::try_arc(&o, &dx, &dy, 1., 0., PI).unwrap(),
         NurbsCurve2D::try_arc(&o, &dx, &dy, 1., PI, TAU).unwrap(),
+    ]);
+    let rectangle = NurbsCurve2D::polyline(&[
+        Point2::new(0., 2.),
+        Point2::new(0., -2.),
+        Point2::new(2., -2.),
+        Point2::new(2., 2.),
+        Point2::new(0., 2.),
+    ]);
+    (compound.into(), rectangle.into())
+}
+
+pub fn rounded_rectangle_case() -> CurveVariants {
+    let length = 2.0;
+    let radius = 1.0;
+    let dx = Vector2::x();
+    let dy = Vector2::y();
+    let compound = CompoundCurve::new(vec![
+        NurbsCurve2D::try_arc(
+            &Point2::new(length, 0.),
+            &dx,
+            &dy,
+            radius,
+            -FRAC_PI_2,
+            FRAC_PI_2,
+        )
+        .unwrap(),
+        NurbsCurve2D::polyline(&vec![
+            Point2::new(length, radius),
+            Point2::new(-length, radius),
+        ]),
+        NurbsCurve2D::try_arc(
+            &Point2::new(-length, 0.),
+            &dx,
+            &dy,
+            radius,
+            FRAC_PI_2,
+            PI + FRAC_PI_2,
+        )
+        .unwrap(),
+        NurbsCurve2D::polyline(&vec![
+            Point2::new(-length, -radius),
+            Point2::new(length, -radius),
+        ]),
     ]);
     let rectangle = NurbsCurve2D::polyline(&[
         Point2::new(0., 2.),
