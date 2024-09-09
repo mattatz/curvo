@@ -48,7 +48,7 @@ where
             match self.curve.degree() {
                 1 => {
                     // Avoid degeneracy case for polyline curves as following:
-                    //   |     / 
+                    //   |     /
                     //   |    /
                     // --+--+------- <- intersected at 2 points
                     //   | /
