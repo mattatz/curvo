@@ -5,7 +5,9 @@ use nalgebra::{ComplexField, Const, Point2};
 use crate::{
     curve::NurbsCurve,
     misc::{FloatingPoint, Line},
-    prelude::{CurveIntersection, CurveIntersectionSolverOptions, HasIntersectionParameter},
+    prelude::{
+        CurveIntersection, CurveIntersectionSolverOptions, HasIntersectionParameter, Intersection,
+    },
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]

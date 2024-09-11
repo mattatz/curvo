@@ -1,6 +1,7 @@
 use argmin::core::ArgminFloat;
 use nalgebra::{allocator::Allocator, Const, DefaultAllocator};
 
+use crate::prelude::Intersection;
 use crate::{
     curve::NurbsCurve, misc::FloatingPoint, prelude::CurveIntersectionSolverOptions,
     region::CompoundCurve,
@@ -27,5 +28,27 @@ where
     ) -> Self::Output {
         let intersections = self.find_intersections(other, option.clone())?;
         clip(self, other, operation, option, intersections)
+    }
+}
+
+/// Boolean operation for compound curve & compound curve
+impl<'a, T: FloatingPoint + ArgminFloat> Boolean<&'a CompoundCurve<T, Const<3>>>
+    for CompoundCurve<T, Const<3>>
+where
+    DefaultAllocator: Allocator<Const<3>>,
+{
+    // type Output = anyhow::Result<Vec<Region<T>>>;
+    type Output = anyhow::Result<Clipped<T>>;
+    type Option = Option<CurveIntersectionSolverOptions<T>>;
+
+    fn boolean(
+        &self,
+        operation: super::operation::BooleanOperation,
+        other: &'a CompoundCurve<T, Const<3>>,
+        option: Self::Option,
+    ) -> Self::Output {
+        todo!();
+        // let intersections = self.find_intersections(other, option.clone())?;
+        // clip(self, other, operation, option, intersections)
     }
 }

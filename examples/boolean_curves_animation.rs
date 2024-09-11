@@ -78,8 +78,10 @@ fn setup(
     let (subject, clip) = boolean::circle_rectangle_case();
     let (subject, clip) = boolean::periodic_interpolation_case();
     let (subject, clip) = boolean::island_case();
-    let (subject, clip) = boolean::compound_circle_and_rectangle_case();
-    let (subject, clip) = boolean::rounded_rectangle_case();
+    let (subject, clip) = boolean::compound_circle_x_rectangle_case();
+    let (subject, clip) = boolean::rounded_rectangle_x_rectangle_case();
+    let (subject, clip) = boolean::rounded_t_shape_x_rectangle_case();
+    let (subject, clip) = boolean::rounded_t_shape_x_t_shape_case();
     commands.spawn((ProfileCurves(subject, clip),));
 
     let ops = [
@@ -90,7 +92,7 @@ fn setup(
     let n = ops.len();
     let inv_n = 1. / n as f32;
     let on = inv_n * 0.5;
-    let h = n as f32 * 6.0;
+    let h = n as f32 * 8.0;
 
     ops.into_iter().enumerate().for_each(|(i, op)| {
         let fi = i as f32 * inv_n + on - 0.5;
@@ -118,11 +120,12 @@ fn boolean(
     booleans: Query<(&BooleanMesh, &Handle<Mesh>, &Transform)>,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
-    let delta = time.elapsed_seconds_f64() * 0.78;
+    let delta = time.elapsed_seconds_f64() * 0.75;
     // let delta: f64 = 3.1309608852600004;
     // let delta: f64 = 3.1613637252600006;
     // let delta: f64 = 4.39098702276;
-    // let delta = (delta / 1e-1).floor() * 1e-1;
+    let interval = 1e-1 * 2.;
+    // let delta = (delta / interval).floor() * interval;
     println!("delta: {}", delta);
 
     let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);
@@ -177,7 +180,7 @@ fn boolean(
                     ));
                 }
 
-                let trans = *trans * Transform::from_xyz(0., 0., 0.5);
+                let trans = *trans * Transform::from_xyz(0., 0., 5.5);
                 regions.iter().for_each(|region| {
                     let exterior = region.exterior().tessellate(None);
                     let pts = exterior
@@ -187,7 +190,7 @@ fn boolean(
                         .map(|pt| pt.cast::<f32>())
                         .map(|pt| trans * Vec3::new(pt.x, pt.y, 0.))
                         .collect_vec();
-                    gizmos.linestrip(pts, Color::TOMATO.with_a(0.5));
+                    gizmos.linestrip(pts, Color::SEA_GREEN.with_a(0.5));
                     region.interiors().iter().for_each(|interior| {
                         let interior = interior.tessellate(None);
                         let pts = interior

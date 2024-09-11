@@ -1,4 +1,6 @@
+pub mod compound_curve;
 pub mod compound_curve_intersection;
+pub mod curve;
 pub mod curve_intersection;
 pub mod curve_intersection_bfgs;
 pub mod curve_intersection_problem;
@@ -11,3 +13,11 @@ pub use curve_intersection_bfgs::*;
 pub use curve_intersection_problem::*;
 pub use curve_intersection_solver_options::*;
 pub use has_intersection::*;
+
+/// Intersection between two curves trait
+pub trait Intersection<'a, T> {
+    type Output;
+    type Option;
+
+    fn find_intersections(&'a self, other: T, option: Self::Option) -> Self::Output;
+}

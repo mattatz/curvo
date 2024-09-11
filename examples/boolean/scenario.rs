@@ -52,7 +52,7 @@ pub fn island_case() -> CurveVariants {
     (subject.into(), rectangle(2., 2.))
 }
 
-pub fn compound_circle_and_rectangle_case() -> CurveVariants {
+pub fn compound_circle_x_rectangle_case() -> CurveVariants {
     let rectangle = NurbsCurve2D::polyline(&[
         Point2::new(0., 2.),
         Point2::new(0., -2.),
@@ -63,12 +63,17 @@ pub fn compound_circle_and_rectangle_case() -> CurveVariants {
     (compound_circle(), rectangle.into())
 }
 
-pub fn rounded_rectangle_case() -> CurveVariants {
+pub fn rounded_rectangle_x_rectangle_case() -> CurveVariants {
     (compound_rounded_rectangle(), rectangle(5., 1.))
 }
 
-pub fn rounded_t_shape_case() -> CurveVariants {
+pub fn rounded_t_shape_x_rectangle_case() -> CurveVariants {
     (compound_rounded_t_shape(), rectangle(5., 0.5))
+    // (compound_rounded_t_shape(), rectangle(0.5, 0.5))
+}
+
+pub fn rounded_t_shape_x_t_shape_case() -> CurveVariants {
+    (compound_rounded_t_shape(), compound_rounded_t_shape())
 }
 
 fn rectangle(width: f64, height: f64) -> CurveVariant {

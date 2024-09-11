@@ -1,6 +1,10 @@
 use nalgebra::{Point2, Rotation2, Translation2};
 
-use crate::{curve::NurbsCurve2D, misc::Transformable, prelude::CurveIntersectionSolverOptions};
+use crate::{
+    curve::NurbsCurve2D,
+    misc::Transformable,
+    prelude::{CurveIntersectionSolverOptions, Intersection},
+};
 
 use super::KnotStyle;
 

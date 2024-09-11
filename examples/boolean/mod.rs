@@ -29,7 +29,9 @@ impl<'a> Boolean<&'a CurveVariant> for CurveVariant {
             (CurveVariant::Curve(_), CurveVariant::Compound(_)) => todo!(),
             (CurveVariant::Curve(_), CurveVariant::Region(_)) => todo!(),
             (CurveVariant::Compound(s), CurveVariant::Curve(c)) => s.boolean(operation, c, option),
-            (CurveVariant::Compound(_), CurveVariant::Compound(_)) => todo!(),
+            (CurveVariant::Compound(s), CurveVariant::Compound(c)) => {
+                s.boolean(operation, c, option)
+            }
             (CurveVariant::Compound(_), CurveVariant::Region(_)) => todo!(),
             (CurveVariant::Region(_), CurveVariant::Curve(_)) => todo!(),
             (CurveVariant::Region(_), CurveVariant::Compound(_)) => todo!(),

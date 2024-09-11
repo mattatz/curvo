@@ -12,7 +12,7 @@ use bevy_points::{mesh::PointsMesh, plugin::PointsPlugin, prelude::PointsMateria
 use boolean::CurveVariant;
 use itertools::Itertools;
 use materials::*;
-use nalgebra::{Isometry, Isometry2, Isometry3, Rotation2, Translation2};
+use nalgebra::{Rotation2, Translation2};
 
 mod boolean;
 mod materials;
@@ -77,11 +77,12 @@ fn setup(
     let (subject, clip) = boolean::circle_rectangle_case();
     let (subject, clip) = boolean::periodic_interpolation_case();
     let (subject, clip) = boolean::island_case();
-    let (subject, clip) = boolean::compound_circle_and_rectangle_case();
-    let (subject, clip) = boolean::rounded_rectangle_case();
+    let (subject, clip) = boolean::compound_circle_x_rectangle_case();
+    let (subject, clip) = boolean::rounded_rectangle_x_rectangle_case();
+    let (subject, clip) = boolean::rounded_t_shape_x_rectangle_case();
 
     let delta: f64 = 0.0;
-    let delta: f64 = 2.2;
+    let delta = 0.5230397505000001_f64;
     let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);
     let clip = clip.transformed(&trans.into());
 
@@ -142,11 +143,13 @@ fn setup(
         });
     };
 
+    let basis = Transform::from_xyz(0., 5., 0.);
+
     spawn_curve(
         &mut commands,
         &mut meshes,
         &mut line_materials,
-        Transform::default(),
+        basis,
         &subject,
         None,
         false,
@@ -156,7 +159,7 @@ fn setup(
         &mut commands,
         &mut meshes,
         &mut line_materials,
-        Transform::default(),
+        basis,
         &clip,
         None,
         false,
@@ -187,6 +190,7 @@ fn setup(
                     circle: true,
                     ..Default::default()
                 }),
+                transform: basis,
                 // visibility: Visibility::Hidden,
                 ..Default::default()
             })
@@ -194,9 +198,9 @@ fn setup(
     });
 
     let ops = [
-        // BooleanOperation::Union,
+        BooleanOperation::Union,
         // BooleanOperation::Intersection,
-        BooleanOperation::Difference,
+        // BooleanOperation::Difference,
     ];
     let n = ops.len();
     let inv_n = 1. / n as f32;
@@ -209,52 +213,63 @@ fn setup(
 
         let (regions, info) = subject.boolean(op, &clip, Some(OPTION.clone())).unwrap();
 
-        info.chunks().iter().enumerate().for_each(|(i, (a, b))| {
-            let tr = Transform::from_xyz(0., 0., i as f32 * 1e-1);
-            commands.spawn(MaterialMeshBundle {
-                mesh: meshes.add(PointsMesh {
-                    vertices: [a.0, b.0]
-                        .iter()
-                        .map(|p| p.cast::<f32>().coords.to_homogeneous().into())
-                        .collect(),
-                    colors: Some(
-                        [Color::RED, Color::BLUE]
-                            .iter()
-                            .map(|c| c.clone())
-                            .collect(),
-                    ),
-                }),
-                material: points_materials.add(PointsMaterial {
-                    settings: bevy_points::material::PointsShaderSettings {
-                        point_size: 0.05,
-                        ..Default::default()
-                    },
-                    circle: true,
-                    ..Default::default()
-                }),
-                transform: tr,
-                ..Default::default()
-            });
-
-            let line = Mesh::new(PrimitiveTopology::LineStrip, default()).with_inserted_attribute(
-                Mesh::ATTRIBUTE_POSITION,
-                VertexAttributeValues::Float32x3(
-                    [a.0, b.0]
-                        .iter()
-                        .map(|pt| pt.coords.cast::<f32>().to_homogeneous().into())
-                        .collect(),
-                ),
+        info.spans().iter().enumerate().for_each(|(i, span)| {
+            spawn_curve(
+                &mut commands,
+                &mut meshes,
+                &mut line_materials,
+                tr * Transform::from_xyz(0., 0., i as f32 * 1e-1),
+                &span.clone().into(),
+                Some(Color::GREEN),
+                true,
             );
-            commands.spawn(MaterialMeshBundle {
-                mesh: meshes.add(line),
-                material: line_materials.add(LineMaterial {
-                    color: Color::WHITE,
-                    ..Default::default()
-                }),
-                transform: tr,
-                ..Default::default()
-            });
         });
+
+        info.node_chunks()
+            .iter()
+            .enumerate()
+            .for_each(|(i, (a, b))| {
+                let tr = Transform::from_xyz(0., 0., i as f32 * 1e-1);
+                commands.spawn(MaterialMeshBundle {
+                    mesh: meshes.add(PointsMesh {
+                        vertices: [a.0, b.0]
+                            .iter()
+                            .map(|p| p.cast::<f32>().coords.to_homogeneous().into())
+                            .collect(),
+                        colors: Some([Color::RED, Color::BLUE].to_vec()),
+                    }),
+                    material: points_materials.add(PointsMaterial {
+                        settings: bevy_points::material::PointsShaderSettings {
+                            point_size: 0.05,
+                            ..Default::default()
+                        },
+                        circle: true,
+                        ..Default::default()
+                    }),
+                    transform: tr,
+                    ..Default::default()
+                });
+
+                let line = Mesh::new(PrimitiveTopology::LineStrip, default())
+                    .with_inserted_attribute(
+                        Mesh::ATTRIBUTE_POSITION,
+                        VertexAttributeValues::Float32x3(
+                            [a.0, b.0]
+                                .iter()
+                                .map(|pt| pt.coords.cast::<f32>().to_homogeneous().into())
+                                .collect(),
+                        ),
+                    );
+                commands.spawn(MaterialMeshBundle {
+                    mesh: meshes.add(line),
+                    material: line_materials.add(LineMaterial {
+                        color: Color::WHITE,
+                        ..Default::default()
+                    }),
+                    transform: tr,
+                    ..Default::default()
+                });
+            });
 
         regions.iter().for_each(|region| {
             let tess = region.tessellate(None);
@@ -295,6 +310,7 @@ fn setup(
                     .insert(Name::new("Triangulation"));
             }
 
+            /*
             region
                 .exterior()
                 .spans()
@@ -324,6 +340,7 @@ fn setup(
                     );
                 });
             });
+            */
         });
     });
 }

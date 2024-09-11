@@ -5,7 +5,7 @@ use argmin::core::ArgminFloat;
 use itertools::Itertools;
 use nalgebra::{allocator::Allocator, Const, DefaultAllocator};
 
-use crate::prelude::CompoundCurveIntersection;
+use crate::prelude::{CompoundCurveIntersection, Intersection};
 use crate::{curve::NurbsCurve, misc::FloatingPoint, prelude::CurveIntersectionSolverOptions};
 
 /// Boolean operation for two NURBS curves.
