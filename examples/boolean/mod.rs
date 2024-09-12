@@ -14,7 +14,6 @@ pub enum CurveVariant {
 }
 
 impl<'a> Boolean<&'a CurveVariant> for CurveVariant {
-    // type Output = anyhow::Result<Vec<Region<f64>>>;
     type Output = anyhow::Result<Clip<f64>>;
     type Option = Option<CurveIntersectionSolverOptions<f64>>;
 
@@ -26,7 +25,7 @@ impl<'a> Boolean<&'a CurveVariant> for CurveVariant {
     ) -> Self::Output {
         match (self, other) {
             (CurveVariant::Curve(s), CurveVariant::Curve(c)) => s.boolean(operation, c, option),
-            (CurveVariant::Curve(_), CurveVariant::Compound(_)) => todo!(),
+            (CurveVariant::Curve(s), CurveVariant::Compound(c)) => s.boolean(operation, c, option),
             (CurveVariant::Curve(_), CurveVariant::Region(_)) => todo!(),
             (CurveVariant::Compound(s), CurveVariant::Curve(c)) => s.boolean(operation, c, option),
             (CurveVariant::Compound(s), CurveVariant::Compound(c)) => {

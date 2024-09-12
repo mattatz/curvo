@@ -47,6 +47,10 @@ where
     pub fn b_curve(&self) -> &NurbsCurve<T, D> {
         self.b.0.borrow()
     }
+
+    pub fn swap(&mut self) {
+        std::mem::swap(&mut self.a, &mut self.b);
+    }
 }
 
 impl<'a, T: FloatingPoint, D: DimName> HasIntersectionParameter<T>

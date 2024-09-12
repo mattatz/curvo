@@ -68,6 +68,10 @@ impl<T: FloatingPoint> Clip<T> {
         &self.regions
     }
 
+    pub fn into_regions(self) -> Vec<Region<T>> {
+        self.regions
+    }
+
     pub fn info(&self) -> &ClipDebugInfo<T> {
         &self.info
     }

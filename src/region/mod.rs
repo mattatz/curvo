@@ -27,6 +27,10 @@ impl<T: FloatingPoint> Region<T> {
         &self.exterior
     }
 
+    pub fn into_exterior(self) -> CompoundCurve<T, Const<3>> {
+        self.exterior
+    }
+
     pub fn interiors(&self) -> &[CompoundCurve<T, Const<3>>] {
         &self.interiors
     }
