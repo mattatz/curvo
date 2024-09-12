@@ -47,8 +47,7 @@ where
         other: &'a CompoundCurve<T, Const<3>>,
         option: Self::Option,
     ) -> Self::Output {
-        todo!();
-        // let intersections = self.find_intersections(other, option.clone())?;
-        // clip(self, other, operation, option, intersections)
+        let intersections = self.find_intersections(other, option.clone())?;
+        clip(self, other, operation, option, intersections)
     }
 }

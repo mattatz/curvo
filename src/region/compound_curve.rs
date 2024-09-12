@@ -34,7 +34,8 @@ where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
-        let eps = T::from_f64(1e-5).unwrap();
+        // epsilon for determining the connected points
+        let epsilon = T::from_f64(1e-4).unwrap();
 
         // Ensure the adjacent spans are connected in the forward direction.
         let mut curves = spans.clone();
@@ -43,7 +44,7 @@ where
             let current = connected.len() - 1;
             let last = &connected[current];
             let found = curves.iter().enumerate().find_map(|(i, c)| {
-                CurveDirection::new(last, c, eps).map(|direction| (i, direction))
+                CurveDirection::new(last, c, epsilon).map(|direction| (i, direction))
             });
             match found {
                 Some((index, direction)) => {
@@ -273,4 +274,3 @@ where
         self.spans.reverse();
     }
 }
-
