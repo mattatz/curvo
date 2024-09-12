@@ -7,9 +7,9 @@ mod degeneracies;
 mod has_parameter;
 pub mod node;
 pub mod operation;
+pub mod region;
 pub mod status;
 mod vertex;
-pub mod region;
 pub use clip::Clip;
 
 /// A trait for boolean operations.
