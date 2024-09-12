@@ -81,7 +81,9 @@ fn setup(
     let (subject, clip) = boolean::compound_circle_x_rectangle_case();
     let (subject, clip) = boolean::rounded_rectangle_x_rectangle_case();
     let (subject, clip) = boolean::rounded_t_shape_x_rectangle_case();
-    let (subject, clip) = boolean::rounded_t_shape_x_t_shape_case();
+    let (subject, clip) = boolean::rectangular_annulus_x_rectangle();
+    // let (clip, subject) = (subject, clip);
+    // let (subject, clip) = boolean::rounded_t_shape_x_t_shape_case();
     commands.spawn((ProfileCurves(subject, clip),));
 
     let ops = [
@@ -128,7 +130,8 @@ fn boolean(
     // let delta = (delta / interval).floor() * interval;
     println!("delta: {}", delta);
 
-    let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);
+    // let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);
+    let trans = Translation2::new(delta.cos(), 0.);
 
     if let Ok(profile) = profile.get_single() {
         let subject = &profile.0;
@@ -148,6 +151,18 @@ fn boolean(
                 .map(|pt| tr * Vec3::new(pt.x, pt.y, 0.))
                 .collect_vec();
             gizmos.linestrip(pts, color);
+
+            if let CurveVariant::Region(r) = curve {
+                r.interiors().iter().for_each(|interior| {
+                    let pts = interior.tessellate(None);
+                    let pts = pts
+                        .iter()
+                        .map(|pt| pt.cast::<f32>())
+                        .map(|pt| tr * Vec3::new(pt.x, pt.y, 0.))
+                        .collect_vec();
+                    gizmos.linestrip(pts, color);
+                });
+            }
         });
 
         booleans.iter().for_each(|(BooleanMesh(op), mesh, trans)| {

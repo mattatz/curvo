@@ -79,11 +79,13 @@ fn setup(
     let (subject, clip) = boolean::island_case();
     let (subject, clip) = boolean::compound_circle_x_rectangle_case();
     let (subject, clip) = boolean::rounded_rectangle_x_rectangle_case();
-    let (subject, clip) = boolean::rounded_t_shape_x_rectangle_case();
-    let (subject, clip) = boolean::rounded_t_shape_x_t_shape_case();
+    let (subject, clip) = boolean::rectangular_annulus_x_rectangle();
+    // let (subject, clip) = boolean::rounded_t_shape_x_rectangle_case();
+    // let (subject, clip) = boolean::rounded_t_shape_x_t_shape_case();
 
     let delta: f64 = 0.0;
-    let delta = 3.1262987190000002_f64;
+    // let delta = 3.1262987190000002_f64;
+    let delta = 1.6338482505_f64;
     let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);
     let clip = clip.transformed(&trans.into());
 
@@ -97,7 +99,14 @@ fn setup(
         let curves: Vec<&NurbsCurve2D<f64>> = match curve {
             CurveVariant::Curve(c) => vec![c],
             CurveVariant::Compound(c) => c.spans().iter().collect_vec(),
-            CurveVariant::Region(r) => todo!(),
+            CurveVariant::Region(r) => {
+                let ex = r.exterior().spans().iter().collect_vec();
+                r.interiors()
+                    .iter()
+                    .flat_map(|i| i.spans())
+                    .chain(ex)
+                    .collect()
+            }
         };
         curves.iter().for_each(|curve| {
             let samples = curve.tessellate(Some(1e-8));
