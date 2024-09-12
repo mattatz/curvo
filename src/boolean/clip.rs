@@ -53,7 +53,25 @@ impl<T: FloatingPoint> ClipDebugInfo<T> {
     }
 }
 
-pub type Clipped<T> = (Vec<Region<T>>, ClipDebugInfo<T>);
+/// A clip result
+pub struct Clip<T: FloatingPoint> {
+    regions: Vec<Region<T>>,
+    info: ClipDebugInfo<T>,
+}
+
+impl<T: FloatingPoint> Clip<T> {
+    pub fn new(regions: Vec<Region<T>>, info: ClipDebugInfo<T>) -> Self {
+        Self { regions, info }
+    }
+
+    pub fn regions(&self) -> &Vec<Region<T>> {
+        &self.regions
+    }
+
+    pub fn info(&self) -> &ClipDebugInfo<T> {
+        &self.info
+    }
+}
 
 /// Boolean operation for two curves.
 /// Base algorithm reference: Efficient clipping of arbitrary polygons (https://www.inf.usi.ch/hormann/papers/Greiner.1998.ECO.pdf)
@@ -63,8 +81,7 @@ pub fn clip<'a, T: FloatingPoint, S, C, O: Clone>(
     operation: BooleanOperation,
     option: O,
     intersections: Vec<CompoundCurveIntersection<'a, T, U3>>,
-    // ) -> anyhow::Result<Vec<Region<T>>>
-) -> anyhow::Result<Clipped<T>>
+) -> anyhow::Result<Clip<T>>
 where
     S: Clone
         + Contains<T, U2, Option = O>
@@ -155,7 +172,7 @@ where
             }
         };
         // return Ok(res);
-        return Ok((res, Default::default()));
+        return Ok(Clip::new(res, Default::default()));
     }
 
     // create linked list
@@ -366,12 +383,9 @@ where
                 }
 
                 if !spans.is_empty() {
-                    /*
-                    println!("spans: {:?}", spans.len());
                     spans.iter().for_each(|span| {
                         info.add_span(span.clone());
                     });
-                    */
                     let region = Region::new(CompoundCurve::new(spans), vec![]);
                     regions.push(region);
                 }
@@ -382,5 +396,5 @@ where
         }
     }
 
-    Ok((regions, info))
+    Ok(Clip::new(regions, info))
 }

@@ -80,9 +80,10 @@ fn setup(
     let (subject, clip) = boolean::compound_circle_x_rectangle_case();
     let (subject, clip) = boolean::rounded_rectangle_x_rectangle_case();
     let (subject, clip) = boolean::rounded_t_shape_x_rectangle_case();
+    let (subject, clip) = boolean::rounded_t_shape_x_t_shape_case();
 
     let delta: f64 = 0.0;
-    let delta = 0.5230397505000001_f64;
+    let delta = 3.1262987190000002_f64;
     let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);
     let clip = clip.transformed(&trans.into());
 
@@ -198,8 +199,8 @@ fn setup(
     });
 
     let ops = [
-        BooleanOperation::Union,
-        // BooleanOperation::Intersection,
+        // BooleanOperation::Union,
+        BooleanOperation::Intersection,
         // BooleanOperation::Difference,
     ];
     let n = ops.len();
@@ -211,7 +212,9 @@ fn setup(
         let fi = i as f32 * inv_n + on - 0.5;
         let tr = Transform::from_xyz(fi * h, 0., 0.);
 
-        let (regions, info) = subject.boolean(op, &clip, Some(OPTION.clone())).unwrap();
+        let clip = subject.boolean(op, &clip, Some(OPTION.clone())).unwrap();
+        let regions = clip.regions();
+        let info = clip.info();
 
         info.spans().iter().enumerate().for_each(|(i, span)| {
             spawn_curve(

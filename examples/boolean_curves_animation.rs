@@ -152,7 +152,8 @@ fn boolean(
 
         booleans.iter().for_each(|(BooleanMesh(op), mesh, trans)| {
             let regions = subject.boolean(*op, &clip, Some(OPTION.clone()));
-            if let Ok((regions, _)) = regions {
+            if let Ok(clip) = regions {
+                let regions = clip.regions();
                 let tess: PolygonMesh<f64, U2> =
                     regions.iter().filter_map(|r| r.tessellate(None).ok()).sum();
 

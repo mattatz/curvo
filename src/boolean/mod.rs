@@ -9,7 +9,8 @@ pub mod node;
 pub mod operation;
 pub mod status;
 mod vertex;
-pub use clip::Clipped;
+pub mod region;
+pub use clip::Clip;
 
 /// A trait for boolean operations.
 pub trait Boolean<T> {
