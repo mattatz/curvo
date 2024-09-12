@@ -1,6 +1,6 @@
 use std::f64::consts::{FRAC_PI_2, PI, TAU};
 
-use curvo::prelude::{CompoundCurve, KnotStyle, NurbsCurve2D};
+use curvo::prelude::{CompoundCurve, KnotStyle, NurbsCurve2D, Region};
 use nalgebra::{Point2, Vector2};
 
 use super::CurveVariant;
@@ -74,6 +74,10 @@ pub fn rounded_t_shape_x_rectangle_case() -> CurveVariants {
 
 pub fn rounded_t_shape_x_t_shape_case() -> CurveVariants {
     (compound_rounded_t_shape(), compound_rounded_t_shape())
+}
+
+pub fn rectangular_annulus_x_rectangle() -> CurveVariants {
+    (rectangular_annulus(2.5, 2., 0.75), rectangle(1.2, 1.4))
 }
 
 fn rectangle(width: f64, height: f64) -> CurveVariant {
@@ -168,5 +172,30 @@ fn compound_rounded_t_shape() -> CurveVariant {
             Point2::new(w_length, -radius),
         ]),
     ])
+    .into()
+}
+
+fn rectangular_annulus(width: f64, height: f64, square_size: f64) -> CurveVariant {
+    let dx = width * 0.5;
+    let dy = height * 0.5;
+    let size = (square_size * 0.5).min(dx).min(dy);
+    Region::new(
+        NurbsCurve2D::polyline(&[
+            Point2::new(-dx, -dy),
+            Point2::new(dx, -dy),
+            Point2::new(dx, dy),
+            Point2::new(-dx, dy),
+            Point2::new(-dx, -dy),
+        ])
+        .into(),
+        vec![NurbsCurve2D::polyline(&[
+            Point2::new(-size, -size),
+            Point2::new(size, -size),
+            Point2::new(size, size),
+            Point2::new(-size, size),
+            Point2::new(-size, -size),
+        ])
+        .into()],
+    )
     .into()
 }

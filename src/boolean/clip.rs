@@ -68,6 +68,10 @@ impl<T: FloatingPoint> Clip<T> {
         &self.regions
     }
 
+    pub fn regions_mut(&mut self) -> &mut Vec<Region<T>> {
+        &mut self.regions
+    }
+
     pub fn into_regions(self) -> Vec<Region<T>> {
         self.regions
     }

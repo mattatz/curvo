@@ -3,7 +3,10 @@ pub mod compound_curve;
 mod curve_direction;
 pub use compound_curve::*;
 
-use crate::misc::{FloatingPoint, Invertible, Transformable};
+use crate::{
+    curve::NurbsCurve,
+    misc::{FloatingPoint, Invertible, Transformable},
+};
 
 /// A closed region bounded by a single exterior curve and zero or more interior curves.
 #[derive(Clone, Debug)]
@@ -23,6 +26,10 @@ impl<T: FloatingPoint> Region<T> {
         }
     }
 
+    pub fn into_tuple(self) -> (CompoundCurve<T, Const<3>>, Vec<CompoundCurve<T, Const<3>>>) {
+        (self.exterior, self.interiors)
+    }
+
     pub fn exterior(&self) -> &CompoundCurve<T, Const<3>> {
         &self.exterior
     }
@@ -33,6 +40,14 @@ impl<T: FloatingPoint> Region<T> {
 
     pub fn interiors(&self) -> &[CompoundCurve<T, Const<3>>] {
         &self.interiors
+    }
+
+    pub fn into_interiors(self) -> Vec<CompoundCurve<T, Const<3>>> {
+        self.interiors
+    }
+
+    pub fn interiors_mut(&mut self) -> &mut Vec<CompoundCurve<T, Const<3>>> {
+        &mut self.interiors
     }
 }
 
@@ -51,5 +66,17 @@ impl<T: FloatingPoint> Invertible for Region<T> {
         self.interiors
             .iter_mut()
             .for_each(|interior| interior.invert());
+    }
+}
+
+impl<T: FloatingPoint> From<NurbsCurve<T, U3>> for Region<T> {
+    fn from(value: NurbsCurve<T, U3>) -> Self {
+        Self::new(value.into(), vec![])
+    }
+}
+
+impl<T: FloatingPoint> From<CompoundCurve<T, U3>> for Region<T> {
+    fn from(value: CompoundCurve<T, U3>) -> Self {
+        Self::new(value, vec![])
     }
 }
