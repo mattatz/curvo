@@ -79,9 +79,10 @@ fn setup(
     let (subject, clip) = boolean::island_case();
     let (subject, clip) = boolean::compound_circle_x_rectangle_case();
     let (subject, clip) = boolean::rounded_rectangle_x_rectangle_case();
-    let (subject, clip) = boolean::rectangular_annulus_x_rectangle();
+    let (subject, clip) = boolean::rectangular_annulus_x_rectangle_case();
     // let (subject, clip) = boolean::rounded_t_shape_x_rectangle_case();
     // let (subject, clip) = boolean::rounded_t_shape_x_t_shape_case();
+    let (subject, clip) = boolean::rectangular_annulus_x_rectangular_annulus_case();
 
     let delta: f64 = 0.0;
     // let delta = 3.1262987190000002_f64;

@@ -29,7 +29,7 @@ impl<'a, T: FloatingPoint + ArgminFloat> Boolean<&'a NurbsCurve<T, U3>> for Regi
     }
 }
 
-/// Boolean operation for Region & NURBS curve
+/// Boolean operation for Region & CompoundCurve
 impl<'a, T: FloatingPoint + ArgminFloat> Boolean<&'a CompoundCurve<T, U3>> for Region<T> {
     type Output = anyhow::Result<Clip<T>>;
     type Option = Option<CurveIntersectionSolverOptions<T>>;
@@ -143,6 +143,37 @@ impl<'a, T: FloatingPoint + ArgminFloat> Boolean<&'a CompoundCurve<T, U3>> for R
                 Ok(Clip::new(regions, Default::default()))
             }
         }
+    }
+}
+
+/// Boolean operation for Region & Region
+impl<'a, T: FloatingPoint + ArgminFloat> Boolean<&'a Region<T>> for Region<T> {
+    type Output = anyhow::Result<Clip<T>>;
+    type Option = Option<CurveIntersectionSolverOptions<T>>;
+
+    fn boolean(
+        &self,
+        operation: BooleanOperation,
+        other: &'a Region<T>,
+        option: Self::Option,
+    ) -> Self::Output {
+        let clip = self.boolean(operation, other.exterior(), option.clone())?;
+        let mut regions = clip.into_regions();
+
+        for interior in other.interiors().iter() {
+            match operation {
+                BooleanOperation::Union | BooleanOperation::Intersection => {
+                    let clips = regions
+                        .iter()
+                        .map(|r| r.boolean(BooleanOperation::Difference, interior, option.clone()))
+                        .collect::<anyhow::Result<Vec<_>>>()?;
+                    regions = clips.into_iter().flat_map(|c| c.into_regions()).collect();
+                }
+                BooleanOperation::Difference => {}
+            };
+        }
+
+        Ok(Clip::new(regions, Default::default()))
     }
 }
 

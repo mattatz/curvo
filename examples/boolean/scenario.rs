@@ -76,8 +76,22 @@ pub fn rounded_t_shape_x_t_shape_case() -> CurveVariants {
     (compound_rounded_t_shape(), compound_rounded_t_shape())
 }
 
-pub fn rectangular_annulus_x_rectangle() -> CurveVariants {
+pub fn rectangular_annulus_x_rectangle_case() -> CurveVariants {
     (rectangular_annulus(2.5, 2., 0.75), rectangle(3.2, 0.8))
+}
+
+pub fn rectangular_annulus_x_t_shape_case() -> CurveVariants {
+    (
+        rectangular_annulus(2.5, 2., 0.75),
+        compound_rounded_t_shape(),
+    )
+}
+
+pub fn rectangular_annulus_x_rectangular_annulus_case() -> CurveVariants {
+    (
+        rectangular_annulus(2.5, 2., 0.75),
+        rectangular_annulus(1.5, 1., 0.5),
+    )
 }
 
 fn rectangle(width: f64, height: f64) -> CurveVariant {

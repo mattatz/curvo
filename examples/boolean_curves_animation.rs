@@ -81,9 +81,10 @@ fn setup(
     let (subject, clip) = boolean::compound_circle_x_rectangle_case();
     let (subject, clip) = boolean::rounded_rectangle_x_rectangle_case();
     let (subject, clip) = boolean::rounded_t_shape_x_rectangle_case();
-    let (subject, clip) = boolean::rectangular_annulus_x_rectangle();
+    let (subject, clip) = boolean::rectangular_annulus_x_rectangle_case();
+    let (subject, clip) = boolean::rectangular_annulus_x_t_shape_case();
+    let (subject, clip) = boolean::rectangular_annulus_x_rectangular_annulus_case();
     // let (clip, subject) = (subject, clip);
-    // let (subject, clip) = boolean::rounded_t_shape_x_t_shape_case();
     commands.spawn((ProfileCurves(subject, clip),));
 
     let ops = [
@@ -130,8 +131,8 @@ fn boolean(
     // let delta = (delta / interval).floor() * interval;
     println!("delta: {}", delta);
 
-    // let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);
-    let trans = Translation2::new(delta.cos(), 0.);
+    let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);
+    // let trans = Translation2::new(delta.cos(), 0.);
 
     if let Ok(profile) = profile.get_single() {
         let subject = &profile.0;
