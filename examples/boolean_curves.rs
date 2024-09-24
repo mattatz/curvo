@@ -26,7 +26,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                resolution: (864., 480.).into(),
+                resolution: (640., 480.).into(),
                 ..Default::default()
             }),
             ..Default::default()
@@ -74,19 +74,17 @@ fn setup(
     };
     commands.spawn((camera, PanOrbitCamera::default()));
 
-    let (subject, clip) = boolean::circle_rectangle_case();
-    let (subject, clip) = boolean::periodic_interpolation_case();
-    let (subject, clip) = boolean::island_case();
-    let (subject, clip) = boolean::compound_circle_x_rectangle_case();
-    let (subject, clip) = boolean::rounded_rectangle_x_rectangle_case();
+    // let (subject, clip) = boolean::circle_rectangle_case();
+    // let (subject, clip) = boolean::periodic_interpolation_case();
+    // let (subject, clip) = boolean::island_case();
+    // let (subject, clip) = boolean::compound_circle_x_rectangle_case();
+    // let (subject, clip) = boolean::rounded_rectangle_x_rectangle_case();
     let (subject, clip) = boolean::rectangular_annulus_x_rectangle_case();
     // let (subject, clip) = boolean::rounded_t_shape_x_rectangle_case();
     // let (subject, clip) = boolean::rounded_t_shape_x_t_shape_case();
-    let (subject, clip) = boolean::rectangular_annulus_x_rectangular_annulus_case();
+    // let (subject, clip) = boolean::rectangular_annulus_x_rectangular_annulus_case();
 
     let delta: f64 = 0.0;
-    // let delta = 3.1262987190000002_f64;
-    let delta = 1.6338482505_f64;
     let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);
     let clip = clip.transformed(&trans.into());
 
@@ -209,9 +207,9 @@ fn setup(
     });
 
     let ops = [
-        // BooleanOperation::Union,
+        BooleanOperation::Union,
         BooleanOperation::Intersection,
-        // BooleanOperation::Difference,
+        BooleanOperation::Difference,
     ];
     let n = ops.len();
     let inv_n = 1. / n as f32;

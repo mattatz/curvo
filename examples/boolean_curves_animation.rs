@@ -31,6 +31,8 @@ const OPTION: CurveIntersectionSolverOptions<f64> = CurveIntersectionSolverOptio
     minimum_distance: 1e-4,
     knot_domain_division: 500,
     max_iters: 1000,
+    // knot_domain_division: 100,
+    // max_iters: 200,
     step_size_tolerance: 1e-8,
     cost_tolerance: 1e-10,
 };
@@ -39,7 +41,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                resolution: (864., 480.).into(),
+                resolution: (640., 480.).into(),
                 ..Default::default()
             }),
             ..Default::default()
@@ -75,15 +77,15 @@ fn setup(
     commands.spawn((camera, PanOrbitCamera::default()));
     commands.spawn(InfiniteGridBundle::default());
 
-    let (subject, clip) = boolean::circle_rectangle_case();
-    let (subject, clip) = boolean::periodic_interpolation_case();
-    let (subject, clip) = boolean::island_case();
-    let (subject, clip) = boolean::compound_circle_x_rectangle_case();
-    let (subject, clip) = boolean::rounded_rectangle_x_rectangle_case();
-    let (subject, clip) = boolean::rounded_t_shape_x_rectangle_case();
-    let (subject, clip) = boolean::rectangular_annulus_x_rectangle_case();
+    // let (subject, clip) = boolean::circle_rectangle_case();
+    // let (subject, clip) = boolean::periodic_interpolation_case();
+    // let (subject, clip) = boolean::island_case();
+    // let (subject, clip) = boolean::compound_circle_x_rectangle_case();
+    // let (subject, clip) = boolean::rounded_rectangle_x_rectangle_case();
+    // let (subject, clip) = boolean::rounded_t_shape_x_rectangle_case();
+    // let (subject, clip) = boolean::rectangular_annulus_x_rectangle_case();
     let (subject, clip) = boolean::rectangular_annulus_x_t_shape_case();
-    let (subject, clip) = boolean::rectangular_annulus_x_rectangular_annulus_case();
+    // let (subject, clip) = boolean::rectangular_annulus_x_rectangular_annulus_case();
     // let (clip, subject) = (subject, clip);
     commands.spawn((ProfileCurves(subject, clip),));
 

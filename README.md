@@ -38,6 +38,8 @@ Additional features are as follows:
 
 <img src="https://github.com/mattatz/curvo/assets/1085910/55f214ec-668a-4d18-8fa8-bfa5ca23b3a2" width="360px" alt="Iso-curves on a surface" />
 
+<img src="https://github.com/user-attachments/assets/a4cef924-b3a9-410d-aebc-477f6f86f193" width="360px" alt="Boolean operations between NURBS curves" />
+
 ## Usage
 
 ```rust
