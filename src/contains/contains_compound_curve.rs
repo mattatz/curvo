@@ -1,9 +1,8 @@
 use argmin::core::ArgminFloat;
-use itertools::Itertools;
 use nalgebra::{Const, Point2};
 
 use crate::{
-    contains::curve::x_ray_intersection,
+    contains::contains_curve::x_ray_intersection,
     misc::FloatingPoint,
     prelude::{BoundingBox, CurveIntersectionSolverOptions},
     region::CompoundCurve,

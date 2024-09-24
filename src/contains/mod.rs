@@ -1,5 +1,5 @@
-pub mod compound_curve;
-pub mod curve;
+pub mod contains_compound_curve;
+pub mod contains_curve;
 
 use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, OPoint};
 

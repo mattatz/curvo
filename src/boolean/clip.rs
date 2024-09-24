@@ -18,6 +18,7 @@ use crate::{
 use super::operation::BooleanOperation;
 
 #[derive(Clone, Debug)]
+#[allow(clippy::type_complexity)]
 pub struct ClipDebugInfo<T>
 where
     T: FloatingPoint,
@@ -35,6 +36,7 @@ impl<T: FloatingPoint> Default for ClipDebugInfo<T> {
     }
 }
 
+#[allow(clippy::type_complexity)]
 impl<T: FloatingPoint> ClipDebugInfo<T> {
     pub fn add_node_chunk(&mut self, chunk: ((Point2<T>, Status), (Point2<T>, Status))) {
         self.chunks.push(chunk);
@@ -312,95 +314,84 @@ where
 
     let mut info = ClipDebugInfo::default();
 
-    loop {
-        match non_visited(subject_head_node.clone()) {
-            Some(start) => {
-                let mut nodes = vec![];
-                let mut current = start.clone();
-                loop {
-                    if current.borrow().visited() {
-                        break;
-                    }
-
-                    current.borrow_mut().visit();
-                    nodes.push(current.clone());
-
-                    let node = current.borrow().clone();
-                    let next = match node.status() {
-                        Status::Enter => node.next(),
-                        Status::Exit => node.prev(),
-                        Status::None => todo!(),
-                    };
-
-                    if let Some(next) = next {
-                        next.borrow_mut().visit();
-                        nodes.push(next.clone());
-                        if let Some(neighbor) = next.borrow().neighbor() {
-                            current = neighbor.clone();
-                        } else {
-                            break;
-                        }
-                    } else {
-                        break;
-                    }
-                }
-
-                let mut spans = vec![];
-                for chunk in nodes.chunks(2) {
-                    if chunk.len() != 2 {
-                        break;
-                    }
-                    let n0 = chunk[0].borrow();
-                    let n1 = chunk[1].borrow();
-
-                    info.add_node_chunk((
-                        (*n0.vertex().position(), n0.status()),
-                        (*n1.vertex().position(), n1.status()),
-                    ));
-
-                    /*
-                    println!(
-                        "{:?} {:?} -> {:?} {:?}",
-                        n0.subject(),
-                        n0.status(),
-                        n1.subject(),
-                        n1.status()
-                    );
-                    */
-
-                    let params = match (n0.status(), n1.status()) {
-                        (Status::Enter, Status::Exit) => {
-                            (n0.vertex().parameter(), n1.vertex().parameter())
-                        }
-                        (Status::Exit, Status::Enter) => {
-                            (n1.vertex().parameter(), n0.vertex().parameter())
-                        }
-                        _ => {
-                            anyhow::bail!("Invalid status");
-                        }
-                    };
-
-                    anyhow::ensure!(n0.subject() == n1.subject(), "Invalid condition");
-
-                    let trimmed = if n0.subject() {
-                        subject.try_trim_range(params)
-                    } else {
-                        clip.try_trim_range(params)
-                    }?;
-                    spans.extend(trimmed);
-                }
-
-                if !spans.is_empty() {
-                    spans.iter().for_each(|span| {
-                        info.add_span(span.clone());
-                    });
-                    let region = Region::new(CompoundCurve::new(spans), vec![]);
-                    regions.push(region);
-                }
-            }
-            None => {
+    while let Some(start) = non_visited(subject_head_node.clone()) {
+        let mut nodes = vec![];
+        let mut current = start.clone();
+        loop {
+            if current.borrow().visited() {
                 break;
             }
+
+            current.borrow_mut().visit();
+            nodes.push(current.clone());
+
+            let node = current.borrow().clone();
+            let next = match node.status() {
+                Status::Enter => node.next(),
+                Status::Exit => node.prev(),
+                Status::None => todo!(),
+            };
+
+            if let Some(next) = next {
+                next.borrow_mut().visit();
+                nodes.push(next.clone());
+                if let Some(neighbor) = next.borrow().neighbor() {
+                    current = neighbor.clone();
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+
+        let mut spans = vec![];
+        for chunk in nodes.chunks(2) {
+            if chunk.len() != 2 {
+                break;
+            }
+            let n0 = chunk[0].borrow();
+            let n1 = chunk[1].borrow();
+
+            info.add_node_chunk((
+                (*n0.vertex().position(), n0.status()),
+                (*n1.vertex().position(), n1.status()),
+            ));
+
+            /*
+            println!(
+                "{:?} {:?} -> {:?} {:?}",
+                n0.subject(),
+                n0.status(),
+                n1.subject(),
+                n1.status()
+            );
+            */
+
+            let params = match (n0.status(), n1.status()) {
+                (Status::Enter, Status::Exit) => (n0.vertex().parameter(), n1.vertex().parameter()),
+                (Status::Exit, Status::Enter) => (n1.vertex().parameter(), n0.vertex().parameter()),
+                _ => {
+                    anyhow::bail!("Invalid status");
+                }
+            };
+
+            anyhow::ensure!(n0.subject() == n1.subject(), "Invalid condition");
+
+            let trimmed = if n0.subject() {
+                subject.try_trim_range(params)
+            } else {
+                clip.try_trim_range(params)
+            }?;
+            spans.extend(trimmed);
+        }
+
+        if !spans.is_empty() {
+            spans.iter().for_each(|span| {
+                info.add_span(span.clone());
+            });
+            let region = Region::new(CompoundCurve::new(spans), vec![]);
+            regions.push(region);
         }
     }
 

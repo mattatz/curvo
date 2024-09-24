@@ -179,7 +179,7 @@ impl<'a, T: FloatingPoint + ArgminFloat> Boolean<&'a Region<T>> for Region<T> {
 
 /// distribute the interiors into the regions that contain them
 fn distribute_interiors_to_regions<T: FloatingPoint + ArgminFloat>(
-    regions: &mut Vec<Region<T>>,
+    regions: &mut [Region<T>],
     interiors: &mut Vec<CompoundCurve<T, U3>>,
     option: Option<CurveIntersectionSolverOptions<T>>,
 ) -> anyhow::Result<()> {

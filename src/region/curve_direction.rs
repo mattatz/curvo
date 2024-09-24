@@ -14,14 +14,14 @@ pub enum CurveDirection {
 }
 
 impl CurveDirection {
-    pub fn new<T: FloatingPoint, D: DimName>(
+    pub fn new<T: FloatingPoint, D>(
         a: &NurbsCurve<T, D>,
         b: &NurbsCurve<T, D>,
         epsilon: T,
     ) -> Option<Self>
     where
+        D: DimName + DimNameSub<U1>,
         DefaultAllocator: Allocator<D>,
-        D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
         let ad = a.knots_domain();

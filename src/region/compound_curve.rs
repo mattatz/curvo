@@ -1,7 +1,6 @@
 use std::cmp::Ordering;
 
 use argmin::core::ArgminFloat;
-use itertools::Itertools;
 use nalgebra::{
     allocator::Allocator, Const, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OMatrix,
     OPoint, U1,

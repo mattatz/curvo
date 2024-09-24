@@ -1,11 +1,11 @@
-pub mod compound_curve;
 pub mod compound_curve_intersection;
-pub mod curve;
 pub mod curve_intersection;
 pub mod curve_intersection_bfgs;
 pub mod curve_intersection_problem;
 pub mod curve_intersection_solver_options;
 pub mod has_intersection;
+pub mod intersection_compound_curve;
+pub mod intersection_curve;
 
 pub use compound_curve_intersection::*;
 pub use curve_intersection::*;

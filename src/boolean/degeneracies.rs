@@ -1,13 +1,9 @@
-use argmin::core::ArgminFloat;
-use itertools::Itertools;
-use nalgebra::{ComplexField, Const, Point2};
+use nalgebra::{ComplexField, Const};
 
 use crate::{
     curve::NurbsCurve,
     misc::{FloatingPoint, Line},
-    prelude::{
-        CurveIntersection, CurveIntersectionSolverOptions, HasIntersectionParameter, Intersection,
-    },
+    prelude::HasIntersectionParameter,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -49,28 +45,14 @@ impl<T: FloatingPoint> Degeneracy<T> {
     }
 }
 
-/// Find intersections between two curves without degeneracies for clipping algorithm.
-pub fn find_intersections_without_degeneracies<T: FloatingPoint + ArgminFloat>(
-    a: &NurbsCurve<T, Const<3>>,
-    b: &NurbsCurve<T, Const<3>>,
-    option: Option<CurveIntersectionSolverOptions<T>>,
-) -> anyhow::Result<Vec<CurveIntersection<Point2<T>, T>>> {
-    let intersections = a.find_intersections(b, option.clone())?;
-    let n = intersections.len();
-    let filtered = intersections
-        .into_iter()
-        .filter(|it| matches!(Degeneracy::new(it, a, b), Degeneracy::None))
-        .collect_vec();
-
-    // println!("# of origin: {}, # of filtered: {}", n, filtered.len());
-
-    Ok(filtered)
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::{boolean::degeneracies::find_intersections_without_degeneracies, prelude::*};
-    use nalgebra::{Point2, Rotation2, Translation2, Vector2};
+    use crate::prelude::*;
+    use argmin::core::ArgminFloat;
+    use itertools::Itertools;
+    use nalgebra::{Const, Point2, Rotation2, Translation2, Vector2};
+
+    use super::Degeneracy;
 
     const OPTIONS: CurveIntersectionSolverOptions<f64> = CurveIntersectionSolverOptions {
         minimum_distance: 1e-4,
@@ -79,6 +61,25 @@ mod tests {
         step_size_tolerance: 1e-8,
         cost_tolerance: 1e-10,
     };
+
+    /// Find intersections between two curves without degeneracies for clipping algorithm.
+    pub fn find_intersections_without_degeneracies<T: FloatingPoint + ArgminFloat>(
+        a: &NurbsCurve<T, Const<3>>,
+        b: &NurbsCurve<T, Const<3>>,
+        option: Option<CurveIntersectionSolverOptions<T>>,
+    ) -> anyhow::Result<Vec<CurveIntersection<Point2<T>, T>>> {
+        let intersections = a.find_intersections(b, option.clone())?;
+        let n = intersections.len();
+
+        let filtered = intersections
+            .into_iter()
+            .filter(|it| matches!(Degeneracy::new(it, a, b), Degeneracy::None))
+            .collect_vec();
+
+        println!("# of origin: {}, # of filtered: {}", n, filtered.len());
+
+        Ok(filtered)
+    }
 
     #[test]
     fn test_circle_rectangle() {

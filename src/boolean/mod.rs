@@ -1,13 +1,13 @@
 use operation::BooleanOperation;
 
+pub mod boolean_compound_curve;
+pub mod boolean_curve;
+pub mod boolean_region;
 mod clip;
-pub mod compound_curve;
-pub mod curve;
 mod degeneracies;
 mod has_parameter;
 pub mod node;
 pub mod operation;
-pub mod region;
 pub mod status;
 mod vertex;
 pub use clip::Clip;

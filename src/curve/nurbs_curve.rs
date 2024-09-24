@@ -9,7 +9,6 @@ use nalgebra::{
     Const, DMatrix, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff, DimNameSub,
     DimNameSum, OMatrix, OPoint, OVector, RealField, Rotation3, UnitVector3, Vector3, U1,
 };
-use num_traits::Float;
 use simba::scalar::SupersetOf;
 
 use crate::misc::binomial::Binomial;
@@ -268,6 +267,7 @@ where
     }
 
     /// Evaluate the curve at a given parameter to get a point & tangent vector at the same time
+    #[allow(clippy::type_complexity)]
     pub fn point_tangent_at(
         &self,
         u: T,

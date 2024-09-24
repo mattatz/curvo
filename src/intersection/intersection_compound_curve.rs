@@ -115,7 +115,7 @@ mod tests {
         intersections.iter().all(|it| {
             points
                 .iter()
-                .any(|pt| (it.a().1 - pt).norm() < epsilon || (&it.b().1 - pt).norm() < epsilon)
+                .any(|pt| (it.a().1 - pt).norm() < epsilon || (it.b().1 - pt).norm() < epsilon)
         })
     }
 
