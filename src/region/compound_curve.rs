@@ -15,7 +15,7 @@ use crate::{
 use super::curve_direction::CurveDirection;
 
 /// A struct representing a compound curve.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct CompoundCurve<T: FloatingPoint, D: DimName>
 where
     DefaultAllocator: Allocator<D>,

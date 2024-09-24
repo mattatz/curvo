@@ -1,21 +1,37 @@
 use crate::prelude::*;
 use nalgebra::{Point2, Rotation2, Translation2, Vector2};
 
+const OPTIONS: CurveIntersectionSolverOptions<f64> = CurveIntersectionSolverOptions {
+    minimum_distance: 1e-4,
+    knot_domain_division: 500,
+    max_iters: 1000,
+    step_size_tolerance: 1e-8,
+    cost_tolerance: 1e-10,
+};
+
 #[test]
 fn test_circle_boundary_case() {
     let radius = 1.;
     let circle =
         NurbsCurve2D::<f64>::try_circle(&Point2::origin(), &Vector2::x(), &Vector2::y(), radius)
             .unwrap();
-    assert!(circle.contains(&Point2::new(radius, 0.0), None).unwrap());
-    assert!(circle.contains(&Point2::new(0., radius), None).unwrap());
-    assert!(circle.contains(&Point2::new(-radius, 0.), None).unwrap());
-    assert!(circle.contains(&Point2::new(0., -radius), None).unwrap());
-    assert!(!circle
-        .contains(&Point2::new(-radius * 5., radius), None)
+    assert!(circle
+        .contains(&Point2::new(radius, 0.0), Some(OPTIONS))
+        .unwrap());
+    assert!(circle
+        .contains(&Point2::new(0., radius), Some(OPTIONS))
+        .unwrap());
+    assert!(circle
+        .contains(&Point2::new(-radius, 0.), Some(OPTIONS))
+        .unwrap());
+    assert!(circle
+        .contains(&Point2::new(0., -radius), Some(OPTIONS))
         .unwrap());
     assert!(!circle
-        .contains(&Point2::new(-radius * 5., -radius), None)
+        .contains(&Point2::new(-radius * 5., radius), Some(OPTIONS))
+        .unwrap());
+    assert!(!circle
+        .contains(&Point2::new(-radius * 5., -radius), Some(OPTIONS))
         .unwrap());
 }
 
@@ -30,22 +46,26 @@ fn test_rectangle_boundary_case() {
         Point2::new(0., dy),
         Point2::new(0., 0.),
     ]);
-    assert!(rectangle.contains(&Point2::new(0., 0.), None).unwrap());
-    assert!(rectangle.contains(&Point2::new(dx, 0.), None).unwrap());
-    assert!(rectangle.contains(&Point2::new(dx, dy), None).unwrap());
-    assert!(rectangle.contains(&Point2::new(0., dy), None).unwrap());
+    assert!(rectangle
+        .contains(&Point2::new(0., 0.), Some(OPTIONS))
+        .unwrap());
+    assert!(rectangle
+        .contains(&Point2::new(dx, 0.), Some(OPTIONS))
+        .unwrap());
+    assert!(rectangle
+        .contains(&Point2::new(dx, dy), Some(OPTIONS))
+        .unwrap());
+    assert!(rectangle
+        .contains(&Point2::new(0., dy), Some(OPTIONS))
+        .unwrap());
 
-    assert!(!rectangle.contains(&Point2::new(-dx, 0.), None).unwrap());
-    assert!(!rectangle.contains(&Point2::new(-dx, dy), None).unwrap());
+    assert!(!rectangle
+        .contains(&Point2::new(-dx, 0.), Some(OPTIONS))
+        .unwrap());
+    assert!(!rectangle
+        .contains(&Point2::new(-dx, dy), Some(OPTIONS))
+        .unwrap());
 }
-
-const OPTIONS: CurveIntersectionSolverOptions<f64> = CurveIntersectionSolverOptions {
-    minimum_distance: 1e-4,
-    knot_domain_division: 500,
-    max_iters: 1000,
-    step_size_tolerance: 1e-8,
-    cost_tolerance: 1e-10,
-};
 
 #[test]
 fn test_problem_case() {
