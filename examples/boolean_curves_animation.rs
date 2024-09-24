@@ -126,12 +126,9 @@ fn boolean(
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
     let delta = time.elapsed_seconds_f64() * 0.75;
-    // let delta: f64 = 3.1309608852600004;
-    // let delta: f64 = 3.1613637252600006;
-    // let delta: f64 = 4.39098702276;
-    let interval = 1e-1 * 2.;
+    // let interval = 1e-1 * 2.;
     // let delta = (delta / interval).floor() * interval;
-    println!("delta: {}", delta);
+    // println!("delta: {}", delta);
 
     let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);
     // let trans = Translation2::new(delta.cos(), 0.);
