@@ -90,5 +90,5 @@ let tessellation = lofted.tessellate(Some(option));
 
 ### Feature development sponsored by VUILD Inc.
 
-The **NURBS boolean operations** feature in this project was developed at the request of and sponsored by [VUILD](https://vuild.co.jp/).  
-VUILD supported the development as a sponsor by funding the feature's implementation.
+The **NURBS boolean operations** feature in this project was developed at the request of [VUILD](https://vuild.co.jp/).  
+They supported the development as a sponsor by funding the feature's implementation.
