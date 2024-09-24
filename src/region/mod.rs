@@ -9,7 +9,7 @@ use crate::{
 };
 
 /// A closed region bounded by a single exterior curve and zero or more interior curves.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Region<T: FloatingPoint> {
     exterior: CompoundCurve<T, Const<3>>,
     interiors: Vec<CompoundCurve<T, Const<3>>>,
