@@ -7,6 +7,7 @@ use crate::{curve::NurbsCurve, misc::FloatingPoint};
 use super::has_parameter::HasParameter;
 
 #[derive(Debug, Clone)]
+#[allow(unused)]
 pub struct Vertex<'a, T: FloatingPoint> {
     curve: Cow<'a, NurbsCurve<T, U3>>,
     position: Point2<T>,
@@ -22,6 +23,7 @@ impl<'a, T: FloatingPoint> Vertex<'a, T> {
         }
     }
 
+    #[allow(unused)]
     pub fn curve(&self) -> &NurbsCurve<T, U3> {
         self.curve.borrow()
     }
