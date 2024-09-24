@@ -71,9 +71,9 @@ impl<T: RealField + Copy> KnotVector<T> {
         (self.0[degree], self.0[self.0.len() - 1 - degree])
     }
 
-    pub fn constrain(&self, degree: usize, u: T) -> T {
+    pub fn clamp(&self, degree: usize, u: T) -> T {
         let (min, max) = self.domain(degree);
-        min.max(u).min(max)
+        u.clamp(min, max)
     }
 
     /// Returns the index of the first knot greater than or equal to knot

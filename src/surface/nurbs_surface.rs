@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use itertools::Itertools;
 use nalgebra::{
     allocator::Allocator, Const, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff,
     DimNameSub, DimNameSum, OMatrix, OPoint, OVector, Point3, Point4, RealField, Vector2, Vector3,
@@ -14,12 +15,6 @@ use crate::{
     },
     misc::{binomial::Binomial, transformable::Transformable, FloatingPoint, Ray},
     prelude::{KnotVector, SurfaceTessellation},
-    tessellation::{
-        adaptive_tessellation_node::AdaptiveTessellationNode,
-        adaptive_tessellation_option::AdaptiveTessellationOptions,
-        adaptive_tessellation_processor::AdaptiveTessellationProcessor,
-        surface_point::SurfacePoint,
-    },
 };
 
 /// NURBS surface representation
@@ -324,112 +319,6 @@ where
         skl
     }
 
-    /// Tessellate the surface into a meshable form
-    /// if adaptive_options is None, the surface will be tessellated at control points
-    /// or else it will be tessellated adaptively based on the options
-    /// this `adaptive` means that the surface will be tessellated based on the curvature of the surface
-    pub fn tessellate(
-        &self,
-        adaptive_options: Option<AdaptiveTessellationOptions<T>>,
-    ) -> SurfaceTessellation<T, D> {
-        let is_adaptive = adaptive_options.is_some();
-        let options = adaptive_options.unwrap_or_default();
-
-        let us: Vec<_> = if self.u_degree <= 1 {
-            self.u_knots
-                .iter()
-                .skip(1)
-                .take(self.u_knots.len() - 2)
-                .cloned()
-                .collect()
-        } else {
-            let min_u = (self.control_points.len() - 1) * 2;
-            let divs_u = options.min_divs_u.max(min_u);
-            let (umin, umax) = self.u_knots_domain();
-            let du = (umax - umin) / T::from_usize(divs_u).unwrap();
-            (0..=divs_u)
-                .map(|i| umin + du * T::from_usize(i).unwrap())
-                .collect()
-        };
-
-        let vs: Vec<_> = if self.v_degree <= 1 {
-            self.v_knots
-                .iter()
-                .skip(1)
-                .take(self.v_knots.len() - 2)
-                .cloned()
-                .collect()
-        } else {
-            let min_v = (self.control_points[0].len() - 1) * 2;
-            let divs_v = options.min_divs_v.max(min_v);
-            let (vmin, vmax) = self.v_knots_domain();
-            let dv = (vmax - vmin) / T::from_usize(divs_v).unwrap();
-            (0..=divs_v)
-                .map(|i| vmin + dv * T::from_usize(i).unwrap())
-                .collect()
-        };
-
-        let mut pts = vec![];
-
-        vs.iter().for_each(|v| {
-            let mut row = vec![];
-            us.iter().for_each(|u| {
-                let ds = self.rational_derivatives(*u, *v, 1);
-                let norm = ds[0][1].cross(&ds[1][0]).normalize();
-                row.push(SurfacePoint {
-                    point: ds[0][0].clone().into(),
-                    normal: norm,
-                    uv: Vector2::new(*u, *v),
-                    is_normal_degenerated: false,
-                });
-            });
-            pts.push(row);
-        });
-
-        let mut divs = vec![];
-        let divs_u = us.len() - 1;
-        let divs_v = vs.len() - 1;
-        for i in 0..divs_v {
-            for j in 0..divs_u {
-                let iv = divs_v - i;
-                let corners = [
-                    pts[iv - 1][j].clone(),
-                    pts[iv - 1][j + 1].clone(),
-                    pts[iv][j + 1].clone(),
-                    pts[iv][j].clone(),
-                ];
-                let node = AdaptiveTessellationNode::new(divs.len(), corners, None);
-                divs.push(node);
-            }
-        }
-
-        let nodes = if !is_adaptive {
-            divs
-        } else {
-            let mut processor = AdaptiveTessellationProcessor {
-                surface: self,
-                nodes: divs,
-            };
-
-            for i in 0..divs_v {
-                for j in 0..divs_u {
-                    let ci = i * divs_u + j;
-                    let s = processor.south(ci, i, j, divs_u, divs_v).map(|n| n.id);
-                    let e = processor.east(ci, i, j, divs_u, divs_v).map(|n| n.id);
-                    let n = processor.north(ci, i, j, divs_u, divs_v).map(|n| n.id);
-                    let w = processor.west(ci, i, j, divs_u, divs_v).map(|n| n.id);
-                    let node = processor.nodes.get_mut(ci).unwrap();
-                    node.neighbors = [s, e, n, w];
-                    processor.divide(ci, &options);
-                }
-            }
-
-            processor.nodes
-        };
-
-        SurfaceTessellation::new(self, &nodes)
-    }
-
     /// Regularly tessellate the surface into a meshable form
     /// This tessellation is faster than adaptive one because of pre-computed basis functions
     /// There is trade-off between speed and mesh quality
@@ -643,12 +532,12 @@ where
                 let points = unified_curves
                     .iter()
                     .map(|c| c.control_points()[i].clone())
-                    .collect::<Vec<_>>();
+                    .collect_vec();
                 let (control_points, knots) = try_interpolate_control_points(
                     &points
                         .iter()
                         .map(|p| DVector::from_vec(p.iter().copied().collect()))
-                        .collect::<Vec<_>>(),
+                        .collect_vec(),
                     degree_v,
                     false,
                 )?;
@@ -884,12 +773,12 @@ where
                     }
                     OVector::<T, DimNameDiff<D, U1>>::from_vec(a_ders)
                 })
-                .collect::<Vec<_>>()
+                .collect_vec()
         })
         .collect();
     let w_ders: Vec<_> = ders
         .iter()
-        .map(|row| row.iter().map(|d| d[D::dim() - 1]).collect::<Vec<_>>())
+        .map(|row| row.iter().map(|d| d[D::dim() - 1]).collect_vec())
         .collect();
 
     let mut skl: Vec<Vec<OVector<T, DimNameDiff<D, U1>>>> = vec![];
@@ -1185,7 +1074,7 @@ where
             let max = knots[knots.len() - 1];
             (min, max)
         })
-        .collect::<Vec<_>>();
+        .collect_vec();
 
     //shift all knot vectors to start at 0.0
     curves.iter_mut().enumerate().for_each(|(i, c)| {
@@ -1197,7 +1086,7 @@ where
     let knot_spans = knot_intervals
         .iter()
         .map(|(min, max)| *max - *min)
-        .collect::<Vec<_>>();
+        .collect_vec();
     let max_knot_span = knot_spans.iter().fold(T::zero(), |x, a| a.max(x));
 
     //scale all of the knot vectors to match

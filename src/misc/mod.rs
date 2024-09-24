@@ -1,15 +1,23 @@
 pub mod binomial;
+pub mod end_points;
 pub mod floating_point;
 pub mod frenet_frame;
 pub mod invertible;
+pub mod line;
+pub mod orientation;
+pub mod polygon_boundary;
 pub mod ray;
 pub mod transformable;
 pub mod trigonometry;
 
 pub use binomial::*;
+pub use end_points::*;
 pub use floating_point::*;
 pub use frenet_frame::*;
 pub use invertible::*;
+pub use line::*;
+pub use orientation::*;
+pub use polygon_boundary::*;
 pub use ray::*;
 pub use transformable::*;
 pub use trigonometry::*;

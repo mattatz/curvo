@@ -6,24 +6,17 @@ use gauss_quad::GaussLegendre;
 use itertools::Itertools;
 use nalgebra::allocator::Allocator;
 use nalgebra::{
-    ComplexField, Const, DMatrix, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff,
-    DimNameSub, DimNameSum, Matrix2, OMatrix, OPoint, OVector, RealField, Rotation3, UnitVector3,
-    Vector2, Vector3, U1,
+    Const, DMatrix, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff, DimNameSub,
+    DimNameSum, OMatrix, OPoint, OVector, RealField, Rotation3, UnitVector3, Vector3, U1,
 };
-use rand::rngs::ThreadRng;
-use rand::Rng;
 use simba::scalar::SupersetOf;
 
-use crate::intersection::curve_intersection::CurveIntersection;
-use crate::intersection::{
-    CurveIntersectionBFGS, CurveIntersectionProblem, CurveIntersectionSolverOptions,
-};
 use crate::misc::binomial::Binomial;
 use crate::misc::frenet_frame::FrenetFrame;
 use crate::misc::transformable::Transformable;
-use crate::misc::trigonometry::{segment_closest_point, three_points_are_flat};
+use crate::misc::trigonometry::segment_closest_point;
 use crate::misc::Ray;
-use crate::prelude::{BoundingBoxTraversal, CurveLengthParameter, Invertible, KnotVector};
+use crate::prelude::{CurveLengthParameter, Invertible, KnotVector};
 use crate::{misc::FloatingPoint, ClosestParameterNewton, ClosestParameterProblem};
 
 use super::KnotStyle;
@@ -250,63 +243,6 @@ where
         points
     }
 
-    /// Tessellate the curve using an adaptive algorithm
-    /// this `adaptive` means that the curve will be tessellated based on the curvature of the curve
-    pub fn tessellate(&self, tolerance: Option<T>) -> Vec<OPoint<T, DimNameDiff<D, U1>>>
-    where
-        D: DimNameSub<U1>,
-        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
-    {
-        if self.degree == 1 {
-            return self.dehomogenized_control_points();
-        }
-
-        let mut rng = rand::thread_rng();
-        let tol = tolerance.unwrap_or(T::from_f64(1e-3).unwrap());
-        let (start, end) = self.knots_domain();
-        self.tessellate_adaptive(start, end, tol, &mut rng)
-    }
-
-    /// Tessellate the curve using an adaptive algorithm recursively
-    /// if the curve between [start ~ end] is flat enough, it will return the two end points
-    fn tessellate_adaptive(
-        &self,
-        start: T,
-        end: T,
-        tol: T,
-        rng: &mut ThreadRng,
-    ) -> Vec<OPoint<T, DimNameDiff<D, U1>>>
-    where
-        D: DimNameSub<U1>,
-        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
-    {
-        let p1 = self.point_at(start);
-        let p3 = self.point_at(end);
-
-        let t = 0.5_f64 + 0.2_f64 * rng.gen::<f64>();
-        let delta = end - start;
-        if delta < T::from_f64(1e-8).unwrap() {
-            return vec![p1];
-        }
-
-        let mid = start + delta * T::from_f64(t).unwrap();
-        let p2 = self.point_at(mid);
-
-        let diff = &p1 - &p3;
-        let diff2 = &p1 - &p2;
-        if (diff.dot(&diff) < tol && diff2.dot(&diff2) > tol)
-            || !three_points_are_flat(&p1, &p2, &p3, tol)
-        {
-            let exact_mid = start + (end - start) * T::from_f64(0.5).unwrap();
-            let mut left_pts = self.tessellate_adaptive(start, exact_mid, tol, rng);
-            let right_pts = self.tessellate_adaptive(exact_mid, end, tol, rng);
-            left_pts.pop();
-            [left_pts, right_pts].concat()
-        } else {
-            vec![p1, p3]
-        }
-    }
-
     /// Evaluate the curve at a given parameter to get a point
     pub(crate) fn point(&self, t: T) -> OPoint<T, D> {
         let n = self.knots.len() - self.degree - 2;
@@ -328,6 +264,23 @@ where
     {
         let deriv = self.rational_derivatives(u, 1);
         deriv[1].clone()
+    }
+
+    /// Evaluate the curve at a given parameter to get a point & tangent vector at the same time
+    #[allow(clippy::type_complexity)]
+    pub fn point_tangent_at(
+        &self,
+        u: T,
+    ) -> (
+        OPoint<T, DimNameDiff<D, U1>>,
+        OVector<T, DimNameDiff<D, U1>>,
+    )
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+    {
+        let deriv = self.rational_derivatives(u, 1);
+        (deriv[0].clone().into(), deriv[1].clone())
     }
 
     /// Evaluate the rational derivatives at a given parameter
@@ -431,7 +384,7 @@ where
     }
 
     pub fn knots_constrain(&self, u: T) -> T {
-        self.knots.constrain(self.degree, u)
+        self.knots.clamp(self.degree, u)
     }
 
     /// Compute the length of the curve by gauss-legendre quadrature
@@ -478,7 +431,7 @@ where
         let segments = &segments[i..j];
 
         let (_, u) = self.knots_domain();
-        let gauss = GaussLegendre::init(16 + self.degree);
+        let gauss = GaussLegendre::new(16 + self.degree)?;
         let length = segments
             .iter()
             .map(|s| compute_bezier_segment_length(s, u, &gauss))
@@ -535,7 +488,7 @@ where
         let mut acc = T::zero();
         let mut acc_prev = T::zero();
 
-        let gauss = GaussLegendre::init(16 + self.degree);
+        let gauss = GaussLegendre::new(16 + self.degree)?;
         let eps = T::from_f64(1e-6).unwrap();
         let tolerance = T::from_f64(1e-3 * 2.5).unwrap();
 
@@ -672,7 +625,7 @@ where
             &points
                 .iter()
                 .map(|p| DVector::from_vec(p.iter().copied().collect()))
-                .collect::<Vec<_>>(),
+                .collect_vec(),
             degree,
             true,
         )?;
@@ -726,7 +679,7 @@ where
         let input = points
             .iter()
             .map(|p| DVector::from_vec(p.iter().copied().collect()))
-            .collect::<Vec<_>>();
+            .collect_vec();
         let (pts, knots) =
             try_periodic_interpolate_control_points(&input, degree, knot_style, true)?;
 
@@ -1281,9 +1234,65 @@ where
         self.knots.is_clamped(self.degree)
     }
 
+    /// Check if the curve is closed
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point2, Point3, Vector3};
+    /// let circle = NurbsCurve3D::try_circle(
+    ///     &Point3::origin(),
+    ///     &Vector3::x(),
+    ///     &Vector3::y(),
+    ///    1.,
+    /// ).unwrap();
+    /// assert!(circle.is_closed());
+    ///
+    /// let polyline = NurbsCurve3D::polyline(
+    ///     &vec![
+    ///         Point3::new(-1., -1., 0.),
+    ///         Point3::new(1., -1., 0.),
+    ///         Point3::new(1., 1., 0.),
+    ///         Point3::new(-1., 1., 0.),
+    ///         Point3::new(-1., -1., 0.),
+    ///     ],
+    /// );
+    /// assert!(polyline.is_closed());
+    ///
+    /// let unclosed = NurbsCurve3D::polyline(
+    ///     &vec![
+    ///         Point3::new(-1., -1., 0.),
+    ///         Point3::new(1., -1., 0.),
+    ///         Point3::new(1., 1., 0.),
+    ///         Point3::new(-1., 1., 0.),
+    ///     ],
+    /// );
+    /// assert!(!unclosed.is_closed());
+    /// ```
+    pub fn is_closed(&self) -> bool
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+    {
+        let eps = T::default_epsilon() * T::from_usize(10).unwrap();
+        match self.knots.is_clamped(self.degree) {
+            true => {
+                let pts = self.dehomogenized_control_points();
+                let delta = &pts[0] - &pts[self.control_points.len() - 1];
+                delta.norm() < eps
+            }
+            false => {
+                let (s, e) = self.knots_domain();
+                let s = self.point_at(s);
+                let e = self.point_at(e);
+                let delta = s - e;
+                delta.norm() < eps
+            }
+        }
+    }
+
     /// Try to refine the curve by inserting knots
     pub fn try_refine_knot(&mut self, knots_to_insert: Vec<T>) -> anyhow::Result<()> {
-        anyhow::ensure!(self.is_clamped(), "Curve must be clamped to refine knots");
+        // anyhow::ensure!(self.is_clamped(), "Curve must be clamped to refine knots");
 
         if knots_to_insert.is_empty() {
             return Ok(());
@@ -1384,9 +1393,7 @@ where
         let mut min = <T as RealField>::max_value().unwrap();
         let mut u = min_u;
 
-        let closed =
-            (&self.control_points[0] - &self.control_points[self.control_points.len() - 1]).norm()
-                < T::default_epsilon();
+        let closed = self.is_closed();
 
         for i in 0..pts.len() - 1 {
             let u0 = pts[i].0;
@@ -1408,156 +1415,22 @@ where
         let res = Executor::new(ClosestParameterProblem::new(point, self), solver)
             .configure(|state| state.param(u).max_iters(5))
             .run()?;
-        res.state()
-            .get_best_param()
-            .cloned()
-            .ok_or(anyhow::anyhow!("No best parameter found"))
-    }
-
-    /// Find the intersection points with another curve by gauss-newton line search
-    /// * `other` - The other curve to intersect with
-    /// * `options` - Hyperparameters for the intersection solver
-    /// # Example
-    /// ```
-    /// use curvo::prelude::*;
-    /// use nalgebra::{Point2, Point3, Vector2};
-    /// use approx::assert_relative_eq;
-    /// let unit_circle = NurbsCurve2D::try_circle(
-    ///     &Point2::origin(),
-    ///     &Vector2::x(),
-    ///     &Vector2::y(),
-    ///     1.
-    /// ).unwrap();
-    /// let line = NurbsCurve2D::try_new(
-    ///     1,
-    ///     vec![
-    ///         Point3::new(-2.0, 0.0, 1.),
-    ///         Point3::new(2.0, 0.0, 1.),
-    ///     ],
-    ///     vec![0., 0., 1., 1.],
-    /// ).unwrap();
-    ///
-    /// // Hyperparameters for the intersection solver
-    /// let options = CurveIntersectionSolverOptions {
-    ///     minimum_distance: 1e-5, // minimum distance between intersections
-    ///     cost_tolerance: 1e-12, // cost tolerance for the solver convergence
-    ///     max_iters: 200, // maximum number of iterations in the solver
-    ///     ..Default::default()
-    /// };
-    ///
-    /// let mut intersections = unit_circle.find_intersections(&line, Some(options)).unwrap();
-    /// assert_eq!(intersections.len(), 2);
-    ///
-    /// intersections.sort_by(|i0, i1| {
-    ///     i0.a().0.x.partial_cmp(&i1.a().0.x).unwrap()
-    /// });
-    /// let p0 = &intersections[0];
-    /// assert_relative_eq!(p0.a().0, Point2::new(-1.0, 0.0), epsilon = 1e-5);
-    /// let p1 = &intersections[1];
-    /// assert_relative_eq!(p1.a().0, Point2::new(1.0, 0.0), epsilon = 1e-5);
-    ///
-    /// ```
-    #[allow(clippy::type_complexity)]
-    pub fn find_intersections(
-        &self,
-        other: &Self,
-        options: Option<CurveIntersectionSolverOptions<T>>,
-    ) -> anyhow::Result<Vec<CurveIntersection<OPoint<T, DimNameDiff<D, U1>>, T>>>
-    where
-        D: DimNameSub<U1>,
-        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
-        T: ArgminFloat,
-    {
-        let options = options.unwrap_or_default();
-
-        let traversed = BoundingBoxTraversal::try_traverse(
-            self,
-            other,
-            Some(
-                self.knots_domain_interval() / T::from_usize(options.knot_domain_division).unwrap(),
-            ),
-            Some(
-                other.knots_domain_interval()
-                    / T::from_usize(options.knot_domain_division).unwrap(),
-            ),
-        )?;
-        let eps = options.minimum_distance * T::from_f64(5.).unwrap();
-
-        let pts = traversed
-            .into_pairs_iter()
-            .filter_map(|(a, b)| {
-                let ca = a.curve_owned();
-                let cb = b.curve_owned();
-
-                let problem = CurveIntersectionProblem::new(&ca, &cb);
-
-                let inv = T::from_f64(0.5).unwrap();
-                let d0 = ca.knots_domain();
-                let d1 = cb.knots_domain();
-
-                // Define initial parameter vector
-                let init_param = Vector2::<T>::new(
-                    // ca.knots_domain().0,
-                    // cb.knots_domain().0,
-                    (d0.0 + d0.1) * inv,
-                    (d1.0 + d1.1) * inv,
-                );
-
-                // Set up solver
-                let solver = CurveIntersectionBFGS::<T>::new()
-                    .with_step_size_tolerance(options.step_size_tolerance)
-                    .with_cost_tolerance(options.cost_tolerance);
-
-                // Run solver
-                let res = Executor::new(problem, solver)
-                    .configure(|state| {
-                        state
-                            .param(init_param)
-                            .inv_hessian(Matrix2::identity())
-                            .max_iters(options.max_iters)
-                    })
-                    .run();
-
-                match res {
-                    Ok(r) => {
-                        // println!("{}", r.state().get_termination_status());
-                        r.state().get_best_param().map(|param| {
-                            let p0 = ca.point_at(param[0]);
-                            let p1 = cb.point_at(param[1]);
-                            CurveIntersection::new((p0, param[0]), (p1, param[1]))
-                        })
-                    }
-                    Err(_e) => {
-                        // println!("{}", e);
-                        None
-                    }
-                }
-            })
-            .filter(|it| {
-                // filter out intersections that are too close
-                let p0 = &it.a().0;
-                let p1 = &it.b().0;
-                let d = (p0 - p1).norm();
-                d < options.minimum_distance
-            })
-            .coalesce(|x, y| {
-                // merge intersections that are close in parameter space
-                let da = ComplexField::abs(x.a().1 - y.a().1);
-                let db = ComplexField::abs(x.b().1 - y.b().1);
-                if da < eps || db < eps {
-                    Ok(x)
+        match res.state().get_best_param().cloned() {
+            Some(t) => {
+                if t.is_finite() {
+                    Ok(t)
                 } else {
-                    Err((x, y))
+                    Err(anyhow::anyhow!("No best parameter found"))
                 }
-            })
-            .collect();
-
-        Ok(pts)
+            }
+            _ => Err(anyhow::anyhow!("No best parameter found")),
+        }
     }
 
     /// Trim the curve into two curves before and after the parameter
     pub fn try_trim(&self, u: T) -> anyhow::Result<(Self, Self)> {
-        let knots_to_insert: Vec<_> = (0..=self.degree).map(|_| u).collect();
+        let u = self.knots.clamp(self.degree, u);
+        let knots_to_insert = (0..=self.degree).map(|_| u).collect_vec();
         let mut cloned = self.clone();
         cloned.try_refine_knot(knots_to_insert)?;
 
@@ -1972,7 +1845,7 @@ pub fn try_periodic_interpolate_control_points<T: FloatingPoint>(
                 *p += *x;
                 Some(*p)
             })
-            .collect::<Vec<_>>(),
+            .collect_vec(),
     ]
     .concat();
 

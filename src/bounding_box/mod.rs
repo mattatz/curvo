@@ -9,7 +9,7 @@ use nalgebra::{
 };
 use simba::scalar::SupersetOf;
 
-use crate::{curve::nurbs_curve::NurbsCurve, misc::FloatingPoint};
+use crate::{curve::nurbs_curve::NurbsCurve, misc::FloatingPoint, region::CompoundCurve};
 
 /// A struct representing a bounding box in D space.
 #[derive(Clone, Debug)]
@@ -28,11 +28,11 @@ where
     /// Create a new bounding box from a minimum and maximum point.
     pub fn new(min: OVector<T, D>, max: OVector<T, D>) -> Self {
         let mut tmin = OVector::<T, D>::from_element(T::max_value().unwrap());
-        let mut tmax = OVector::<T, D>::from_element(T::min_value().unwrap());
+        let mut tmax = -tmin.clone();
 
         for i in 0..D::dim() {
-            tmin[i] = tmin[i].min(min[i]);
-            tmax[i] = tmax[i].max(max[i]);
+            tmin[i] = tmin[i].min(min[i]).min(max[i]);
+            tmax[i] = tmax[i].max(max[i]).max(min[i]);
         }
 
         BoundingBox {
@@ -44,7 +44,7 @@ where
     /// Create a new bounding box from point iterator.
     pub fn new_with_points<I: IntoIterator<Item = OPoint<T, D>>>(iter: I) -> Self {
         let mut min = OVector::<T, D>::from_element(T::max_value().unwrap());
-        let mut max = OVector::<T, D>::from_element(-T::max_value().unwrap());
+        let mut max = -min.clone();
 
         for point in iter {
             for i in 0..D::dim() {
@@ -116,6 +116,20 @@ where
         true
     }
 
+    /// Check if the bounding box contains a point.
+    /// # Examples
+    /// ```
+    /// use nalgebra::{Point3, Vector3};
+    /// use curvo::prelude::BoundingBox;
+    /// let bb = BoundingBox::new(Vector3::from_element(0.), Vector3::from_element(1.));
+    /// assert!(bb.contains(&Point3::new(0.5, 0.5, 0.5)));
+    /// assert!(bb.contains(&Point3::new(0., 0.5, 1.0)));
+    /// assert!(!bb.contains(&Point3::new(-1e-8, 0.5, 0.5)));
+    /// ```
+    pub fn contains(&self, point: &OPoint<T, D>) -> bool {
+        (0..D::dim()).all(|i| self.min[i] <= point[i] && point[i] <= self.max[i])
+    }
+
     /// Cast the bounding box to a curve with another floating point type
     pub fn cast<F: FloatingPoint + SupersetOf<T>>(&self) -> BoundingBox<F, D>
     where
@@ -180,5 +194,21 @@ where
     fn from(value: &'a NurbsCurve<T, D>) -> Self {
         let pts = value.dehomogenized_control_points();
         Self::new_with_points(pts)
+    }
+}
+
+impl<'a, T: FloatingPoint, D: DimName> From<&'a CompoundCurve<T, D>>
+    for BoundingBox<T, DimNameDiff<D, U1>>
+where
+    DefaultAllocator: Allocator<D>,
+    D: DimNameSub<U1>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+{
+    fn from(value: &'a CompoundCurve<T, D>) -> Self {
+        let pts = value
+            .spans()
+            .iter()
+            .flat_map(|span| span.dehomogenized_control_points());
+        Self::from_iter(pts)
     }
 }

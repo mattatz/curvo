@@ -30,7 +30,9 @@ The supported features also include finding the closest point on NURBS curves, f
 
 <img src="https://github.com/mattatz/curvo/assets/1085910/8f29cb4b-d3d5-4553-9f41-deb8cc63b132" width="360px" alt="Find intersection points between two NURBS curves" />
 
-Additional features are as follows:
+## Additional features
+
+<img src="https://github.com/user-attachments/assets/a4cef924-b3a9-410d-aebc-477f6f86f193" width="360px" alt="Boolean operations between NURBS curves" />
 
 <img src="https://github.com/mattatz/curvo/assets/1085910/754d2a96-0f6b-40f7-b6b1-106789d585b7" width="360px" alt="Smooth periodic points interpolation with knot styles" />
 
@@ -85,3 +87,8 @@ let tessellation = lofted.tessellate(Some(option));
 ## References
 
 - [The NURBS Book](https://www.amazon.com/NURBS-Book-Monographs-Visual-Communication/dp/3540615458) by Piegl and Tiller
+
+### Feature development sponsored by VUILD Inc.
+
+The **NURBS boolean operations** feature in this project was developed at the request of and sponsored by [VUILD](https://vuild.co.jp/).  
+VUILD supported the development as a sponsor by funding the feature's implementation.

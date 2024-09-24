@@ -1671,7 +1671,7 @@ checksum = "96a6ac251f4a2aca6b3f91340350eab87ae57c3f127ffeb585e92bd336717991"
 
 [[package]]
 name = "curvo"
-version = "0.1.27"
+version = "0.1.28"
 dependencies = [
  "anyhow",
  "approx",
@@ -1691,9 +1691,11 @@ dependencies = [
  "num-traits",
  "rand",
  "rand_distr",
+ "robust",
  "serde",
  "serde_json",
  "simba",
+ "spade",
 ]
 
 [[package]]
@@ -2048,9 +2050,9 @@ dependencies = [
 
 [[package]]
 name = "gauss-quad"
-version = "0.1.9"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff26d658d1572fbb8ac2bf1d233eac782d531afa022ec4c95b23d75e062e0e08"
+checksum = "3651220c731d380338f924cd078968a2f4808f6732141beb1a56e2acec75d9be"
 dependencies = [
  "nalgebra",
 ]
@@ -3401,6 +3403,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19b30a45b0cd0bcca8037f3d0dc3421eaf95327a17cad11964fb8179b4fc4832"
 
 [[package]]
+name = "robust"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cbf4a6aa5f6d6888f39e980649f3ad6b666acdce1d78e95b8a2cb076e687ae30"
+
+[[package]]
 name = "rodio"
 version = "0.17.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3625,6 +3633,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6845563ada680337a52d43bb0b29f396f2d911616f6573012645b9e3d048a49"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "spade"
+version = "2.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9bd14cf9e23b5241e1b1289ed3b9afc7746c95ead8df52d9254f5ed2d40c561b"
+dependencies = [
+ "hashbrown",
+ "num-traits",
+ "robust",
+ "smallvec",
 ]
 
 [[package]]
