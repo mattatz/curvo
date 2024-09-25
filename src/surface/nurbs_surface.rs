@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use argmin::core::{ArgminFloat, Executor, State};
 use itertools::Itertools;
 use nalgebra::{
     allocator::Allocator, Const, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff,
@@ -14,7 +15,8 @@ use crate::{
         try_interpolate_control_points,
     },
     misc::{binomial::Binomial, transformable::Transformable, FloatingPoint, Ray},
-    prelude::{KnotVector, SurfaceTessellation},
+    prelude::{KnotVector, SurfaceTessellation, Tessellation},
+    SurfaceClosestParameterNewton, SurfaceClosestParameterProblem,
 };
 
 /// NURBS surface representation
@@ -88,6 +90,17 @@ where
 
     pub fn control_points(&self) -> &Vec<Vec<OPoint<T, D>>> {
         &self.control_points
+    }
+
+    pub fn dehomogenized_control_points(&self) -> Vec<Vec<OPoint<T, DimNameDiff<D, U1>>>>
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+    {
+        self.control_points
+            .iter()
+            .map(|row| row.iter().map(|p| dehomogenize(p).unwrap()).collect())
+            .collect()
     }
 
     /// Evaluate the surface at the given u, v parameters to get a point
@@ -731,6 +744,75 @@ where
         Ok(())
     }
 
+    /// Find the closest point on the surface to a given point
+    pub fn find_closest_point(
+        &self,
+        point: &OPoint<T, DimNameDiff<D, U1>>,
+    ) -> anyhow::Result<OPoint<T, DimNameDiff<D, U1>>>
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+        T: ArgminFloat,
+    {
+        self.find_closest_parameter(point)
+            .map(|(u, v)| self.point_at(u, v))
+    }
+
+    /// Find the closest parameter on the surface to a given point with Newton's method
+    pub fn find_closest_parameter(
+        &self,
+        point: &OPoint<T, DimNameDiff<D, U1>>,
+    ) -> anyhow::Result<(T, T)>
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+        T: ArgminFloat,
+    {
+        let mut uv = Vector2::new(self.u_knots_domain().0, self.v_knots_domain().0);
+        let mut min_dist = T::infinity();
+        let tess = self.tessellate(None);
+        tess.points().iter().enumerate().for_each(|(i, pt)| {
+            let d = point - pt;
+            let d = d.norm_squared();
+            if d < min_dist {
+                min_dist = d;
+                uv = tess.uvs()[i];
+            }
+        });
+        // println!("Initial guess: {:?}", uv);
+
+        let pts = self.dehomogenized_control_points();
+        let u0 = pts.first().unwrap();
+        let u1 = pts.last().unwrap();
+        let eps = T::default_epsilon() * T::from_f64(10.0).unwrap();
+        let u_closed = (0..pts[0].len()).all(|i| (&u0[i] - &u1[i]).norm() < eps);
+        let v_closed = (0..pts.len()).all(|i| {
+            let row = &pts[i];
+            let v0 = row.first().unwrap();
+            let v1 = row.last().unwrap();
+            (v0 - v1).norm() < eps
+        });
+        // println!("u_closed: {}, v_closed: {}", u_closed, v_closed);
+
+        let solver = SurfaceClosestParameterNewton::<T, D>::new(
+            (self.u_knots_domain(), self.v_knots_domain()),
+            (u_closed, v_closed),
+        );
+        let res = Executor::new(SurfaceClosestParameterProblem::new(point, self), solver)
+            .configure(|state| state.param(uv).max_iters(5))
+            .run()?;
+        match res.state().get_best_param().cloned() {
+            Some(t) => {
+                if t.x.is_finite() && t.y.is_finite() {
+                    Ok((t.x, t.y))
+                } else {
+                    Err(anyhow::anyhow!("No best parameter found"))
+                }
+            }
+            _ => Err(anyhow::anyhow!("No best parameter found")),
+        }
+    }
+
     /// Cast the surface to a surface with another floating point type
     pub fn cast<F: FloatingPoint + SupersetOf<T>>(&self) -> NurbsSurface<F, D>
     where
@@ -1039,6 +1121,17 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
             u_knots: KnotVector::new(u_knots),
             v_knots: profile.knots().clone(),
         })
+    }
+
+    /// Try to create a sphere
+    pub fn try_sphere(
+        center: Point3<T>,
+        axis: Vector3<T>,
+        x_axis: Vector3<T>,
+        radius: T,
+    ) -> anyhow::Result<Self> {
+        let arc = NurbsCurve::try_arc(&center, &-axis, &x_axis, radius, T::zero(), T::pi())?;
+        Self::try_revolve(&arc, &center, &axis, T::two_pi())
     }
 }
 

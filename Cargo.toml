@@ -150,3 +150,8 @@ required-features = ["bevy"]
 name = "boolean_curves_animation"
 path = "examples/boolean_curves_animation.rs"
 required-features = ["bevy"]
+
+[[example]]
+name = "closest_point_on_surface"
+path = "examples/closest_point_on_surface.rs"
+required-features = ["bevy"]
