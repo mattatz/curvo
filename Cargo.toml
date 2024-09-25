@@ -14,9 +14,7 @@ readme = "README.md"
 [dependencies]
 anyhow = "1.0.81"
 nalgebra = { version = "0.33.0", features = [
-  "serde-serialize",
-  "convert-glam027",
-  "convert-glam028"
+  "serde-serialize"
 ] }
 num-traits = "0.2.18"
 rand = "0.8.5"
@@ -57,7 +55,8 @@ bevy = [
   "dep:bevy_infinite_grid",
   "dep:bevy_normal_material",
   "dep:bevy_panorbit_camera",
-  "dep:bevy_points"
+  "dep:bevy_points",
+  "nalgebra/convert-glam027"
 ]
 log = ["dep:log"]
 serde = ["dep:serde"]
