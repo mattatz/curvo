@@ -15,10 +15,18 @@ use nalgebra::{Point3, Point4};
 use curvo::prelude::*;
 use rand::Rng;
 mod materials;
+mod systems;
+use systems::screenshot_on_spacebar;
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                resolution: (640., 480.).into(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }))
         .add_plugins(LineMaterialPlugin)
         .add_plugins(InfiniteGridPlugin)
         .add_plugins(PanOrbitCameraPlugin)
@@ -32,8 +40,8 @@ struct AppPlugin;
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.add_systems(Startup, setup)
-            // .add_systems(Update, find_closest_point);
-            ;
+            .add_systems(Update, screenshot_on_spacebar);
+        // .add_systems(Update, find_closest_point);
     }
 }
 
@@ -88,7 +96,7 @@ fn setup(
             );
 
             let vertices = tess.points().iter().map(|pt| (*pt).into()).collect();
-            let normals = tess.normals().iter().map(|n| (*n).into()).collect();
+            let normals = tess.normals().iter().map(|n| (-n).into()).collect();
             let uvs = tess.uvs().iter().map(|uv| (*uv).into()).collect();
             let indices = tess
                 .faces()
@@ -156,10 +164,10 @@ fn setup(
     commands.spawn((camera, PanOrbitCamera::default()));
     commands.spawn(InfiniteGridBundle::default());
 
-    let u_div = 10;
-    let v_div = 10;
+    let u_div = 8;
+    let v_div = 8;
     let nf = (N - 1) as f64;
-    let height = 4.5;
+    let height = 3.5;
     let pts = (0..=u_div)
         .flat_map(|iu| {
             let fu = iu as f64 / u_div as f64 * nf - hn;
@@ -206,8 +214,8 @@ fn setup(
             commands.spawn(MaterialMeshBundle {
                 mesh: meshes.add(line),
                 material: line_materials.add(LineMaterial {
-                    color: WHITE.with_alpha(0.25).into(),
-                    opacity: 0.6,
+                    color: WHITE.into(),
+                    opacity: 1.0,
                     alpha_mode: AlphaMode::Blend,
                     ..Default::default()
                 }),
