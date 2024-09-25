@@ -1,5 +1,7 @@
 use bevy::{
-    color::palettes::css::{AQUAMARINE, GRAY, TOMATO, WHITE}, prelude::*, render::{camera::ScalingMode, mesh::VertexAttributeValues}
+    color::palettes::css::{AQUAMARINE, GRAY, TOMATO, WHITE},
+    prelude::*,
+    render::{camera::ScalingMode, mesh::VertexAttributeValues},
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
 
@@ -41,7 +43,7 @@ struct CurveContainer(NurbsCurve3D<f64>);
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.add_systems(Startup, setup)
-            .add_systems(Update, (find_closest_point));
+            .add_systems(Update, find_closest_point);
     }
 }
 

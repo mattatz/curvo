@@ -1,7 +1,9 @@
 use std::f64::consts::FRAC_PI_2;
 
 use bevy::{
-    color::palettes::css::TOMATO, prelude::*, render::mesh::{Indices, PrimitiveTopology, VertexAttributeValues}
+    color::palettes::css::TOMATO,
+    prelude::*,
+    render::mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
 
@@ -40,7 +42,7 @@ struct AppPlugin;
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.add_systems(Startup, setup)
-            .add_systems(Update, (screenshot_on_spacebar));
+            .add_systems(Update, screenshot_on_spacebar);
     }
 }
 

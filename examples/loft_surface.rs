@@ -1,10 +1,12 @@
 use std::f64::consts::FRAC_PI_2;
 
 use bevy::{
-    color::palettes::css::{RED, YELLOW}, prelude::*, render::{
+    color::palettes::css::{RED, YELLOW},
+    prelude::*,
+    render::{
         camera::ScalingMode,
         mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
-    }
+    },
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
 

@@ -1,7 +1,9 @@
 use std::f64::consts::TAU;
 
 use bevy::{
-    color::palettes::css::WHITE, prelude::*, render::mesh::{PrimitiveTopology, VertexAttributeValues}
+    color::palettes::css::WHITE,
+    prelude::*,
+    render::mesh::{PrimitiveTopology, VertexAttributeValues},
 };
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 

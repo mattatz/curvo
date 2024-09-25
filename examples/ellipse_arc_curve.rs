@@ -41,7 +41,7 @@ struct AppPlugin;
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.add_systems(Startup, setup)
-            .add_systems(Update, (screenshot_on_spacebar));
+            .add_systems(Update, screenshot_on_spacebar);
     }
 }
 

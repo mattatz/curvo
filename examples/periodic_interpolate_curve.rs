@@ -1,5 +1,10 @@
 use bevy::{
-    color::palettes::{css::{BLUE, TOMATO, WHITE}, tailwind::LIME_300}, prelude::*, render::{camera::ScalingMode, mesh::VertexAttributeValues}
+    color::palettes::{
+        css::{BLUE, TOMATO, WHITE},
+        tailwind::LIME_300,
+    },
+    prelude::*,
+    render::{camera::ScalingMode, mesh::VertexAttributeValues},
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
 
@@ -40,7 +45,7 @@ struct AppPlugin;
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.add_systems(Startup, setup)
-            .add_systems(Update, (screenshot_on_spacebar));
+            .add_systems(Update, screenshot_on_spacebar);
     }
 }
 
