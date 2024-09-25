@@ -1,9 +1,7 @@
 use std::f64::consts::TAU;
 
 use bevy::{
-    prelude::*,
-    render::mesh::{PrimitiveTopology, VertexAttributeValues},
-    window::close_on_esc,
+    color::palettes::css::WHITE, prelude::*, render::mesh::{PrimitiveTopology, VertexAttributeValues}
 };
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 
@@ -32,8 +30,7 @@ struct AppPlugin;
 
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
-        app.add_systems(Startup, setup)
-            .add_systems(Update, close_on_esc);
+        app.add_systems(Startup, setup);
     }
 }
 
@@ -123,7 +120,7 @@ fn setup(
                 }),
                 material: points_materials.add(PointsMaterial {
                     settings: bevy_points::material::PointsShaderSettings {
-                        color: Color::WHITE,
+                        color: WHITE.into(),
                         point_size: 0.05,
                         ..Default::default()
                     },

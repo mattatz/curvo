@@ -1,8 +1,5 @@
 use bevy::{
-    core::Zeroable,
-    prelude::*,
-    render::{camera::ScalingMode, mesh::VertexAttributeValues},
-    window::close_on_esc,
+    color::palettes::css::{AQUAMARINE, GRAY, TOMATO, WHITE}, prelude::*, render::{camera::ScalingMode, mesh::VertexAttributeValues}
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
 
@@ -44,7 +41,7 @@ struct CurveContainer(NurbsCurve3D<f64>);
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.add_systems(Startup, setup)
-            .add_systems(Update, (close_on_esc, find_closest_point));
+            .add_systems(Update, (find_closest_point));
     }
 }
 
@@ -97,7 +94,7 @@ fn setup(
                 .spawn(MaterialMeshBundle {
                     mesh: meshes.add(line),
                     material: line_materials.add(LineMaterial {
-                        color: Color::AQUAMARINE,
+                        color: AQUAMARINE.into(),
                         ..Default::default()
                     }),
                     // visibility: Visibility::Hidden,
@@ -120,7 +117,7 @@ fn setup(
                 .spawn(MaterialMeshBundle {
                     mesh: meshes.add(line),
                     material: line_materials.add(LineMaterial {
-                        color: Color::TOMATO,
+                        color: TOMATO.into(),
                         ..Default::default()
                     }),
                     // visibility: Visibility::Hidden,
@@ -151,7 +148,7 @@ fn setup(
             }),
             material: points_materials.add(PointsMaterial {
                 settings: bevy_points::material::PointsShaderSettings {
-                    color: Color::WHITE,
+                    color: WHITE.into(),
                     point_size: 0.05,
                     ..Default::default()
                 },
@@ -209,17 +206,17 @@ fn find_closest_point(
         .cursor_position()
         .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor))
     {
-        if let Some(d) = ray.intersect_plane(Vec3::zeroed(), Plane3d::new(Vec3::Z)) {
+        if let Some(d) = ray.intersect_plane(Vec3::ZERO, InfinitePlane3d::new(Vec3::Z)) {
             let pt = ray.get_point(d);
-            gizmos.circle(pt, Direction3d::Z, 0.1, Color::GRAY);
+            gizmos.circle(pt, Dir3::Z, 0.1, GRAY);
             let curve = curves.single();
             let p = Point3::from(pt).cast();
             let closest = curve.0.find_closest_point(&p);
             if let Ok(closest) = closest {
                 let center = closest.cast::<f32>().into();
-                gizmos.circle(center, Direction3d::Z, 0.05, Color::WHITE);
+                gizmos.circle(center, Dir3::Z, 0.05, WHITE);
 
-                gizmos.line(pt, center, Color::WHITE);
+                gizmos.line(pt, center, WHITE);
             }
         }
     }

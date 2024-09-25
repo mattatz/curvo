@@ -1,9 +1,7 @@
 use std::ops::Range;
 
 use bevy::{
-    prelude::*,
-    render::mesh::{PrimitiveTopology, VertexAttributeValues},
-    window::close_on_esc,
+    color::palettes::css::WHITE, prelude::*, render::mesh::{PrimitiveTopology, VertexAttributeValues}
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
 
@@ -54,10 +52,9 @@ impl Default for Setting {
 
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
-        app.insert_resource(ClearColor(Color::rgb(0.97, 0.39, 0.62)))
+        app.insert_resource(ClearColor(Color::srgb(0.97, 0.39, 0.62)))
             .insert_resource(Setting::default())
             .add_systems(Startup, setup)
-            .add_systems(Update, close_on_esc)
             .add_systems(Update, (animate, reset));
     }
 }
@@ -185,7 +182,7 @@ fn reset(
                     }),
                     material: points_materials.add(PointsMaterial {
                         settings: bevy_points::material::PointsShaderSettings {
-                            color: Color::WHITE,
+                            color: WHITE.into(),
                             point_size: 0.025,
                             opacity: 0.5,
                         },

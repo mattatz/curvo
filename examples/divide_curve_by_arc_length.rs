@@ -1,7 +1,7 @@
 use bevy::{
+    color::palettes::css::{ALICE_BLUE, AQUAMARINE, WHITE, YELLOW},
     prelude::*,
     render::mesh::{PrimitiveTopology, VertexAttributeValues},
-    window::close_on_esc,
 };
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
@@ -53,7 +53,6 @@ impl Plugin for AppPlugin {
                     .after(bevy_egui::systems::process_input_system)
                     .before(bevy_egui::EguiSet::BeginFrame),
             )
-            .add_systems(Update, close_on_esc)
             .add_systems(Update, (update_ui, divide_by_arc_length));
     }
 }
@@ -103,7 +102,7 @@ fn setup(
         MaterialMeshBundle {
             mesh: meshes.add(mesh),
             material: line_materials.add(LineMaterial {
-                color: Color::WHITE,
+                color: WHITE.into(),
                 ..Default::default()
             }),
             // visibility: Visibility::Hidden,
@@ -172,11 +171,11 @@ fn divide_by_arc_length(profile: Query<&ProfileCurve>, settings: Res<Setting>, m
         let binormal = f.binormal().cast::<f32>() * 1e-1;
         gizmos.circle(
             pt.into(),
-            Direction3d::new_unchecked(Vec3::from(normal)),
+            Dir3::new_unchecked(Vec3::from(normal)),
             r,
-            Color::ALICE_BLUE,
+            ALICE_BLUE,
         );
-        gizmos.line(pt.into(), (pt + tangent).into(), Color::AQUAMARINE);
-        gizmos.line(pt.into(), (pt + binormal).into(), Color::YELLOW);
+        gizmos.line(pt.into(), (pt + tangent).into(), AQUAMARINE);
+        gizmos.line(pt.into(), (pt + binormal).into(), YELLOW);
     });
 }

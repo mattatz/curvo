@@ -1,9 +1,7 @@
 use std::f64::consts::TAU;
 
 use bevy::{
-    prelude::*,
-    render::mesh::{PrimitiveTopology, VertexAttributeValues},
-    window::close_on_esc,
+    color::palettes::css::{GREEN, RED, WHITE, YELLOW}, prelude::*, render::mesh::{PrimitiveTopology, VertexAttributeValues}
 };
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 
@@ -32,8 +30,7 @@ struct AppPlugin;
 
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
-        app.add_systems(Startup, setup)
-            .add_systems(Update, close_on_esc);
+        app.add_systems(Startup, setup);
     }
 }
 
@@ -77,7 +74,7 @@ fn setup(
         .spawn(MaterialMeshBundle {
             mesh: meshes.add(mesh),
             material: line_materials.add(LineMaterial {
-                color: Color::WHITE,
+                color: WHITE.into(),
                 ..Default::default()
             }),
             ..Default::default()
@@ -122,7 +119,7 @@ fn setup(
             .spawn(MaterialMeshBundle {
                 mesh: meshes.add(mesh),
                 material: line_materials.add(LineMaterial {
-                    color: Color::WHITE,
+                    color: WHITE.into(),
                     ..Default::default()
                 }),
                 transform: tr,
@@ -169,7 +166,7 @@ fn setup(
         &mut meshes,
         &mut line_materials,
         &tangents,
-        Color::RED,
+        RED.into(),
         "t".to_string(),
     );
     add_arrows(
@@ -177,7 +174,7 @@ fn setup(
         &mut meshes,
         &mut line_materials,
         &normals,
-        Color::YELLOW,
+        YELLOW.into(),
         "n".to_string(),
     );
     add_arrows(
@@ -185,7 +182,7 @@ fn setup(
         &mut meshes,
         &mut line_materials,
         &binormals,
-        Color::GREEN,
+        GREEN.into(),
         "b".to_string(),
     );
 

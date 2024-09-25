@@ -1,7 +1,5 @@
 use bevy::{
-    prelude::*,
-    render::mesh::{PrimitiveTopology, VertexAttributeValues},
-    window::close_on_esc,
+    color::palettes::css::{SALMON, TOMATO}, prelude::*, render::mesh::{PrimitiveTopology, VertexAttributeValues}
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
 
@@ -30,7 +28,6 @@ struct AppPlugin;
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.add_systems(Startup, setup)
-            .add_systems(Update, close_on_esc)
             .add_systems(Update, trim_animation);
     }
 }
@@ -77,7 +74,7 @@ fn setup(
         MaterialMeshBundle {
             mesh: meshes.add(Mesh::new(PrimitiveTopology::LineStrip, default())),
             material: line_materials.add(LineMaterial {
-                color: Color::TOMATO,
+                color: TOMATO.into(),
                 ..Default::default()
             }),
             // visibility: Visibility::Hidden,
@@ -137,7 +134,7 @@ fn trim_animation(
         let p1 = p0 + n * 0.15;
         gizmos.linestrip(
             [Vec3::new(p0.x, p0.y, 0.), Vec3::new(p1.x, p1.y, 0.)],
-            Color::SALMON,
+            SALMON,
         );
     });
 }

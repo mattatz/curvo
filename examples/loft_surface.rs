@@ -1,12 +1,10 @@
 use std::f64::consts::FRAC_PI_2;
 
 use bevy::{
-    prelude::*,
-    render::{
+    color::palettes::css::{RED, YELLOW}, prelude::*, render::{
         camera::ScalingMode,
         mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
-    },
-    window::close_on_esc,
+    }
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
 
@@ -36,8 +34,7 @@ struct AppPlugin;
 
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
-        app.add_systems(Startup, setup)
-            .add_systems(Update, close_on_esc);
+        app.add_systems(Startup, setup);
     }
 }
 
@@ -91,7 +88,7 @@ fn setup(
                 .spawn(MaterialMeshBundle {
                     mesh: meshes.add(line_list),
                     material: line_materials.add(LineMaterial {
-                        color: Color::YELLOW,
+                        color: YELLOW.into(),
                         ..Default::default()
                     }),
                     // visibility: Visibility::Hidden,
@@ -112,7 +109,7 @@ fn setup(
                     material: points_materials.add(PointsMaterial {
                         settings: PointsShaderSettings {
                             point_size: 0.05,
-                            color: Color::RED,
+                            color: RED.into(),
                             ..Default::default()
                         },
                         ..Default::default()

@@ -1,10 +1,8 @@
 use bevy::{
-    prelude::*,
-    render::{
+    color::palettes::css::TOMATO, prelude::*, render::{
         camera::ScalingMode,
         mesh::{PrimitiveTopology, VertexAttributeValues},
-    },
-    window::close_on_esc,
+    }
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
 
@@ -36,8 +34,7 @@ struct AppPlugin;
 
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
-        app.add_systems(Startup, setup)
-            .add_systems(Update, close_on_esc);
+        app.add_systems(Startup, setup);
     }
 }
 
@@ -68,7 +65,7 @@ fn setup(
             material: points_materials.add(PointsMaterial {
                 settings: PointsShaderSettings {
                     point_size: 0.05,
-                    color: Color::TOMATO,
+                    color: TOMATO.into(),
                     ..Default::default()
                 },
                 ..Default::default()

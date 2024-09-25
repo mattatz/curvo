@@ -1,7 +1,5 @@
 use bevy::{
-    prelude::*,
-    render::mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
-    window::close_on_esc,
+    color::palettes::css::{SEA_GREEN, TURQUOISE}, prelude::*, render::mesh::{Indices, PrimitiveTopology, VertexAttributeValues}
 };
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 
@@ -59,7 +57,7 @@ struct AppPlugin;
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.add_systems(Startup, setup)
-            .add_systems(Update, (boolean, screenshot_on_spacebar, close_on_esc));
+            .add_systems(Update, (boolean, screenshot_on_spacebar));
     }
 }
 
@@ -139,7 +137,7 @@ fn boolean(
         let tr = Transform::from_xyz(0., 5., 0.);
 
         [subject, &clip].iter().for_each(|curve| {
-            let color = Color::rgba(1., 1., 1., 0.2);
+            let color = Color::srgba(1., 1., 1., 0.2);
             let pts = match curve {
                 CurveVariant::Curve(c) => c.tessellate(None),
                 CurveVariant::Compound(c) => c.tessellate(None),
@@ -206,7 +204,7 @@ fn boolean(
                         .map(|pt| pt.cast::<f32>())
                         .map(|pt| trans * Vec3::new(pt.x, pt.y, 0.))
                         .collect_vec();
-                    gizmos.linestrip(pts, Color::SEA_GREEN.with_a(0.5));
+                    gizmos.linestrip(pts, SEA_GREEN.with_alpha(0.5));
                     region.interiors().iter().for_each(|interior| {
                         let interior = interior.tessellate(None);
                         let pts = interior
@@ -216,7 +214,7 @@ fn boolean(
                             .map(|pt| pt.cast::<f32>())
                             .map(|pt| trans * Vec3::new(pt.x, pt.y, 0.))
                             .collect_vec();
-                        gizmos.linestrip(pts, Color::TURQUOISE.with_a(0.5));
+                        gizmos.linestrip(pts, TURQUOISE.with_alpha(0.5));
                     });
                 });
             }
@@ -229,7 +227,7 @@ fn boolean(
 
         intersections.iter().for_each(|it| {
             let position = it.a().0.cast::<f32>().coords.to_homogeneous().into();
-            gizmos.sphere(position, Quat::IDENTITY, 1e-1, Color::TOMATO);
+            gizmos.sphere(position, Quat::IDENTITY, 1e-1, TOMATO);
         });
         */
 
@@ -239,7 +237,7 @@ fn boolean(
             match regions {
                 Ok((regions, its)) => {
                     its.iter().for_each(|it| {
-                        // gizmos.sphere(it.vertex().position().coords.cast::<f32>().to_homogeneous().into(), Quat::IDENTITY, 1e-2, Color::TOMATO);
+                        // gizmos.sphere(it.vertex().position().coords.cast::<f32>().to_homogeneous().into(), Quat::IDENTITY, 1e-2, TOMATO);
                     });
 
                     let fi = i as f32 * inv_n + on - 0.5;
@@ -252,7 +250,7 @@ fn boolean(
                             .map(|pt| pt.cast::<f32>())
                             .map(|pt| tr * Vec3::new(pt.x, pt.y, 0.))
                             .collect_vec();
-                        gizmos.linestrip(pts, Color::TOMATO.with_a(0.5));
+                        gizmos.linestrip(pts, TOMATO.with_a(0.5));
                         region.interiors().iter().for_each(|interior| {
                             let pts = interior
                                 .tessellate(None)
@@ -260,7 +258,7 @@ fn boolean(
                                 .map(|pt| pt.cast::<f32>())
                                 .map(|pt| tr * Vec3::new(pt.x, pt.y, 0.))
                                 .collect_vec();
-                            gizmos.linestrip(pts, Color::TURQUOISE.with_a(0.5));
+                            gizmos.linestrip(pts, TURQUOISE.with_a(0.5));
                         });
                     });
                 }
