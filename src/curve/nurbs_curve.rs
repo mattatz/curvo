@@ -17,7 +17,7 @@ use crate::misc::transformable::Transformable;
 use crate::misc::trigonometry::segment_closest_point;
 use crate::misc::Ray;
 use crate::prelude::{CurveLengthParameter, Invertible, KnotVector};
-use crate::{misc::FloatingPoint, ClosestParameterNewton, ClosestParameterProblem};
+use crate::{misc::FloatingPoint, CurveClosestParameterNewton, CurveClosestParameterProblem};
 
 use super::KnotStyle;
 
@@ -1411,8 +1411,8 @@ where
             }
         }
 
-        let solver = ClosestParameterNewton::new((min_u, max_u), closed);
-        let res = Executor::new(ClosestParameterProblem::new(point, self), solver)
+        let solver = CurveClosestParameterNewton::new((min_u, max_u), closed);
+        let res = Executor::new(CurveClosestParameterProblem::new(point, self), solver)
             .configure(|state| state.param(u).max_iters(5))
             .run()?;
         match res.state().get_best_param().cloned() {
@@ -1485,13 +1485,6 @@ where
 
     /// Decompose the curve into Bezier segments
     pub fn try_decompose_bezier_segments(&self) -> anyhow::Result<Vec<Self>> {
-        /*
-        anyhow::ensure!(
-            self.is_clamped(),
-            "Curve must be clamped to decompose into Bezier segments"
-        );
-        */
-
         let mut cloned = self.clone();
         if !cloned.is_clamped() {
             cloned.try_clamp()?;

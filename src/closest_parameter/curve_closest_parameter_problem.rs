@@ -6,7 +6,7 @@ use nalgebra::{
 use crate::{curve::nurbs_curve::NurbsCurve, misc::FloatingPoint};
 
 /// Gradient & Hessian provider for finding the closest parameter on a curve to a given point.
-pub struct ClosestParameterProblem<'a, T: FloatingPoint, D: DimName>
+pub struct CurveClosestParameterProblem<'a, T: FloatingPoint, D: DimName>
 where
     DefaultAllocator: Allocator<D>,
     D: DimNameSub<U1>,
@@ -18,18 +18,18 @@ where
     curve: &'a NurbsCurve<T, D>,
 }
 
-impl<'a, T: FloatingPoint, D: DimName> ClosestParameterProblem<'a, T, D>
+impl<'a, T: FloatingPoint, D: DimName> CurveClosestParameterProblem<'a, T, D>
 where
     DefaultAllocator: Allocator<D>,
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     pub fn new(point: &'a OPoint<T, DimNameDiff<D, U1>>, curve: &'a NurbsCurve<T, D>) -> Self {
-        ClosestParameterProblem { point, curve }
+        CurveClosestParameterProblem { point, curve }
     }
 }
 
-impl<'a, T: FloatingPoint, D: DimName> Gradient for ClosestParameterProblem<'a, T, D>
+impl<'a, T: FloatingPoint, D: DimName> Gradient for CurveClosestParameterProblem<'a, T, D>
 where
     DefaultAllocator: Allocator<D>,
     D: DimNameSub<U1>,
@@ -47,7 +47,7 @@ where
     }
 }
 
-impl<'a, T: FloatingPoint, D: DimName> Hessian for ClosestParameterProblem<'a, T, D>
+impl<'a, T: FloatingPoint, D: DimName> Hessian for CurveClosestParameterProblem<'a, T, D>
 where
     DefaultAllocator: Allocator<D>,
     D: DimNameSub<U1>,

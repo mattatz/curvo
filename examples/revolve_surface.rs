@@ -3,7 +3,6 @@ use std::f64::consts::TAU;
 use bevy::{
     prelude::*,
     render::mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
-    window::close_on_esc,
 };
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 
@@ -41,7 +40,7 @@ struct AppPlugin;
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.add_systems(Startup, setup)
-            .add_systems(Update, (screenshot_on_spacebar, close_on_esc));
+            .add_systems(Update, screenshot_on_spacebar);
     }
 }
 

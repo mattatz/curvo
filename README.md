@@ -40,6 +40,8 @@ The supported features also include finding the closest point on NURBS curves, f
 
 <img src="https://github.com/mattatz/curvo/assets/1085910/55f214ec-668a-4d18-8fa8-bfa5ca23b3a2" width="360px" alt="Iso-curves on a surface" />
 
+<img src="https://github.com/user-attachments/assets/3b739a9f-531c-4264-90ce-a65e426439b3" width="360px" alt="Closest point on surface" />
+
 ## Usage
 
 ```rust
@@ -88,7 +90,7 @@ let tessellation = lofted.tessellate(Some(option));
 
 - [The NURBS Book](https://www.amazon.com/NURBS-Book-Monographs-Visual-Communication/dp/3540615458) by Piegl and Tiller
 
-### Feature development sponsored by VUILD Inc.
+## Feature development sponsored by VUILD Inc.
 
 The **NURBS boolean operations** feature in this project was developed at the request of [VUILD](https://vuild.co.jp/).  
 They supported the development as a sponsor by funding the feature's implementation.

@@ -1,9 +1,9 @@
 use std::f64::consts::FRAC_PI_2;
 
 use bevy::{
+    color::palettes::css::TOMATO,
     prelude::*,
     render::mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
-    window::close_on_esc,
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
 
@@ -42,7 +42,7 @@ struct AppPlugin;
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.add_systems(Startup, setup)
-            .add_systems(Update, (screenshot_on_spacebar, close_on_esc));
+            .add_systems(Update, screenshot_on_spacebar);
     }
 }
 
@@ -142,7 +142,7 @@ fn setup(
                         VertexAttributeValues::Float32x4(
                             (0..n)
                                 .map(|i| Color::hsl(((i as f32) / n as f32) * 300., 0.5, 0.5))
-                                .map(|c| c.rgba_to_vec4().into())
+                                .map(|c| c.to_srgba().to_f32_array())
                                 .collect(),
                         ),
                     );
@@ -168,7 +168,7 @@ fn setup(
                         material: points_materials.add(PointsMaterial {
                             settings: PointsShaderSettings {
                                 point_size: 0.05,
-                                color: Color::TOMATO,
+                                color: TOMATO.into(),
                                 ..Default::default()
                             },
                             ..Default::default()

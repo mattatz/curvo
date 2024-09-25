@@ -1,10 +1,10 @@
 use bevy::{
+    color::palettes::css::{TOMATO, WHITE},
     prelude::*,
     render::{
         camera::ScalingMode,
         mesh::{PrimitiveTopology, VertexAttributeValues},
     },
-    window::close_on_esc,
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
 
@@ -32,8 +32,7 @@ struct AppPlugin;
 
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
-        app.add_systems(Startup, setup)
-            .add_systems(Update, close_on_esc);
+        app.add_systems(Startup, setup);
     }
 }
 
@@ -60,7 +59,7 @@ fn setup(
         .spawn(MaterialMeshBundle {
             mesh: meshes.add(line),
             material: line_materials.add(LineMaterial {
-                color: Color::TOMATO,
+                color: TOMATO.into(),
                 ..Default::default()
             }),
             // visibility: Visibility::Hidden,
@@ -82,7 +81,7 @@ fn setup(
         .spawn(MaterialMeshBundle {
             mesh: meshes.add(line),
             material: line_materials.add(LineMaterial {
-                color: Color::WHITE,
+                color: WHITE.into(),
                 ..Default::default()
             }),
             // visibility: Visibility::Hidden,

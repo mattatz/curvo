@@ -17,16 +17,16 @@ pub struct LineMaterial {
 impl Default for LineMaterial {
     fn default() -> Self {
         Self {
-            color: Color::rgb(1.0, 1.0, 1.0),
+            color: Color::srgb(1.0, 1.0, 1.0),
             opacity: 1.0,
             alpha_mode: AlphaMode::Opaque,
         }
     }
 }
 
-#[derive(ShaderType)]
+#[derive(Clone, Default, ShaderType)]
 struct LineMaterialUniform {
-    color: Color,
+    color: Vec4,
     opacity: f32,
     #[cfg(feature = "webgl")]
     _webgl2_padding: bevy::math::Vec3,
@@ -35,7 +35,7 @@ struct LineMaterialUniform {
 impl From<&LineMaterial> for LineMaterialUniform {
     fn from(material: &LineMaterial) -> LineMaterialUniform {
         LineMaterialUniform {
-            color: material.color,
+            color: LinearRgba::from(material.color).to_f32_array().into(),
             opacity: material.opacity,
             #[cfg(feature = "webgl")]
             _webgl2_padding: Default::default(),
@@ -59,7 +59,7 @@ impl Material for LineMaterial {
     fn specialize(
         _pipeline: &bevy::pbr::MaterialPipeline<Self>,
         descriptor: &mut bevy::render::render_resource::RenderPipelineDescriptor,
-        layout: &bevy::render::mesh::MeshVertexBufferLayout,
+        layout: &bevy::render::mesh::MeshVertexBufferLayoutRef,
         _key: bevy::pbr::MaterialPipelineKey<Self>,
     ) -> Result<(), bevy::render::render_resource::SpecializedMeshPipelineError> {
         // WebGL2 structs must be 16 byte aligned.
@@ -68,7 +68,7 @@ impl Material for LineMaterial {
             "SIXTEEN_BYTE_ALIGNMENT".into(),
         ];
 
-        if layout.contains(Mesh::ATTRIBUTE_COLOR) {
+        if layout.0.contains(Mesh::ATTRIBUTE_COLOR) {
             shader_defs.push("VERTEX_COLORS".into());
         }
 

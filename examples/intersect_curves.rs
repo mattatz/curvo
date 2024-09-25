@@ -1,9 +1,9 @@
 use std::f32::consts::FRAC_PI_2;
 
 use bevy::{
+    color::palettes::{css::TOMATO, tailwind::LIME_500},
     prelude::*,
     render::mesh::{PrimitiveTopology, VertexAttributeValues},
-    window::close_on_esc,
 };
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin, InfiniteGridSettings};
 
@@ -38,9 +38,7 @@ struct AppPlugin;
 
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
-        app.add_systems(Startup, setup)
-            .add_systems(Update, (update, close_on_esc));
-        // .add_systems(Update, (close_on_esc));
+        app.add_systems(Startup, setup).add_systems(Update, update);
     }
 }
 
@@ -80,7 +78,7 @@ fn setup(
         .spawn(MaterialMeshBundle {
             mesh: meshes.add(line),
             material: line_materials.add(LineMaterial {
-                color: Color::TOMATO,
+                color: TOMATO.into(),
                 ..Default::default()
             }),
             // visibility: Visibility::Hidden,
@@ -106,7 +104,7 @@ fn setup(
         .spawn(MaterialMeshBundle {
             mesh: meshes.add(line),
             material: line_materials.add(LineMaterial {
-                color: Color::LIME_GREEN,
+                color: LIME_500.into(),
                 ..Default::default()
             }),
             // visibility: Visibility::Hidden,
@@ -312,7 +310,7 @@ fn update(
         intersections.iter().for_each(|it| {
             let p: Vec3 = it.a().0.coords.to_homogeneous().cast::<f32>().into();
             let normal = (camera_transform.translation - p).normalize();
-            let dir = Direction3d::new_unchecked(normal);
+            let dir = Dir3::new_unchecked(normal);
             gizmos.circle(p, dir, 1e-2 * 2.5, Color::WHITE);
         });
     }

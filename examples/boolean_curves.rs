@@ -1,7 +1,7 @@
 use bevy::{
+    color::palettes::css::{BLUE, GREEN, ORANGE, PURPLE, RED, WHITE},
     prelude::*,
     render::mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
-    window::close_on_esc,
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
 
@@ -45,7 +45,7 @@ struct AppPlugin;
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.add_systems(Startup, setup)
-            .add_systems(Update, (screenshot_on_spacebar, close_on_esc));
+            .add_systems(Update, screenshot_on_spacebar);
     }
 }
 
@@ -120,8 +120,8 @@ fn setup(
                 VertexAttributeValues::Float32x3(line_vertices),
             );
             let line = if sequence {
-                let start = Color::RED;
-                let end = Color::GREEN;
+                let start = RED;
+                let end = GREEN;
                 line.with_inserted_attribute(
                     Mesh::ATTRIBUTE_COLOR,
                     VertexAttributeValues::Float32x4(
@@ -130,7 +130,8 @@ fn setup(
                                 let t = i as f32 / (n - 1) as f32;
                                 let c0 = start * (1. - t);
                                 let c1 = end * t;
-                                (c0 + c1).as_rgba_f32()
+                                let c = c0 + c1;
+                                c.to_f32_array()
                             })
                             .collect(),
                     ),
@@ -141,7 +142,7 @@ fn setup(
             commands.spawn(MaterialMeshBundle {
                 mesh: meshes.add(line),
                 material: line_materials.add(LineMaterial {
-                    color: color.unwrap_or(Color::WHITE.with_a(0.25)),
+                    color: color.unwrap_or(WHITE.with_alpha(0.25).into()),
                     opacity: 0.6,
                     alpha_mode: AlphaMode::Blend,
                     ..Default::default()
@@ -184,15 +185,15 @@ fn setup(
                         .map(|p| p.cast::<f32>().coords.to_homogeneous().into())
                         .collect(),
                     colors: Some(if i == 0 {
-                        vec![Color::ORANGE, Color::ORANGE]
+                        vec![ORANGE.into(), ORANGE.into()]
                     } else {
-                        vec![Color::PURPLE, Color::PURPLE]
+                        vec![PURPLE.into(), PURPLE.into()]
                     }),
                     ..Default::default()
                 }),
                 material: points_materials.add(PointsMaterial {
                     settings: bevy_points::material::PointsShaderSettings {
-                        color: Color::WHITE,
+                        color: WHITE.into(),
                         point_size: 0.05,
                         ..Default::default()
                     },
@@ -231,7 +232,7 @@ fn setup(
                 &mut line_materials,
                 tr * Transform::from_xyz(0., 0., i as f32 * 1e-1),
                 &span.clone().into(),
-                Some(Color::GREEN),
+                Some(GREEN.into()),
                 true,
             );
         });
@@ -247,7 +248,7 @@ fn setup(
                             .iter()
                             .map(|p| p.cast::<f32>().coords.to_homogeneous().into())
                             .collect(),
-                        colors: Some([Color::RED, Color::BLUE].to_vec()),
+                        colors: Some([RED.into(), BLUE.into()].to_vec()),
                     }),
                     material: points_materials.add(PointsMaterial {
                         settings: bevy_points::material::PointsShaderSettings {
