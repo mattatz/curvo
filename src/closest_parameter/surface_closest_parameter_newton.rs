@@ -1,4 +1,4 @@
-use argmin::{argmin_error_closure, core::*};
+use argmin::{argmin_error, argmin_error_closure, core::*, float};
 use nalgebra::{
     allocator::Allocator, DefaultAllocator, DimNameDiff, DimNameSub, Matrix2, OVector, Vector2, U1,
 };
@@ -8,25 +8,44 @@ use crate::misc::FloatingPoint;
 /// Customized Newton's method for finding the closest parameter on a NURBS surface
 /// Original source: https://argmin-rs.github.io/argmin/argmin/solver/newton/struct.Newton.html
 #[derive(Clone, Copy)]
-pub struct SurfaceClosestParameterNewton<T, D> {
+pub struct SurfaceClosestParameterNewton<F, D> {
+    /// gamma
+    gamma: F,
     /// domain of the parameter
-    knot_domain: ((T, T), (T, T)),
+    knot_domain: ((F, F), (F, F)),
     /// the target curve is closed or not
     closed: (bool, bool),
     phantom: std::marker::PhantomData<D>,
 }
 
-impl<T, D> SurfaceClosestParameterNewton<T, D>
+impl<F, D> SurfaceClosestParameterNewton<F, D>
 where
-    T: ArgminFloat + Clone,
+    F: ArgminFloat + Clone,
 {
     /// Construct a new instance of [`Newton`]
-    pub fn new(domain: ((T, T), (T, T)), closed: (bool, bool)) -> Self {
+    pub fn new(domain: ((F, F), (F, F)), closed: (bool, bool)) -> Self {
         SurfaceClosestParameterNewton {
+            // gamma: float!(0.25),
+            gamma: float!(0.25),
             knot_domain: domain,
             closed,
             phantom: Default::default(),
         }
+    }
+
+    /// Set step size gamma
+    ///
+    /// Gamma must be in `(0, 1]` and defaults to `1`.
+    #[allow(unused)]
+    pub fn with_gamma(mut self, gamma: F) -> Result<Self, Error> {
+        if gamma <= float!(0.0) || gamma > float!(1.0) {
+            return Err(argmin_error!(
+                InvalidParameter,
+                "Newton: gamma must be in  (0, 1]."
+            ));
+        }
+        self.gamma = gamma;
+        Ok(self)
     }
 }
 
@@ -34,13 +53,30 @@ impl<O, F, D> Solver<O, IterState<Vector2<F>, Vector2<F>, (), (), (), F>>
     for SurfaceClosestParameterNewton<F, D>
 where
     F: FloatingPoint + ArgminFloat,
-    O: Gradient<Param = Vector2<F>, Gradient = OVector<F, DimNameDiff<D, U1>>>
+    O: CostFunction<Param = Vector2<F>, Output = F>
+        + Gradient<Param = Vector2<F>, Gradient = OVector<F, DimNameDiff<D, U1>>>
         + Hessian<Param = Vector2<F>, Hessian = Vec<Vec<OVector<F, DimNameDiff<D, U1>>>>>,
     DefaultAllocator: Allocator<D>,
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     const NAME: &'static str = "Closest parameter newton method";
+
+    fn init(
+        &mut self,
+        problem: &mut Problem<O>,
+        state: IterState<Vector2<F>, Vector2<F>, (), (), (), F>,
+    ) -> Result<(IterState<Vector2<F>, Vector2<F>, (), (), (), F>, Option<KV>), Error> {
+        let x0 = state.get_param().ok_or_else(argmin_error_closure!(
+            NotInitialized,
+            concat!(
+                "`Newton` requires an initial parameter vector. ",
+                "Please provide an initial guess via `Executor`s `configure` method."
+            )
+        ))?;
+        let cost = problem.cost(x0)?;
+        Ok((state.cost(cost), None))
+    }
 
     fn next_iter(
         &mut self,
@@ -68,45 +104,53 @@ where
         let s_uv = &e[1][1];
         // let s_vu = &e[1][1];
 
-        // point coincidence
-        // |S(u,v) - p| < epsilon
+        let grad = Vector2::new(s_u.dot(&dif), s_v.dot(&dif));
+
         let distance = dif.norm();
+        let eps = F::from_f64(1e-5).unwrap();
 
-        // cosine
-        // |Su(u,v) * (S(u,v) - p)|
-        // ------------------------ < epsilon
-        // |Su(u,v)| |S(u,v) - p|
-        let f = s_u.dot(&dif);
-        let d1 = s_u.norm() * distance;
-        let c1 = f / d1;
-
-        // |Sv(u,v) * (S(u,v) - p)|
-        // ------------------------ < epsilon
-        // |Sv(u,v)| |S(u,v) - p|
-        let g = s_v.dot(&dif);
-        let d2 = s_v.norm() * distance;
-        let c2 = g / d2;
-
-        let eps = F::from_f64(1e-4).unwrap();
-
-        // halt if the conditions are met
-        if distance < eps && c1 < eps && c2 < eps {
+        // halt if point is close enough
+        if distance < eps {
             let p = *param;
+            // println!("halt");
             return Ok((state.param(p), None));
         }
 
-        let j00 = s_u.dot(s_u) + s_uu.dot(&dif);
-        let j01 = s_u.dot(s_v) + s_uv.dot(&dif);
-        let j10 = j01;
-        let j11 = s_v.dot(s_v) + s_vv.dot(&dif);
-        let jacobian = Matrix2::new(j00, j01, j10, j11);
-        let k = Vector2::new(-f, -g);
-        let d = jacobian
-            .lu()
-            .solve(&k)
-            .ok_or(anyhow::anyhow!("Failed to solve jacobian"))?;
+        let u_d = s_uu.norm() < F::default_epsilon();
+        let v_d = s_vv.norm() < F::default_epsilon();
+        // println!("u_d: {}, v_d: {}", u_d, v_d);
+        let new_param = match (u_d, v_d) {
+            (false, false) => {
+                let j00 = s_u.dot(s_u) + s_uu.dot(&dif);
+                let j01 = s_u.dot(s_v) + s_uv.dot(&dif);
+                let j11 = s_v.dot(s_v) + s_vv.dot(&dif);
+                let hessian = Matrix2::new(j00, j01, j01, j11);
+                let delta = hessian
+                    .lu()
+                    .solve(&-grad)
+                    .ok_or(anyhow::anyhow!("Failed to solve"))?;
+                *param + delta * self.gamma
+            }
+            (true, false) => {
+                let v_delta = -grad.y / (s_v.dot(s_v) + s_vv.dot(&dif));
+                *param + Vector2::new(F::zero(), v_delta) * self.gamma
+            }
+            (false, true) => {
+                let u_delta = -grad.x / (s_u.dot(s_u) + s_uu.dot(&dif));
+                *param + Vector2::new(u_delta, F::zero()) * self.gamma
+            }
+            _ => {
+                return Err(anyhow::anyhow!("Invalid case"));
+            }
+        };
 
-        let new_param = d + param;
+        /*
+        let inv = hessian
+            .try_inverse()
+            .ok_or(anyhow::anyhow!("Failed to compute inverse matrix"))?;
+        let delta = -inv * grad;
+        let new_param = *param + delta * self.gamma;
+        */
 
         // Constrain the parameter to the domain
         let new_param = Vector2::new(
@@ -114,7 +158,16 @@ where
             constrain(new_param.y, self.knot_domain.1, self.closed.1),
         );
 
-        Ok((state.param(new_param), None))
+        let new_cost = problem.cost(&new_param)?;
+        // println!("prev: {}, next: {}", state.get_cost(), new_cost);
+
+        // halt if cost is not decreasing
+        if state.get_cost() < new_cost {
+            let p = *param;
+            Ok((state.param(p), None))
+        } else {
+            Ok((state.cost(new_cost).param(new_param), None))
+        }
     }
 
     fn terminate(

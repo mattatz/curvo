@@ -745,6 +745,28 @@ where
     }
 
     /// Find the closest point on the surface to a given point
+    ///
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point3, Vector3};
+    /// use approx::assert_relative_eq;
+    /// let sphere = NurbsSurface3D::try_sphere(&Point3::origin(), &Vector3::x(), &Vector3::y(), 1.0).unwrap();
+    /// let ud = sphere.u_knots_domain();
+    /// let vd = sphere.v_knots_domain();
+    /// let div = 10;
+    /// (0..div).for_each(|u| {
+    ///     (0..div).for_each(|v| {
+    ///         let u = u as f64 / div as f64 * (ud.1 - ud.0) + ud.0;
+    ///         let v = v as f64 / div as f64 * (vd.1 - vd.0) + vd.0;
+    ///         // println!("u: {}, v: {}", u, v);
+    ///         let pt = sphere.point_at(u, v);
+    ///         let pt2 = pt * 5.;
+    ///         let closest = sphere.find_closest_point(&pt2).unwrap();
+    ///         assert_relative_eq!(pt, closest, epsilon = 1e-4);
+    ///     });
+    /// });
+    /// ```
     pub fn find_closest_point(
         &self,
         point: &OPoint<T, DimNameDiff<D, U1>>,
@@ -770,6 +792,19 @@ where
     {
         let mut uv = Vector2::new(self.u_knots_domain().0, self.v_knots_domain().0);
         let mut min_dist = T::infinity();
+
+        /*
+        let tess = self.regular_tessellate(10, 10);
+        tess.points().iter().enumerate().for_each(|(i, pt)| {
+            let d = point - pt;
+            let d = d.norm_squared();
+            if d < min_dist {
+                min_dist = d;
+                uv = tess.uvs()[i];
+            }
+        });
+        */
+
         let tess = self.tessellate(None);
         tess.points().iter().enumerate().for_each(|(i, pt)| {
             let d = point - pt;
@@ -799,7 +834,7 @@ where
             (u_closed, v_closed),
         );
         let res = Executor::new(SurfaceClosestParameterProblem::new(point, self), solver)
-            .configure(|state| state.param(uv).max_iters(5))
+            .configure(|state| state.param(uv).max_iters(100))
             .run()?;
         match res.state().get_best_param().cloned() {
             Some(t) => {
@@ -1125,13 +1160,13 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
 
     /// Try to create a sphere
     pub fn try_sphere(
-        center: Point3<T>,
-        axis: Vector3<T>,
-        x_axis: Vector3<T>,
+        center: &Point3<T>,
+        axis: &Vector3<T>,
+        x_axis: &Vector3<T>,
         radius: T,
     ) -> anyhow::Result<Self> {
-        let arc = NurbsCurve::try_arc(&center, &-axis, &x_axis, radius, T::zero(), T::pi())?;
-        Self::try_revolve(&arc, &center, &axis, T::two_pi())
+        let arc = NurbsCurve::try_arc(center, &-axis, x_axis, radius, T::zero(), T::pi())?;
+        Self::try_revolve(&arc, center, axis, T::two_pi())
     }
 }
 

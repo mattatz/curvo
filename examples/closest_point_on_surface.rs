@@ -1,12 +1,7 @@
-use std::f64::consts::FRAC_PI_2;
-
 use bevy::{
     color::palettes::css::WHITE,
     prelude::*,
-    render::{
-        camera::ScalingMode,
-        mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
-    },
+    render::mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
 };
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 
@@ -15,7 +10,7 @@ use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use bevy_points::{mesh::PointsMesh, plugin::PointsPlugin, prelude::PointsMaterial};
 use itertools::Itertools;
 use materials::*;
-use nalgebra::{Point3, Point4, Rotation3, Translation3, Vector3};
+use nalgebra::{Point3, Point4};
 
 use curvo::prelude::*;
 use rand::Rng;
@@ -37,12 +32,15 @@ struct AppPlugin;
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.add_systems(Startup, setup)
-            .add_systems(Update, find_closest_point);
+            // .add_systems(Update, find_closest_point);
+            ;
     }
 }
 
 #[derive(Component)]
 struct TargetSurface(pub NurbsSurface3D<f64>);
+
+const N: usize = 6;
 
 fn setup(
     mut commands: Commands,
@@ -124,14 +122,13 @@ fn setup(
 
     // let surface = NurbsSurface3D::try_sphere(Point3::origin(), Vector3::z(), Vector3::x(), 1.).unwrap();
     let degree = 3;
-    let n = 6;
-    let goal = n + degree + 1;
+    let goal = N + degree + 1;
     let knots = KnotVector::uniform(goal - degree * 2, degree);
-    let hn = (n - 1) as f64 / 2.;
+    let hn = (N - 1) as f64 / 2.;
     let mut rng: rand::rngs::StdRng = rand::SeedableRng::from_seed([0; 32]);
-    let pts = (0..n)
+    let pts = (0..N)
         .map(|i| {
-            (0..n)
+            (0..N)
                 .map(|j| {
                     let x = i as f64 - hn;
                     let z = (rng.gen::<f64>() - 0.5) * 2.;
@@ -161,15 +158,16 @@ fn setup(
 
     let u_div = 10;
     let v_div = 10;
-    let nf = (n - 1) as f64;
+    let nf = (N - 1) as f64;
+    let height = 4.5;
     let pts = (0..=u_div)
         .flat_map(|iu| {
             let fu = iu as f64 / u_div as f64 * nf - hn;
             (0..=v_div)
                 .map(|iv| {
                     let fv = iv as f64 / v_div as f64 * nf - hn;
-                    let pt = Point3::new(fu, 2., fv);
-                    pt
+
+                    Point3::new(fu, height, fv)
                 })
                 .collect_vec()
         })
@@ -196,7 +194,7 @@ fn setup(
         .insert(Name::new("points"));
 
     pts.iter().for_each(|pt| {
-        if let Ok(closest) = surface.find_closest_point(&pt) {
+        if let Ok(closest) = surface.find_closest_point(pt) {
             let line_vertices = [pt, &closest]
                 .iter()
                 .map(|p| p.cast::<f32>().into())
@@ -224,19 +222,35 @@ fn setup(
 }
 
 fn find_closest_point(time: Res<Time>, surfaces: Query<&TargetSurface>, mut gizmos: Gizmos) {
-    /*
     let t = time.elapsed_seconds_f64();
-    let point = Point3::new(t.sin(), t.cos(), 0.) * 5.;
-    gizmos.sphere(point.cast::<f32>().into(), Quat::IDENTITY, 0.25, WHITE);
-    surfaces.iter().for_each(|s| {
-        let closest = s.0.find_closest_point(&point);
-        if let Ok(closest) = closest {
-            gizmos.line(
-                point.cast::<f32>().into(),
-                closest.cast::<f32>().into(),
-                WHITE,
-            );
-        }
+
+    let u_div = 10;
+    let v_div = 10;
+    let nf = (N - 1) as f64;
+    let hn = (N - 1) as f64 / 2.;
+    let y = t.cos() * 5.;
+    let pts = (0..=u_div)
+        .flat_map(|iu| {
+            let fu = iu as f64 / u_div as f64 * nf - hn;
+            (0..=v_div)
+                .map(|iv| {
+                    let fv = iv as f64 / v_div as f64 * nf - hn;
+
+                    Point3::new(fu, y, fv)
+                })
+                .collect_vec()
+        })
+        .collect_vec();
+
+    pts.iter().for_each(|pt| {
+        gizmos.sphere(pt.cast::<f32>().into(), Quat::IDENTITY, 0.025, WHITE);
     });
-    */
+
+    surfaces.iter().for_each(|s| {
+        pts.iter().for_each(|pt| {
+            if let Ok(closest) = s.0.find_closest_point(pt) {
+                gizmos.line(pt.cast::<f32>().into(), closest.cast::<f32>().into(), WHITE);
+            }
+        });
+    });
 }
