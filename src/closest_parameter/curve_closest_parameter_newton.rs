@@ -3,7 +3,7 @@ use argmin::{argmin_error, argmin_error_closure, core::*, float};
 /// Customized Newton's method for finding the closest parameter on a NURBS curve
 /// Original source: https://argmin-rs.github.io/argmin/argmin/solver/newton/struct.Newton.html
 #[derive(Clone, Copy)]
-pub struct ClosestParameterNewton<F, P> {
+pub struct CurveClosestParameterNewton<F, P> {
     /// gamma
     gamma: F,
     /// domain of the parameter
@@ -12,14 +12,14 @@ pub struct ClosestParameterNewton<F, P> {
     closed: bool,
 }
 
-impl<F, P> ClosestParameterNewton<F, P>
+impl<F, P> CurveClosestParameterNewton<F, P>
 where
     F: ArgminFloat,
     P: Clone,
 {
     /// Construct a new instance of [`Newton`]
     pub fn new(domain: (P, P), closed: bool) -> Self {
-        ClosestParameterNewton {
+        CurveClosestParameterNewton {
             gamma: float!(1.0),
             knot_domain: domain,
             closed,
@@ -42,7 +42,7 @@ where
     }
 }
 
-impl<O, F> Solver<O, IterState<F, F, (), F, (), F>> for ClosestParameterNewton<F, F>
+impl<O, F> Solver<O, IterState<F, F, (), F, (), F>> for CurveClosestParameterNewton<F, F>
 where
     O: Gradient<Param = F, Gradient = F> + Hessian<Param = F, Hessian = F>,
     F: Clone + ArgminFloat,
