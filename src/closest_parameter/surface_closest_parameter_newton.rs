@@ -116,15 +116,17 @@ where
             return Ok((state.param(p), None));
         }
 
-        let u_d = s_uu.norm() < F::default_epsilon();
-        let v_d = s_vv.norm() < F::default_epsilon();
-        // println!("u_d: {}, v_d: {}", u_d, v_d);
+        let duu = s_u.dot(s_u) + s_uu.dot(&dif);
+        let dvv = s_v.dot(s_v) + s_vv.dot(&dif);
+
+        // check if the second derivative is vanishing
+        let u_d = duu < F::default_epsilon();
+        let v_d = dvv < F::default_epsilon();
+
         let new_param = match (u_d, v_d) {
             (false, false) => {
-                let j00 = s_u.dot(s_u) + s_uu.dot(&dif);
-                let j01 = s_u.dot(s_v) + s_uv.dot(&dif);
-                let j11 = s_v.dot(s_v) + s_vv.dot(&dif);
-                let hessian = Matrix2::new(j00, j01, j01, j11);
+                let duv = s_u.dot(s_v) + s_uv.dot(&dif);
+                let hessian = Matrix2::new(duu, duv, duv, dvv);
                 let delta = hessian
                     .lu()
                     .solve(&-grad)
@@ -132,11 +134,11 @@ where
                 *param + delta * self.gamma
             }
             (true, false) => {
-                let v_delta = -grad.y / (s_v.dot(s_v) + s_vv.dot(&dif));
+                let v_delta = -grad.y / dvv;
                 *param + Vector2::new(F::zero(), v_delta) * self.gamma
             }
             (false, true) => {
-                let u_delta = -grad.x / (s_u.dot(s_u) + s_uu.dot(&dif));
+                let u_delta = -grad.x / duu;
                 *param + Vector2::new(u_delta, F::zero()) * self.gamma
             }
             _ => {
