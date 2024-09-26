@@ -140,7 +140,8 @@ where
                 *param + Vector2::new(u_delta, F::zero()) * self.gamma
             }
             _ => {
-                return Err(anyhow::anyhow!("Invalid case"));
+                let p = *param;
+                return Ok((state.param(p), None));
             }
         };
 
