@@ -7,6 +7,9 @@ use nalgebra::{Point3, Vector3};
 #[test]
 #[cfg(feature = "serde")]
 fn test_curve_serialization() {
+    use curvo::prelude::CompoundCurve;
+    use nalgebra::{U3, U4};
+
     let curve =
         NurbsCurve3D::try_circle(&Point3::origin(), &Vector3::x(), &Vector3::y(), 1.).unwrap();
     let json = serde_json::to_string_pretty(&curve).unwrap();
@@ -26,6 +29,14 @@ fn test_curve_serialization() {
     );
     assert_eq!(curve.degree(), der.degree());
     assert_relative_eq!(curve.knots().as_slice(), der.knots().as_slice());
+
+    let compound = CompoundCurve::new(vec![curve.clone()]);
+    let json = serde_json::to_string_pretty(&compound).unwrap();
+    let der: CompoundCurve<f64, U4> = serde_json::from_str(&json).unwrap();
+    compound.spans().iter().enumerate().for_each(|(i, span)| {
+        let o = &der.spans()[i];
+        assert_relative_eq!(span.knots().as_slice(), o.knots().as_slice());
+    });
 }
 
 #[test]

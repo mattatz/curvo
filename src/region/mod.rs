@@ -10,6 +10,7 @@ use crate::{
 
 /// A closed region bounded by a single exterior curve and zero or more interior curves.
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Region<T: FloatingPoint> {
     exterior: CompoundCurve<T, Const<3>>,
     interiors: Vec<CompoundCurve<T, Const<3>>>,
