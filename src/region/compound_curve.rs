@@ -273,3 +273,119 @@ where
         self.spans.reverse();
     }
 }
+
+#[cfg(feature = "serde")]
+impl<T, D: DimName> serde::Serialize for CompoundCurve<T, D>
+where
+    T: FloatingPoint + serde::Serialize,
+    DefaultAllocator: Allocator<D>,
+    <DefaultAllocator as nalgebra::allocator::Allocator<D>>::Buffer<T>: serde::Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("CompoundCurve", 1)?;
+        state.serialize_field("spans", &self.spans)?;
+        state.end()
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, T, D: DimName> serde::Deserialize<'de> for CompoundCurve<T, D>
+where
+    T: FloatingPoint + serde::Deserialize<'de>,
+    DefaultAllocator: Allocator<D>,
+    <DefaultAllocator as nalgebra::allocator::Allocator<D>>::Buffer<T>: serde::Deserialize<'de>,
+{
+    fn deserialize<S>(deserializer: S) -> Result<Self, S::Error>
+    where
+        S: serde::Deserializer<'de>,
+    {
+        use serde::de::{self, MapAccess, Visitor};
+
+        #[derive(Debug)]
+        enum Field {
+            Spans,
+        }
+
+        impl<'de> serde::Deserialize<'de> for Field {
+            fn deserialize<S>(deserializer: S) -> Result<Self, S::Error>
+            where
+                S: serde::Deserializer<'de>,
+            {
+                struct FieldVisitor;
+
+                impl<'de> Visitor<'de> for FieldVisitor {
+                    type Value = Field;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                        formatter.write_str("`control_points` or `degree` or `knots`")
+                    }
+
+                    fn visit_str<E>(self, value: &str) -> Result<Field, E>
+                    where
+                        E: de::Error,
+                    {
+                        match value {
+                            "spans" => Ok(Field::Spans),
+                            _ => Err(de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+
+                deserializer.deserialize_identifier(FieldVisitor)
+            }
+        }
+
+        struct CompoundCurveVisitor<T, D>(std::marker::PhantomData<(T, D)>);
+
+        impl<T, D> CompoundCurveVisitor<T, D> {
+            pub fn new() -> Self {
+                CompoundCurveVisitor(std::marker::PhantomData)
+            }
+        }
+
+        impl<'de, T, D: DimName> Visitor<'de> for CompoundCurveVisitor<T, D>
+        where
+            T: FloatingPoint + serde::Deserialize<'de>,
+            DefaultAllocator: Allocator<D>,
+            <DefaultAllocator as nalgebra::allocator::Allocator<D>>::Buffer<T>:
+                serde::Deserialize<'de>,
+        {
+            type Value = CompoundCurve<T, D>;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("struct CompoundCurve")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<Self::Value, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                let mut spans = None;
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::Spans => {
+                            if spans.is_some() {
+                                return Err(de::Error::duplicate_field("spans"));
+                            }
+                            spans = Some(map.next_value()?);
+                        }
+                    }
+                }
+                let spans = spans.ok_or_else(|| de::Error::missing_field("spans"))?;
+
+                Ok(Self::Value { spans })
+            }
+        }
+
+        const FIELDS: &[&str] = &["spans"];
+        deserializer.deserialize_struct(
+            "CompoundCurve",
+            FIELDS,
+            CompoundCurveVisitor::<T, D>::new(),
+        )
+    }
+}
