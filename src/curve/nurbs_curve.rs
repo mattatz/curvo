@@ -459,12 +459,15 @@ where
         };
         let segments = &segments[i..j];
 
-        if segments.is_empty() {
-            return Ok(T::zero());
-        }
-
         let (_, u) = self.knots_domain();
         let gauss = GaussLegendre::new(16 + self.degree)?;
+
+        if segments.len() <= 1 {
+            // If the curve is a single Bezier segment, compute the length directly
+            let l = compute_bezier_segment_length(self, u, &gauss);
+            return Ok(l);
+        }
+
         let length = segments
             .iter()
             .map(|s| compute_bezier_segment_length(s, u, &gauss))
@@ -1548,6 +1551,10 @@ where
                 control_points,
                 knots: KnotVector::new(knots),
             });
+        }
+
+        if segments.len() <= 1 {
+            return Ok(vec![cloned]);
         }
 
         Ok(segments)
