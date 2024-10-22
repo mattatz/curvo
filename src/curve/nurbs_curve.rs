@@ -387,6 +387,35 @@ where
         self.knots.clamp(self.degree, u)
     }
 
+    /// Normalize the knot vector to the range of [0, 1]
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point2, Vector2};
+    /// use std::f64::consts::TAU;
+    /// let unit_circle = NurbsCurve2D::try_circle(
+    ///     &Point2::origin(),
+    ///     &Vector2::x(),
+    ///     &Vector2::y(),
+    ///     1.
+    /// ).unwrap();
+    /// let (min, max) = unit_circle.knots_domain();
+    /// assert_eq!(min, 0.);
+    /// assert_eq!(max, TAU);
+    /// let mut normalized = unit_circle.clone();
+    /// normalized.normalize_knots();
+    /// let (min, max) = normalized.knots_domain();
+    /// assert_eq!(min, 0.);
+    /// assert_eq!(max, 1.);
+    /// ```
+    pub fn normalize_knots(&mut self) {
+        let knots = self.knots();
+        let (min, max) = self.knots_domain();
+        let size = max - min;
+        let normalized = knots.iter().map(|k| (*k - min) / size).collect_vec();
+        self.knots = KnotVector::new(normalized);
+    }
+
     /// Compute the length of the curve by gauss-legendre quadrature
     /// # Example
     /// ```
@@ -430,14 +459,18 @@ where
         };
         let segments = &segments[i..j];
 
+        anyhow::ensure!(
+            !segments.is_empty(),
+            "Decomposed segments are empty to compute the length"
+        );
+
         let (_, u) = self.knots_domain();
         let gauss = GaussLegendre::new(16 + self.degree)?;
         let length = segments
             .iter()
             .map(|s| compute_bezier_segment_length(s, u, &gauss))
-            .reduce(T::add)
-            .unwrap();
-        Ok(length)
+            .reduce(T::add);
+        length.ok_or(anyhow::anyhow!("Failed to compute the length of the curve"))
     }
 
     /// Divide a NURBS curve by a given length
