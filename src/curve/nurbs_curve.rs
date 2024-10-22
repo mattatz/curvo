@@ -509,7 +509,9 @@ where
 
         anyhow::ensure!(
             total > length,
-            "The curve is too short to divide by the given length"
+            "The curve is too short to divide by the given length total:{}, given length:{}",
+            total,
+            length
         );
 
         let mut samples = vec![CurveLengthParameter::new(self.knots.first(), T::zero())];
