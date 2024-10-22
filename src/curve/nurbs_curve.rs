@@ -459,10 +459,9 @@ where
         };
         let segments = &segments[i..j];
 
-        anyhow::ensure!(
-            !segments.is_empty(),
-            "Decomposed segments are empty to compute the length"
-        );
+        if segments.is_empty() {
+            return Ok(T::zero());
+        }
 
         let (_, u) = self.knots_domain();
         let gauss = GaussLegendre::new(16 + self.degree)?;
