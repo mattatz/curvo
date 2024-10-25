@@ -14,7 +14,7 @@ use crate::{
         nurbs_curve::{dehomogenize, NurbsCurve, NurbsCurve3D},
         try_interpolate_control_points,
     },
-    misc::{binomial::Binomial, transformable::Transformable, FloatingPoint, Ray},
+    misc::{binomial::Binomial, transformable::Transformable, FloatingPoint, Invertible, Ray},
     prelude::{KnotVector, SurfaceTessellation, Tessellation},
     SurfaceClosestParameterNewton, SurfaceClosestParameterProblem,
 };
@@ -215,8 +215,8 @@ where
             .map(|row| {
                 row.into_iter()
                     .map(|der| {
-                        let v0 = &der[1][0];
-                        let v1 = &der[0][1];
+                        let v0 = &der[0][1];
+                        let v1 = &der[1][0];
                         v0.cross(v1).normalize()
                     })
                     .collect()
@@ -1325,6 +1325,35 @@ impl<'a, T: FloatingPoint, const D: usize> Transformable<&'a OMatrix<T, Const<D>
                 }
             });
         });
+    }
+}
+
+impl<T: FloatingPoint, D: DimName> Invertible for NurbsSurface<T, D>
+where
+    DefaultAllocator: Allocator<D>,
+{
+    /// Reverse the direction of the surface
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point3, Vector3};
+    /// use approx::assert_relative_eq;
+    /// let mut surface = NurbsSurface::try_sphere(&Point3::origin(), &Vector3::x(), &Vector3::y(), 1.0).unwrap();
+    /// let (u_start, u_end) = surface.u_knots_domain();
+    /// let (v_start, v_end) = surface.v_knots_domain();
+    /// assert_relative_eq!(surface.point_at(u_start, v_start), Point3::new(-1.0, 0.0, 0.0), epsilon = 1e-8);
+    /// assert_relative_eq!(surface.point_at(u_end, v_end), Point3::new(1.0, 0.0, 0.0), epsilon = 1e-8);
+    /// surface.invert();
+    /// assert_relative_eq!(surface.point_at(u_start, v_start), Point3::new(1.0, 0.0, 0.0), epsilon = 1e-8);
+    /// assert_relative_eq!(surface.point_at(u_end, v_end), Point3::new(-1.0, 0.0, 0.0), epsilon = 1e-8);
+    /// ```
+    fn invert(&mut self) {
+        self.control_points.iter_mut().for_each(|row| {
+            row.reverse();
+        });
+        self.control_points.reverse();
+        self.u_knots.invert();
+        self.v_knots.invert();
     }
 }
 
