@@ -266,6 +266,18 @@ where
         deriv[1].clone()
     }
 
+    /// Compute second order derivative at a given parameter.
+    /// Beware that normal cannot be defined with zero-curvature point of a curve.
+    /// In that case this fn will just return zero vector.
+    pub fn normal_at(&self, u: T) -> OVector<T, DimNameDiff<D, U1>>
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+    {
+        let deriv = self.rational_derivatives(u, 2);
+        deriv[2].clone()
+    }
+
     /// Evaluate the curve at a given parameter to get a point & tangent vector at the same time
     #[allow(clippy::type_complexity)]
     pub fn point_tangent_at(
