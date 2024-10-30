@@ -267,9 +267,7 @@ where
     }
 
     /// Compute second order derivative at a given parameter.
-    /// Beware that normal cannot be defined with zero-curvature point of a curve.
-    /// In that case this fn will just return zero vector.
-    pub fn normal_at(&self, u: T) -> OVector<T, DimNameDiff<D, U1>>
+    pub fn second_derivative_at(&self, u: T) -> OVector<T, DimNameDiff<D, U1>>
     where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
