@@ -128,13 +128,16 @@ mod tests {
             NurbsCurve2D::try_arc(&o, &dx, &dy, 1., 0., PI).unwrap(),
             NurbsCurve2D::try_arc(&o, &dx, &dy, 1., PI, TAU).unwrap(),
         ]);
-        let rectangle = NurbsCurve2D::polyline(&[
-            Point2::new(0., 2.),
-            Point2::new(0., -2.),
-            Point2::new(2., -2.),
-            Point2::new(2., 2.),
-            Point2::new(0., 2.),
-        ]);
+        let rectangle = NurbsCurve2D::polyline(
+            &[
+                Point2::new(0., 2.),
+                Point2::new(0., -2.),
+                Point2::new(2., -2.),
+                Point2::new(2., 2.),
+                Point2::new(0., 2.),
+            ],
+            true,
+        );
         let intersections = compound_circle
             .find_intersections(&rectangle, Some(OPTIONS))
             .unwrap();
@@ -145,13 +148,16 @@ mod tests {
             1e-2
         ));
 
-        let square = NurbsCurve2D::polyline(&[
-            Point2::new(-1., 1.),
-            Point2::new(-1., -1.),
-            Point2::new(1., -1.),
-            Point2::new(1., 1.),
-            Point2::new(-1., 1.),
-        ]);
+        let square = NurbsCurve2D::polyline(
+            &[
+                Point2::new(-1., 1.),
+                Point2::new(-1., -1.),
+                Point2::new(1., -1.),
+                Point2::new(1., 1.),
+                Point2::new(-1., 1.),
+            ],
+            true,
+        );
         let intersections = compound_circle
             .find_intersections(&square, Some(OPTIONS))
             .unwrap();
@@ -178,16 +184,22 @@ mod tests {
             NurbsCurve2D::try_arc(&o, &dx, &dy, 1., PI, TAU).unwrap(),
         ]);
         let compound_rectangle = CompoundCurve::new(vec![
-            NurbsCurve2D::polyline(&[
-                Point2::new(-2., -0.5),
-                Point2::new(2., -0.5),
-                Point2::new(2., 0.5),
-            ]),
-            NurbsCurve2D::polyline(&[
-                Point2::new(2., 0.5),
-                Point2::new(-2., 0.5),
-                Point2::new(-2., -0.5),
-            ]),
+            NurbsCurve2D::polyline(
+                &[
+                    Point2::new(-2., -0.5),
+                    Point2::new(2., -0.5),
+                    Point2::new(2., 0.5),
+                ],
+                true,
+            ),
+            NurbsCurve2D::polyline(
+                &[
+                    Point2::new(2., 0.5),
+                    Point2::new(-2., 0.5),
+                    Point2::new(-2., -0.5),
+                ],
+                true,
+            ),
         ]);
 
         let intersections = compound_circle

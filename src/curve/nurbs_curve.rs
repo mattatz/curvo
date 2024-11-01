@@ -114,7 +114,7 @@ where
     ///     Point2::new(-1.0, 1.0),
     ///     Point2::new(1.0, 1.0),
     /// ];
-    /// let polyline_curve = NurbsCurve2D::polyline(&points);
+    /// let polyline_curve = NurbsCurve2D::polyline(&points, true);
     /// let (start, end) = polyline_curve.knots_domain();
     /// let start = polyline_curve.point_at(start);
     /// let end = polyline_curve.point_at(end);
@@ -125,7 +125,7 @@ where
     /// let goal = points.iter().tuple_windows().map(|(a, b)| (a - b).norm()).sum();
     /// assert_eq!(length, goal);
     /// ```
-    pub fn polyline(points: &[OPoint<T, DimNameDiff<D, U1>>]) -> Self
+    pub fn polyline(points: &[OPoint<T, DimNameDiff<D, U1>>], normalize_knots: bool) -> Self
     where
         D: DimNameSub<U1>,
         <D as DimNameSub<U1>>::Output: DimNameAdd<U1>,
@@ -142,7 +142,11 @@ where
         }
         knots.push(acc);
 
-        let knots = knots.into_iter().map(|k| k / acc).collect();
+        let knots = if normalize_knots {
+            knots.into_iter().map(|k| k / acc).collect()
+        } else {
+            knots
+        };
 
         Self {
             degree: 1,
@@ -264,6 +268,16 @@ where
     {
         let deriv = self.rational_derivatives(u, 1);
         deriv[1].clone()
+    }
+
+    /// Compute second order derivative at a given parameter.
+    pub fn second_derivative_at(&self, u: T) -> OVector<T, DimNameDiff<D, U1>>
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+    {
+        let deriv = self.rational_derivatives(u, 2);
+        deriv[2].clone()
     }
 
     /// Evaluate the curve at a given parameter to get a point & tangent vector at the same time
@@ -1291,7 +1305,7 @@ where
     ///         Point3::new(1., 1., 0.),
     ///         Point3::new(-1., 1., 0.),
     ///         Point3::new(-1., -1., 0.),
-    ///     ],
+    ///     ], true,
     /// );
     /// assert!(polyline.is_closed());
     ///
@@ -1301,7 +1315,7 @@ where
     ///         Point3::new(1., -1., 0.),
     ///         Point3::new(1., 1., 0.),
     ///         Point3::new(-1., 1., 0.),
-    ///     ],
+    ///     ], true,
     /// );
     /// assert!(!unclosed.is_closed());
     /// ```

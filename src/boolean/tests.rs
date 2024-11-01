@@ -21,13 +21,16 @@ const OPTIONS: CurveIntersectionSolverOptions<f64> = CurveIntersectionSolverOpti
 fn rectangle(width: f64, height: f64) -> NurbsCurve2D<f64> {
     let dx = width * 0.5;
     let dy = height * 0.5;
-    NurbsCurve2D::polyline(&[
-        Point2::new(-dx, -dy),
-        Point2::new(dx, -dy),
-        Point2::new(dx, dy),
-        Point2::new(-dx, dy),
-        Point2::new(-dx, -dy),
-    ])
+    NurbsCurve2D::polyline(
+        &[
+            Point2::new(-dx, -dy),
+            Point2::new(dx, -dy),
+            Point2::new(dx, dy),
+            Point2::new(-dx, dy),
+            Point2::new(-dx, -dy),
+        ],
+        true,
+    )
 }
 
 fn compound_circle(radius: f64) -> CompoundCurve<f64, U3> {
@@ -45,21 +48,27 @@ fn rectangular_annulus(width: f64, height: f64, square_size: f64) -> Region<f64>
     let dy = height * 0.5;
     let size = (square_size * 0.5).min(dx).min(dy);
     Region::new(
-        NurbsCurve2D::polyline(&[
-            Point2::new(-dx, -dy),
-            Point2::new(dx, -dy),
-            Point2::new(dx, dy),
-            Point2::new(-dx, dy),
-            Point2::new(-dx, -dy),
-        ])
+        NurbsCurve2D::polyline(
+            &[
+                Point2::new(-dx, -dy),
+                Point2::new(dx, -dy),
+                Point2::new(dx, dy),
+                Point2::new(-dx, dy),
+                Point2::new(-dx, -dy),
+            ],
+            true,
+        )
         .into(),
-        vec![NurbsCurve2D::polyline(&[
-            Point2::new(-size, -size),
-            Point2::new(size, -size),
-            Point2::new(size, size),
-            Point2::new(-size, size),
-            Point2::new(-size, -size),
-        ])
+        vec![NurbsCurve2D::polyline(
+            &[
+                Point2::new(-size, -size),
+                Point2::new(size, -size),
+                Point2::new(size, size),
+                Point2::new(-size, size),
+                Point2::new(-size, -size),
+            ],
+            true,
+        )
         .into()],
     )
 }

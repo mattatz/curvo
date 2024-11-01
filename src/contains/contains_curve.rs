@@ -67,7 +67,7 @@ pub fn x_ray_intersection<T: FloatingPoint + ArgminFloat>(
     option: Option<CurveIntersectionSolverOptions<T>>,
 ) -> anyhow::Result<Vec<Point2<T>>> {
     let option = option.unwrap_or_default();
-    let ray = NurbsCurve::polyline(&[*point, point + Vector2::x() * ray_length]);
+    let ray = NurbsCurve::polyline(&[*point, point + Vector2::x() * ray_length], true);
     let traversed = BoundingBoxTraversal::try_traverse(
         curve,
         &ray,

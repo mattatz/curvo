@@ -76,7 +76,7 @@ fn setup(
         })
         .insert(Name::new("points"));
 
-    let polyline_curve = NurbsCurve2D::polyline(&points);
+    let polyline_curve = NurbsCurve2D::polyline(&points, true);
 
     let samples = polyline_curve.tessellate(Some(1e-8));
     let line_vertices = samples

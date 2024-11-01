@@ -33,13 +33,16 @@ fn problem_case() {
         KnotStyle::Centripetal,
     )
     .unwrap();
-    let clip = NurbsCurve2D::<f64>::polyline(&[
-        Point2::new(-1., -1.),
-        Point2::new(1., -1.),
-        Point2::new(1., 1.),
-        Point2::new(-1., 1.),
-        Point2::new(-1., -1.),
-    ]);
+    let clip = NurbsCurve2D::<f64>::polyline(
+        &[
+            Point2::new(-1., -1.),
+            Point2::new(1., -1.),
+            Point2::new(1., 1.),
+            Point2::new(-1., 1.),
+            Point2::new(-1., -1.),
+        ],
+        true,
+    );
     let delta: f64 = 17.58454421724;
     let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);
     let clip = clip.transformed(&trans.into());
@@ -64,13 +67,16 @@ fn problem_case2() {
         KnotStyle::Centripetal,
     )
     .unwrap();
-    let clip = NurbsCurve2D::<f64>::polyline(&[
-        Point2::new(-1., -1.),
-        Point2::new(1., -1.),
-        Point2::new(1., 1.),
-        Point2::new(-1., 1.),
-        Point2::new(-1., -1.),
-    ]);
+    let clip = NurbsCurve2D::<f64>::polyline(
+        &[
+            Point2::new(-1., -1.),
+            Point2::new(1., -1.),
+            Point2::new(1., 1.),
+            Point2::new(-1., 1.),
+            Point2::new(-1., -1.),
+        ],
+        true,
+    );
 
     let delta: f64 = 1.2782841177;
     let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);

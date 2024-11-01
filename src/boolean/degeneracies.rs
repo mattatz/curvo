@@ -86,24 +86,30 @@ mod tests {
         let circle =
             NurbsCurve2D::<f64>::try_circle(&Point2::origin(), &Vector2::x(), &Vector2::y(), 1.)
                 .unwrap();
-        let rectangle = NurbsCurve2D::<f64>::polyline(&[
-            Point2::new(0., 2.),
-            Point2::new(1., 2.),
-            Point2::new(1., -2.),
-            Point2::new(0., -2.),
-            Point2::new(0., 2.),
-        ]);
+        let rectangle = NurbsCurve2D::<f64>::polyline(
+            &[
+                Point2::new(0., 2.),
+                Point2::new(1., 2.),
+                Point2::new(1., -2.),
+                Point2::new(0., -2.),
+                Point2::new(0., 2.),
+            ],
+            true,
+        );
         let intersections =
             find_intersections_without_degeneracies(&circle, &rectangle, Some(OPTIONS)).unwrap();
         assert_eq!(intersections.len(), 2);
 
-        let rectangle_2 = NurbsCurve2D::<f64>::polyline(&[
-            Point2::new(-0.5, 2.),
-            Point2::new(0.5, 2.),
-            Point2::new(0.5, -1.),
-            Point2::new(-0.5, -1.),
-            Point2::new(-0.5, 2.),
-        ]);
+        let rectangle_2 = NurbsCurve2D::<f64>::polyline(
+            &[
+                Point2::new(-0.5, 2.),
+                Point2::new(0.5, 2.),
+                Point2::new(0.5, -1.),
+                Point2::new(-0.5, -1.),
+                Point2::new(-0.5, 2.),
+            ],
+            true,
+        );
         let intersections_2 =
             find_intersections_without_degeneracies(&circle, &rectangle_2, Some(OPTIONS)).unwrap();
         assert_eq!(intersections_2.len(), 4);
@@ -154,13 +160,16 @@ mod tests {
         let subject =
             NurbsCurve2D::<f64>::try_circle(&Point2::origin(), &Vector2::x(), &Vector2::y(), 1.)
                 .unwrap();
-        let clip = NurbsCurve2D::<f64>::polyline(&[
-            Point2::new(-dx, -dy),
-            Point2::new(dx, -dy),
-            Point2::new(dx, dy),
-            Point2::new(-dx, dy),
-            Point2::new(-dx, -dy),
-        ]);
+        let clip = NurbsCurve2D::<f64>::polyline(
+            &[
+                Point2::new(-dx, -dy),
+                Point2::new(dx, -dy),
+                Point2::new(dx, dy),
+                Point2::new(-dx, dy),
+                Point2::new(-dx, -dy),
+            ],
+            true,
+        );
         let delta: f64 = 0.8204758902600001;
         let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);
         let intersections = find_intersections_without_degeneracies(
