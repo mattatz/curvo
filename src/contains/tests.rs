@@ -39,13 +39,16 @@ fn test_circle_boundary_case() {
 fn test_rectangle_boundary_case() {
     let dx = 2.;
     let dy = 1.;
-    let rectangle = NurbsCurve2D::<f64>::polyline(&[
-        Point2::new(0., 0.),
-        Point2::new(dx, 0.),
-        Point2::new(dx, dy),
-        Point2::new(0., dy),
-        Point2::new(0., 0.),
-    ]);
+    let rectangle = NurbsCurve2D::<f64>::polyline(
+        &[
+            Point2::new(0., 0.),
+            Point2::new(dx, 0.),
+            Point2::new(dx, dy),
+            Point2::new(0., dy),
+            Point2::new(0., 0.),
+        ],
+        true,
+    );
     assert!(rectangle
         .contains(&Point2::new(0., 0.), Some(OPTIONS))
         .unwrap());
