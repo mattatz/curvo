@@ -1393,18 +1393,23 @@ where
             control_points_post[k - degree - 1] = control_points_post[k - degree].clone();
             for l in 1..=degree {
                 let ind = k - degree + l;
-                let alpha = knots_post[k + l] - knots_to_insert[j];
-                if alpha.abs() < T::default_epsilon() {
-                    control_points_post[ind - 1] = control_points_post[ind].clone();
-                } else {
-                    let denom = knots_post[k + l] - self.knots[i - degree + l];
-                    let weight = if denom != T::zero() {
-                        alpha / denom
+                if ind < control_points_post.len() {
+                    let alpha = knots_post[k + l] - knots_to_insert[j];
+                    if alpha.abs() < T::default_epsilon() {
+                        control_points_post[ind - 1] = control_points_post[ind].clone();
                     } else {
-                        T::zero()
-                    };
-                    control_points_post[ind - 1] = control_points_post[ind - 1]
-                        .lerp(&control_points_post[ind], T::one() - weight);
+                        let denom = knots_post[k + l] - self.knots[i - degree + l];
+                        let weight = if denom != T::zero() {
+                            alpha / denom
+                        } else {
+                            T::zero()
+                        };
+                        control_points_post[ind - 1] = control_points_post[ind - 1]
+                            .lerp(&control_points_post[ind], T::one() - weight);
+                    }
+                } else {
+                    // TODO: resolve this issue
+                    // ind is out of bound
                 }
             }
             knots_post[k] = knots_to_insert[j];
