@@ -1,7 +1,7 @@
 use nalgebra::RealField;
 
 /// Options for adaptive tessellation of a surface
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct AdaptiveTessellationOptions<T: RealField> {
     /// Tolerance for the normal vector: if the L2 norm of the normal vectors is below this value, the edge is considered flat
     pub norm_tolerance: T,
