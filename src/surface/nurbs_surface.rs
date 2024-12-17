@@ -19,6 +19,8 @@ use crate::{
     SurfaceClosestParameterNewton, SurfaceClosestParameterProblem,
 };
 
+use super::FlipDirection;
+
 /// NURBS surface representation
 /// by generics, it can be used for 2D or 3D curves with f32 or f64 scalar types
 #[derive(Clone, Debug)]
@@ -86,6 +88,11 @@ where
     /// Get the v domain of the knot vector by degree
     pub fn v_knots_domain(&self) -> (T, T) {
         self.v_knots.domain(self.v_degree)
+    }
+
+    /// Get the u and v domain of the knot vector by degree
+    pub fn knots_domain(&self) -> ((T, T), (T, T)) {
+        (self.u_knots_domain(), self.v_knots_domain())
     }
 
     pub fn control_points(&self) -> &Vec<Vec<OPoint<T, D>>> {
@@ -448,6 +455,58 @@ where
         }
 
         skl
+    }
+
+    /// Flip the surface in u or v direction
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point3, Vector3};
+    /// use approx::assert_relative_eq;
+    /// let sphere = NurbsSurface3D::try_sphere(&Point3::origin(), &Vector3::x(), &Vector3::y(), 1.0).unwrap();
+    /// let (ud, vd) = sphere.knots_domain();
+    /// let p0 = sphere.point_at(ud.0, vd.0);
+    ///
+    /// let u_flipped = sphere.flip(FlipDirection::U);
+    /// let (u_flipped_ud, u_flipped_vd) = u_flipped.knots_domain();
+    /// let p1 = u_flipped.point_at(u_flipped_ud.1, u_flipped_vd.0);
+    ///
+    /// let v_flipped = sphere.flip(FlipDirection::V);
+    /// let (v_flipped_ud, v_flipped_vd) = v_flipped.knots_domain();
+    /// let p2 = v_flipped.point_at(v_flipped_ud.0, v_flipped_vd.1);
+    /// assert_relative_eq!(p0, p2, epsilon = 1e-8);
+    ///
+    /// let uv_flipped = sphere.flip(FlipDirection::UV);
+    /// let (uv_flipped_ud, uv_flipped_vd) = uv_flipped.knots_domain();
+    /// let p3 = uv_flipped.point_at(uv_flipped_ud.1, uv_flipped_vd.1);
+    /// assert_relative_eq!(p0, p3, epsilon = 1e-8);
+    /// ```
+    pub fn flip(&self, direction: FlipDirection) -> Self {
+        let mut flipped = self.clone();
+
+        // flip in u direction
+        match direction {
+            FlipDirection::U | FlipDirection::UV => {
+                flipped.control_points = flipped.control_points.iter().rev().cloned().collect();
+                flipped.u_knots = flipped.u_knots.inverse();
+            }
+            _ => {}
+        }
+
+        // flip in v direction
+        match direction {
+            FlipDirection::V | FlipDirection::UV => {
+                flipped.control_points = flipped
+                    .control_points
+                    .iter()
+                    .map(|row| row.iter().rev().cloned().collect())
+                    .collect();
+                flipped.v_knots = flipped.v_knots.inverse();
+            }
+            _ => {}
+        }
+
+        flipped
     }
 
     /// Extrude a NURBS curve to create a NURBS surface
