@@ -24,13 +24,13 @@ easer = { version = "0.3.0", optional = true }
 simba = { version = "0.9.0", default-features = false }
 spade = { version = "2.12.1" }
 gauss-quad = "0.2.1"
-bevy = { version = "0.14.2", optional = true }
-bevy_egui = { version = "0.30.0", optional = true }
-bevy-inspector-egui = { version = "0.27.0", optional = true }
-bevy_infinite_grid = { version = "0.13.0", optional = true }
-bevy_normal_material = { version = "0.6.0", optional = true }
-bevy_panorbit_camera = { version = "0.19.4", optional = true }
-bevy_points = { version = "0.6.0", optional = true }
+bevy = { version = "0.15.0", optional = true }
+bevy_egui = { version = "0.31.1", optional = true }
+bevy-inspector-egui = { version = "0.28.0", optional = true }
+bevy_infinite_grid = { git = "https://github.com/ForesightMiningSoftwareCorporation/bevy_infinite_grid.git", rev = "1b27619cc5c44d4e939e63345cddc1954e4123db", optional = true }
+bevy_normal_material = { version = "0.7.0", optional = true }
+bevy_panorbit_camera = { version = "0.21.1", optional = true }
+bevy_points = { version = "0.7.0", optional = true }
 argmin = "0.10.0"
 itertools = "0.13.0"
 log = { version = "0.4.22", optional = true }
@@ -44,8 +44,8 @@ approx = { version = "0.5", default-features = false }
 serde_json = "1.0.133"
 
 [features]
-default = []
-# default = ["bevy"] # for debugging example
+# default = []
+default = ["bevy"] # for debugging example
 bevy = [
   "dep:easer",
   "dep:rand_distr",
@@ -56,7 +56,7 @@ bevy = [
   "dep:bevy_normal_material",
   "dep:bevy_panorbit_camera",
   "dep:bevy_points",
-  "nalgebra/convert-glam027"
+  "nalgebra/convert-glam029"
 ]
 log = ["dep:log"]
 serde = ["dep:serde"]
@@ -134,6 +134,11 @@ required-features = ["bevy"]
 [[example]]
 name = "intersect_curves"
 path = "examples/intersect_curves.rs"
+required-features = ["bevy"]
+
+[[example]]
+name = "intersect_surface_curve"
+path = "examples/intersect_surface_curve.rs"
 required-features = ["bevy"]
 
 [[example]]

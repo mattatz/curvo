@@ -73,14 +73,13 @@ fn setup(
         VertexAttributeValues::Float32x3(vertices),
     );
     commands
-        .spawn(MaterialMeshBundle {
-            mesh: meshes.add(mesh),
-            material: line_materials.add(LineMaterial {
+        .spawn((
+            Mesh3d(meshes.add(mesh)),
+            MeshMaterial3d(line_materials.add(LineMaterial {
                 color: WHITE.into(),
                 ..Default::default()
-            }),
-            ..Default::default()
-        })
+            })),
+        ))
         .insert(Name::new("curve"));
 
     let (start, end) = curve.knots_domain();
@@ -118,15 +117,14 @@ fn setup(
         let tr = Transform::from_matrix(matrix.into());
 
         commands
-            .spawn(MaterialMeshBundle {
-                mesh: meshes.add(mesh),
-                material: line_materials.add(LineMaterial {
+            .spawn((
+                Mesh3d(meshes.add(mesh)),
+                MeshMaterial3d(line_materials.add(LineMaterial {
                     color: WHITE.into(),
                     ..Default::default()
-                }),
-                transform: tr,
-                ..Default::default()
-            })
+                })),
+                tr,
+            ))
             .insert(Name::new(format!("frame_{}", i)));
 
         let p: Vec3 = (*frame.position()).into();
@@ -148,19 +146,18 @@ fn setup(
                       color: Color,
                       name: String| {
         commands
-            .spawn(MaterialMeshBundle {
-                mesh: meshes.add(
+            .spawn((
+                Mesh3d(meshes.add(
                     Mesh::new(PrimitiveTopology::LineList, default()).with_inserted_attribute(
                         Mesh::ATTRIBUTE_POSITION,
                         VertexAttributeValues::Float32x3(vs.iter().map(|v| v.to_array()).collect()),
                     ),
-                ),
-                material: line_materials.add(LineMaterial {
+                )),
+                MeshMaterial3d(line_materials.add(LineMaterial {
                     color,
                     ..Default::default()
-                }),
-                ..Default::default()
-            })
+                })),
+            ))
             .insert(Name::new(name));
     };
     add_arrows(
@@ -188,10 +185,9 @@ fn setup(
         "b".to_string(),
     );
 
-    let camera = Camera3dBundle {
-        transform: Transform::from_translation(Vec3::new(0., 2.5, 10.)),
-        ..Default::default()
-    };
-    commands.spawn((camera, PanOrbitCamera::default()));
+    commands.spawn((
+        Transform::from_translation(Vec3::new(0., 2.5, 10.)),
+        PanOrbitCamera::default(),
+    ));
     commands.spawn(InfiniteGridBundle::default());
 }

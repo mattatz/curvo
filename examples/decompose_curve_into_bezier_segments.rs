@@ -73,15 +73,13 @@ fn setup(
         VertexAttributeValues::Float32x3(vertices),
     );
     commands
-        .spawn(MaterialMeshBundle {
-            mesh: meshes.add(mesh),
-            material: line_materials.add(LineMaterial {
+        .spawn((
+            Mesh3d(meshes.add(mesh)),
+            MeshMaterial3d(line_materials.add(LineMaterial {
                 color: Color::WHITE,
                 ..Default::default()
-            }),
-            visibility: Visibility::Hidden,
-            ..Default::default()
-        })
+            })),
+        ))
         .insert(Name::new("curve"));
 
     let segments = curve.try_decompose_bezier_segments().unwrap();
@@ -99,15 +97,13 @@ fn setup(
         );
         let t = i as f32 / n as f32;
         commands
-            .spawn(MaterialMeshBundle {
-                mesh: meshes.add(mesh),
-                material: line_materials.add(LineMaterial {
+            .spawn((
+                Mesh3d(meshes.add(mesh)),
+                MeshMaterial3d(line_materials.add(LineMaterial {
                     color: Color::hsl(t * 360., 0.5, 0.5),
                     ..Default::default()
-                }),
-                // visibility: Visibility::Hidden,
-                ..Default::default()
-            })
+                })),
+            ))
             .insert(Name::new("bezier segment"));
 
         let (start, end) = segment.knots_domain();
@@ -115,12 +111,12 @@ fn setup(
         let p1 = segment.point_at(end);
 
         commands
-            .spawn(MaterialMeshBundle {
-                mesh: meshes.add(PointsMesh {
+            .spawn((
+                Mesh3d(meshes.add(PointsMesh {
                     vertices: [p0, p1].iter().map(|pt| (*pt).into()).collect(),
                     colors: None,
-                }),
-                material: points_materials.add(PointsMaterial {
+                })),
+                MeshMaterial3d(points_materials.add(PointsMaterial {
                     settings: bevy_points::material::PointsShaderSettings {
                         color: WHITE.into(),
                         point_size: 0.05,
@@ -128,16 +124,15 @@ fn setup(
                     },
                     circle: true,
                     ..Default::default()
-                }),
-                ..Default::default()
-            })
+                })),
+            ))
             .insert(Name::new("interpolation targets"));
     });
 
-    let camera = Camera3dBundle {
-        transform: Transform::from_translation(Vec3::new(0., 2.5, 10.)),
-        ..Default::default()
-    };
-    commands.spawn((camera, PanOrbitCamera::default()));
+    commands.spawn((
+        Camera3d::default(),
+        Transform::from_translation(Vec3::new(0., 2.5, 10.)),
+        PanOrbitCamera::default(),
+    ));
     commands.spawn(InfiniteGridBundle::default());
 }

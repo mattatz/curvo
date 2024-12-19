@@ -116,15 +116,13 @@ fn setup(
             mesh.insert_indices(Indices::U32(indices));
 
             commands
-                .spawn(MaterialMeshBundle {
-                    mesh: meshes.add(mesh),
-                    material: normal_materials.add(NormalMaterial {
+                .spawn((
+                    Mesh3d(meshes.add(mesh)),
+                    MeshMaterial3d(normal_materials.add(NormalMaterial {
                         cull_mode: None,
                         ..Default::default()
-                    }),
-                    // visibility: Visibility::Hidden,
-                    ..Default::default()
-                })
+                    })),
+                ))
                 .insert(Name::new("surface"));
         };
 
@@ -157,11 +155,11 @@ fn setup(
         &mut points_materials,
     );
 
-    let camera = Camera3dBundle {
-        transform: Transform::from_translation(Vec3::new(0., 2.5, 10.)),
-        ..Default::default()
-    };
-    commands.spawn((camera, PanOrbitCamera::default()));
+    commands.spawn((
+        Camera3d::default(),
+        Transform::from_translation(Vec3::new(0., 2.5, 10.)),
+        PanOrbitCamera::default(),
+    ));
     commands.spawn(InfiniteGridBundle::default());
 
     let u_div = 8;
@@ -182,12 +180,12 @@ fn setup(
         .collect_vec();
 
     commands
-        .spawn(MaterialMeshBundle {
-            mesh: meshes.add(PointsMesh {
+        .spawn((
+            Mesh3d(meshes.add(PointsMesh {
                 vertices: pts.iter().map(|p| p.cast::<f32>().coords.into()).collect(),
                 ..Default::default()
-            }),
-            material: points_materials.add(PointsMaterial {
+            })),
+            MeshMaterial3d(points_materials.add(PointsMaterial {
                 settings: bevy_points::material::PointsShaderSettings {
                     color: WHITE.into(),
                     point_size: 0.05,
@@ -195,10 +193,8 @@ fn setup(
                 },
                 circle: true,
                 ..Default::default()
-            }),
-            // visibility: Visibility::Hidden,
-            ..Default::default()
-        })
+            })),
+        ))
         .insert(Name::new("points"));
 
     pts.iter().for_each(|pt| {
@@ -211,16 +207,15 @@ fn setup(
                 Mesh::ATTRIBUTE_POSITION,
                 VertexAttributeValues::Float32x3(line_vertices),
             );
-            commands.spawn(MaterialMeshBundle {
-                mesh: meshes.add(line),
-                material: line_materials.add(LineMaterial {
+            commands.spawn((
+                Mesh3d(meshes.add(line)),
+                MeshMaterial3d(line_materials.add(LineMaterial {
                     color: WHITE.into(),
                     opacity: 1.0,
                     alpha_mode: AlphaMode::Blend,
                     ..Default::default()
-                }),
-                ..Default::default()
-            });
+                })),
+            ));
         } else {
             println!("Failed to find closest point");
         }
@@ -230,7 +225,7 @@ fn setup(
 }
 
 fn find_closest_point(time: Res<Time>, surfaces: Query<&TargetSurface>, mut gizmos: Gizmos) {
-    let t = time.elapsed_seconds_f64();
+    let t = time.elapsed_secs_f64();
 
     let u_div = 10;
     let v_div = 10;
@@ -251,7 +246,7 @@ fn find_closest_point(time: Res<Time>, surfaces: Query<&TargetSurface>, mut gizm
         .collect_vec();
 
     pts.iter().for_each(|pt| {
-        gizmos.sphere(pt.cast::<f32>().into(), Quat::IDENTITY, 0.025, WHITE);
+        gizmos.sphere(Isometry3d::from_translation(pt.cast()), 0.025, WHITE);
     });
 
     surfaces.iter().for_each(|s| {

@@ -107,31 +107,28 @@ fn setup(
             VertexAttributeValues::Float32x3(line_vertices),
         );
         commands
-            .spawn(MaterialMeshBundle {
-                mesh: meshes.add(line),
-                material: line_materials.add(LineMaterial {
+            .spawn((
+                Mesh3d(meshes.add(line)),
+                MeshMaterial3d(line_materials.add(LineMaterial {
                     color: Color::WHITE,
                     ..Default::default()
-                }),
-                // visibility: Visibility::Hidden,
-                ..Default::default()
-            })
+                })),
+            ))
             .insert(Name::new(format!("{:?}", variant)));
     });
 
     let scale = 6.5;
-    let orth = Camera3dBundle {
-        projection: OrthographicProjection {
+    commands.spawn((
+        Projection::Orthographic(OrthographicProjection {
             scale,
             near: 1e-1,
             far: 1e4,
-            scaling_mode: ScalingMode::FixedVertical(2.0),
-            ..Default::default()
-        }
-        .into(),
-        transform: Transform::from_translation(Vec3::new(0., 0., 4.2))
-            .looking_at(Vec3::ZERO, Vec3::Y),
-        ..Default::default()
-    };
-    commands.spawn((orth, PanOrbitCamera::default()));
+            scaling_mode: ScalingMode::FixedVertical {
+                viewport_height: 2.,
+            },
+            ..OrthographicProjection::default_3d()
+        }),
+        Transform::from_translation(Vec3::new(0., 0., 4.2)).looking_at(Vec3::ZERO, Vec3::Y),
+        PanOrbitCamera::default(),
+    ));
 }
