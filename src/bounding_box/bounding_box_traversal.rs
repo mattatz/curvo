@@ -1,30 +1,31 @@
 use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, U1};
 
-use crate::{curve::nurbs_curve::NurbsCurve, misc::FloatingPoint, prelude::BoundingBoxTree};
+use crate::misc::FloatingPoint;
 
-pub struct BoundingBoxTraversal<'a, T: FloatingPoint, D: DimName>
-where
-    DefaultAllocator: Allocator<D>,
-{
-    pairs: Vec<(BoundingBoxTree<'a, T, D>, BoundingBoxTree<'a, T, D>)>,
-}
+use super::BoundingBoxTree;
 
-impl<'a, T: FloatingPoint, D: DimName> BoundingBoxTraversal<'a, T, D>
+pub struct BoundingBoxTraversal<T0, T1, T: FloatingPoint, D: DimName>
 where
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+    T0: BoundingBoxTree<T, D>,
+    T1: BoundingBoxTree<T, D>,
+{
+    pairs: Vec<(T0, T1)>,
+    _phantom: std::marker::PhantomData<(T, D)>,
+}
+
+impl<T0, T1, T: FloatingPoint, D: DimName> BoundingBoxTraversal<T0, T1, T, D>
+where
+    D: DimNameSub<U1>,
+    T0: BoundingBoxTree<T, D>,
+    T1: BoundingBoxTree<T, D>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     /// Try to traverse bounding box tree pairs to find pairs of intersecting curves.
-    pub fn try_traverse(
-        a: &'a NurbsCurve<T, D>,
-        b: &'a NurbsCurve<T, D>,
-        a_knot_tolerance: Option<T>,
-        b_knot_tolerance: Option<T>,
-    ) -> anyhow::Result<Self> {
-        let ta = BoundingBoxTree::new(a, a_knot_tolerance);
-        let tb = BoundingBoxTree::new(b, b_knot_tolerance);
-
+    pub fn try_traverse(ta: T0, tb: T1) -> anyhow::Result<Self> {
         let mut trees = vec![(ta, tb)];
         let mut pairs = vec![];
 
@@ -63,27 +64,25 @@ where
             };
         }
 
-        Ok(Self { pairs })
+        Ok(Self {
+            pairs,
+            _phantom: std::marker::PhantomData,
+        })
     }
 
-    #[allow(clippy::type_complexity)]
-    pub fn pairs(&self) -> &[(BoundingBoxTree<'a, T, D>, BoundingBoxTree<'a, T, D>)] {
+    pub fn pairs(&self) -> &[(T0, T1)] {
         &self.pairs
     }
 
-    pub fn pairs_iter(
-        &self,
-    ) -> impl Iterator<Item = &(BoundingBoxTree<'a, T, D>, BoundingBoxTree<'a, T, D>)> {
+    pub fn pairs_iter(&self) -> impl Iterator<Item = &(T0, T1)> {
         self.pairs.iter()
     }
 
-    pub fn into_pairs(self) -> Vec<(BoundingBoxTree<'a, T, D>, BoundingBoxTree<'a, T, D>)> {
+    pub fn into_pairs(self) -> Vec<(T0, T1)> {
         self.pairs
     }
 
-    pub fn into_pairs_iter(
-        self,
-    ) -> impl Iterator<Item = (BoundingBoxTree<'a, T, D>, BoundingBoxTree<'a, T, D>)> {
+    pub fn into_pairs_iter(self) -> impl Iterator<Item = (T0, T1)> {
         self.pairs.into_iter()
     }
 }

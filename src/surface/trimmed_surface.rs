@@ -56,7 +56,7 @@ impl<T: FloatingPoint> TrimmedSurface<T> {
         Ok(Self {
             surface,
             exterior,
-            interiors: interiors,
+            interiors,
         })
     }
 

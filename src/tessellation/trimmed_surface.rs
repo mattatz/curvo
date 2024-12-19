@@ -3,14 +3,10 @@ use std::collections::HashMap;
 use super::adaptive_tessellation_option::AdaptiveTessellationOptions;
 use super::surface_tessellation::SurfaceTessellation;
 use super::Tessellation;
-use argmin::core::ArgminFloat;
 use itertools::Itertools;
 use nalgebra::Vector2;
 use nalgebra::{ComplexField, Point2, Point3, Vector3};
-use spade::handles::FixedVertexHandle;
-use spade::{
-    ConstrainedDelaunayTriangulation, HasPosition, Point2 as SP2, SpadeNum, Triangulation,
-};
+use spade::{ConstrainedDelaunayTriangulation, HasPosition, SpadeNum, Triangulation};
 
 use crate::curve::NurbsCurve2D;
 use crate::misc::FloatingPoint;
@@ -49,18 +45,12 @@ impl<T: FloatingPoint + SpadeNum> Tessellation for TrimmedSurface<T> {
         let o = options.as_ref();
 
         let curve_tessellation_option = o
-            .clone()
             .map(|o| o.norm_tolerance)
             .unwrap_or(T::from_f64(1e-2).unwrap());
 
-        let exterior = match self.exterior() {
-            Some(curve) => Some(tessellate_uv_curve_adaptive(
-                curve,
-                self.surface(),
-                curve_tessellation_option,
-            )),
-            None => None,
-        };
+        let exterior = self.exterior().map(|curve| {
+            tessellate_uv_curve_adaptive(curve, self.surface(), curve_tessellation_option)
+        });
 
         let interiors = self
             .interiors()
@@ -221,15 +211,15 @@ fn iterate_uv_curve_tessellation<T: FloatingPoint>(
     let (p3, n3) = curve.point_tangent_at(end);
 
     let flag = {
-        let diff = &n2 - &n1;
-        let diff2 = &n3 - &n2;
+        let diff = n2 - n1;
+        let diff2 = n3 - n2;
         (diff - diff2).norm() > normal_tolerance
     } || {
         let sn1 = surface.normal_at(p1.x, p1.y);
         let sn2 = surface.normal_at(p2.x, p2.y);
         let sn3 = surface.normal_at(p3.x, p3.y);
-        let diff = &sn2 - &sn1;
-        let diff2 = &sn3 - &sn2;
+        let diff = sn2 - sn1;
+        let diff2 = sn3 - sn2;
         (diff - diff2).norm() > normal_tolerance
     };
     if flag {
