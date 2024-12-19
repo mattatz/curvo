@@ -66,7 +66,7 @@ where
             let mut row = vec![];
             us.iter().for_each(|u| {
                 let ds = self.rational_derivatives(*u, *v, 1);
-                let norm = ds[0][1].cross(&ds[1][0]).normalize();
+                let norm = ds[1][0].cross(&ds[0][1]).normalize();
                 row.push(SurfacePoint {
                     point: ds[0][0].clone().into(),
                     normal: norm,
