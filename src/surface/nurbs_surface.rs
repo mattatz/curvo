@@ -222,8 +222,8 @@ where
             .map(|row| {
                 row.into_iter()
                     .map(|der| {
-                        let v0 = &der[0][1];
-                        let v1 = &der[1][0];
+                        let v0 = &der[1][0];
+                        let v1 = &der[0][1];
                         v0.cross(v1).normalize()
                     })
                     .collect()
