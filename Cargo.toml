@@ -107,6 +107,11 @@ path = "examples/revolve_surface.rs"
 required-features = ["bevy"]
 
 [[example]]
+name = "trimmed_surface"
+path = "examples/trimmed_surface.rs"
+required-features = ["bevy"]
+
+[[example]]
 name = "frenet_frame"
 path = "examples/frenet_frame.rs"
 required-features = ["bevy"]
