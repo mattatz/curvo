@@ -1,7 +1,5 @@
-use std::f64::consts::TAU;
-
 use bevy::{
-    color::palettes::css::{AQUAMARINE, GRAY, TOMATO, WHITE},
+    color::palettes::css::TOMATO,
     prelude::*,
     render::mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
 };
@@ -16,8 +14,8 @@ use nalgebra::{Point2, Point3, Point4, Vector2, Vector3};
 
 use curvo::prelude::*;
 use rand::Rng;
-use systems::screenshot_on_spacebar;
 mod materials;
+mod misc;
 mod systems;
 
 fn main() {
@@ -82,15 +80,14 @@ fn setup(
             )
             .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, VertexAttributeValues::Float32x2(uvs))
             .with_inserted_indices(Indices::U32(indices));
-        commands.spawn(MaterialMeshBundle {
-            mesh: meshes.add(mesh),
-            material: normal_materials.add(NormalMaterial {
+        commands.spawn((
+            Mesh3d(meshes.add(mesh)),
+            MeshMaterial3d(normal_materials.add(NormalMaterial {
                 cull_mode: None,
                 ..Default::default()
-            }),
+            })),
             transform,
-            ..Default::default()
-        });
+        ));
     };
 
     let add_surface = |commands: &mut Commands<'_, '_>,
@@ -122,15 +119,14 @@ fn setup(
             )
             .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, VertexAttributeValues::Float32x2(uvs))
             .with_inserted_indices(Indices::U32(indices));
-        commands.spawn(MaterialMeshBundle {
-            mesh: meshes.add(mesh),
-            material: normal_materials.add(NormalMaterial {
+        commands.spawn((
+            Mesh3d(meshes.add(mesh)),
+            MeshMaterial3d(normal_materials.add(NormalMaterial {
                 cull_mode: None,
                 ..Default::default()
-            }),
+            })),
             transform,
-            ..Default::default()
-        });
+        ));
     };
 
     let add_curve = |commands: &mut Commands<'_, '_>,
@@ -162,15 +158,14 @@ fn setup(
             Mesh::ATTRIBUTE_POSITION,
             VertexAttributeValues::Float32x3(line_vertices),
         );
-        commands.spawn(MaterialMeshBundle {
-            mesh: meshes.add(line),
-            material: line_materials.add(LineMaterial {
+        commands.spawn((
+            Mesh3d(meshes.add(line)),
+            MeshMaterial3d(line_materials.add(LineMaterial {
                 color: TOMATO.into(),
                 ..Default::default()
-            }),
+            })),
             transform,
-            ..Default::default()
-        });
+        ));
     };
 
     let profile = NurbsCurve3D::polyline(&[Point3::origin(), Point3::new(5., 0., 0.)], true);
@@ -275,10 +270,9 @@ fn setup(
         transform * Transform::from_translation(Vec3::new(0., 1.5, 0.)),
     );
 
-    let camera = Camera3dBundle {
-        transform: Transform::from_translation(Vec3::new(18., 18., 18.)),
-        ..Default::default()
-    };
-    commands.spawn((camera, PanOrbitCamera::default()));
+    commands.spawn((
+        Transform::from_translation(Vec3::new(18., 18., 18.)),
+        PanOrbitCamera::default(),
+    ));
     commands.spawn(InfiniteGridBundle::default());
 }

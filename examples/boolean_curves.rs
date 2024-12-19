@@ -16,8 +16,8 @@ use nalgebra::{Rotation2, Translation2};
 
 mod boolean;
 mod materials;
-mod systems;
 pub mod misc;
+mod systems;
 
 use curvo::prelude::*;
 use operation::BooleanOperation;
@@ -140,17 +140,16 @@ fn setup(
             } else {
                 line
             };
-            commands.spawn(MaterialMeshBundle {
-                mesh: meshes.add(line),
-                material: line_materials.add(LineMaterial {
+            commands.spawn((
+                Mesh3d(meshes.add(line)),
+                MeshMaterial3d(line_materials.add(LineMaterial {
                     color: color.unwrap_or(WHITE.with_alpha(0.25).into()),
                     opacity: 0.6,
                     alpha_mode: AlphaMode::Blend,
                     ..Default::default()
-                }),
+                })),
                 transform,
-                ..Default::default()
-            });
+            ));
         });
     };
 
@@ -179,20 +178,22 @@ fn setup(
     [&subject, &clip].iter().enumerate().for_each(|(i, c)| {
         let (start, end) = c.end_points();
         commands
-            .spawn(MaterialMeshBundle {
-                mesh: meshes.add(PointsMesh {
-                    vertices: [start, end]
-                        .iter()
-                        .map(|p| p.cast::<f32>().coords.to_homogeneous().into())
-                        .collect(),
-                    colors: Some(if i == 0 {
-                        vec![ORANGE.into(), ORANGE.into()]
-                    } else {
-                        vec![PURPLE.into(), PURPLE.into()]
+            .spawn((
+                Mesh3d(
+                    meshes.add(PointsMesh {
+                        vertices: [start, end]
+                            .iter()
+                            .map(|p| p.cast::<f32>().coords.to_homogeneous().into())
+                            .collect(),
+                        colors: Some(if i == 0 {
+                            vec![ORANGE.into(), ORANGE.into()]
+                        } else {
+                            vec![PURPLE.into(), PURPLE.into()]
+                        }),
+                        ..Default::default()
                     }),
-                    ..Default::default()
-                }),
-                material: points_materials.add(PointsMaterial {
+                ),
+                MeshMaterial3d(points_materials.add(PointsMaterial {
                     settings: bevy_points::material::PointsShaderSettings {
                         color: WHITE.into(),
                         point_size: 0.05,
@@ -200,11 +201,9 @@ fn setup(
                     },
                     circle: true,
                     ..Default::default()
-                }),
-                transform: basis,
-                // visibility: Visibility::Hidden,
-                ..Default::default()
-            })
+                })),
+                basis,
+            ))
             .insert(Name::new("End points"));
     });
 
@@ -243,25 +242,26 @@ fn setup(
             .enumerate()
             .for_each(|(i, (a, b))| {
                 let tr = Transform::from_xyz(0., 0., i as f32 * 1e-1);
-                commands.spawn(MaterialMeshBundle {
-                    mesh: meshes.add(PointsMesh {
-                        vertices: [a.0, b.0]
-                            .iter()
-                            .map(|p| p.cast::<f32>().coords.to_homogeneous().into())
-                            .collect(),
-                        colors: Some([RED.into(), BLUE.into()].to_vec()),
-                    }),
-                    material: points_materials.add(PointsMaterial {
+                commands.spawn((
+                    Mesh3d(
+                        meshes.add(PointsMesh {
+                            vertices: [a.0, b.0]
+                                .iter()
+                                .map(|p| p.cast::<f32>().coords.to_homogeneous().into())
+                                .collect(),
+                            colors: Some([RED.into(), BLUE.into()].to_vec()),
+                        }),
+                    ),
+                    MeshMaterial3d(points_materials.add(PointsMaterial {
                         settings: bevy_points::material::PointsShaderSettings {
                             point_size: 0.05,
                             ..Default::default()
                         },
                         circle: true,
                         ..Default::default()
-                    }),
-                    transform: tr,
-                    ..Default::default()
-                });
+                    })),
+                    tr,
+                ));
 
                 let line = Mesh::new(PrimitiveTopology::LineStrip, default())
                     .with_inserted_attribute(
@@ -273,15 +273,14 @@ fn setup(
                                 .collect(),
                         ),
                     );
-                commands.spawn(MaterialMeshBundle {
-                    mesh: meshes.add(line),
-                    material: line_materials.add(LineMaterial {
+                commands.spawn((
+                    Mesh3d(meshes.add(line)),
+                    MeshMaterial3d(line_materials.add(LineMaterial {
                         color: Color::WHITE,
                         ..Default::default()
-                    }),
-                    transform: tr,
-                    ..Default::default()
-                });
+                    })),
+                    tr,
+                ));
             });
 
         regions.iter().for_each(|region| {
@@ -310,16 +309,14 @@ fn setup(
                             .collect(),
                     ));
                 commands
-                    .spawn(MaterialMeshBundle {
-                        mesh: meshes.add(mesh),
-                        material: normal_materials.add(NormalMaterial {
+                    .spawn((
+                        Mesh3d(meshes.add(mesh)),
+                        MeshMaterial3d(normal_materials.add(NormalMaterial {
                             cull_mode: None,
                             ..Default::default()
-                        }),
-                        transform: tr,
-                        // visibility: Visibility::Hidden,
-                        ..Default::default()
-                    })
+                        })),
+                        tr,
+                    ))
                     .insert(Name::new("Triangulation"));
             }
 

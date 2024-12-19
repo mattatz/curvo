@@ -2,7 +2,6 @@ use bevy::{
     color::palettes::css::YELLOW,
     prelude::*,
     render::mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
-    state::commands,
 };
 use bevy_normal_material::prelude::NormalMaterial;
 use curvo::prelude::{
@@ -50,7 +49,7 @@ pub fn add_curve(
 }
 
 pub fn add_surface(
-    surf: &NurbsSurface3D<f64>,
+    surface: &NurbsSurface3D<f64>,
     commands: &mut Commands<'_, '_>,
     meshes: &mut ResMut<'_, Assets<Mesh>>,
     normal_materials: &mut ResMut<'_, Assets<NormalMaterial>>,
@@ -59,7 +58,7 @@ pub fn add_surface(
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, default());
 
     let option = option.unwrap_or_default();
-    let tess = surf.tessellate(Some(option));
+    let tess = surface.tessellate(Some(option));
     let tess = tess.cast::<f32>();
 
     let mut line_list = Mesh::new(bevy::render::mesh::PrimitiveTopology::LineList, default());

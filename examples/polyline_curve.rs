@@ -1,10 +1,7 @@
 use bevy::{
-    color::palettes::css::TOMATO,
+    color::palettes::css::{TOMATO, WHITE},
     prelude::*,
-    render::{
-        camera::ScalingMode,
-        mesh::{PrimitiveTopology, VertexAttributeValues},
-    },
+    render::camera::ScalingMode,
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
 
@@ -14,11 +11,13 @@ use bevy_points::{
     mesh::PointsMesh,
     plugin::PointsPlugin,
 };
+use misc::add_curve;
 use nalgebra::Point2;
 
 use curvo::prelude::*;
 
 mod materials;
+mod misc;
 
 use materials::*;
 
@@ -55,63 +54,51 @@ fn setup(
         Point2::new(1.0, 1.0),
     ];
     commands
-        .spawn(MaterialMeshBundle {
-            mesh: meshes.add(PointsMesh {
-                vertices: points
-                    .iter()
-                    .map(|pt| pt.cast::<f32>())
-                    .map(|pt| Vec3::new(pt.x, pt.y, 0.))
-                    .collect(),
-                ..Default::default()
-            }),
-            material: points_materials.add(PointsMaterial {
+        .spawn((
+            Mesh3d(
+                meshes.add(PointsMesh {
+                    vertices: points
+                        .iter()
+                        .map(|pt| pt.cast::<f32>())
+                        .map(|pt| Vec3::new(pt.x, pt.y, 0.))
+                        .collect(),
+                    ..Default::default()
+                }),
+            ),
+            MeshMaterial3d(points_materials.add(PointsMaterial {
                 settings: PointsShaderSettings {
                     point_size: 0.05,
                     color: TOMATO.into(),
                     ..Default::default()
                 },
                 ..Default::default()
-            }),
-            ..Default::default()
-        })
+            })),
+        ))
         .insert(Name::new("points"));
 
     let polyline_curve = NurbsCurve2D::polyline(&points, true);
 
-    let samples = polyline_curve.tessellate(Some(1e-8));
-    let line_vertices = samples
-        .iter()
-        .map(|p| p.cast::<f32>())
-        .map(|p| [p.x, p.y, 0.])
-        .collect();
-    let line = Mesh::new(PrimitiveTopology::LineStrip, default()).with_inserted_attribute(
-        Mesh::ATTRIBUTE_POSITION,
-        VertexAttributeValues::Float32x3(line_vertices),
+    add_curve(
+        &polyline_curve.elevate_dimension(),
+        WHITE.into(),
+        Some(1e-8),
+        &mut commands,
+        &mut meshes,
+        &mut line_materials,
     );
-    commands
-        .spawn(MaterialMeshBundle {
-            mesh: meshes.add(line),
-            material: line_materials.add(LineMaterial {
-                color: Color::WHITE,
-                ..Default::default()
-            }),
-            ..Default::default()
-        })
-        .insert(Name::new("curve"));
 
     let scale = 5.;
-    let orth = Camera3dBundle {
-        projection: OrthographicProjection {
+    commands.spawn((
+        Projection::Orthographic(OrthographicProjection {
             scale,
             near: 1e-1,
             far: 1e4,
-            scaling_mode: ScalingMode::FixedVertical(2.0),
-            ..Default::default()
-        }
-        .into(),
-        transform: Transform::from_translation(Vec3::new(0., 0., 3.))
-            .looking_at(Vec3::ZERO, Vec3::Y),
-        ..Default::default()
-    };
-    commands.spawn((orth, PanOrbitCamera::default()));
+            scaling_mode: ScalingMode::FixedVertical {
+                viewport_height: 2.,
+            },
+            ..OrthographicProjection::default_3d()
+        }),
+        Transform::from_translation(Vec3::new(0., 0., 3.)).looking_at(Vec3::ZERO, Vec3::Y),
+        PanOrbitCamera::default(),
+    ));
 }

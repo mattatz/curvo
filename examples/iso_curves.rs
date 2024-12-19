@@ -3,7 +3,6 @@ use std::f64::consts::FRAC_PI_2;
 use bevy::{
     color::palettes::css::{TOMATO, WHITE},
     prelude::*,
-    render::mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
 
@@ -53,7 +52,7 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut line_materials: ResMut<Assets<LineMaterial>>,
     mut points_materials: ResMut<Assets<PointsMaterial>>,
-    mut normal_materials: ResMut<'_, Assets<NormalMaterial>>,
+    normal_materials: ResMut<'_, Assets<NormalMaterial>>,
 ) {
     let interpolation_target = vec![
         Point3::new(-1.0, -1.0, 0.),

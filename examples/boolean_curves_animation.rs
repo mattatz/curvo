@@ -70,11 +70,10 @@ fn setup(
     points_materials: ResMut<Assets<PointsMaterial>>,
     mut normal_materials: ResMut<'_, Assets<NormalMaterial>>,
 ) {
-    let camera = Camera3dBundle {
-        transform: Transform::from_translation(Vec3::new(0., 0., 5.)),
-        ..Default::default()
-    };
-    commands.spawn((camera, PanOrbitCamera::default()));
+    commands.spawn((
+        Transform::from_translation(Vec3::new(0., 0., 5.)),
+        PanOrbitCamera::default(),
+    ));
     commands.spawn(InfiniteGridBundle::default());
 
     // let (subject, clip) = boolean::circle_rectangle_case();
@@ -103,16 +102,14 @@ fn setup(
         let fi = i as f32 * inv_n + on - 0.5;
         let tr = Transform::from_xyz(fi * h, 0., 0.);
         commands
-            .spawn(MaterialMeshBundle {
-                mesh: meshes.add(Mesh::new(PrimitiveTopology::TriangleList, default())),
-                material: normal_materials.add(NormalMaterial {
+            .spawn((
+                Mesh3d(meshes.add(Mesh::new(PrimitiveTopology::TriangleList, default()))),
+                MeshMaterial3d(normal_materials.add(NormalMaterial {
                     cull_mode: None,
                     ..Default::default()
-                }),
-                transform: tr,
-                // visibility: Visibility::Hidden,
-                ..Default::default()
-            })
+                })),
+                tr,
+            ))
             .insert(BooleanMesh(op))
             .insert(Name::new(format!("{}", op)));
     });
@@ -122,10 +119,10 @@ fn boolean(
     mut gizmos: Gizmos,
     time: Res<Time>,
     profile: Query<&ProfileCurves>,
-    booleans: Query<(&BooleanMesh, &Handle<Mesh>, &Transform)>,
+    booleans: Query<(&BooleanMesh, &Mesh3d, &Transform)>,
     mut meshes: ResMut<Assets<Mesh>>,
 ) {
-    let delta = time.elapsed_seconds_f64() * 0.75;
+    let delta = time.elapsed_secs_f64() * 0.75;
     // let interval = 1e-1 * 2.;
     // let delta = (delta / interval).floor() * interval;
     // println!("delta: {}", delta);

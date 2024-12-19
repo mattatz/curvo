@@ -62,33 +62,25 @@ fn setup(
 
     commands.spawn((
         FirstCurve,
-        MaterialMeshBundle {
-            mesh: meshes.add(Mesh::new(PrimitiveTopology::LineStrip, default())),
-            material: line_materials.add(LineMaterial {
-                color: Color::WHITE,
-                ..Default::default()
-            }),
+        Mesh3d(meshes.add(Mesh::new(PrimitiveTopology::LineStrip, default()))),
+        MeshMaterial3d(line_materials.add(LineMaterial {
+            color: Color::WHITE,
             ..Default::default()
-        },
+        })),
     ));
     commands.spawn((
         SecondCurve,
-        MaterialMeshBundle {
-            mesh: meshes.add(Mesh::new(PrimitiveTopology::LineStrip, default())),
-            material: line_materials.add(LineMaterial {
-                color: TOMATO.into(),
-                ..Default::default()
-            }),
-            // visibility: Visibility::Hidden,
+        Mesh3d(meshes.add(Mesh::new(PrimitiveTopology::LineStrip, default()))),
+        MeshMaterial3d(line_materials.add(LineMaterial {
+            color: TOMATO.into(),
             ..Default::default()
-        },
+        })),
     ));
 
-    let camera = Camera3dBundle {
-        transform: Transform::from_translation(Vec3::new(0., 2.5, 10.)),
-        ..Default::default()
-    };
-    commands.spawn((camera, PanOrbitCamera::default()));
+    commands.spawn((
+        Transform::from_translation(Vec3::new(0., 2.5, 10.)),
+        PanOrbitCamera::default(),
+    ));
     // commands.spawn(InfiniteGridBundle::default());
 }
 
@@ -96,13 +88,13 @@ fn trim_animation(
     time: Res<Time>,
     profile: Query<&ProfileCurve>,
     mut meshes: ResMut<Assets<Mesh>>,
-    first: Query<&Handle<Mesh>, With<FirstCurve>>,
-    second: Query<&Handle<Mesh>, With<SecondCurve>>,
+    first: Query<&Mesh3d, With<FirstCurve>>,
+    second: Query<&Mesh3d, With<SecondCurve>>,
     mut gizmos: Gizmos,
 ) {
     let profile = profile.single();
     let (start, end) = profile.0.knots_domain();
-    let sec = time.elapsed_seconds_f64();
+    let sec = time.elapsed_secs_f64();
     let t = start + (end - start) * (0.5 + 0.5 * sec.sin());
     let (c0, c1) = profile.0.try_trim(t).unwrap();
     let first = first.single();

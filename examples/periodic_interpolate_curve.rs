@@ -4,7 +4,7 @@ use bevy::{
         tailwind::LIME_300,
     },
     prelude::*,
-    render::{camera::ScalingMode, mesh::VertexAttributeValues},
+    render::camera::ScalingMode,
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
 

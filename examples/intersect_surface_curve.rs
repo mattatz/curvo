@@ -1,15 +1,10 @@
 use std::f32::consts::FRAC_PI_2;
 
-use bevy::{
-    color::palettes::{css::TOMATO, tailwind::LIME_500},
-    prelude::*,
-    render::mesh::{PrimitiveTopology, VertexAttributeValues},
-};
+use bevy::prelude::*;
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin, InfiniteGridSettings};
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use bevy_points::{plugin::PointsPlugin, prelude::PointsMaterial};
-use nalgebra::{Point2, Rotation2, Translation2, Vector2};
 
 use curvo::prelude::*;
 
@@ -50,8 +45,8 @@ struct SecondCurve(pub NurbsCurve2D<f64>);
 
 fn setup(
     mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut line_materials: ResMut<Assets<LineMaterial>>,
+    meshes: ResMut<Assets<Mesh>>,
+    line_materials: ResMut<Assets<LineMaterial>>,
     _points_materials: ResMut<Assets<PointsMaterial>>,
 ) {
     let center = Vec3::ZERO;

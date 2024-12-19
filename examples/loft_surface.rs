@@ -1,13 +1,6 @@
 use std::f64::consts::FRAC_PI_2;
 
-use bevy::{
-    color::palettes::css::{RED, YELLOW},
-    prelude::*,
-    render::{
-        camera::ScalingMode,
-        mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
-    },
-};
+use bevy::{color::palettes::css::RED, prelude::*, render::camera::ScalingMode};
 use bevy_infinite_grid::InfiniteGridPlugin;
 
 use bevy_normal_material::{material::NormalMaterial, plugin::NormalMaterialPlugin};

@@ -53,13 +53,16 @@ pub fn island_case() -> CurveVariants {
 }
 
 pub fn compound_circle_x_rectangle_case() -> CurveVariants {
-    let rectangle = NurbsCurve2D::polyline(&[
-        Point2::new(0., 2.),
-        Point2::new(0., -2.),
-        Point2::new(2., -2.),
-        Point2::new(2., 2.),
-        Point2::new(0., 2.),
-    ]);
+    let rectangle = NurbsCurve2D::polyline(
+        &[
+            Point2::new(0., 2.),
+            Point2::new(0., -2.),
+            Point2::new(2., -2.),
+            Point2::new(2., 2.),
+            Point2::new(0., 2.),
+        ],
+        false,
+    );
     (compound_circle(), rectangle.into())
 }
 
@@ -97,13 +100,16 @@ pub fn rectangular_annulus_x_rectangular_annulus_case() -> CurveVariants {
 fn rectangle(width: f64, height: f64) -> CurveVariant {
     let dx = width * 0.5;
     let dy = height * 0.5;
-    NurbsCurve2D::polyline(&[
-        Point2::new(-dx, -dy),
-        Point2::new(dx, -dy),
-        Point2::new(dx, dy),
-        Point2::new(-dx, dy),
-        Point2::new(-dx, -dy),
-    ])
+    NurbsCurve2D::polyline(
+        &[
+            Point2::new(-dx, -dy),
+            Point2::new(dx, -dy),
+            Point2::new(dx, dy),
+            Point2::new(-dx, dy),
+            Point2::new(-dx, -dy),
+        ],
+        false,
+    )
     .into()
 }
 
@@ -133,7 +139,10 @@ fn compound_rounded_rectangle() -> CurveVariant {
             FRAC_PI_2,
         )
         .unwrap(),
-        NurbsCurve2D::polyline(&[Point2::new(length, radius), Point2::new(-length, radius)]),
+        NurbsCurve2D::polyline(
+            &[Point2::new(length, radius), Point2::new(-length, radius)],
+            false,
+        ),
         NurbsCurve2D::try_arc(
             &Point2::new(-length, 0.),
             &dx,
@@ -143,7 +152,10 @@ fn compound_rounded_rectangle() -> CurveVariant {
             PI + FRAC_PI_2,
         )
         .unwrap(),
-        NurbsCurve2D::polyline(&[Point2::new(-length, -radius), Point2::new(length, -radius)]),
+        NurbsCurve2D::polyline(
+            &[Point2::new(-length, -radius), Point2::new(length, -radius)],
+            false,
+        ),
     ])
     .into()
 }
@@ -164,10 +176,13 @@ fn compound_rounded_t_shape() -> CurveVariant {
             FRAC_PI_2,
         )
         .unwrap(),
-        NurbsCurve2D::polyline(&[
-            Point2::new(w_length, radius),
-            Point2::new(-w_length, radius),
-        ]),
+        NurbsCurve2D::polyline(
+            &[
+                Point2::new(w_length, radius),
+                Point2::new(-w_length, radius),
+            ],
+            false,
+        ),
         NurbsCurve2D::try_arc(
             &Point2::new(-w_length, 0.),
             &dx,
@@ -177,14 +192,17 @@ fn compound_rounded_t_shape() -> CurveVariant {
             PI + FRAC_PI_2,
         )
         .unwrap(),
-        NurbsCurve2D::polyline(&[
-            Point2::new(-w_length, -radius),
-            Point2::new(-radius, -radius),
-            Point2::new(-radius, -h_length),
-            Point2::new(radius, -h_length),
-            Point2::new(radius, -radius),
-            Point2::new(w_length, -radius),
-        ]),
+        NurbsCurve2D::polyline(
+            &[
+                Point2::new(-w_length, -radius),
+                Point2::new(-radius, -radius),
+                Point2::new(-radius, -h_length),
+                Point2::new(radius, -h_length),
+                Point2::new(radius, -radius),
+                Point2::new(w_length, -radius),
+            ],
+            false,
+        ),
     ])
     .into()
 }
@@ -194,21 +212,27 @@ fn rectangular_annulus(width: f64, height: f64, square_size: f64) -> CurveVarian
     let dy = height * 0.5;
     let size = (square_size * 0.5).min(dx).min(dy);
     Region::new(
-        NurbsCurve2D::polyline(&[
-            Point2::new(-dx, -dy),
-            Point2::new(dx, -dy),
-            Point2::new(dx, dy),
-            Point2::new(-dx, dy),
-            Point2::new(-dx, -dy),
-        ])
+        NurbsCurve2D::polyline(
+            &[
+                Point2::new(-dx, -dy),
+                Point2::new(dx, -dy),
+                Point2::new(dx, dy),
+                Point2::new(-dx, dy),
+                Point2::new(-dx, -dy),
+            ],
+            false,
+        )
         .into(),
-        vec![NurbsCurve2D::polyline(&[
-            Point2::new(-size, -size),
-            Point2::new(size, -size),
-            Point2::new(size, size),
-            Point2::new(-size, size),
-            Point2::new(-size, -size),
-        ])
+        vec![NurbsCurve2D::polyline(
+            &[
+                Point2::new(-size, -size),
+                Point2::new(size, -size),
+                Point2::new(size, size),
+                Point2::new(-size, size),
+                Point2::new(-size, -size),
+            ],
+            false,
+        )
         .into()],
     )
     .into()

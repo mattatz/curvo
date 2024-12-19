@@ -1,7 +1,6 @@
 use bevy::{
     prelude::*,
     render::view::screenshot::{save_to_disk, Screenshot},
-    window::PrimaryWindow,
 };
 
 pub fn screenshot_on_spacebar(

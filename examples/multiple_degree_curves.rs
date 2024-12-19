@@ -85,7 +85,7 @@ fn animate(
     profile: Query<&ProfileCurve>,
     mut settings: ResMut<Setting>,
 ) {
-    let delta = time.delta_seconds();
+    let delta = time.delta_secs();
 
     let t = settings.time_since_last_update / settings.duration;
     let t = (t * (1.0 + 1e-2)).min(1.0); // add padding
@@ -127,17 +127,12 @@ fn animate(
 
         if is_most_accurate {
             [pts.first(), pts.last()].iter().for_each(|pt| {
-                gizmos.sphere(*pt.unwrap(), Quat::IDENTITY, 1e-2, Color::BLACK);
+                gizmos.sphere(*pt.unwrap(), 1e-2, Color::BLACK);
             });
             gizmos.linestrip(pts.iter().copied(), Color::hsla(0.0, 0.0, 0.0, 1.));
         } else {
             pts.iter().for_each(|pt| {
-                gizmos.sphere(
-                    *pt,
-                    Quat::IDENTITY,
-                    1e-2 * 0.5,
-                    Color::hsla(0., 0., 0., 0.5),
-                );
+                gizmos.sphere(*pt, 1e-2 * 0.5, Color::hsla(0., 0., 0., 0.5));
             });
             gizmos.linestrip(pts.iter().copied(), Color::hsla(0.0, 0.0, 0.0, 0.35));
         }
@@ -177,41 +172,37 @@ fn reset(
         commands
             .spawn((
                 SourceControlPoints,
-                MaterialMeshBundle {
-                    mesh: meshes.add(PointsMesh {
-                        vertices: pts.iter().map(|pt| (*pt).into()).collect(),
-                        colors: None,
-                    }),
-                    material: points_materials.add(PointsMaterial {
-                        settings: bevy_points::material::PointsShaderSettings {
-                            color: WHITE.into(),
-                            point_size: 0.025,
-                            opacity: 0.5,
-                        },
-                        alpha_mode: AlphaMode::Blend,
-                        circle: true,
-                        ..Default::default()
-                    }),
+                Mesh3d(meshes.add(PointsMesh {
+                    vertices: pts.iter().map(|pt| (*pt).into()).collect(),
+                    colors: None,
+                })),
+                MeshMaterial3d(points_materials.add(PointsMaterial {
+                    settings: bevy_points::material::PointsShaderSettings {
+                        color: WHITE.into(),
+                        point_size: 0.025,
+                        opacity: 0.5,
+                    },
+                    alpha_mode: AlphaMode::Blend,
+                    circle: true,
                     ..Default::default()
-                },
+                })),
             ))
             .with_children(|f| {
-                f.spawn((MaterialMeshBundle {
-                    mesh: meshes.add(
+                f.spawn((
+                    Mesh3d(meshes.add(
                         Mesh::new(PrimitiveTopology::LineStrip, default()).with_inserted_attribute(
                             Mesh::ATTRIBUTE_POSITION,
                             VertexAttributeValues::Float32x3(
                                 pts.iter().map(|pt| [pt.x, pt.y, pt.z]).collect(),
                             ),
                         ),
-                    ),
-                    material: line_materials.add(LineMaterial {
+                    )),
+                    MeshMaterial3d(line_materials.add(LineMaterial {
                         color: Color::WHITE,
                         opacity: 0.5,
                         alpha_mode: AlphaMode::Blend,
-                    }),
-                    ..Default::default()
-                },));
+                    })),
+                ));
             });
 
         let homogenized: Vec<Point4<f32>> =
