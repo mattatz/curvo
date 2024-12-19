@@ -161,7 +161,6 @@ fn divide_by_arc_length(profile: Query<&ProfileCurve>, settings: Res<Setting>, m
     );
     frames.iter().for_each(|f| {
         let pt = f.position();
-        let normal = f.normal().cast::<f32>();
         let tangent = f.tangent() * 1e-1;
         let binormal = f.binormal() * 1e-1;
         gizmos.circle(

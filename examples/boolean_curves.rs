@@ -17,6 +17,7 @@ use nalgebra::{Rotation2, Translation2};
 mod boolean;
 mod materials;
 mod systems;
+pub mod misc;
 
 use curvo::prelude::*;
 use operation::BooleanOperation;

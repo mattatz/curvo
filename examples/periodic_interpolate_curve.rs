@@ -13,11 +13,13 @@ use bevy_points::{
     plugin::PointsPlugin,
     prelude::{PointsMaterial, PointsMesh},
 };
+use misc::add_curve;
 use nalgebra::Point3;
 
 use curvo::prelude::*;
 
 mod materials;
+mod misc;
 mod systems;
 
 use materials::*;
@@ -55,64 +57,25 @@ fn setup(
     mut line_materials: ResMut<Assets<LineMaterial>>,
     mut points_materials: ResMut<Assets<PointsMaterial>>,
 ) {
-    let add_curve = |curve: &NurbsCurve3D<f64>,
-                     commands: &mut Commands<'_, '_>,
-                     meshes: &mut ResMut<'_, Assets<Mesh>>,
-                     line_materials: &mut ResMut<'_, Assets<LineMaterial>>,
-                     points_materials: &mut ResMut<'_, Assets<PointsMaterial>>,
-                     color: Color| {
-        // dbg!(curve.knots());
-        let samples = curve.tessellate(Some(1e-12));
-        let line_vertices = samples
-            .iter()
-            .map(|p| p.cast::<f32>())
-            .map(|p| [p.x, p.y, p.z])
-            .collect();
-        let _n = 1. / (samples.len() as f32);
-        let line = Mesh::new(bevy::render::mesh::PrimitiveTopology::LineStrip, default())
-            .with_inserted_attribute(
-                Mesh::ATTRIBUTE_POSITION,
-                VertexAttributeValues::Float32x3(line_vertices),
-            );
-        /*
-        .with_inserted_attribute(
-            Mesh::ATTRIBUTE_COLOR,
-            VertexAttributeValues::Float32x4(
-                samples
-                    .iter()
-                    .enumerate()
-                    .map(|(i, _)| {
-                        let t = i as f32 * n;
-                        Color::hsl(t * 360., 0.5, 0.5).rgba_to_vec4().into()
-                    })
-                    .collect(),
-            ),
-        );
-        */
-
+    let add_curve_control_points = |curve: &NurbsCurve3D<f64>,
+                                    commands: &mut Commands<'_, '_>,
+                                    meshes: &mut ResMut<'_, Assets<Mesh>>,
+                                    line_materials: &mut ResMut<'_, Assets<LineMaterial>>,
+                                    points_materials: &mut ResMut<'_, Assets<PointsMaterial>>,
+                                    color: Color| {
         commands
-            .spawn(MaterialMeshBundle {
-                mesh: meshes.add(line),
-                material: line_materials.add(LineMaterial {
-                    color,
-                    ..Default::default()
-                }),
-                // visibility: Visibility::Hidden,
-                ..Default::default()
-            })
-            .insert(Name::new("curve"));
-
-        commands
-            .spawn(MaterialMeshBundle {
-                mesh: meshes.add(PointsMesh {
-                    vertices: curve
-                        .dehomogenized_control_points()
-                        .iter()
-                        .map(|pt| pt.cast::<f32>().into())
-                        .collect(),
-                    colors: None,
-                }),
-                material: points_materials.add(PointsMaterial {
+            .spawn((
+                Mesh3d(
+                    meshes.add(PointsMesh {
+                        vertices: curve
+                            .dehomogenized_control_points()
+                            .iter()
+                            .map(|pt| pt.cast::<f32>().into())
+                            .collect(),
+                        colors: None,
+                    }),
+                ),
+                MeshMaterial3d(points_materials.add(PointsMaterial {
                     settings: bevy_points::material::PointsShaderSettings {
                         color: color.into(),
                         point_size: 0.05,
@@ -120,10 +83,8 @@ fn setup(
                     },
                     circle: true,
                     ..Default::default()
-                }),
-                // visibility: Visibility::Hidden,
-                ..Default::default()
-            })
+                })),
+            ))
             .insert(Name::new("control points"));
     };
 
@@ -135,15 +96,17 @@ fn setup(
         .collect();
 
     commands
-        .spawn(MaterialMeshBundle {
-            mesh: meshes.add(PointsMesh {
-                vertices: interpolation_target
-                    .iter()
-                    .map(|pt| pt.cast::<f32>().into())
-                    .collect(),
-                colors: None,
-            }),
-            material: points_materials.add(PointsMaterial {
+        .spawn((
+            Mesh3d(
+                meshes.add(PointsMesh {
+                    vertices: interpolation_target
+                        .iter()
+                        .map(|pt| pt.cast::<f32>().into())
+                        .collect(),
+                    colors: None,
+                }),
+            ),
+            MeshMaterial3d(points_materials.add(PointsMaterial {
                 settings: bevy_points::material::PointsShaderSettings {
                     color: WHITE.into(),
                     point_size: 0.072,
@@ -151,10 +114,8 @@ fn setup(
                 },
                 circle: true,
                 ..Default::default()
-            }),
-            // visibility: Visibility::Hidden,
-            ..Default::default()
-        })
+            })),
+        ))
         .insert(Name::new("interpolation targets"));
 
     let degree = 3;
@@ -170,6 +131,14 @@ fn setup(
             NurbsCurve3D::try_periodic_interpolate(&interpolation_target, degree, knot).unwrap();
         add_curve(
             &curve,
+            color.into(),
+            Some(1e-8),
+            &mut commands,
+            &mut meshes,
+            &mut line_materials,
+        );
+        add_curve_control_points(
+            &curve,
             &mut commands,
             &mut meshes,
             &mut line_materials,
@@ -179,17 +148,17 @@ fn setup(
     });
 
     let scale = 5.;
-    let orth = Camera3dBundle {
-        projection: OrthographicProjection {
+    commands.spawn((
+        Projection::Orthographic(OrthographicProjection {
             scale,
             near: 1e-1,
             far: 1e4,
-            scaling_mode: ScalingMode::FixedVertical(2.0),
-            ..Default::default()
-        }
-        .into(),
-        transform: Transform::from_translation(Vec3::new(0., 0., 3.)),
-        ..Default::default()
-    };
-    commands.spawn((orth, PanOrbitCamera::default()));
+            scaling_mode: ScalingMode::FixedVertical {
+                viewport_height: 2.,
+            },
+            ..OrthographicProjection::default_3d()
+        }),
+        Transform::from_translation(Vec3::new(0., 0., 3.)),
+        PanOrbitCamera::default(),
+    ));
 }
