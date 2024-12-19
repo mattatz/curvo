@@ -70,11 +70,10 @@ struct ProfileCurve(pub NurbsCurve3D<f32>);
 fn setup(mut commands: Commands, mut settings: ResMut<Setting>) {
     settings.time_since_last_update = settings.duration;
 
-    let camera = Camera3dBundle {
-        transform: Transform::from_translation(Vec3::new(0., 0., 3.)),
-        ..Default::default()
-    };
-    commands.spawn((camera, PanOrbitCamera::default()));
+    commands.spawn((
+        Transform::from_translation(Vec3::new(0., 0., 3.)),
+        PanOrbitCamera::default(),
+    ));
     // commands.spawn(InfiniteGridBundle::default());
 }
 

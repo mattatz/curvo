@@ -50,12 +50,10 @@ fn setup(
     _points_materials: ResMut<Assets<PointsMaterial>>,
 ) {
     let center = Vec3::ZERO;
-    let orth = Camera3dBundle {
-        transform: Transform::from_translation(center + Vec3::new(0., 0., 8.))
-            .looking_at(center, Vec3::Y),
-        ..Default::default()
-    };
-    commands.spawn((orth, PanOrbitCamera::default()));
+    commands.spawn((
+        Transform::from_translation(center + Vec3::new(0., 0., 8.)).looking_at(center, Vec3::Y),
+        PanOrbitCamera::default(),
+    ));
     commands.spawn(InfiniteGridBundle {
         settings: InfiniteGridSettings {
             x_axis_color: Color::BLACK,

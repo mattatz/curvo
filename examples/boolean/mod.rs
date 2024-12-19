@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 pub mod scenario;
 use curvo::prelude::{
     operation::BooleanOperation, Boolean, Clip, CompoundCurve, CurveIntersectionSolverOptions,

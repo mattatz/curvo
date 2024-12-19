@@ -47,7 +47,7 @@ fn setup(
          commands: &mut Commands<'_, '_>,
          meshes: &mut ResMut<'_, Assets<Mesh>>,
          line_materials: &mut ResMut<'_, Assets<LineMaterial>>,
-         normal_materials: &mut ResMut<'_, Assets<NormalMaterial>>,
+         _normal_materials: &mut ResMut<'_, Assets<NormalMaterial>>,
          points_materials: &mut ResMut<'_, Assets<PointsMaterial>>| {
             let option = AdaptiveTessellationOptions {
                 norm_tolerance: 1e-2,

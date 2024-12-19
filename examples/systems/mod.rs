@@ -3,6 +3,7 @@ use bevy::{
     render::view::screenshot::{save_to_disk, Screenshot},
 };
 
+#[allow(unused)]
 pub fn screenshot_on_spacebar(
     mut commands: Commands,
     input: Res<ButtonInput<KeyCode>>,

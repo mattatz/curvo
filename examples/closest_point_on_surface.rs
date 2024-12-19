@@ -61,9 +61,9 @@ fn setup(
         |surf: &NurbsSurface3D<f64>,
          commands: &mut Commands<'_, '_>,
          meshes: &mut ResMut<'_, Assets<Mesh>>,
-         line_materials: &mut ResMut<'_, Assets<LineMaterial>>,
+         _line_materials: &mut ResMut<'_, Assets<LineMaterial>>,
          normal_materials: &mut ResMut<'_, Assets<NormalMaterial>>,
-         points_materials: &mut ResMut<'_, Assets<PointsMaterial>>| {
+         _points_materials: &mut ResMut<'_, Assets<PointsMaterial>>| {
             let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, default());
 
             let option = AdaptiveTessellationOptions {
@@ -213,7 +213,6 @@ fn setup(
                     color: WHITE.into(),
                     opacity: 1.0,
                     alpha_mode: AlphaMode::Blend,
-                    ..Default::default()
                 })),
             ));
         } else {
@@ -224,6 +223,7 @@ fn setup(
     commands.spawn(TargetSurface(surface));
 }
 
+#[allow(unused)]
 fn find_closest_point(time: Res<Time>, surfaces: Query<&TargetSurface>, mut gizmos: Gizmos) {
     let t = time.elapsed_secs_f64();
 

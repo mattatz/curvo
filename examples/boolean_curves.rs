@@ -65,15 +65,14 @@ fn setup(
     mut points_materials: ResMut<Assets<PointsMaterial>>,
     mut normal_materials: ResMut<'_, Assets<NormalMaterial>>,
 ) {
-    let camera = Camera3dBundle {
-        projection: Projection::Perspective(PerspectiveProjection {
+    commands.spawn((
+        Projection::Perspective(PerspectiveProjection {
             near: 1e-3,
             ..Default::default()
         }),
-        transform: Transform::from_translation(Vec3::new(0., 0., 5.)),
-        ..Default::default()
-    };
-    commands.spawn((camera, PanOrbitCamera::default()));
+        Transform::from_translation(Vec3::new(0., 0., 5.)),
+        PanOrbitCamera::default(),
+    ));
 
     // let (subject, clip) = boolean::circle_rectangle_case();
     // let (subject, clip) = boolean::periodic_interpolation_case();
@@ -146,7 +145,6 @@ fn setup(
                     color: color.unwrap_or(WHITE.with_alpha(0.25).into()),
                     opacity: 0.6,
                     alpha_mode: AlphaMode::Blend,
-                    ..Default::default()
                 })),
                 transform,
             ));
@@ -190,7 +188,6 @@ fn setup(
                         } else {
                             vec![PURPLE.into(), PURPLE.into()]
                         }),
-                        ..Default::default()
                     }),
                 ),
                 MeshMaterial3d(points_materials.add(PointsMaterial {

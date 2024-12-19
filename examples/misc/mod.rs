@@ -10,6 +10,7 @@ use curvo::prelude::{
 
 use crate::LineMaterial;
 
+#[allow(unused)]
 pub fn add_curve(
     curve: &NurbsCurve3D<f64>,
     color: Color,
@@ -48,6 +49,7 @@ pub fn add_curve(
     ));
 }
 
+#[allow(unused)]
 pub fn add_surface(
     surface: &NurbsSurface3D<f64>,
     commands: &mut Commands<'_, '_>,
@@ -111,6 +113,7 @@ pub fn add_surface(
     ));
 }
 
+#[allow(unused)]
 pub fn add_surface_normals(
     tess: &SurfaceTessellation3D<f32>,
     commands: &mut Commands<'_, '_>,

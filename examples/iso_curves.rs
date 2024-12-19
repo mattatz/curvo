@@ -52,7 +52,7 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut line_materials: ResMut<Assets<LineMaterial>>,
     mut points_materials: ResMut<Assets<PointsMaterial>>,
-    normal_materials: ResMut<'_, Assets<NormalMaterial>>,
+    _normal_materials: ResMut<'_, Assets<NormalMaterial>>,
 ) {
     let interpolation_target = vec![
         Point3::new(-1.0, -1.0, 0.),
