@@ -7,7 +7,7 @@ use argmin::core::ArgminFloat;
 use itertools::Itertools;
 use nalgebra::U3;
 
-use crate::prelude::{CompoundCurveIntersection, HasIntersectionParameter, Intersection};
+use crate::prelude::{CompoundCurveIntersection, HasIntersectionParameter, Intersects};
 use crate::region::CompoundCurve;
 use crate::{curve::NurbsCurve, misc::FloatingPoint, prelude::CurveIntersectionSolverOptions};
 

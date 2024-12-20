@@ -6,10 +6,10 @@ use num_traits::Float;
 use crate::{curve::NurbsCurve, misc::FloatingPoint, region::CompoundCurve};
 
 use super::{
-    CompoundCurveIntersection, CurveIntersectionSolverOptions, HasIntersection, Intersection,
+    CompoundCurveIntersection, CurveIntersectionSolverOptions, HasIntersection, Intersects,
 };
 
-impl<'a, T, D> Intersection<'a, &'a NurbsCurve<T, D>> for CompoundCurve<T, D>
+impl<'a, T, D> Intersects<'a, &'a NurbsCurve<T, D>> for CompoundCurve<T, D>
 where
     T: FloatingPoint + ArgminFloat,
     D: DimName + DimNameSub<U1>,
@@ -66,7 +66,7 @@ where
     }
 }
 
-impl<'a, T, D> Intersection<'a, &'a CompoundCurve<T, D>> for CompoundCurve<T, D>
+impl<'a, T, D> Intersects<'a, &'a CompoundCurve<T, D>> for CompoundCurve<T, D>
 where
     T: FloatingPoint + ArgminFloat,
     D: DimName + DimNameSub<U1>,

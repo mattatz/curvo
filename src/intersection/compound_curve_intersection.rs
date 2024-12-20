@@ -53,7 +53,7 @@ where
     }
 }
 
-impl<'a, T: FloatingPoint, D: DimName> HasIntersectionParameter<T>
+impl<'a, T: FloatingPoint, D: DimName> HasIntersectionParameter<T, T>
     for CompoundCurveIntersection<'a, T, D>
 where
     D: DimNameSub<U1>,
@@ -69,7 +69,8 @@ where
     }
 }
 
-impl<'a, T: FloatingPoint, D: DimName> HasIntersection<Intersection<'a, T, D>, T>
+impl<'a, T: FloatingPoint, D: DimName>
+    HasIntersection<Intersection<'a, T, D>, Intersection<'a, T, D>, T, T>
     for CompoundCurveIntersection<'a, T, D>
 where
     D: DimNameSub<U1>,

@@ -1,25 +1,18 @@
-use std::cmp::Ordering;
-
-use argmin::core::{ArgminFloat, Executor, State};
-use itertools::Itertools;
+use argmin::core::{ArgminFloat, State};
 use nalgebra::{
-    allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, Matrix2, OPoint,
-    Vector2, U1,
+    allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, U1,
 };
-use num_traits::Float;
 
 use crate::{
     curve::NurbsCurve,
     misc::FloatingPoint,
-    prelude::{BoundingBoxTraversal, CurveBoundingBoxTree},
+    prelude::{BoundingBoxTraversal, CurveBoundingBoxTree, SurfaceBoundingBoxTree},
+    surface::{NurbsSurface, UVDirection},
 };
 
-use super::{
-    CurveIntersection, CurveIntersectionBFGS, CurveIntersectionProblem,
-    CurveIntersectionSolverOptions, HasIntersection, Intersects,
-};
+use super::{CurveIntersection, CurveIntersectionSolverOptions, Intersects};
 
-impl<'a, T, D> Intersects<'a, &'a NurbsCurve<T, D>> for NurbsCurve<T, D>
+impl<'a, T, D> Intersects<'a, &'a NurbsCurve<T, D>> for NurbsSurface<T, D>
 where
     T: FloatingPoint + ArgminFloat,
     D: DimName + DimNameSub<U1>,
@@ -29,48 +22,7 @@ where
     type Output = anyhow::Result<Vec<CurveIntersection<OPoint<T, DimNameDiff<D, U1>>, T>>>;
     type Option = Option<CurveIntersectionSolverOptions<T>>;
 
-    /// Find the intersection points with another curve by gauss-newton line search
-    /// * `other` - The other curve to intersect with
-    /// * `options` - Hyperparameters for the intersection solver
-    /// # Example
-    /// ```
-    /// use curvo::prelude::*;
-    /// use nalgebra::{Point2, Point3, Vector2};
-    /// use approx::assert_relative_eq;
-    /// let unit_circle = NurbsCurve2D::try_circle(
-    ///     &Point2::origin(),
-    ///     &Vector2::x(),
-    ///     &Vector2::y(),
-    ///     1.
-    /// ).unwrap();
-    /// let line = NurbsCurve2D::try_new(
-    ///     1,
-    ///     vec![
-    ///         Point3::new(-2.0, 0.0, 1.),
-    ///         Point3::new(2.0, 0.0, 1.),
-    ///     ],
-    ///     vec![0., 0., 1., 1.],
-    /// ).unwrap();
     ///
-    /// // Hyperparameters for the intersection solver
-    /// let options = CurveIntersectionSolverOptions {
-    ///     minimum_distance: 1e-5, // minimum distance between intersections
-    ///     cost_tolerance: 1e-12, // cost tolerance for the solver convergence
-    ///     max_iters: 200, // maximum number of iterations in the solver
-    ///     ..Default::default()
-    /// };
-    ///
-    /// let mut intersections = unit_circle.find_intersections(&line, Some(options)).unwrap();
-    /// assert_eq!(intersections.len(), 2);
-    ///
-    /// intersections.sort_by(|i0, i1| {
-    ///     i0.a().0.x.partial_cmp(&i1.a().0.x).unwrap()
-    /// });
-    /// let p0 = &intersections[0];
-    /// assert_relative_eq!(p0.a().0, Point2::new(-1.0, 0.0), epsilon = 1e-5);
-    /// let p1 = &intersections[1];
-    /// assert_relative_eq!(p1.a().0, Point2::new(1.0, 0.0), epsilon = 1e-5);
-    /// ```
     #[allow(clippy::type_complexity)]
     fn find_intersections(
         &'a self,
@@ -79,29 +31,25 @@ where
     ) -> Self::Output {
         let options = option.unwrap_or_default();
 
-        let ta = CurveBoundingBoxTree::new(
+        let div = T::one() / T::from_usize(options.knot_domain_division).unwrap();
+        let interval = self.knots_domain_interval();
+        let ta = SurfaceBoundingBoxTree::new(
             self,
-            Some(
-                self.knots_domain_interval() / T::from_usize(options.knot_domain_division).unwrap(),
-            ),
+            UVDirection::U,
+            Some((interval.0 * div, interval.1 * div)),
         );
-        let tb = CurveBoundingBoxTree::new(
-            other,
-            Some(
-                other.knots_domain_interval()
-                    / T::from_usize(options.knot_domain_division).unwrap(),
-            ),
-        );
+        let tb = CurveBoundingBoxTree::new(other, Some(other.knots_domain_interval() * div));
 
         let traversed = BoundingBoxTraversal::try_traverse(ta, tb)?;
-
         let a_domain = self.knots_domain();
         let b_domain = other.knots_domain();
+        todo!();
 
+        /*
         let intersections = traversed
             .into_pairs_iter()
             .filter_map(|(a, b)| {
-                let ca = a.curve_owned();
+                let ca = a.surface_owned();
                 let cb = b.curve_owned();
 
                 let problem = CurveIntersectionProblem::new(&ca, &cb);
@@ -188,16 +136,9 @@ where
                     Err((x, y))
                 }
             })
-            .collect::<Vec<Vec<CurveIntersection<OPoint<T, DimNameDiff<D, U1>>, T>>>>()
+            .collect::<Vec<Vec<Intersects<OPoint<T, DimNameDiff<D, U1>>, T>>>>()
             .into_iter()
             .collect_vec();
-
-        /*
-        println!("groups: {:?}", groups.len());
-        groups.iter().for_each(|group| {
-            println!("group: {:?}", group.iter().map(|v| &v.b().0).collect_vec());
-        });
-        */
 
         let pts = groups
             .into_iter()
@@ -218,8 +159,7 @@ where
             })
             .collect_vec();
 
-        // println!("pts: {:?}", pts.len());
-
         Ok(pts)
+        */
     }
 }

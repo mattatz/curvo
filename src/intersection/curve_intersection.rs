@@ -2,39 +2,46 @@ use super::{has_intersection::HasIntersection, HasIntersectionParameter};
 
 /// A struct representing the intersection of two curves.
 #[derive(Debug, Clone)]
-pub struct CurveIntersection<P, T> {
-    /// The point & parameter of the first curve at the intersection.
-    a: (P, T),
-    /// The point & parameter of the second curve at the intersection.
-    b: (P, T),
+pub struct Intersection<P, T0, T1> {
+    /// The point & parameter of the first object at the intersection.
+    a: (P, T0),
+    /// The point & parameter of the second object at the intersection.
+    b: (P, T1),
 }
 
-impl<P, T> CurveIntersection<P, T> {
-    pub fn new(a: (P, T), b: (P, T)) -> Self {
+impl<P, T0, T1> Intersection<P, T0, T1> {
+    pub fn new(a: (P, T0), b: (P, T1)) -> Self {
         Self { a, b }
     }
 
-    pub fn as_tuple(self) -> ((P, T), (P, T)) {
+    pub fn as_tuple(self) -> ((P, T0), (P, T1)) {
         (self.a, self.b)
     }
 }
 
-impl<P, T: Clone + Copy> HasIntersectionParameter<T> for CurveIntersection<P, T> {
-    fn a_parameter(&self) -> T {
+impl<P, T0: Clone + Copy, T1: Clone + Copy> HasIntersectionParameter<T0, T1>
+    for Intersection<P, T0, T1>
+{
+    fn a_parameter(&self) -> T0 {
         self.a.1
     }
 
-    fn b_parameter(&self) -> T {
+    fn b_parameter(&self) -> T1 {
         self.b.1
     }
 }
 
-impl<P, T: Clone + Copy> HasIntersection<(P, T), T> for CurveIntersection<P, T> {
-    fn a(&self) -> &(P, T) {
+impl<P, T0: Clone + Copy, T1: Clone + Copy> HasIntersection<(P, T0), (P, T1), T0, T1>
+    for Intersection<P, T0, T1>
+{
+    fn a(&self) -> &(P, T0) {
         &self.a
     }
 
-    fn b(&self) -> &(P, T) {
+    fn b(&self) -> &(P, T1) {
         &self.b
     }
 }
+
+/// A struct representing the intersection of two curves.
+pub type CurveIntersection<P, T> = Intersection<P, T, T>;

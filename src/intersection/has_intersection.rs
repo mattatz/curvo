@@ -1,11 +1,11 @@
 /// A trait for types that have an intersection.
-pub trait HasIntersection<V, T>: HasIntersectionParameter<T> {
-    fn a(&self) -> &V;
-    fn b(&self) -> &V;
+pub trait HasIntersection<VA, VB, A, B>: HasIntersectionParameter<A, B> {
+    fn a(&self) -> &VA;
+    fn b(&self) -> &VB;
 }
 
 /// A trait for types that have intersection parameters.
-pub trait HasIntersectionParameter<T> {
-    fn a_parameter(&self) -> T;
-    fn b_parameter(&self) -> T;
+pub trait HasIntersectionParameter<A, B> {
+    fn a_parameter(&self) -> A;
+    fn b_parameter(&self) -> B;
 }

@@ -14,7 +14,7 @@ pub enum Degeneracy<T: FloatingPoint> {
 }
 
 impl<T: FloatingPoint> Degeneracy<T> {
-    pub fn new<I: HasIntersectionParameter<T>>(
+    pub fn new<I: HasIntersectionParameter<T, T>>(
         it: &I,
         a: &NurbsCurve<T, Const<3>>,
         b: &NurbsCurve<T, Const<3>>,

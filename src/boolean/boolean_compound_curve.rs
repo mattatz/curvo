@@ -1,7 +1,7 @@
 use argmin::core::ArgminFloat;
 use nalgebra::U3;
 
-use crate::prelude::Intersection;
+use crate::prelude::Intersects;
 use crate::{
     curve::NurbsCurve, misc::FloatingPoint, prelude::CurveIntersectionSolverOptions,
     region::CompoundCurve,
