@@ -10,6 +10,7 @@ mod knot;
 mod misc;
 mod polygon_mesh;
 mod region;
+mod split;
 mod surface;
 mod tessellation;
 mod trim;
@@ -25,6 +26,7 @@ pub mod prelude {
     pub use crate::misc::*;
     pub use crate::polygon_mesh::*;
     pub use crate::region::*;
+    pub use crate::split::*;
     pub use crate::surface::*;
     pub use crate::tessellation::{
         adaptive_tessellation_option::AdaptiveTessellationOptions, surface_tessellation::*,

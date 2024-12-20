@@ -51,7 +51,7 @@ impl Plugin for AppPlugin {
                 PreUpdate,
                 (absorb_egui_inputs,)
                     .after(bevy_egui::systems::process_input_system)
-                    .before(bevy_egui::EguiSet::BeginFrame),
+                    .before(bevy_egui::EguiSet::BeginPass),
             )
             .add_systems(Update, (update_ui, divide_by_arc_length));
     }
@@ -99,22 +99,17 @@ fn setup(
 
     commands.spawn((
         ProfileCurve(curve),
-        MaterialMeshBundle {
-            mesh: meshes.add(mesh),
-            material: line_materials.add(LineMaterial {
-                color: WHITE.into(),
-                ..Default::default()
-            }),
-            // visibility: Visibility::Hidden,
+        Mesh3d(meshes.add(mesh)),
+        MeshMaterial3d(line_materials.add(LineMaterial {
+            color: WHITE.into(),
             ..Default::default()
-        },
+        })),
     ));
 
-    let camera = Camera3dBundle {
-        transform: Transform::from_translation(Vec3::new(0., 2.5, 10.)),
-        ..Default::default()
-    };
-    commands.spawn((camera, PanOrbitCamera::default()));
+    commands.spawn((
+        Transform::from_translation(Vec3::new(0., 2.5, 10.)),
+        PanOrbitCamera::default(),
+    ));
     commands.spawn(InfiniteGridBundle::default());
 }
 
@@ -165,17 +160,24 @@ fn divide_by_arc_length(profile: Query<&ProfileCurve>, settings: Res<Setting>, m
             .collect::<Vec<_>>(),
     );
     frames.iter().for_each(|f| {
-        let pt = f.position().cast::<f32>();
-        let normal = f.normal().cast::<f32>();
-        let tangent = f.tangent().cast::<f32>() * 1e-1;
-        let binormal = f.binormal().cast::<f32>() * 1e-1;
+        let pt = f.position();
+        let tangent = f.tangent() * 1e-1;
+        let binormal = f.binormal() * 1e-1;
         gizmos.circle(
-            pt.into(),
-            Dir3::new_unchecked(Vec3::from(normal)),
+            Isometry3d::from_translation(pt.cast()),
+            // Dir3::new_unchecked(Vec3::from(normal)),
             r,
             ALICE_BLUE,
         );
-        gizmos.line(pt.into(), (pt + tangent).into(), AQUAMARINE);
-        gizmos.line(pt.into(), (pt + binormal).into(), YELLOW);
+        gizmos.line(
+            pt.cast::<f32>().into(),
+            (pt + tangent).cast::<f32>().into(),
+            AQUAMARINE,
+        );
+        gizmos.line(
+            pt.cast::<f32>().into(),
+            (pt + binormal).cast::<f32>().into(),
+            YELLOW,
+        );
     });
 }

@@ -96,17 +96,16 @@ fn setup(
         .with_inserted_indices(Indices::U32(indices));
 
     commands
-        .spawn(MaterialMeshBundle {
-            mesh: meshes.add(mesh),
-            material: normal_materials.add(NormalMaterial {
+        .spawn((
+            Mesh3d(meshes.add(mesh)),
+            MeshMaterial3d(normal_materials.add(NormalMaterial {
                 opacity: 0.05,
                 cull_mode: None,
                 alpha_mode: AlphaMode::Blend,
                 ..Default::default()
-            }),
-            visibility: Visibility::Hidden,
-            ..Default::default()
-        })
+            })),
+            Visibility::Hidden,
+        ))
         .insert(Name::new("lofted"));
 
     let boundary = lofted.try_boundary_curves();
@@ -135,21 +134,19 @@ fn setup(
                     ),
                 );
             commands
-                .spawn(MaterialMeshBundle {
-                    mesh: meshes.add(line),
-                    material: line_materials.add(LineMaterial {
+                .spawn((
+                    Mesh3d(meshes.add(line)),
+                    MeshMaterial3d(line_materials.add(LineMaterial {
                         color: Color::WHITE,
                         ..Default::default()
-                    }),
-                    ..Default::default()
-                })
+                    })),
+                ))
                 .insert(Name::new("boundary curve"));
         });
     }
 
-    let camera = Camera3dBundle {
-        transform: Transform::from_translation(Vec3::new(0., 3., 8.)),
-        ..Default::default()
-    };
-    commands.spawn((camera, PanOrbitCamera::default()));
+    commands.spawn((
+        Transform::from_translation(Vec3::new(0., 3., 8.)),
+        PanOrbitCamera::default(),
+    ));
 }

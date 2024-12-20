@@ -6,7 +6,6 @@ use bevy::{
         mesh::{PrimitiveTopology, VertexAttributeValues},
     },
 };
-use bevy_infinite_grid::InfiniteGridPlugin;
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use bevy_points::plugin::PointsPlugin;
@@ -22,7 +21,6 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugins(LineMaterialPlugin)
-        .add_plugins(InfiniteGridPlugin)
         .add_plugins(PanOrbitCameraPlugin)
         .add_plugins(PointsPlugin)
         .add_plugins(AppPlugin)
@@ -56,15 +54,13 @@ fn setup(
         VertexAttributeValues::Float32x3(line_vertices),
     );
     commands
-        .spawn(MaterialMeshBundle {
-            mesh: meshes.add(line),
-            material: line_materials.add(LineMaterial {
+        .spawn((
+            Mesh3d(meshes.add(line)),
+            MeshMaterial3d(line_materials.add(LineMaterial {
                 color: TOMATO.into(),
                 ..Default::default()
-            }),
-            // visibility: Visibility::Hidden,
-            ..Default::default()
-        })
+            })),
+        ))
         .insert(Name::new("curve"));
 
     let bbox = BoundingBox::from(&unit_circle);
@@ -78,30 +74,28 @@ fn setup(
         VertexAttributeValues::Float32x3(vertices),
     );
     commands
-        .spawn(MaterialMeshBundle {
-            mesh: meshes.add(line),
-            material: line_materials.add(LineMaterial {
+        .spawn((
+            Mesh3d(meshes.add(line)),
+            MeshMaterial3d(line_materials.add(LineMaterial {
                 color: WHITE.into(),
                 ..Default::default()
-            }),
-            // visibility: Visibility::Hidden,
-            ..Default::default()
-        })
+            })),
+        ))
         .insert(Name::new("bounding box"));
 
     let scale = 5.;
-    let orth = Camera3dBundle {
-        projection: OrthographicProjection {
+    commands.spawn((
+        Camera3d::default(),
+        Projection::Orthographic(OrthographicProjection {
             scale,
             near: 1e-1,
             far: 1e4,
-            scaling_mode: ScalingMode::FixedVertical(2.0),
-            ..Default::default()
-        }
-        .into(),
-        transform: Transform::from_translation(Vec3::new(0., 0., 3.))
-            .looking_at(Vec3::ZERO, Vec3::Y),
-        ..Default::default()
-    };
-    commands.spawn((orth, PanOrbitCamera::default()));
+            scaling_mode: ScalingMode::FixedVertical {
+                viewport_height: 1.,
+            },
+            ..OrthographicProjection::default_3d()
+        }),
+        Transform::from_translation(Vec3::new(0., 0., 3.)).looking_at(Vec3::ZERO, Vec3::Y),
+        PanOrbitCamera::default(),
+    ));
 }

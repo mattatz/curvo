@@ -1483,33 +1483,6 @@ where
         }
     }
 
-    /// Trim the curve into two curves before and after the parameter
-    pub fn try_trim(&self, u: T) -> anyhow::Result<(Self, Self)> {
-        let u = self.knots.clamp(self.degree, u);
-        let knots_to_insert = (0..=self.degree).map(|_| u).collect_vec();
-        let mut cloned = self.clone();
-        cloned.try_refine_knot(knots_to_insert)?;
-
-        let n = self.knots.len() - self.degree - 2;
-        let s = self.knots.find_knot_span_index(n, self.degree, u);
-        let knots0 = cloned.knots.as_slice()[0..=(s + self.degree + 1)].to_vec();
-        let knots1 = cloned.knots.as_slice()[s + 1..].to_vec();
-        let cpts0 = cloned.control_points[0..=s].to_vec();
-        let cpts1 = cloned.control_points[s + 1..].to_vec();
-        Ok((
-            Self {
-                degree: self.degree,
-                control_points: cpts0,
-                knots: KnotVector::new(knots0),
-            },
-            Self {
-                degree: self.degree,
-                control_points: cpts1,
-                knots: KnotVector::new(knots1),
-            },
-        ))
-    }
-
     /// Try to clamp knots of the curve
     /// Multiplex the start/end part of the knot vector so that the knot has `degree + 1` overlap
     pub fn try_clamp(&mut self) -> anyhow::Result<()> {

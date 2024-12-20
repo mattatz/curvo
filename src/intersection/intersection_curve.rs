@@ -8,7 +8,11 @@ use nalgebra::{
 };
 use num_traits::Float;
 
-use crate::{curve::NurbsCurve, misc::FloatingPoint, prelude::BoundingBoxTraversal};
+use crate::{
+    curve::NurbsCurve,
+    misc::FloatingPoint,
+    prelude::{BoundingBoxTraversal, CurveBoundingBoxTree},
+};
 
 use super::{
     CurveIntersection, CurveIntersectionBFGS, CurveIntersectionProblem,
@@ -75,17 +79,21 @@ where
     ) -> Self::Output {
         let options = option.unwrap_or_default();
 
-        let traversed = BoundingBoxTraversal::try_traverse(
+        let ta = CurveBoundingBoxTree::new(
             self,
-            other,
             Some(
                 self.knots_domain_interval() / T::from_usize(options.knot_domain_division).unwrap(),
             ),
+        );
+        let tb = CurveBoundingBoxTree::new(
+            other,
             Some(
                 other.knots_domain_interval()
                     / T::from_usize(options.knot_domain_division).unwrap(),
             ),
-        )?;
+        );
+
+        let traversed = BoundingBoxTraversal::try_traverse(ta, tb)?;
 
         let a_domain = self.knots_domain();
         let b_domain = other.knots_domain();

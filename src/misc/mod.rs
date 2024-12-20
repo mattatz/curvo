@@ -8,6 +8,7 @@ pub mod orientation;
 pub mod polygon_boundary;
 pub mod ray;
 pub mod transformable;
+pub mod transpose;
 pub mod trigonometry;
 
 pub use binomial::*;
@@ -20,4 +21,5 @@ pub use orientation::*;
 pub use polygon_boundary::*;
 pub use ray::*;
 pub use transformable::*;
+pub use transpose::*;
 pub use trigonometry::*;

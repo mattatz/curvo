@@ -93,15 +93,13 @@ fn setup(
                 VertexAttributeValues::Float32x3(line_list_vertices),
             );
             commands
-                .spawn(MaterialMeshBundle {
-                    mesh: meshes.add(line),
-                    material: line_materials.add(LineMaterial {
+                .spawn((
+                    Mesh3d(meshes.add(line)),
+                    MeshMaterial3d(line_materials.add(LineMaterial {
                         color: AQUAMARINE.into(),
                         ..Default::default()
-                    }),
-                    // visibility: Visibility::Hidden,
-                    ..Default::default()
-                })
+                    })),
+                ))
                 .insert(Name::new("normal"));
 
             let samples = curve.tessellate(Some(1e-8));
@@ -116,15 +114,13 @@ fn setup(
                 VertexAttributeValues::Float32x3(line_vertices),
             );
             commands
-                .spawn(MaterialMeshBundle {
-                    mesh: meshes.add(line),
-                    material: line_materials.add(LineMaterial {
+                .spawn((
+                    Mesh3d(meshes.add(line)),
+                    MeshMaterial3d(line_materials.add(LineMaterial {
                         color: TOMATO.into(),
                         ..Default::default()
-                    }),
-                    // visibility: Visibility::Hidden,
-                    ..Default::default()
-                })
+                    })),
+                ))
                 .insert(Name::new("curve"));
 
             vertices
@@ -140,15 +136,17 @@ fn setup(
     ];
 
     commands
-        .spawn(MaterialMeshBundle {
-            mesh: meshes.add(PointsMesh {
-                vertices: interpolation_target
-                    .iter()
-                    .map(|pt| pt.cast::<f32>().into())
-                    .collect(),
-                colors: None,
-            }),
-            material: points_materials.add(PointsMaterial {
+        .spawn((
+            Mesh3d(
+                meshes.add(PointsMesh {
+                    vertices: interpolation_target
+                        .iter()
+                        .map(|pt| pt.cast::<f32>().into())
+                        .collect(),
+                    colors: None,
+                }),
+            ),
+            MeshMaterial3d(points_materials.add(PointsMaterial {
                 settings: bevy_points::material::PointsShaderSettings {
                     color: WHITE.into(),
                     point_size: 0.05,
@@ -156,9 +154,8 @@ fn setup(
                 },
                 circle: true,
                 ..Default::default()
-            }),
-            ..Default::default()
-        })
+            })),
+        ))
         .insert(Name::new("interpolation targets"));
 
     let interpolated = NurbsCurve::try_interpolate(&interpolation_target, 3).unwrap();
@@ -180,20 +177,19 @@ fn setup(
     };
 
     let scale = 5.;
-    let orth = Camera3dBundle {
-        projection: OrthographicProjection {
+    commands.spawn((
+        Projection::Orthographic(OrthographicProjection {
             scale,
             near: 1e-1,
             far: 1e4,
-            scaling_mode: ScalingMode::FixedVertical(2.0),
-            ..Default::default()
-        }
-        .into(),
-        transform: Transform::from_translation(center + Vec3::new(0., 0., 3.))
-            .looking_at(center, Vec3::Y),
-        ..Default::default()
-    };
-    commands.spawn((orth, PanOrbitCamera::default()));
+            scaling_mode: ScalingMode::FixedVertical {
+                viewport_height: 2.,
+            },
+            ..OrthographicProjection::default_3d()
+        }),
+        Transform::from_translation(center + Vec3::new(0., 0., 3.)).looking_at(center, Vec3::Y),
+        PanOrbitCamera::default(),
+    ));
 }
 
 fn find_closest_point(
@@ -206,17 +202,17 @@ fn find_closest_point(
     let (camera, camera_transform) = camera.single();
     if let Some(ray) = w
         .cursor_position()
-        .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor))
+        .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor).ok())
     {
         if let Some(d) = ray.intersect_plane(Vec3::ZERO, InfinitePlane3d::new(Vec3::Z)) {
             let pt = ray.get_point(d);
-            gizmos.circle(pt, Dir3::Z, 0.1, GRAY);
+            gizmos.circle(pt, 0.1, GRAY);
             let curve = curves.single();
             let p = Point3::from(pt).cast();
             let closest = curve.0.find_closest_point(&p);
             if let Ok(closest) = closest {
                 let center = closest.cast::<f32>().into();
-                gizmos.circle(center, Dir3::Z, 0.05, WHITE);
+                gizmos.circle(center, 0.05, WHITE);
 
                 gizmos.line(pt, center, WHITE);
             }

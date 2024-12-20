@@ -75,15 +75,13 @@ fn setup(
         VertexAttributeValues::Float32x3(line_vertices),
     );
     commands
-        .spawn(MaterialMeshBundle {
-            mesh: meshes.add(line),
-            material: line_materials.add(LineMaterial {
+        .spawn((
+            Mesh3d(meshes.add(line)),
+            MeshMaterial3d(line_materials.add(LineMaterial {
                 color: TOMATO.into(),
                 ..Default::default()
-            }),
-            // visibility: Visibility::Hidden,
-            ..Default::default()
-        })
+            })),
+        ))
         .insert(FirstCurve(curve.clone()))
         .insert(Name::new("curve"));
 
@@ -101,15 +99,13 @@ fn setup(
         VertexAttributeValues::Float32x3(line_vertices),
     );
     commands
-        .spawn(MaterialMeshBundle {
-            mesh: meshes.add(line),
-            material: line_materials.add(LineMaterial {
+        .spawn((
+            Mesh3d(meshes.add(line)),
+            MeshMaterial3d(line_materials.add(LineMaterial {
                 color: LIME_500.into(),
                 ..Default::default()
-            }),
-            // visibility: Visibility::Hidden,
-            ..Default::default()
-        })
+            })),
+        ))
         .insert(SecondCurve(circle.clone()))
         .insert(Name::new("circle"));
 
@@ -213,12 +209,10 @@ fn setup(
     */
 
     let center = Vec3::ZERO;
-    let orth = Camera3dBundle {
-        transform: Transform::from_translation(center + Vec3::new(0., 0., 8.))
-            .looking_at(center, Vec3::Y),
-        ..Default::default()
-    };
-    commands.spawn((orth, PanOrbitCamera::default()));
+    commands.spawn((
+        Transform::from_translation(center + Vec3::new(0., 0., 8.)).looking_at(center, Vec3::Y),
+        PanOrbitCamera::default(),
+    ));
     commands.spawn(InfiniteGridBundle {
         settings: InfiniteGridSettings {
             x_axis_color: Color::BLACK,
@@ -241,8 +235,8 @@ fn update(
     mut gizmos: Gizmos,
 ) {
     let speed = 1.0;
-    let elapsed = time.elapsed_seconds() * speed;
-    let delta = time.delta_seconds() * speed;
+    let elapsed = time.elapsed_secs() * speed;
+    let delta = time.delta_secs() * speed;
 
     set.p1().iter_mut().for_each(|(_, mut tr1)| {
         tr1.rotate_local_z(-delta * 0.25);
@@ -310,8 +304,8 @@ fn update(
         intersections.iter().for_each(|it| {
             let p: Vec3 = it.a().0.coords.to_homogeneous().cast::<f32>().into();
             let normal = (camera_transform.translation - p).normalize();
-            let dir = Dir3::new_unchecked(normal);
-            gizmos.circle(p, dir, 1e-2 * 2.5, Color::WHITE);
+            let _dir = Dir3::new_unchecked(normal);
+            gizmos.circle(p, 1e-2 * 2.5, Color::WHITE);
         });
     }
 }

@@ -40,7 +40,9 @@ The supported features also include finding the closest point on NURBS curves, f
 
 <img src="https://github.com/mattatz/curvo/assets/1085910/55f214ec-668a-4d18-8fa8-bfa5ca23b3a2" width="360px" alt="Iso-curves on a surface" />
 
-<img src="https://github.com/user-attachments/assets/3b739a9f-531c-4264-90ce-a65e426439b3" width="360px" alt="Closest point on surface" />
+<img src="https://github.com/user-attachments/assets/3b739a9f-531c-4264-90ce-a65e426439b3" width="360px" alt="Closest point on a surface" />
+
+<img src="https://github.com/user-attachments/assets/6dc44288-1b21-4040-a49c-fc41d4ca3f45" width="360px" alt="Split a surface" />
 
 ## Usage
 

@@ -1,8 +1,10 @@
 pub mod bounding_box_traversal;
 pub mod bounding_box_tree;
+pub mod curve_bounding_box_tree;
 
 pub use bounding_box_traversal::*;
 pub use bounding_box_tree::*;
+pub use curve_bounding_box_tree::*;
 
 use nalgebra::{
     allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, OVector, U1,

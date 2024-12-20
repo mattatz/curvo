@@ -47,14 +47,14 @@ where
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     let p1 = curve.point_at(start);
-    let p3 = curve.point_at(end);
-
-    let t = 0.5_f64 + 0.2_f64 * rng.gen::<f64>();
     let delta = end - start;
     if delta < T::from_f64(1e-8).unwrap() {
         return vec![p1];
     }
 
+    let p3 = curve.point_at(end);
+
+    let t = 0.5_f64 + 0.2_f64 * rng.gen::<f64>();
     let mid = start + delta * T::from_f64(t).unwrap();
     let p2 = curve.point_at(mid);
 

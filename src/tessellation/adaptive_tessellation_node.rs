@@ -80,7 +80,7 @@ where
     ) -> SurfacePoint<T, DimNameDiff<D, U1>> {
         let derivs = surface.rational_derivatives(uv.x, uv.y, 1);
         let pt = derivs[0][0].clone();
-        let mut norm = derivs[0][1].cross(&derivs[1][0]);
+        let mut norm = derivs[1][0].cross(&derivs[0][1]);
         let degen = norm.magnitude_squared() < T::default_epsilon();
         if !degen {
             norm = norm.normalize();

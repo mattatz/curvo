@@ -14,12 +14,15 @@ use crate::{
         nurbs_curve::{dehomogenize, NurbsCurve, NurbsCurve3D},
         try_interpolate_control_points,
     },
-    misc::{binomial::Binomial, transformable::Transformable, FloatingPoint, Invertible, Ray},
+    misc::{
+        binomial::Binomial, transformable::Transformable, transpose_control_points, FloatingPoint,
+        Invertible, Ray,
+    },
     prelude::{KnotVector, SurfaceTessellation, Tessellation},
     SurfaceClosestParameterNewton, SurfaceClosestParameterProblem,
 };
 
-use super::FlipDirection;
+use super::{FlipDirection, UVDirection};
 
 /// NURBS surface representation
 /// by generics, it can be used for 2D or 3D curves with f32 or f64 scalar types
@@ -97,6 +100,11 @@ where
 
     pub fn control_points(&self) -> &Vec<Vec<OPoint<T, D>>> {
         &self.control_points
+    }
+
+    /// Get the transposed control points
+    pub fn transposed_control_points(&self) -> Vec<Vec<OPoint<T, D>>> {
+        transpose_control_points(&self.control_points)
     }
 
     pub fn dehomogenized_control_points(&self) -> Vec<Vec<OPoint<T, DimNameDiff<D, U1>>>>
@@ -222,8 +230,8 @@ where
             .map(|row| {
                 row.into_iter()
                     .map(|der| {
-                        let v0 = &der[0][1];
-                        let v1 = &der[1][0];
+                        let v0 = &der[1][0];
+                        let v1 = &der[0][1];
                         v0.cross(v1).normalize()
                     })
                     .collect()
@@ -457,7 +465,7 @@ where
         skl
     }
 
-    /// Flip the surface in u or v direction
+    /// Flip the surface in u or v direction or both
     /// # Example
     /// ```
     /// use curvo::prelude::*;
@@ -650,23 +658,22 @@ where
     ///
     /// // Create an iso curve at the start of the u direction
     /// let (start, _) = extruded.u_knots_domain();
-    /// let u_iso = extruded.try_isocurve(start, false).unwrap();
+    /// let u_iso = extruded.try_isocurve(start, UVDirection::U).unwrap();
     /// let (iso_start, iso_end) = u_iso.knots_domain();
     /// assert_relative_eq!(u_iso.point_at(iso_start), Point3::new(1.0, 0.0, 1.0), epsilon = 1e-8);
     /// assert_relative_eq!(u_iso.point_at(iso_end), Point3::new(1.0, 0.0, 1.0), epsilon = 1e-8);
     ///
     /// // Create an iso curve at the start of the v direction
     /// let (start, _) = extruded.v_knots_domain();
-    /// let v_iso = extruded.try_isocurve(start, true).unwrap();
+    /// let v_iso = extruded.try_isocurve(start, UVDirection::V).unwrap();
     /// let (iso_start, iso_end) = v_iso.knots_domain();
     /// assert_relative_eq!(v_iso.point_at(iso_start), Point3::new(1.0, 0.0, 1.0), epsilon = 1e-8);
     /// assert_relative_eq!(v_iso.point_at(iso_end), Point3::new(1.0, 0.0, 0.0), epsilon = 1e-8);
     /// ```
-    pub fn try_isocurve(&self, t: T, v_direction: bool) -> anyhow::Result<NurbsCurve<T, D>> {
-        let (knots, degree) = if v_direction {
-            (self.v_knots.clone(), self.v_degree)
-        } else {
-            (self.u_knots.clone(), self.u_degree)
+    pub fn try_isocurve(&self, t: T, direction: UVDirection) -> anyhow::Result<NurbsCurve<T, D>> {
+        let (knots, degree) = match direction {
+            UVDirection::U => (self.u_knots.clone(), self.u_degree),
+            UVDirection::V => (self.v_knots.clone(), self.v_degree),
         };
 
         let mult = knots.multiplicity();
@@ -692,7 +699,7 @@ where
 
         let refined = if knots_to_insert > 0 {
             let mut refined = self.clone();
-            refined.try_refine_knot(vec![t; knots_to_insert], v_direction)?;
+            refined.try_refine_knot(vec![t; knots_to_insert], direction)?;
             Cow::Owned(refined)
         } else {
             Cow::Borrowed(self)
@@ -701,17 +708,21 @@ where
         let span = if (t - knots.first()).abs() < T::default_epsilon() {
             0
         } else if (t - knots.last()).abs() < T::default_epsilon() {
-            if v_direction {
-                refined.control_points[0].len() - 1
-            } else {
-                refined.control_points.len() - 1
+            match direction {
+                UVDirection::U => refined.control_points.len() - 1,
+                UVDirection::V => refined.control_points[0].len() - 1,
             }
         } else {
             knots.find_knot_span_index(knots.len() - degree - 2, degree, t)
         };
 
-        if v_direction {
-            NurbsCurve::try_new(
+        match direction {
+            UVDirection::U => NurbsCurve::try_new(
+                refined.v_degree,
+                refined.control_points[span].clone(),
+                refined.v_knots.clone().to_vec(),
+            ),
+            UVDirection::V => NurbsCurve::try_new(
                 refined.u_degree,
                 refined
                     .control_points
@@ -719,13 +730,7 @@ where
                     .map(|row| row[span].clone())
                     .collect(),
                 refined.u_knots.clone().to_vec(),
-            )
-        } else {
-            NurbsCurve::try_new(
-                self.v_degree,
-                refined.control_points[span].clone(),
-                refined.v_knots.clone().to_vec(),
-            )
+            ),
         }
     }
 
@@ -734,10 +739,10 @@ where
         let (u_start, u_end) = self.u_knots_domain();
         let (v_start, v_end) = self.v_knots_domain();
         Ok([
-            self.try_isocurve(u_start, false)?,
-            self.try_isocurve(v_start, true)?,
-            self.try_isocurve(u_end, false)?,
-            self.try_isocurve(v_end, true)?,
+            self.try_isocurve(u_start, UVDirection::U)?,
+            self.try_isocurve(v_start, UVDirection::V)?,
+            self.try_isocurve(u_end, UVDirection::U)?,
+            self.try_isocurve(v_end, UVDirection::V)?,
         ])
     }
 
@@ -745,59 +750,58 @@ where
     pub fn try_refine_knot(
         &mut self,
         knots_to_insert: Vec<T>,
-        v_direction: bool,
+        direction: UVDirection,
     ) -> anyhow::Result<()> {
-        if !v_direction {
-            let transpose = |points: &Vec<Vec<OPoint<T, D>>>| -> Vec<Vec<OPoint<T, D>>> {
-                let mut transposed = vec![vec![]; points[0].len()];
-                points.iter().for_each(|row| {
-                    row.iter().enumerate().for_each(|(j, p)| {
-                        transposed[j].push(p.clone());
+        match direction {
+            UVDirection::U => {
+                let refined = self
+                    .transposed_control_points()
+                    .iter()
+                    .map(|row| {
+                        let mut curve = NurbsCurve::try_new(
+                            self.u_degree,
+                            row.clone(),
+                            self.u_knots.clone().to_vec(),
+                        )?;
+                        curve.try_refine_knot(knots_to_insert.clone())?;
+                        Ok(curve)
                     })
-                });
-                transposed
-            };
-            let refined = transpose(&self.control_points)
-                .iter()
-                .map(|row| {
-                    let mut curve = NurbsCurve::try_new(
-                        self.u_degree,
-                        row.clone(),
-                        self.u_knots.clone().to_vec(),
-                    )?;
-                    curve.try_refine_knot(knots_to_insert.clone())?;
-                    Ok(curve)
-                })
-                .collect::<anyhow::Result<Vec<_>>>()?;
+                    .collect::<anyhow::Result<Vec<_>>>()?;
 
-            let u_knots = refined
-                .first()
-                .map(|c| c.knots().clone())
-                .ok_or(anyhow::anyhow!("No curves"))?;
-            self.control_points =
-                transpose(&refined.iter().map(|c| c.control_points().clone()).collect());
-            self.u_knots = u_knots;
-        } else {
-            let refined = self
-                .control_points
-                .iter()
-                .map(|row| {
-                    let mut curve = NurbsCurve::try_new(
-                        self.v_degree,
-                        row.clone(),
-                        self.v_knots.clone().to_vec(),
-                    )?;
-                    curve.try_refine_knot(knots_to_insert.clone())?;
-                    Ok(curve)
-                })
-                .collect::<anyhow::Result<Vec<_>>>()?;
+                let u_knots = refined
+                    .first()
+                    .map(|c| c.knots().clone())
+                    .ok_or(anyhow::anyhow!("No curves"))?;
+                self.control_points = transpose_control_points(
+                    &refined
+                        .iter()
+                        .map(|c| c.control_points().clone())
+                        .collect_vec(),
+                );
+                self.u_knots = u_knots;
+            }
+            UVDirection::V => {
+                let refined = self
+                    .control_points
+                    .iter()
+                    .map(|row| {
+                        let mut curve = NurbsCurve::try_new(
+                            self.v_degree,
+                            row.clone(),
+                            self.v_knots.clone().to_vec(),
+                        )?;
+                        curve.try_refine_knot(knots_to_insert.clone())?;
+                        Ok(curve)
+                    })
+                    .collect::<anyhow::Result<Vec<_>>>()?;
 
-            let v_knots = refined
-                .first()
-                .map(|c| c.knots().clone())
-                .ok_or(anyhow::anyhow!("No curves"))?;
-            self.control_points = refined.iter().map(|c| c.control_points().clone()).collect();
-            self.v_knots = v_knots;
+                let v_knots = refined
+                    .first()
+                    .map(|c| c.knots().clone())
+                    .ok_or(anyhow::anyhow!("No curves"))?;
+                self.control_points = refined.iter().map(|c| c.control_points().clone()).collect();
+                self.v_knots = v_knots;
+            }
         };
 
         Ok(())

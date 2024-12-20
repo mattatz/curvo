@@ -1,13 +1,6 @@
 use std::f64::consts::FRAC_PI_2;
 
-use bevy::{
-    color::palettes::css::{RED, YELLOW},
-    prelude::*,
-    render::{
-        camera::ScalingMode,
-        mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
-    },
-};
+use bevy::{color::palettes::css::RED, prelude::*, render::camera::ScalingMode};
 use bevy_infinite_grid::InfiniteGridPlugin;
 
 use bevy_normal_material::{material::NormalMaterial, plugin::NormalMaterialPlugin};
@@ -16,10 +9,12 @@ use bevy_points::{
     material::PointsShaderSettings, mesh::PointsMesh, plugin::PointsPlugin, prelude::PointsMaterial,
 };
 use materials::*;
+use misc::{add_surface, add_surface_normals};
 use nalgebra::{Point3, Rotation3, Translation3, Vector3};
 
 use curvo::prelude::*;
 mod materials;
+mod misc;
 
 fn main() {
     App::new()
@@ -47,15 +42,13 @@ fn setup(
     mut points_materials: ResMut<Assets<PointsMaterial>>,
     mut normal_materials: ResMut<'_, Assets<NormalMaterial>>,
 ) {
-    let add_surface =
+    let add_surface_tess =
         |surf: &NurbsSurface3D<f64>,
          commands: &mut Commands<'_, '_>,
          meshes: &mut ResMut<'_, Assets<Mesh>>,
          line_materials: &mut ResMut<'_, Assets<LineMaterial>>,
-         normal_materials: &mut ResMut<'_, Assets<NormalMaterial>>,
+         _normal_materials: &mut ResMut<'_, Assets<NormalMaterial>>,
          points_materials: &mut ResMut<'_, Assets<PointsMaterial>>| {
-            let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, default());
-
             let option = AdaptiveTessellationOptions {
                 norm_tolerance: 1e-2,
                 ..Default::default()
@@ -63,95 +56,31 @@ fn setup(
             let tess = surf.tessellate(Some(option));
             let tess = tess.cast::<f32>();
             // let tess = surf.regular_tessellate(32, 32);
-
-            let mut line_list =
-                Mesh::new(bevy::render::mesh::PrimitiveTopology::LineList, default());
-            let normal_length = 0.15;
-            let normals = tess.normals();
-
-            let vertices = tess
-                .points()
-                .iter()
-                .enumerate()
-                .flat_map(|(i, p)| {
-                    let pt: Vec3 = (*p).into();
-                    let normal: Vec3 = normals[i].normalize().into();
-                    [pt, pt + normal * normal_length]
-                })
-                .map(|p| p.to_array())
-                .collect();
-
-            line_list.insert_attribute(
-                Mesh::ATTRIBUTE_POSITION,
-                VertexAttributeValues::Float32x3(vertices),
-            );
-
-            commands
-                .spawn(MaterialMeshBundle {
-                    mesh: meshes.add(line_list),
-                    material: line_materials.add(LineMaterial {
-                        color: YELLOW.into(),
-                        ..Default::default()
-                    }),
-                    // visibility: Visibility::Hidden,
-                    ..Default::default()
-                })
-                .insert(Name::new("normal"));
+            add_surface_normals(&tess, commands, meshes, line_materials);
 
             let points = surf.regular_sample_points(32, 32);
             commands
-                .spawn(MaterialMeshBundle {
-                    mesh: meshes.add(PointsMesh {
-                        vertices: points
-                            .iter()
-                            .flat_map(|row| row.iter().map(|pt| pt.cast::<f32>().into()))
-                            .collect(),
-                        ..Default::default()
-                    }),
-                    material: points_materials.add(PointsMaterial {
+                .spawn((
+                    Mesh3d(
+                        meshes.add(PointsMesh {
+                            vertices: points
+                                .iter()
+                                .flat_map(|row| row.iter().map(|pt| pt.cast::<f32>().into()))
+                                .collect(),
+                            ..Default::default()
+                        }),
+                    ),
+                    MeshMaterial3d(points_materials.add(PointsMaterial {
                         settings: PointsShaderSettings {
                             point_size: 0.05,
                             color: RED.into(),
                             ..Default::default()
                         },
                         ..Default::default()
-                    }),
-                    visibility: Visibility::Hidden,
-                    ..Default::default()
-                })
+                    })),
+                    Visibility::Hidden,
+                ))
                 .insert(Name::new("points"));
-
-            let vertices = tess.points().iter().map(|pt| (*pt).into()).collect();
-            let normals = tess.normals().iter().map(|n| (*n).into()).collect();
-            let uvs = tess.uvs().iter().map(|uv| (*uv).into()).collect();
-            let indices = tess
-                .faces()
-                .iter()
-                .flat_map(|f| f.iter().map(|i| *i as u32))
-                .collect();
-
-            mesh.insert_attribute(
-                Mesh::ATTRIBUTE_POSITION,
-                VertexAttributeValues::Float32x3(vertices),
-            );
-            mesh.insert_attribute(
-                Mesh::ATTRIBUTE_NORMAL,
-                VertexAttributeValues::Float32x3(normals),
-            );
-            mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, VertexAttributeValues::Float32x2(uvs));
-            mesh.insert_indices(Indices::U32(indices));
-
-            commands
-                .spawn(MaterialMeshBundle {
-                    mesh: meshes.add(mesh),
-                    material: normal_materials.add(NormalMaterial {
-                        cull_mode: None,
-                        ..Default::default()
-                    }),
-                    // visibility: Visibility::Hidden,
-                    ..Default::default()
-                })
-                .insert(Name::new("lofted"));
         };
 
     let interpolation_target = vec![
@@ -176,6 +105,13 @@ fn setup(
         &lofted,
         &mut commands,
         &mut meshes,
+        &mut normal_materials,
+        None,
+    );
+    add_surface_tess(
+        &lofted,
+        &mut commands,
+        &mut meshes,
         &mut line_materials,
         &mut normal_materials,
         &mut points_materials,
@@ -189,18 +125,17 @@ fn setup(
         .into();
 
     let scale = 5.;
-    let orth = Camera3dBundle {
-        projection: OrthographicProjection {
+    commands.spawn((
+        Projection::Orthographic(OrthographicProjection {
             scale,
             near: 1e-1,
             far: 1e4,
-            scaling_mode: ScalingMode::FixedVertical(2.0),
-            ..Default::default()
-        }
-        .into(),
-        transform: Transform::from_translation(center + Vec3::new(0., 0., 3.))
-            .looking_at(center, Vec3::Y),
-        ..Default::default()
-    };
-    commands.spawn((orth, PanOrbitCamera::default()));
+            scaling_mode: ScalingMode::FixedVertical {
+                viewport_height: 2.,
+            },
+            ..OrthographicProjection::default_3d()
+        }),
+        Transform::from_translation(center + Vec3::new(0., 0., 3.)).looking_at(center, Vec3::Y),
+        PanOrbitCamera::default(),
+    ));
 }
