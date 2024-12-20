@@ -773,7 +773,10 @@ where
                     .map(|c| c.knots().clone())
                     .ok_or(anyhow::anyhow!("No curves"))?;
                 self.control_points = transpose_control_points(
-                    &refined.iter().map(|c| c.control_points().clone()).collect(),
+                    &refined
+                        .iter()
+                        .map(|c| c.control_points().clone())
+                        .collect_vec(),
                 );
                 self.u_knots = u_knots;
             }

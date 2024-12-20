@@ -225,7 +225,7 @@ fn setup(
     let n: usize = 6;
     let goal = n + degree + 1;
     let knots = KnotVector::uniform(goal - degree * 2, degree);
-    let hn = (n - 1) as f64 / 2.;
+    let _hn = (n - 1) as f64 / 2.;
     let mut rng: rand::rngs::StdRng = rand::SeedableRng::from_seed([0; 32]);
     let pts = (0..n)
         .map(|i| {

@@ -66,8 +66,8 @@ impl Plugin for AppPlugin {
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
-    line_materials: ResMut<Assets<LineMaterial>>,
-    points_materials: ResMut<Assets<PointsMaterial>>,
+    _line_materials: ResMut<Assets<LineMaterial>>,
+    _points_materials: ResMut<Assets<PointsMaterial>>,
     mut normal_materials: ResMut<'_, Assets<NormalMaterial>>,
 ) {
     commands.spawn((
@@ -182,7 +182,7 @@ fn boolean(
                     mesh.insert_attribute(
                         Mesh::ATTRIBUTE_NORMAL,
                         VertexAttributeValues::Float32x3(
-                            tess.vertices().iter().map(|p| [0., 0., 1.]).collect(),
+                            tess.vertices().iter().map(|_p| [0., 0., 1.]).collect(),
                         ),
                     );
                     mesh.insert_indices(Indices::U32(

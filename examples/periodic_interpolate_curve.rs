@@ -60,7 +60,7 @@ fn setup(
     let add_curve_control_points = |curve: &NurbsCurve3D<f64>,
                                     commands: &mut Commands<'_, '_>,
                                     meshes: &mut ResMut<'_, Assets<Mesh>>,
-                                    line_materials: &mut ResMut<'_, Assets<LineMaterial>>,
+                                    _line_materials: &mut ResMut<'_, Assets<LineMaterial>>,
                                     points_materials: &mut ResMut<'_, Assets<PointsMaterial>>,
                                     color: Color| {
         commands

@@ -296,7 +296,7 @@ fn setup(
                     .with_inserted_attribute(
                         Mesh::ATTRIBUTE_NORMAL,
                         VertexAttributeValues::Float32x3(
-                            tess.vertices().iter().map(|p| [0., 0., 1.]).collect(),
+                            tess.vertices().iter().map(|_p| [0., 0., 1.]).collect(),
                         ),
                     )
                     .with_inserted_indices(Indices::U32(

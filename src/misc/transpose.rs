@@ -4,7 +4,7 @@ use super::FloatingPoint;
 
 /// Transpose control points
 pub fn transpose_control_points<T: FloatingPoint, D: DimName>(
-    points: &Vec<Vec<OPoint<T, D>>>,
+    points: &[Vec<OPoint<T, D>>],
 ) -> Vec<Vec<OPoint<T, D>>>
 where
     DefaultAllocator: Allocator<D>,

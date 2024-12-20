@@ -304,7 +304,7 @@ fn update(
         intersections.iter().for_each(|it| {
             let p: Vec3 = it.a().0.coords.to_homogeneous().cast::<f32>().into();
             let normal = (camera_transform.translation - p).normalize();
-            let dir = Dir3::new_unchecked(normal);
+            let _dir = Dir3::new_unchecked(normal);
             gizmos.circle(p, 1e-2 * 2.5, Color::WHITE);
         });
     }

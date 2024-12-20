@@ -130,7 +130,7 @@ fn update_ui(mut contexts: EguiContexts, mut settings: ResMut<Setting>) {
         .min_width(420.)
         .max_width(420.)
         .show(contexts.ctx_mut(), |ui| {
-            let response = egui::ComboBox::from_label("split direction")
+            egui::ComboBox::from_label("split direction")
                 .selected_text(format!("{:?}", settings.direction))
                 .show_ui(ui, |ui| {
                     ui.selectable_value(&mut settings.direction, UVDirection::U, "U");
