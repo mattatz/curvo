@@ -45,7 +45,8 @@ where
             uvs: Default::default(),
         };
 
-        nodes.iter().for_each(|node| {
+        // Triangulate only leaf nodes
+        nodes.iter().filter(|n| n.is_leaf()).for_each(|node| {
             tess.triangulate(surface, nodes, node);
         });
 
