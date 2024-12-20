@@ -14,7 +14,7 @@ pub enum Degeneracy<T: FloatingPoint> {
 }
 
 impl<T: FloatingPoint> Degeneracy<T> {
-    pub fn new<I: HasIntersectionParameter<T>>(
+    pub fn new<I: HasIntersectionParameter<T, T>>(
         it: &I,
         a: &NurbsCurve<T, Const<3>>,
         b: &NurbsCurve<T, Const<3>>,
@@ -67,7 +67,7 @@ mod tests {
         a: &NurbsCurve<T, Const<3>>,
         b: &NurbsCurve<T, Const<3>>,
         option: Option<CurveIntersectionSolverOptions<T>>,
-    ) -> anyhow::Result<Vec<CurveIntersection<Point2<T>, T>>> {
+    ) -> anyhow::Result<Vec<CurveCurveIntersection<Point2<T>, T>>> {
         let intersections = a.find_intersections(b, option.clone())?;
         let n = intersections.len();
 

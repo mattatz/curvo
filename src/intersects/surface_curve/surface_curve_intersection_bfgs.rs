@@ -1,12 +1,14 @@
 use argmin::{argmin_error_closure, core::*, float};
-use nalgebra::{Matrix2, Vector2};
+use nalgebra::Matrix3;
 
 use crate::misc::FloatingPoint;
 
-/// Customized quasi-Newton's method for finding the intersections between NURBS curves
+use super::{SurfaceCurveGradient, SurfaceCurveParam};
+
+/// Customized quasi-Newton's method for finding the intersections between NURBS surface & curve
 /// Original source: https://argmin-rs.github.io/argmin/argmin/solver/newton/struct.Newton.html
 #[derive(Clone, Copy)]
-pub struct CurveIntersectionBFGS<F> {
+pub struct SurfaceCurveIntersectionBFGS<F> {
     /// Tolerance for the step size in the line search
     step_size_tolerance: F,
 
@@ -14,7 +16,7 @@ pub struct CurveIntersectionBFGS<F> {
     cost_tolerance: F,
 }
 
-impl<F> Default for CurveIntersectionBFGS<F>
+impl<F> Default for SurfaceCurveIntersectionBFGS<F>
 where
     F: FloatingPoint,
 {
@@ -26,7 +28,7 @@ where
     }
 }
 
-impl<F> CurveIntersectionBFGS<F>
+impl<F> SurfaceCurveIntersectionBFGS<F>
 where
     F: FloatingPoint,
 {
@@ -46,11 +48,14 @@ where
     }
 }
 
-impl<O, F> Solver<O, IterState<Vector2<F>, Vector2<F>, (), Matrix2<F>, (), F>>
-    for CurveIntersectionBFGS<F>
+type SurfaceCurveIterState<F> =
+    IterState<SurfaceCurveParam<F>, SurfaceCurveGradient<F>, (), Matrix3<F>, (), F>;
+
+// TODO: commonize this with CurveIntersectionBFGS
+impl<O, F> Solver<O, SurfaceCurveIterState<F>> for SurfaceCurveIntersectionBFGS<F>
 where
-    O: Gradient<Param = Vector2<F>, Gradient = Vector2<F>>
-        + CostFunction<Param = Vector2<F>, Output = F>,
+    O: Gradient<Param = SurfaceCurveParam<F>, Gradient = SurfaceCurveGradient<F>>
+        + CostFunction<Param = SurfaceCurveParam<F>, Output = F>,
     F: FloatingPoint + ArgminFloat,
 {
     const NAME: &'static str = "Curve intersection newton method with line search";
@@ -58,14 +63,8 @@ where
     fn init(
         &mut self,
         problem: &mut Problem<O>,
-        state: IterState<Vector2<F>, Vector2<F>, (), Matrix2<F>, (), F>,
-    ) -> Result<
-        (
-            IterState<Vector2<F>, Vector2<F>, (), Matrix2<F>, (), F>,
-            Option<KV>,
-        ),
-        Error,
-    > {
+        state: SurfaceCurveIterState<F>,
+    ) -> Result<(SurfaceCurveIterState<F>, Option<KV>), Error> {
         let x0 = state.get_param().ok_or_else(argmin_error_closure!(
             NotInitialized,
             concat!(
@@ -81,14 +80,8 @@ where
     fn next_iter(
         &mut self,
         problem: &mut Problem<O>,
-        state: IterState<Vector2<F>, Vector2<F>, (), Matrix2<F>, (), F>,
-    ) -> Result<
-        (
-            IterState<Vector2<F>, Vector2<F>, (), Matrix2<F>, (), F>,
-            Option<KV>,
-        ),
-        Error,
-    > {
+        state: SurfaceCurveIterState<F>,
+    ) -> Result<(SurfaceCurveIterState<F>, Option<KV>), Error> {
         let x0 = state.get_param().ok_or_else(argmin_error_closure!(
             NotInitialized,
             concat!(
@@ -104,8 +97,7 @@ where
             None => problem.gradient(x0)?,
         };
 
-        let h0 = state.get_hessian().cloned().unwrap_or(Matrix2::identity());
-        // println!("cost: {:?}, hessian: {:?}", &f0, &h0);
+        let h0 = state.get_hessian().cloned().unwrap_or(Matrix3::identity());
 
         // line search
         let step = -h0 * g0;
@@ -166,16 +158,13 @@ where
         ))
     }
 
-    fn terminate(
-        &mut self,
-        state: &IterState<Vector2<F>, Vector2<F>, (), Matrix2<F>, (), F>,
-    ) -> TerminationStatus {
+    fn terminate(&mut self, state: &SurfaceCurveIterState<F>) -> TerminationStatus {
         if state.iter > state.max_iters {
             return TerminationStatus::Terminated(TerminationReason::MaxItersReached);
         }
 
         if let Some(g) = state.get_gradient() {
-            if g.x.is_nan() || g.y.is_nan() || g.x.is_infinite() || g.y.is_infinite() {
+            if g.iter().any(|v| v.is_nan() || v.is_infinite()) {
                 return TerminationStatus::Terminated(TerminationReason::SolverExit(
                     "gradient is NaN or infinite".into(),
                 ));
@@ -183,15 +172,8 @@ where
         }
 
         if let Some(h) = state.get_hessian() {
-            if h[(0, 0)].is_nan()
-                || h[(0, 1)].is_nan()
-                || h[(1, 0)].is_nan()
-                || h[(1, 1)].is_nan()
-                || h[(0, 0)].is_infinite()
-                || h[(0, 1)].is_infinite()
-                || h[(1, 0)].is_infinite()
-                || h[(1, 1)].is_infinite()
-            {
+            let has_nan = h.iter().any(|&v| v.is_nan() || v.is_infinite());
+            if has_nan {
                 return TerminationStatus::Terminated(TerminationReason::SolverExit(
                     "hessian is NaN or infinite".into(),
                 ));

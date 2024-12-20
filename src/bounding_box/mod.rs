@@ -1,17 +1,22 @@
 pub mod bounding_box_traversal;
 pub mod bounding_box_tree;
 pub mod curve_bounding_box_tree;
+pub mod surface_bounding_box_tree;
 
 pub use bounding_box_traversal::*;
 pub use bounding_box_tree::*;
 pub use curve_bounding_box_tree::*;
+pub use surface_bounding_box_tree::*;
 
 use nalgebra::{
     allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, OVector, U1,
 };
 use simba::scalar::SupersetOf;
 
-use crate::{curve::nurbs_curve::NurbsCurve, misc::FloatingPoint, region::CompoundCurve};
+use crate::{
+    curve::nurbs_curve::NurbsCurve, misc::FloatingPoint, region::CompoundCurve,
+    surface::NurbsSurface,
+};
 
 /// A struct representing a bounding box in D space.
 #[derive(Clone, Debug)]
@@ -212,5 +217,19 @@ where
             .iter()
             .flat_map(|span| span.dehomogenized_control_points());
         Self::from_iter(pts)
+    }
+}
+
+impl<'a, T: FloatingPoint, D: DimName> From<&'a NurbsSurface<T, D>>
+    for BoundingBox<T, DimNameDiff<D, U1>>
+where
+    DefaultAllocator: Allocator<D>,
+    D: DimNameSub<U1>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+{
+    fn from(value: &'a NurbsSurface<T, D>) -> Self {
+        let pts = value.dehomogenized_control_points();
+        let flatten = pts.into_iter().flatten();
+        Self::new_with_points(flatten)
     }
 }

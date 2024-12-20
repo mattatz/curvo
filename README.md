@@ -44,6 +44,8 @@ The supported features also include finding the closest point on NURBS curves, f
 
 <img src="https://github.com/user-attachments/assets/6dc44288-1b21-4040-a49c-fc41d4ca3f45" width="360px" alt="Split a surface" />
 
+<img src="https://github.com/user-attachments/assets/4117250d-582e-4bee-84b7-976f27739f9d" width="360px" alt="Surface & curve intersections" />
+
 ## Usage
 
 ```rust

@@ -59,7 +59,34 @@ pub fn surface_2_mesh(
     let tess = tess.cast::<f32>();
 
     let vertices = tess.points().iter().map(|pt| (*pt).into()).collect();
-    let normals = tess.normals().iter().map(|n| (-n).into()).collect();
+    let normals = tess.normals().iter().map(|n| (*n).into()).collect();
+    let uvs = tess.uvs().iter().map(|uv| (*uv).into()).collect();
+    let indices = tess
+        .faces()
+        .iter()
+        .flat_map(|f| f.iter().map(|i| *i as u32))
+        .collect();
+
+    Mesh::new(PrimitiveTopology::TriangleList, default())
+        .with_inserted_attribute(
+            Mesh::ATTRIBUTE_POSITION,
+            VertexAttributeValues::Float32x3(vertices),
+        )
+        .with_inserted_attribute(
+            Mesh::ATTRIBUTE_NORMAL,
+            VertexAttributeValues::Float32x3(normals),
+        )
+        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, VertexAttributeValues::Float32x2(uvs))
+        .with_inserted_indices(Indices::U32(indices))
+}
+
+#[allow(unused)]
+pub fn surface_2_regular_mesh(surface: &NurbsSurface3D<f64>, divs_u: usize, divs_v: usize) -> Mesh {
+    let tess = surface.regular_tessellate(divs_u, divs_v);
+    let tess = tess.cast::<f32>();
+
+    let vertices = tess.points().iter().map(|pt| (*pt).into()).collect();
+    let normals = tess.normals().iter().map(|n| (*n).into()).collect();
     let uvs = tess.uvs().iter().map(|uv| (*uv).into()).collect();
     let indices = tess
         .faces()
@@ -116,7 +143,7 @@ pub fn add_surface(
     );
 
     let vertices = tess.points().iter().map(|pt| (*pt).into()).collect();
-    let normals = tess.normals().iter().map(|n| (-n).into()).collect();
+    let normals = tess.normals().iter().map(|n| (*n).into()).collect();
     let uvs = tess.uvs().iter().map(|uv| (*uv).into()).collect();
     let indices = tess
         .faces()

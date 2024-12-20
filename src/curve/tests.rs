@@ -3,7 +3,7 @@ use nalgebra::{Point2, Rotation2, Translation2};
 use crate::{
     curve::NurbsCurve2D,
     misc::Transformable,
-    prelude::{CurveIntersectionSolverOptions, Intersection},
+    prelude::{CurveIntersectionSolverOptions, Intersects},
 };
 
 use super::KnotStyle;

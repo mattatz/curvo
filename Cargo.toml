@@ -1,6 +1,6 @@
 [package]
 name = "curvo"
-version = "0.1.40"
+version = "0.1.41"
 authors = ["Masatatsu Nakamura <masatatsu.nakamura@gmail.com"]
 edition = "2021"
 keywords = ["nurbs", "modeling", "graphics", "3d"]
@@ -134,6 +134,11 @@ required-features = ["bevy"]
 [[example]]
 name = "intersect_curves"
 path = "examples/intersect_curves.rs"
+required-features = ["bevy"]
+
+[[example]]
+name = "intersect_surface_curve"
+path = "examples/intersect_surface_curve.rs"
 required-features = ["bevy"]
 
 [[example]]

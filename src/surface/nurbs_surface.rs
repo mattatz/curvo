@@ -93,9 +93,22 @@ where
         self.v_knots.domain(self.v_degree)
     }
 
+    pub fn knots_domain_at(&self, direction: UVDirection) -> (T, T) {
+        match direction {
+            UVDirection::U => self.u_knots_domain(),
+            UVDirection::V => self.v_knots_domain(),
+        }
+    }
+
     /// Get the u and v domain of the knot vector by degree
     pub fn knots_domain(&self) -> ((T, T), (T, T)) {
         (self.u_knots_domain(), self.v_knots_domain())
+    }
+
+    /// Get the u and v domain interval of the knot vector by degree
+    pub fn knots_domain_interval(&self) -> (T, T) {
+        let (u, v) = self.knots_domain();
+        (u.1 - u.0, v.1 - v.0)
     }
 
     pub fn control_points(&self) -> &Vec<Vec<OPoint<T, D>>> {

@@ -10,6 +10,16 @@ pub enum UVDirection {
     V,
 }
 
+impl UVDirection {
+    /// Get the opposite direction.
+    pub fn opposite(&self) -> Self {
+        match self {
+            Self::U => Self::V,
+            Self::V => Self::U,
+        }
+    }
+}
+
 /// The direction to flip the surface.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FlipDirection {
