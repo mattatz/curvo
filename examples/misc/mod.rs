@@ -5,8 +5,7 @@ use bevy::{
 };
 use bevy_normal_material::prelude::NormalMaterial;
 use curvo::prelude::{
-    AdaptiveTessellationOptions, NurbsCurve3D, NurbsSurface, NurbsSurface3D, SurfaceTessellation3D,
-    Tessellation,
+    AdaptiveTessellationOptions, NurbsCurve3D, NurbsSurface3D, SurfaceTessellation3D, Tessellation,
 };
 
 use crate::LineMaterial;

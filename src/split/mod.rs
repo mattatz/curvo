@@ -3,7 +3,6 @@ use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, Dim
 
 use crate::{
     curve::NurbsCurve,
-    knot,
     misc::{transpose_control_points, FloatingPoint},
     surface::{NurbsSurface, UVDirection},
 };

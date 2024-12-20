@@ -1,19 +1,14 @@
 use std::f64::consts::FRAC_PI_2;
 
-use bevy::{
-    color::palettes::css::{SALMON, TOMATO},
-    prelude::*,
-    render::mesh::{PrimitiveTopology, VertexAttributeValues},
-};
+use bevy::{prelude::*, render::mesh::PrimitiveTopology};
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 
 use bevy_normal_material::{plugin::NormalMaterialPlugin, prelude::NormalMaterial};
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
-use bevy_points::plugin::PointsPlugin;
 use materials::*;
 use misc::surface_2_mesh;
-use nalgebra::{Point2, Point3, Rotation3, Translation3, Vector2, Vector3};
+use nalgebra::{Point3, Rotation3, Translation3, Vector3};
 
 use curvo::prelude::*;
 mod materials;
@@ -115,7 +110,7 @@ fn split_animation(
     };
     let t = rng.0 + (rng.1 - rng.0) * (0.5 + 0.5 * sec.sin());
     let option = SplitSurfaceOption::new(t, direction);
-    let (s0, s1) = profile.0.try_split(option).unwrap();
+    let (s0, _s1) = profile.0.try_split(option).unwrap();
     let first = first.single();
     let mesh = surface_2_mesh(
         &s0,
