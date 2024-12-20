@@ -1,19 +1,29 @@
 use std::f32::consts::FRAC_PI_2;
 
 use bevy::{
-    color::palettes::{css::TOMATO, tailwind::LIME_500},
+    color::palettes::{
+        css::{TOMATO, WHITE},
+        tailwind::LIME_500,
+    },
     prelude::*,
     render::mesh::{PrimitiveTopology, VertexAttributeValues},
 };
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin, InfiniteGridSettings};
 
+use bevy_normal_material::{plugin::NormalMaterialPlugin, prelude::NormalMaterial};
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
-use bevy_points::{plugin::PointsPlugin, prelude::PointsMaterial};
-use nalgebra::{Point2, Rotation2, Translation2, Vector2};
+use bevy_points::{
+    material::PointsShaderSettings, mesh::PointsMesh, plugin::PointsPlugin, prelude::PointsMaterial,
+};
+use misc::surface_2_mesh;
+use nalgebra::{
+    Matrix4, Point2, Point3, Rotation2, Rotation3, Translation2, Translation3, Vector2, Vector3,
+};
 
 use curvo::prelude::*;
 
 mod materials;
+mod misc;
 
 use materials::*;
 
@@ -26,6 +36,7 @@ fn main() {
             }),
             ..Default::default()
         }))
+        .add_plugins(NormalMaterialPlugin)
         .add_plugins(LineMaterialPlugin)
         .add_plugins(InfiniteGridPlugin)
         .add_plugins(PanOrbitCameraPlugin)
@@ -42,50 +53,36 @@ impl Plugin for AppPlugin {
 }
 
 #[derive(Component)]
-struct FirstCurve(pub NurbsCurve2D<f64>);
+struct IntersectionSurface(pub NurbsSurface3D<f64>);
 
 #[derive(Component)]
-struct SecondCurve(pub NurbsCurve2D<f64>);
+struct IntersectionCurve(pub NurbsCurve3D<f64>);
 
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
+    mut normal_materials: ResMut<Assets<NormalMaterial>>,
     mut line_materials: ResMut<Assets<LineMaterial>>,
     _points_materials: ResMut<Assets<PointsMaterial>>,
 ) {
-    let points = vec![
-        Point2::new(-1.0, -1.0),
-        Point2::new(1.0, -1.0),
-        Point2::new(1.0, 0.0),
-        Point2::new(-1.0, 0.0),
-        Point2::new(-1.0, 1.0),
-        Point2::new(1.0, 1.0),
-    ];
-    let curve = NurbsCurve2D::try_interpolate(&points, 3).unwrap();
+    let profile =
+        NurbsCurve3D::polyline(&[Point3::new(-2., 0., -2.), Point3::new(2., 0., -2.)], true);
+    let surface = NurbsSurface::extrude(&profile, &(Vector3::z() * 4.));
 
-    let line_vertices = curve
-        .tessellate(Some(1e-8))
-        .iter()
-        .map(|p| p.cast::<f32>())
-        .map(|p| [p.x, p.y, 0.])
-        .collect();
-    let line = Mesh::new(PrimitiveTopology::LineStrip, default()).with_inserted_attribute(
-        Mesh::ATTRIBUTE_POSITION,
-        VertexAttributeValues::Float32x3(line_vertices),
-    );
-    commands
-        .spawn((
-            Mesh3d(meshes.add(line)),
-            MeshMaterial3d(line_materials.add(LineMaterial {
-                color: TOMATO.into(),
-                ..Default::default()
-            })),
-        ))
-        .insert(FirstCurve(curve.clone()))
-        .insert(Name::new("curve"));
+    commands.spawn((
+        Mesh3d(meshes.add(surface_2_mesh(&surface, None))),
+        MeshMaterial3d(normal_materials.add(NormalMaterial {
+            opacity: 0.35,
+            cull_mode: None,
+            alpha_mode: AlphaMode::Blend,
+            ..Default::default()
+        })),
+        IntersectionSurface(surface.clone()),
+    ));
 
     let circle =
-        NurbsCurve2D::try_circle(&Point2::origin(), &Vector2::x(), &Vector2::y(), 1.).unwrap();
+        NurbsCurve3D::try_circle(&Point3::new(0., 0., 0.), &Vector3::x(), &Vector3::y(), 1.)
+            .unwrap();
 
     let line_vertices = circle
         .tessellate(Some(1e-8))
@@ -97,19 +94,19 @@ fn setup(
         Mesh::ATTRIBUTE_POSITION,
         VertexAttributeValues::Float32x3(line_vertices),
     );
-    commands
-        .spawn((
-            Mesh3d(meshes.add(line)),
-            MeshMaterial3d(line_materials.add(LineMaterial {
-                color: LIME_500.into(),
-                ..Default::default()
-            })),
-        ))
-        .insert(SecondCurve(circle.clone()))
-        .insert(Name::new("circle"));
+    commands.spawn((
+        Mesh3d(meshes.add(line)),
+        MeshMaterial3d(line_materials.add(LineMaterial {
+            color: TOMATO.into(),
+            ..Default::default()
+        })),
+        IntersectionCurve(circle.clone()),
+    ));
 
     /*
-    let traversed = BoundingBoxTraversal::try_traverse(&curve, &circle, None, None);
+    let ta = SurfaceBoundingBoxTree::new(&surface, UVDirection::U, None);
+    let tb = CurveBoundingBoxTree::new(&circle, None);
+    let traversed = BoundingBoxTraversal::try_traverse(ta, tb);
     if let Ok(traversed) = traversed {
         let n = traversed.pairs_iter().count();
         traversed
@@ -139,77 +136,48 @@ fn setup(
                         VertexAttributeValues::Float32x3(vertices),
                     );
                 commands
-                    .spawn(MaterialMeshBundle {
-                        mesh: meshes.add(line),
-                        material: line_materials.add(LineMaterial {
+                    .spawn((
+                        Mesh3d(meshes.add(line)),
+                        MeshMaterial3d(line_materials.add(LineMaterial {
                             // color: Color::WHITE,
                             color,
                             opacity: 0.5,
                             alpha_mode: AlphaMode::Blend,
-                        }),
-                        // visibility: Visibility::Hidden,
-                        ..Default::default()
-                    })
+                        })),
+                    ))
                     .insert(Name::new("bounding box"));
-
-                [a.curve(), b.curve()].iter().for_each(|curve| {
-                    let line_vertices = curve
-                        .tessellate(Some(1e-8))
-                        .iter()
-                        .map(|p| p.cast::<f32>())
-                        .map(|p| [p.x, p.y, 0.])
-                        .collect();
-                    let line = Mesh::new(PrimitiveTopology::LineStrip, default())
-                        .with_inserted_attribute(
-                            Mesh::ATTRIBUTE_POSITION,
-                            VertexAttributeValues::Float32x3(line_vertices),
-                        );
-                    commands
-                        .spawn(MaterialMeshBundle {
-                            mesh: meshes.add(line),
-                            material: line_materials.add(LineMaterial {
-                                color: Color::WHITE,
-                                ..Default::default()
-                            }),
-                            // visibility: Visibility::Hidden,
-                            ..Default::default()
-                        })
-                        .insert(Name::new("segment"));
-                });
             });
     }
-        */
+    */
 
     /*
-    let intersections = curve.find_intersections(&circle, None);
+    let intersections = surface.find_intersections(&circle, None);
     if let Ok(intersections) = intersections {
-        commands
-            .spawn(MaterialMeshBundle {
-                mesh: meshes.add(PointsMesh::from_iter(intersections.iter().flat_map(|it| {
+        commands.spawn((
+            Mesh3d(
+                meshes.add(PointsMesh::from_iter(intersections.iter().flat_map(|it| {
                     [
-                        Vec3::from(it.a().0.cast::<f32>().coords.to_homogeneous()),
-                        Vec3::from(it.b().0.cast::<f32>().coords.to_homogeneous()),
+                        Vec3::from(it.a().0.cast::<f32>()),
+                        Vec3::from(it.b().0.cast::<f32>()),
                     ]
                 }))),
-                material: points_materials.add(PointsMaterial {
-                    settings: PointsShaderSettings {
-                        point_size: 0.025,
-                        color: Color::WHITE,
-                        ..Default::default()
-                    },
-                    circle: true,
+            ),
+            MeshMaterial3d(points_materials.add(PointsMaterial {
+                settings: PointsShaderSettings {
+                    point_size: 0.025,
+                    color: WHITE.into(),
                     ..Default::default()
-                }),
-                // visibility: Visibility::Hidden,
+                },
+                circle: true,
                 ..Default::default()
-            })
-            .insert(Name::new("intersection points"));
+            })),
+        ));
     }
     */
 
     let center = Vec3::ZERO;
     commands.spawn((
-        Transform::from_translation(center + Vec3::new(0., 0., 8.)).looking_at(center, Vec3::Y),
+        Transform::from_translation(center + Vec3::new(3., 3., 3.)).looking_at(center, Vec3::Y),
         PanOrbitCamera::default(),
     ));
     commands.spawn(InfiniteGridBundle {
@@ -228,8 +196,8 @@ fn update(
     time: Res<Time>,
     mut set: ParamSet<(
         Query<&Transform, With<Camera>>,
-        Query<(&FirstCurve, &mut Transform), With<FirstCurve>>,
-        Query<(&SecondCurve, &mut Transform), With<SecondCurve>>,
+        Query<(&IntersectionSurface, &mut Transform), With<IntersectionSurface>>,
+        Query<(&IntersectionCurve, &mut Transform), With<IntersectionCurve>>,
     )>,
     mut gizmos: Gizmos,
 ) {
@@ -241,26 +209,30 @@ fn update(
         tr1.rotate_local_z(-delta * 0.25);
     });
     set.p2().iter_mut().for_each(|(_, mut tr2)| {
-        let x = elapsed.cos() * 1.25;
-        let y = elapsed.sin() * 1.25;
+        let x = elapsed.cos() * 1.5;
+        let y = elapsed.sin() * 1.5;
         *tr2 = tr2.with_translation(Vec3::new(x, y, 0.));
+        tr2.rotate_local_x(delta * 1.0);
     });
 
-    let c1 = set
+    let transformed_surface = set
         .p1()
         .iter()
-        .map(|(c1, tr1)| {
-            let trans1 = Rotation2::new(tr1.rotation.to_euler(EulerRot::XYZ).2);
-            c1.0.transformed(&trans1.cast::<f64>().into())
+        .map(|(s, tr)| {
+            let mat = tr.compute_matrix();
+            let m = Matrix4::from(mat);
+            s.0.transformed(&m.cast::<f64>().into())
         })
         .next()
         .unwrap();
-    let c2 = set
+
+    let transformed_curve = set
         .p2()
         .iter()
-        .map(|(c2, tr2)| {
-            let trans2 = Translation2::new(tr2.translation.x, tr2.translation.y);
-            c2.0.transformed(&trans2.cast::<f64>().into())
+        .map(|(c2, tr)| {
+            let mat = tr.compute_matrix();
+            let m = Matrix4::from(mat);
+            c2.0.transformed(&m.cast::<f64>().into())
         })
         .next()
         .unwrap();
@@ -296,13 +268,13 @@ fn update(
     */
 
     let p0 = set.p0();
-    let camera_transform = p0.single();
+    let camera_position = p0.single().translation;
 
-    let intersections = c1.find_intersections(&c2, None);
+    let intersections = transformed_surface.find_intersections(&transformed_curve, None);
     if let Ok(intersections) = intersections {
         intersections.iter().for_each(|it| {
-            let p: Vec3 = it.a().0.coords.to_homogeneous().cast::<f32>().into();
-            let normal = (camera_transform.translation - p).normalize();
+            let p: Vec3 = it.a().0.cast::<f32>().into();
+            let normal = (camera_position - p).normalize();
             let _dir = Dir3::new_unchecked(normal);
             gizmos.circle(p, 1e-2 * 2.5, Color::WHITE);
         });

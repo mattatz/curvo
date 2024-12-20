@@ -134,15 +134,8 @@ where
             .coalesce(|x, y| {
                 let x0 = &x[x.len() - 1];
                 let y0 = &y[y.len() - 1];
-                let xs = x0.a().1;
-                let ys = y0.a().1;
-                let da0 = Float::abs(xs.0 - ys.0);
-                let da1 = Float::abs(xs.1 - ys.1);
                 let db = Float::abs(x0.b().1 - y0.b().1);
-                if da0 < parameter_minimum_distance
-                    || da1 < parameter_minimum_distance
-                    || db < parameter_minimum_distance
-                {
+                if db < parameter_minimum_distance {
                     // merge near parameter results
                     let group = [x, y].concat();
                     Ok(group)
