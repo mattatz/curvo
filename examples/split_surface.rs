@@ -29,7 +29,13 @@ impl Default for Setting {
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                resolution: (640., 480.).into(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }))
         .add_plugins(InfiniteGridPlugin)
         .add_plugins(PanOrbitCameraPlugin)
         .add_plugins(NormalMaterialPlugin)
@@ -87,7 +93,7 @@ fn setup(
     ));
 
     commands.spawn((
-        Transform::from_translation(Vec3::new(0., 2.5, 10.)),
+        Transform::from_translation(Vec3::new(5., 5., 5.)),
         PanOrbitCamera::default(),
     ));
     commands.spawn(InfiniteGridBundle::default());
@@ -103,7 +109,7 @@ fn split_animation(
     let profile = profile.single();
     let direction = setting.direction;
     let (u, v) = profile.0.knots_domain();
-    let sec = time.elapsed_secs_f64();
+    let sec = time.elapsed_secs_f64() * 2.;
     let rng = match direction {
         UVDirection::U => u,
         UVDirection::V => v,
