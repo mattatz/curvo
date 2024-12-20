@@ -5,7 +5,7 @@ mod bounding_box;
 mod closest_parameter;
 mod contains;
 mod curve;
-mod intersection;
+mod intersects;
 mod knot;
 mod misc;
 mod polygon_mesh;
@@ -21,7 +21,7 @@ pub mod prelude {
     pub use crate::bounding_box::*;
     pub use crate::contains::*;
     pub use crate::curve::*;
-    pub use crate::intersection::*;
+    pub use crate::intersects::*;
     pub use crate::knot::*;
     pub use crate::misc::*;
     pub use crate::polygon_mesh::*;

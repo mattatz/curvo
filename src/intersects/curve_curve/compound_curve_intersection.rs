@@ -4,9 +4,13 @@ use nalgebra::{
     allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, U1,
 };
 
-use crate::{curve::NurbsCurve, misc::FloatingPoint};
+use crate::{
+    curve::NurbsCurve,
+    misc::FloatingPoint,
+    prelude::{HasIntersection, HasIntersectionParameter},
+};
 
-use super::{has_intersection::HasIntersection, CurveIntersection, HasIntersectionParameter};
+use super::CurveCurveIntersection;
 
 type Intersection<'a, T, D> = (Cow<'a, NurbsCurve<T, D>>, OPoint<T, DimNameDiff<D, U1>>, T);
 
@@ -31,7 +35,7 @@ where
     pub fn new(
         a: &'a NurbsCurve<T, D>,
         b: &'a NurbsCurve<T, D>,
-        intersection: CurveIntersection<OPoint<T, DimNameDiff<D, U1>>, T>,
+        intersection: CurveCurveIntersection<OPoint<T, DimNameDiff<D, U1>>, T>,
     ) -> Self {
         let ((pa, ta), (pb, tb)) = intersection.as_tuple();
         Self {

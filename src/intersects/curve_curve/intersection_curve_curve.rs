@@ -11,12 +11,12 @@ use num_traits::Float;
 use crate::{
     curve::NurbsCurve,
     misc::FloatingPoint,
-    prelude::{BoundingBoxTraversal, CurveBoundingBoxTree},
+    prelude::{BoundingBoxTraversal, CurveBoundingBoxTree, HasIntersection, Intersects},
 };
 
 use super::{
-    CurveIntersection, CurveIntersectionBFGS, CurveIntersectionProblem,
-    CurveIntersectionSolverOptions, HasIntersection, Intersects,
+    CurveCurveIntersection, CurveIntersectionBFGS, CurveIntersectionProblem,
+    CurveIntersectionSolverOptions,
 };
 
 impl<'a, T, D> Intersects<'a, &'a NurbsCurve<T, D>> for NurbsCurve<T, D>
@@ -26,7 +26,7 @@ where
     DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
-    type Output = anyhow::Result<Vec<CurveIntersection<OPoint<T, DimNameDiff<D, U1>>, T>>>;
+    type Output = anyhow::Result<Vec<CurveCurveIntersection<OPoint<T, DimNameDiff<D, U1>>, T>>>;
     type Option = Option<CurveIntersectionSolverOptions<T>>;
 
     /// Find the intersection points with another curve by gauss-newton line search
@@ -142,7 +142,7 @@ where
                             {
                                 let p0 = self.point_at(param[0]);
                                 let p1 = other.point_at(param[1]);
-                                Some(CurveIntersection::new((p0, param[0]), (p1, param[1])))
+                                Some(CurveCurveIntersection::new((p0, param[0]), (p1, param[1])))
                             } else {
                                 None
                             }
@@ -188,7 +188,7 @@ where
                     Err((x, y))
                 }
             })
-            .collect::<Vec<Vec<CurveIntersection<OPoint<T, DimNameDiff<D, U1>>, T>>>>()
+            .collect::<Vec<Vec<CurveCurveIntersection<OPoint<T, DimNameDiff<D, U1>>, T>>>>()
             .into_iter()
             .collect_vec();
 

@@ -1,6 +1,6 @@
 use super::{has_intersection::HasIntersection, HasIntersectionParameter};
 
-/// A struct representing the intersection of two curves.
+/// A struct representing the intersection of two objects.
 #[derive(Debug, Clone)]
 pub struct Intersection<P, T0, T1> {
     /// The point & parameter of the first object at the intersection.
@@ -43,5 +43,5 @@ impl<P, T0: Clone + Copy, T1: Clone + Copy> HasIntersection<(P, T0), (P, T1), T0
     }
 }
 
-/// A struct representing the intersection of two curves.
-pub type CurveIntersection<P, T> = Intersection<P, T, T>;
+/// A struct representing the intersection of surface & curve.
+pub type SurfaceCurveIntersection<P, T> = Intersection<P, (T, T), T>;

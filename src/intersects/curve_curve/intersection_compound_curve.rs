@@ -3,11 +3,14 @@ use itertools::Itertools;
 use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, U1};
 use num_traits::Float;
 
-use crate::{curve::NurbsCurve, misc::FloatingPoint, region::CompoundCurve};
-
-use super::{
-    CompoundCurveIntersection, CurveIntersectionSolverOptions, HasIntersection, Intersects,
+use crate::{
+    curve::NurbsCurve,
+    misc::FloatingPoint,
+    prelude::{HasIntersection, Intersects},
+    region::CompoundCurve,
 };
+
+use super::{CompoundCurveIntersection, CurveIntersectionSolverOptions};
 
 impl<'a, T, D> Intersects<'a, &'a NurbsCurve<T, D>> for CompoundCurve<T, D>
 where

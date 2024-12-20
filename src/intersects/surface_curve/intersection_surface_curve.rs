@@ -1,16 +1,24 @@
-use argmin::core::{ArgminFloat, State};
+use std::cmp::Ordering;
+
+use argmin::core::{ArgminFloat, Executor, State};
+use itertools::Itertools;
 use nalgebra::{
-    allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, U1,
+    allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, Matrix3, OPoint,
+    Vector2, Vector3, U1,
 };
+use num_traits::Float;
 
 use crate::{
     curve::NurbsCurve,
     misc::FloatingPoint,
-    prelude::{BoundingBoxTraversal, CurveBoundingBoxTree, SurfaceBoundingBoxTree},
-    surface::{NurbsSurface, UVDirection},
+    prelude::{
+        BoundingBoxTraversal, CurveBoundingBoxTree, CurveIntersectionSolverOptions,
+        HasIntersection, Intersects, SurfaceBoundingBoxTree, SurfaceCurveIntersection,
+    },
+    surface::{self, NurbsSurface, UVDirection},
 };
 
-use super::{CurveIntersection, CurveIntersectionSolverOptions, Intersects};
+use super::{SurfaceCurveIntersectionBFGS, SurfaceCurveIntersectionProblem};
 
 impl<'a, T, D> Intersects<'a, &'a NurbsCurve<T, D>> for NurbsSurface<T, D>
 where
@@ -19,7 +27,7 @@ where
     DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
-    type Output = anyhow::Result<Vec<CurveIntersection<OPoint<T, DimNameDiff<D, U1>>, T>>>;
+    type Output = anyhow::Result<Vec<SurfaceCurveIntersection<OPoint<T, DimNameDiff<D, U1>>, T>>>;
     type Option = Option<CurveIntersectionSolverOptions<T>>;
 
     ///
@@ -41,33 +49,31 @@ where
         let tb = CurveBoundingBoxTree::new(other, Some(other.knots_domain_interval() * div));
 
         let traversed = BoundingBoxTraversal::try_traverse(ta, tb)?;
-        let a_domain = self.knots_domain();
-        let b_domain = other.knots_domain();
-        todo!();
+        let (surface_u_domain, surface_v_domain) = self.knots_domain();
+        let curve_domain = other.knots_domain();
 
-        /*
         let intersections = traversed
             .into_pairs_iter()
             .filter_map(|(a, b)| {
-                let ca = a.surface_owned();
-                let cb = b.curve_owned();
+                let surface = a.surface_owned();
+                let curve = b.curve_owned();
 
-                let problem = CurveIntersectionProblem::new(&ca, &cb);
+                let div = T::from_f64(0.5).unwrap();
 
-                // let inv = T::from_f64(0.5).unwrap();
-                // let d0 = ca.knots_domain();
-                // let d1 = cb.knots_domain();
+                let d = curve.knots_domain();
+                let curve_parameter = (d.0 + d.1) * div;
+
+                let (u, v) = surface.knots_domain();
+                let surface_parameter = ((u.0 + u.1) * div, (v.0 + v.1) * div);
+
+                let problem = SurfaceCurveIntersectionProblem::new(&surface, &curve);
 
                 // Define initial parameter vector
-                let init_param = Vector2::<T>::new(
-                    ca.knots_domain().0,
-                    cb.knots_domain().0,
-                    // (d0.0 + d0.1) * inv,
-                    // (d1.0 + d1.1) * inv,
-                );
+                let init_param =
+                    Vector3::new(curve_parameter, surface_parameter.0, surface_parameter.1);
 
                 // Set up solver
-                let solver = CurveIntersectionBFGS::<T>::new()
+                let solver = SurfaceCurveIntersectionBFGS::<T>::new()
                     .with_step_size_tolerance(options.step_size_tolerance)
                     .with_cost_tolerance(options.cost_tolerance);
 
@@ -76,7 +82,7 @@ where
                     .configure(|state| {
                         state
                             .param(init_param)
-                            .inv_hessian(Matrix2::identity())
+                            .inv_hessian(Matrix3::identity())
                             .max_iters(options.max_iters)
                     })
                     .run();
@@ -85,12 +91,16 @@ where
                     Ok(r) => {
                         // println!("{}", r.state().get_termination_status());
                         r.state().get_best_param().and_then(|param| {
-                            if (a_domain.0..=a_domain.1).contains(&param[0])
-                                && (b_domain.0..=b_domain.1).contains(&param[1])
+                            if (surface_u_domain.0..=surface_u_domain.1).contains(&param.y)
+                                && (surface_v_domain.0..=surface_v_domain.1).contains(&param.z)
+                                && (curve_domain.0..=curve_domain.1).contains(&param.x)
                             {
-                                let p0 = self.point_at(param[0]);
-                                let p1 = other.point_at(param[1]);
-                                Some(CurveIntersection::new((p0, param[0]), (p1, param[1])))
+                                let p0 = self.point_at(param.y, param.z);
+                                let p1 = other.point_at(param.x);
+                                Some(SurfaceCurveIntersection::new(
+                                    (p0, (param.y, param.z)),
+                                    (p1, param.x),
+                                ))
                             } else {
                                 None
                             }
@@ -113,10 +123,8 @@ where
 
         let sorted = intersections
             .into_iter()
-            .sorted_by(|x, y| x.a().1.partial_cmp(&y.a().1).unwrap_or(Ordering::Equal))
+            .sorted_by(|x, y| x.b().1.partial_cmp(&y.b().1).unwrap_or(Ordering::Equal))
             .collect_vec();
-
-        // println!("sorted: {:?}", sorted.iter().map(|it| it.a()).collect_vec());
 
         // group near parameter results & extract the closest one in each group
         let parameter_minimum_distance = T::from_f64(1e-3).unwrap();
@@ -126,9 +134,15 @@ where
             .coalesce(|x, y| {
                 let x0 = &x[x.len() - 1];
                 let y0 = &y[y.len() - 1];
-                let da = Float::abs(x0.a().1 - y0.a().1);
+                let xs = x0.a().1;
+                let ys = y0.a().1;
+                let da0 = Float::abs(xs.0 - ys.0);
+                let da1 = Float::abs(xs.1 - ys.1);
                 let db = Float::abs(x0.b().1 - y0.b().1);
-                if da < parameter_minimum_distance || db < parameter_minimum_distance {
+                if da0 < parameter_minimum_distance
+                    || da1 < parameter_minimum_distance
+                    || db < parameter_minimum_distance
+                {
                     // merge near parameter results
                     let group = [x, y].concat();
                     Ok(group)
@@ -136,7 +150,7 @@ where
                     Err((x, y))
                 }
             })
-            .collect::<Vec<Vec<Intersects<OPoint<T, DimNameDiff<D, U1>>, T>>>>()
+            .collect::<Vec<Vec<_>>>()
             .into_iter()
             .collect_vec();
 
@@ -160,6 +174,5 @@ where
             .collect_vec();
 
         Ok(pts)
-        */
     }
 }

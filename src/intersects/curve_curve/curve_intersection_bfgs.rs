@@ -46,8 +46,9 @@ where
     }
 }
 
-impl<O, F> Solver<O, IterState<Vector2<F>, Vector2<F>, (), Matrix2<F>, (), F>>
-    for CurveIntersectionBFGS<F>
+type CurveCurveIterState<F> = IterState<Vector2<F>, Vector2<F>, (), Matrix2<F>, (), F>;
+
+impl<O, F> Solver<O, CurveCurveIterState<F>> for CurveIntersectionBFGS<F>
 where
     O: Gradient<Param = Vector2<F>, Gradient = Vector2<F>>
         + CostFunction<Param = Vector2<F>, Output = F>,
@@ -58,14 +59,8 @@ where
     fn init(
         &mut self,
         problem: &mut Problem<O>,
-        state: IterState<Vector2<F>, Vector2<F>, (), Matrix2<F>, (), F>,
-    ) -> Result<
-        (
-            IterState<Vector2<F>, Vector2<F>, (), Matrix2<F>, (), F>,
-            Option<KV>,
-        ),
-        Error,
-    > {
+        state: CurveCurveIterState<F>,
+    ) -> Result<(CurveCurveIterState<F>, Option<KV>), Error> {
         let x0 = state.get_param().ok_or_else(argmin_error_closure!(
             NotInitialized,
             concat!(
@@ -81,14 +76,8 @@ where
     fn next_iter(
         &mut self,
         problem: &mut Problem<O>,
-        state: IterState<Vector2<F>, Vector2<F>, (), Matrix2<F>, (), F>,
-    ) -> Result<
-        (
-            IterState<Vector2<F>, Vector2<F>, (), Matrix2<F>, (), F>,
-            Option<KV>,
-        ),
-        Error,
-    > {
+        state: CurveCurveIterState<F>,
+    ) -> Result<(CurveCurveIterState<F>, Option<KV>), Error> {
         let x0 = state.get_param().ok_or_else(argmin_error_closure!(
             NotInitialized,
             concat!(
@@ -166,10 +155,7 @@ where
         ))
     }
 
-    fn terminate(
-        &mut self,
-        state: &IterState<Vector2<F>, Vector2<F>, (), Matrix2<F>, (), F>,
-    ) -> TerminationStatus {
+    fn terminate(&mut self, state: &CurveCurveIterState<F>) -> TerminationStatus {
         if state.iter > state.max_iters {
             return TerminationStatus::Terminated(TerminationReason::MaxItersReached);
         }
