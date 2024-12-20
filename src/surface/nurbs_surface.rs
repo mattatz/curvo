@@ -376,8 +376,8 @@ where
                 let ioff = iu * (divs_v + 1);
                 (0..divs_v).flat_map(move |iv| {
                     [
-                        [ioff + iv, ioff + iv + 1, ioff + iv + divs_v + 2],
-                        [ioff + iv, ioff + iv + divs_v + 2, ioff + iv + divs_v + 1],
+                        [ioff + iv, ioff + iv + divs_v + 2, ioff + iv + 1],
+                        [ioff + iv, ioff + iv + divs_v + 1, ioff + iv + divs_v + 2],
                     ]
                 })
             })

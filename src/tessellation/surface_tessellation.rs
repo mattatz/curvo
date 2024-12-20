@@ -84,26 +84,19 @@ where
 
             match uvs.len() {
                 4 => {
-                    self.faces.push([ids[0], ids[3], ids[1]]);
-                    self.faces.push([ids[3], ids[2], ids[1]]);
+                    self.faces.push([ids[0], ids[1], ids[3]]);
+                    self.faces.push([ids[3], ids[1], ids[2]]);
                 }
                 5 => {
                     let il = ids.len();
-                    self.faces.push([
-                        ids[split_id],
-                        ids[(split_id + 2) % il],
-                        ids[(split_id + 1) % il],
-                    ]);
-                    self.faces.push([
-                        ids[(split_id + 4) % il],
-                        ids[(split_id + 3) % il],
-                        ids[split_id],
-                    ]);
-                    self.faces.push([
-                        ids[split_id],
-                        ids[(split_id + 3) % il],
-                        ids[(split_id + 2) % il],
-                    ]);
+                    let a = ids[split_id];
+                    let b = ids[(split_id + 1) % il];
+                    let c = ids[(split_id + 2) % il];
+                    let d = ids[(split_id + 3) % il];
+                    let e = ids[(split_id + 4) % il];
+                    self.faces.push([a, b, c]);
+                    self.faces.push([a, d, e]);
+                    self.faces.push([a, c, d]);
                 }
                 n => {
                     let center = node.center(surface);
@@ -115,7 +108,7 @@ where
                     let mut j = n - 1;
                     let mut i = 0;
                     while i < n {
-                        self.faces.push([center_index, ids[i], ids[j]]);
+                        self.faces.push([center_index, ids[j], ids[i]]);
                         j = i;
                         i += 1;
                     }

@@ -1,5 +1,3 @@
-use std::f32::consts::FRAC_PI_2;
-
 use bevy::{
     color::palettes::css::TOMATO,
     prelude::*,
@@ -76,7 +74,7 @@ fn setup(
                 .map(|j| {
                     let x = i as f64 - hn;
                     let y = (rng.gen::<f64>() - 0.5) * 2.;
-                    let z = j as f64 - hn;
+                    let z = (j as f64) - hn;
                     Point4::new(x, y, z, 1.)
                 })
                 .collect_vec()
@@ -86,6 +84,7 @@ fn setup(
 
     commands.spawn((
         Mesh3d(meshes.add(surface_2_mesh(&surface, None))),
+        // Mesh3d(meshes.add(surface_2_regular_mesh(&surface, 64, 64))),
         MeshMaterial3d(normal_materials.add(NormalMaterial {
             opacity: 0.35,
             cull_mode: None,
@@ -201,7 +200,6 @@ fn setup(
             z_axis_color: Color::BLACK,
             ..Default::default()
         },
-        transform: Transform::from_rotation(Quat::from_rotation_x(FRAC_PI_2)),
         ..Default::default()
     });
 }
