@@ -1,6 +1,6 @@
 [package]
 name = "curvo"
-version = "0.1.39"
+version = "0.1.40"
 authors = ["Masatatsu Nakamura <masatatsu.nakamura@gmail.com"]
 edition = "2021"
 keywords = ["nurbs", "modeling", "graphics", "3d"]
@@ -106,10 +106,10 @@ name = "revolve_surface"
 path = "examples/revolve_surface.rs"
 required-features = ["bevy"]
 
-[[example]]
-name = "trimmed_surface"
-path = "examples/trimmed_surface.rs"
-required-features = ["bevy"]
+# [[example]]
+# name = "trimmed_surface"
+# path = "examples/trimmed_surface.rs"
+# required-features = ["bevy"]
 
 [[example]]
 name = "frenet_frame"
