@@ -1,8 +1,7 @@
 use argmin::core::{CostFunction, Gradient};
 
 use nalgebra::{
-    allocator::Allocator, Const, DefaultAllocator, DimName, DimNameDiff, DimNameSub, Vector2,
-    Vector3, U1,
+    allocator::Allocator, Const, DefaultAllocator, DimName, DimNameDiff, DimNameSub, Vector3, U1,
 };
 
 use crate::{curve::nurbs_curve::NurbsCurve, misc::FloatingPoint, surface::NurbsSurface};

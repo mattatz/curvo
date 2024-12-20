@@ -2,7 +2,6 @@ pub mod intersection_surface_curve;
 pub mod surface_curve_intersection_bfgs;
 pub mod surface_curve_intersection_problem;
 
-pub use intersection_surface_curve::*;
 use nalgebra::Vector3;
 pub use surface_curve_intersection_bfgs::*;
 pub use surface_curve_intersection_problem::*;

@@ -4,7 +4,7 @@ use argmin::core::{ArgminFloat, Executor, State};
 use itertools::Itertools;
 use nalgebra::{
     allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, Matrix3, OPoint,
-    Vector2, Vector3, U1,
+    Vector3, U1,
 };
 use num_traits::Float;
 
@@ -15,7 +15,7 @@ use crate::{
         BoundingBoxTraversal, CurveBoundingBoxTree, CurveIntersectionSolverOptions,
         HasIntersection, Intersects, SurfaceBoundingBoxTree, SurfaceCurveIntersection,
     },
-    surface::{self, NurbsSurface, UVDirection},
+    surface::{NurbsSurface, UVDirection},
 };
 
 use super::{SurfaceCurveIntersectionBFGS, SurfaceCurveIntersectionProblem};

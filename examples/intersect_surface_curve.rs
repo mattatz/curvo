@@ -1,10 +1,7 @@
 use std::f32::consts::FRAC_PI_2;
 
 use bevy::{
-    color::palettes::{
-        css::{TOMATO, WHITE},
-        tailwind::LIME_500,
-    },
+    color::palettes::css::TOMATO,
     prelude::*,
     render::mesh::{PrimitiveTopology, VertexAttributeValues},
 };
@@ -12,13 +9,10 @@ use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin, InfiniteGridSet
 
 use bevy_normal_material::{plugin::NormalMaterialPlugin, prelude::NormalMaterial};
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
-use bevy_points::{
-    material::PointsShaderSettings, mesh::PointsMesh, plugin::PointsPlugin, prelude::PointsMaterial,
-};
+use bevy_points::{plugin::PointsPlugin, prelude::PointsMaterial};
+use itertools::Itertools;
 use misc::surface_2_mesh;
-use nalgebra::{
-    Matrix4, Point2, Point3, Rotation2, Rotation3, Translation2, Translation3, Vector2, Vector3,
-};
+use nalgebra::{Matrix4, Point3, Point4, Vector3};
 
 use curvo::prelude::*;
 
@@ -26,6 +20,7 @@ mod materials;
 mod misc;
 
 use materials::*;
+use rand::Rng;
 
 fn main() {
     App::new()
@@ -68,6 +63,26 @@ fn setup(
     let profile =
         NurbsCurve3D::polyline(&[Point3::new(-2., 0., -2.), Point3::new(2., 0., -2.)], true);
     let surface = NurbsSurface::extrude(&profile, &(Vector3::z() * 4.));
+
+    let degree = 3;
+    let n: usize = 6;
+    let goal = n + degree + 1;
+    let knots = KnotVector::uniform(goal - degree * 2, degree);
+    let _hn = (n - 1) as f64 / 2.;
+    let mut rng: rand::rngs::StdRng = rand::SeedableRng::from_seed([0; 32]);
+    let pts = (0..n)
+        .map(|i| {
+            (0..n)
+                .map(|j| {
+                    let x = i as f64;
+                    let z = (rng.gen::<f64>() - 0.5) * 2.;
+                    let y = j as f64;
+                    Point4::new(x, z, y, 1.)
+                })
+                .collect_vec()
+        })
+        .collect_vec();
+    let surface = NurbsSurface3D::new(degree, degree, knots.to_vec(), knots.to_vec(), pts);
 
     commands.spawn((
         Mesh3d(meshes.add(surface_2_mesh(&surface, None))),
@@ -221,7 +236,7 @@ fn update(
         .map(|(s, tr)| {
             let mat = tr.compute_matrix();
             let m = Matrix4::from(mat);
-            s.0.transformed(&m.cast::<f64>().into())
+            s.0.transformed(&m.cast::<f64>())
         })
         .next()
         .unwrap();
@@ -232,7 +247,7 @@ fn update(
         .map(|(c2, tr)| {
             let mat = tr.compute_matrix();
             let m = Matrix4::from(mat);
-            c2.0.transformed(&m.cast::<f64>().into())
+            c2.0.transformed(&m.cast::<f64>())
         })
         .next()
         .unwrap();

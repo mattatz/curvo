@@ -1,5 +1,5 @@
 use argmin::{argmin_error_closure, core::*, float};
-use nalgebra::{Matrix2, Matrix3, Vector2};
+use nalgebra::Matrix3;
 
 use crate::misc::FloatingPoint;
 
