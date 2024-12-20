@@ -51,6 +51,7 @@ where
 type SurfaceCurveIterState<F> =
     IterState<SurfaceCurveParam<F>, SurfaceCurveGradient<F>, (), Matrix3<F>, (), F>;
 
+// TODO: commonize this with CurveIntersectionBFGS
 impl<O, F> Solver<O, SurfaceCurveIterState<F>> for SurfaceCurveIntersectionBFGS<F>
 where
     O: Gradient<Param = SurfaceCurveParam<F>, Gradient = SurfaceCurveGradient<F>>

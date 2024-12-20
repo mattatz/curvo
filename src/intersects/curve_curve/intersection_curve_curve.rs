@@ -71,7 +71,6 @@ where
     /// let p1 = &intersections[1];
     /// assert_relative_eq!(p1.a().0, Point2::new(1.0, 0.0), epsilon = 1e-5);
     /// ```
-    #[allow(clippy::type_complexity)]
     fn find_intersections(
         &'a self,
         other: &'a NurbsCurve<T, D>,
