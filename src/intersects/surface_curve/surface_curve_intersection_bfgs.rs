@@ -163,7 +163,7 @@ where
         }
 
         if let Some(g) = state.get_gradient() {
-            if g.x.is_nan() || g.y.is_nan() || g.x.is_infinite() || g.y.is_infinite() {
+            if g.iter().any(|v| v.is_nan() || v.is_infinite()) {
                 return TerminationStatus::Terminated(TerminationReason::SolverExit(
                     "gradient is NaN or infinite".into(),
                 ));
@@ -171,15 +171,8 @@ where
         }
 
         if let Some(h) = state.get_hessian() {
-            if h[(0, 0)].is_nan()
-                || h[(0, 1)].is_nan()
-                || h[(1, 0)].is_nan()
-                || h[(1, 1)].is_nan()
-                || h[(0, 0)].is_infinite()
-                || h[(0, 1)].is_infinite()
-                || h[(1, 0)].is_infinite()
-                || h[(1, 1)].is_infinite()
-            {
+            let has_nan = h.iter().any(|&v| v.is_nan() || v.is_infinite());
+            if has_nan {
                 return TerminationStatus::Terminated(TerminationReason::SolverExit(
                     "hessian is NaN or infinite".into(),
                 ));
