@@ -658,7 +658,7 @@ where
     ///
     /// // Create an iso curve at the start of the u direction
     /// let (start, _) = extruded.u_knots_domain();
-    /// let u_iso = extruded.try_isocurve(start, false).unwrap();
+    /// let u_iso = extruded.try_isocurve(start, UVDirection::U).unwrap();
     /// let (iso_start, iso_end) = u_iso.knots_domain();
     /// assert_relative_eq!(u_iso.point_at(iso_start), Point3::new(1.0, 0.0, 1.0), epsilon = 1e-8);
     /// assert_relative_eq!(u_iso.point_at(iso_end), Point3::new(1.0, 0.0, 1.0), epsilon = 1e-8);
