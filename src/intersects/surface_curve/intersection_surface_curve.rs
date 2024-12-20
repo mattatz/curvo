@@ -30,8 +30,8 @@ where
     type Output = anyhow::Result<Vec<SurfaceCurveIntersection<OPoint<T, DimNameDiff<D, U1>>, T>>>;
     type Option = Option<CurveIntersectionSolverOptions<T>>;
 
-    ///
-    #[allow(clippy::type_complexity)]
+    /// Find the intersections between the surface and the curve.
+    /// CAUTION: This method is experimental and may not work as expected.
     fn find_intersections(
         &'a self,
         other: &'a NurbsCurve<T, D>,

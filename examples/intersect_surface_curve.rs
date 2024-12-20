@@ -62,22 +62,22 @@ fn setup(
 ) {
     let profile =
         NurbsCurve3D::polyline(&[Point3::new(-2., 0., -2.), Point3::new(2., 0., -2.)], true);
-    let surface = NurbsSurface::extrude(&profile, &(Vector3::z() * 4.));
+    let _surface = NurbsSurface::extrude(&profile, &(Vector3::z() * 4.));
 
     let degree = 3;
     let n: usize = 6;
     let goal = n + degree + 1;
     let knots = KnotVector::uniform(goal - degree * 2, degree);
-    let _hn = (n - 1) as f64 / 2.;
+    let hn = (n - 1) as f64 / 2.;
     let mut rng: rand::rngs::StdRng = rand::SeedableRng::from_seed([0; 32]);
     let pts = (0..n)
         .map(|i| {
             (0..n)
                 .map(|j| {
-                    let x = i as f64;
-                    let z = (rng.gen::<f64>() - 0.5) * 2.;
-                    let y = j as f64;
-                    Point4::new(x, z, y, 1.)
+                    let x = i as f64 - hn;
+                    let y = (rng.gen::<f64>() - 0.5) * 2.;
+                    let z = j as f64 - hn;
+                    Point4::new(x, y, z, 1.)
                 })
                 .collect_vec()
         })
@@ -95,11 +95,11 @@ fn setup(
         IntersectionSurface(surface.clone()),
     ));
 
-    let circle =
+    let curve =
         NurbsCurve3D::try_circle(&Point3::new(0., 0., 0.), &Vector3::x(), &Vector3::y(), 1.)
             .unwrap();
 
-    let line_vertices = circle
+    let line_vertices = curve
         .tessellate(Some(1e-8))
         .iter()
         .map(|p| p.cast::<f32>())
@@ -115,7 +115,7 @@ fn setup(
             color: TOMATO.into(),
             ..Default::default()
         })),
-        IntersectionCurve(circle.clone()),
+        IntersectionCurve(curve.clone()),
     ));
 
     /*
