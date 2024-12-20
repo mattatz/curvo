@@ -11,7 +11,7 @@ use bevy_normal_material::{plugin::NormalMaterialPlugin, prelude::NormalMaterial
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use bevy_points::{plugin::PointsPlugin, prelude::PointsMaterial};
 use itertools::Itertools;
-use misc::surface_2_mesh;
+use misc::{surface_2_mesh, surface_2_regular_mesh};
 use nalgebra::{Matrix4, Point3, Point4, Vector3};
 
 use curvo::prelude::*;
@@ -76,7 +76,7 @@ fn setup(
                 .map(|j| {
                     let x = i as f64 - hn;
                     let y = (rng.gen::<f64>() - 0.5) * 2.;
-                    let z = j as f64 - hn;
+                    let z = (j as f64) - hn;
                     Point4::new(x, y, z, 1.)
                 })
                 .collect_vec()
@@ -86,6 +86,7 @@ fn setup(
 
     commands.spawn((
         Mesh3d(meshes.add(surface_2_mesh(&surface, None))),
+        // Mesh3d(meshes.add(surface_2_regular_mesh(&surface, 64, 64))),
         MeshMaterial3d(normal_materials.add(NormalMaterial {
             opacity: 0.35,
             cull_mode: None,
@@ -201,7 +202,6 @@ fn setup(
             z_axis_color: Color::BLACK,
             ..Default::default()
         },
-        transform: Transform::from_rotation(Quat::from_rotation_x(FRAC_PI_2)),
         ..Default::default()
     });
 }

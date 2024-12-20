@@ -96,7 +96,7 @@ fn setup(
             );
 
             let vertices = tess.points().iter().map(|pt| (*pt).into()).collect();
-            let normals = tess.normals().iter().map(|n| (-n).into()).collect();
+            let normals = tess.normals().iter().map(|n| (*n).into()).collect();
             let uvs = tess.uvs().iter().map(|uv| (*uv).into()).collect();
             let indices = tess
                 .faces()
@@ -137,9 +137,9 @@ fn setup(
             (0..N)
                 .map(|j| {
                     let x = i as f64 - hn;
-                    let z = (rng.gen::<f64>() - 0.5) * 2.;
-                    let y = j as f64 - hn;
-                    Point4::new(x, z, y, 1.)
+                    let y = (rng.gen::<f64>() - 0.5) * 2.;
+                    let z = (j as f64) - hn;
+                    Point4::new(x, y, z, 1.)
                 })
                 .collect_vec()
         })
