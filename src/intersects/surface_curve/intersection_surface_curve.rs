@@ -32,6 +32,32 @@ where
 
     /// Find the intersections between the surface and the curve.
     /// CAUTION: This method is experimental and may not work as expected.
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point3, Vector3};
+    /// use approx::assert_relative_eq;
+    /// let unit_sphere = NurbsSurface3D::try_sphere(
+    ///     &Point3::origin(),
+    ///     &Vector3::x(),
+    ///     &Vector3::y(),
+    ///     1.
+    /// ).unwrap();
+    /// let line = NurbsCurve3D::polyline(&[
+    ///     Point3::new(-2.0, 0.0, 0.0),
+    ///     Point3::new(2.0, 0.0, 0.0),
+    /// ], false);
+    /// let intersections = unit_sphere.find_intersections(&line, None).unwrap();
+    /// assert_eq!(intersections.len(), 2);
+    ///
+    /// let it0 = &intersections[0];
+    /// let p0 = it0.a().0;
+    /// assert_relative_eq!(p0.x, -1., epsilon = 1e-5);
+    ///
+    /// let it1 = &intersections[1];
+    /// let p1 = it1.a().0;
+    /// assert_relative_eq!(p1.x, 1., epsilon = 1e-5);
+    /// ```
     fn find_intersections(
         &'a self,
         other: &'a NurbsCurve<T, D>,
