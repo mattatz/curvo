@@ -844,10 +844,12 @@ dependencies = [
 
 [[package]]
 name = "bevy_infinite_grid"
-version = "0.13.1"
-source = "git+https://github.com/ForesightMiningSoftwareCorporation/bevy_infinite_grid.git?rev=1b27619cc5c44d4e939e63345cddc1954e4123db#1b27619cc5c44d4e939e63345cddc1954e4123db"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "55c5afa9b6b745befade95dd456a5be2efb7889425331b8871ee2c27211d4633"
 dependencies = [
  "bevy",
+ "bevy_internal",
 ]
 
 [[package]]
