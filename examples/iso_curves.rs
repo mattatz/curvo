@@ -81,17 +81,16 @@ fn setup(
     );
     */
 
-    let v_direction = true;
-    let (min, max) = if v_direction {
-        lofted.v_knots_domain()
-    } else {
-        lofted.u_knots_domain()
+    let direction = UVDirection::V;
+    let (min, max) = match direction {
+        UVDirection::U => lofted.u_knots_domain(),
+        UVDirection::V => lofted.v_knots_domain(),
     };
     let div = 64;
     for i in 0..div {
         let u = min + (max - min) * i as f64 / (div - 1) as f64;
         // println!("u:{}, min:{}, max:{}", u, min, max);
-        let iso = lofted.try_isocurve(u, v_direction);
+        let iso = lofted.try_isocurve(u, direction);
         match iso {
             Ok(curve) => {
                 add_curve(

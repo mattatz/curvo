@@ -5,7 +5,8 @@ use bevy::{
 };
 use bevy_normal_material::prelude::NormalMaterial;
 use curvo::prelude::{
-    AdaptiveTessellationOptions, NurbsCurve3D, NurbsSurface3D, SurfaceTessellation3D, Tessellation,
+    AdaptiveTessellationOptions, NurbsCurve3D, NurbsSurface, NurbsSurface3D, SurfaceTessellation3D,
+    Tessellation,
 };
 
 use crate::LineMaterial;
@@ -47,6 +48,37 @@ pub fn add_curve(
             ..Default::default()
         })),
     ));
+}
+
+#[allow(unused)]
+pub fn surface_2_mesh(
+    surface: &NurbsSurface3D<f64>,
+    option: Option<AdaptiveTessellationOptions<f64>>,
+) -> Mesh {
+    let option = option.unwrap_or_default();
+    let tess = surface.tessellate(Some(option));
+    let tess = tess.cast::<f32>();
+
+    let vertices = tess.points().iter().map(|pt| (*pt).into()).collect();
+    let normals = tess.normals().iter().map(|n| (-n).into()).collect();
+    let uvs = tess.uvs().iter().map(|uv| (*uv).into()).collect();
+    let indices = tess
+        .faces()
+        .iter()
+        .flat_map(|f| f.iter().map(|i| *i as u32))
+        .collect();
+
+    Mesh::new(PrimitiveTopology::TriangleList, default())
+        .with_inserted_attribute(
+            Mesh::ATTRIBUTE_POSITION,
+            VertexAttributeValues::Float32x3(vertices),
+        )
+        .with_inserted_attribute(
+            Mesh::ATTRIBUTE_NORMAL,
+            VertexAttributeValues::Float32x3(normals),
+        )
+        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, VertexAttributeValues::Float32x2(uvs))
+        .with_inserted_indices(Indices::U32(indices))
 }
 
 #[allow(unused)]

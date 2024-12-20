@@ -30,7 +30,7 @@ struct AppPlugin;
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.add_systems(Startup, setup)
-            .add_systems(Update, trim_animation);
+            .add_systems(Update, split_animation);
     }
 }
 
@@ -84,7 +84,7 @@ fn setup(
     // commands.spawn(InfiniteGridBundle::default());
 }
 
-fn trim_animation(
+fn split_animation(
     time: Res<Time>,
     profile: Query<&ProfileCurve>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -102,7 +102,7 @@ fn trim_animation(
 
     let tesselate = |curve: &NurbsCurve2D<f64>| {
         curve
-            .tessellate(Some(1e-3))
+            .tessellate(Some(1e-6))
             .iter()
             .map(|p| p.cast::<f32>())
             .map(|p| [p.x, p.y, 0.])
