@@ -989,9 +989,9 @@ dependencies = [
 
 [[package]]
 name = "bevy_normal_material"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66367f2b77afe4d0fa2537b21aeee0fdf11d62a5f2133d61acb4cc7166326d13"
+checksum = "dd0173d0ad6a6561e33ff19184661e82e843b44dd53210bcc34e27f1daa46205"
 dependencies = [
  "bevy",
 ]
