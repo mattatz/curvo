@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use nalgebra::{allocator::Allocator, DefaultAllocator, DimName};
 
-use crate::{curve::NurbsCurve, misc::FloatingPoint, region::CompoundCurve};
+use crate::{curve::NurbsCurve, misc::FloatingPoint, region::CompoundCurve, split::Split};
 
 /// Trim curve by range parameters.
 pub trait TrimRange<T: FloatingPoint, D: DimName>
@@ -22,12 +22,12 @@ where
         );
         let inside = parameters.0 < parameters.1;
         let curves = if inside {
-            let (_, tail) = self.try_trim(min)?;
-            let (head, _) = tail.try_trim(max)?;
+            let (_, tail) = self.try_split(min)?;
+            let (head, _) = tail.try_split(max)?;
             vec![head]
         } else {
-            let (head, tail) = self.try_trim(min)?;
-            let (_, tail2) = tail.try_trim(max)?;
+            let (head, tail) = self.try_split(min)?;
+            let (_, tail2) = tail.try_split(max)?;
             vec![tail2, head]
         };
 
@@ -62,13 +62,13 @@ where
                         if inside {
                             curve.try_trim_range((min, max))
                         } else {
-                            let (head, tail) = curve.try_trim(min)?;
-                            let (_, tail2) = tail.try_trim(max)?;
+                            let (head, tail) = curve.try_split(min)?;
+                            let (_, tail2) = tail.try_split(max)?;
                             Ok(vec![head, tail2])
                         }
                     }
                     (true, false) => {
-                        curve.try_trim(min).map(
+                        curve.try_split(min).map(
                             |(head, tail)| {
                                 if inside {
                                     vec![tail]
@@ -79,7 +79,7 @@ where
                         )
                     }
                     (false, true) => {
-                        curve.try_trim(max).map(
+                        curve.try_split(max).map(
                             |(head, tail)| {
                                 if inside {
                                     vec![head]

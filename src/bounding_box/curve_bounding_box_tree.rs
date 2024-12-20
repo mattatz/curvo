@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, U1};
 use rand::Rng;
 
-use crate::{curve::NurbsCurve, misc::FloatingPoint};
+use crate::{curve::NurbsCurve, misc::FloatingPoint, split::Split};
 
 use super::{BoundingBox, BoundingBoxTree};
 
@@ -81,7 +81,7 @@ where
         let r = interval * T::from_f64(1e-1 * (rng.gen::<f64>() - 0.5)).unwrap();
         // let r = T::zero(); // non random
 
-        let (head, tail) = self.curve.try_trim(mid + r)?;
+        let (head, tail) = self.curve.try_split(mid + r)?;
         Ok((
             Self {
                 curve: Cow::Owned(head),

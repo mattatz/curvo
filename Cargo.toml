@@ -87,8 +87,8 @@ path = "examples/polyline_curve.rs"
 required-features = ["bevy"]
 
 [[example]]
-name = "trim_curve"
-path = "examples/trim_curve.rs"
+name = "split_curve"
+path = "examples/split_curve.rs"
 required-features = ["bevy"]
 
 [[example]]
@@ -137,11 +137,6 @@ path = "examples/intersect_curves.rs"
 required-features = ["bevy"]
 
 [[example]]
-name = "intersect_surface_curve"
-path = "examples/intersect_surface_curve.rs"
-required-features = ["bevy"]
-
-[[example]]
 name = "iso_curves"
 path = "examples/iso_curves.rs"
 required-features = ["bevy"]
@@ -165,3 +160,9 @@ required-features = ["bevy"]
 name = "closest_point_on_surface"
 path = "examples/closest_point_on_surface.rs"
 required-features = ["bevy"]
+
+[[example]]
+name = "split_surface"
+path = "examples/split_surface.rs"
+required-features = ["bevy"]
+
