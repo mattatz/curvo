@@ -1,5 +1,3 @@
-use std::f32::consts::FRAC_PI_2;
-
 use bevy::{
     color::palettes::css::TOMATO,
     prelude::*,
@@ -11,7 +9,7 @@ use bevy_normal_material::{plugin::NormalMaterialPlugin, prelude::NormalMaterial
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use bevy_points::{plugin::PointsPlugin, prelude::PointsMaterial};
 use itertools::Itertools;
-use misc::{surface_2_mesh, surface_2_regular_mesh};
+use misc::surface_2_mesh;
 use nalgebra::{Matrix4, Point3, Point4, Vector3};
 
 use curvo::prelude::*;
