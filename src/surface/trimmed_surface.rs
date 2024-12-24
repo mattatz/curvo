@@ -111,3 +111,131 @@ fn try_project_curve<T: FloatingPoint + ArgminFloat>(
         .collect::<anyhow::Result<Vec<_>>>()?;
     NurbsCurve2D::try_new(curve.degree(), pts, curve.knots().to_vec())
 }
+
+#[cfg(feature = "serde")]
+impl<T> serde::Serialize for TrimmedSurface<T>
+where
+    T: FloatingPoint + serde::Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("TrimmedSurface", 3)?;
+        state.serialize_field("surface", &self.surface)?;
+        state.serialize_field("exterior", &self.exterior)?;
+        state.serialize_field("interiors", &self.interiors)?;
+        state.end()
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, T> serde::Deserialize<'de> for TrimmedSurface<T>
+where
+    T: FloatingPoint + serde::Deserialize<'de>,
+{
+    fn deserialize<S>(deserializer: S) -> Result<Self, S::Error>
+    where
+        S: serde::Deserializer<'de>,
+    {
+        use serde::de::{self, MapAccess, Visitor};
+
+        #[derive(Debug)]
+        enum Field {
+            Surface,
+            Exterior,
+            Interiors,
+        }
+
+        impl<'de> serde::Deserialize<'de> for Field {
+            fn deserialize<S>(deserializer: S) -> Result<Self, S::Error>
+            where
+                S: serde::Deserializer<'de>,
+            {
+                struct FieldVisitor;
+
+                impl<'de> Visitor<'de> for FieldVisitor {
+                    type Value = Field;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                        formatter.write_str("`surface` or `exterior` or `interiors`")
+                    }
+
+                    fn visit_str<E>(self, value: &str) -> Result<Field, E>
+                    where
+                        E: de::Error,
+                    {
+                        match value {
+                            "surface" => Ok(Field::Surface),
+                            "exterior" => Ok(Field::Exterior),
+                            "interiors" => Ok(Field::Interiors),
+                            _ => Err(de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+
+                deserializer.deserialize_identifier(FieldVisitor)
+            }
+        }
+
+        struct TrimmedSurfaceVisitor<T>(std::marker::PhantomData<T>);
+
+        impl<T> TrimmedSurfaceVisitor<T> {
+            pub fn new() -> Self {
+                TrimmedSurfaceVisitor(std::marker::PhantomData)
+            }
+        }
+
+        impl<'de, T> Visitor<'de> for TrimmedSurfaceVisitor<T>
+        where
+            T: FloatingPoint + serde::Deserialize<'de>,
+        {
+            type Value = TrimmedSurface<T>;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("struct TrimmedSurface")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<Self::Value, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                let mut surface = None;
+                let mut exterior = None;
+                let mut interiors = None;
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::Surface => {
+                            if surface.is_some() {
+                                return Err(de::Error::duplicate_field("surface"));
+                            }
+                            surface = Some(map.next_value()?);
+                        }
+                        Field::Exterior => {
+                            if exterior.is_some() {
+                                return Err(de::Error::duplicate_field("exterior"));
+                            }
+                            exterior = map.next_value().ok();
+                        }
+                        Field::Interiors => {
+                            if interiors.is_some() {
+                                return Err(de::Error::duplicate_field("interiors"));
+                            }
+                            interiors = Some(map.next_value()?);
+                        }
+                    }
+                }
+
+                Ok(Self::Value {
+                    surface: surface.ok_or_else(|| de::Error::missing_field("surface"))?,
+                    exterior,
+                    interiors: interiors.ok_or_else(|| de::Error::missing_field("interiors"))?,
+                })
+            }
+        }
+
+        const FIELDS: &[&str] = &["surface", "exterior", "interiors"];
+        deserializer.deserialize_struct("TrimmedSurface", FIELDS, TrimmedSurfaceVisitor::<T>::new())
+    }
+}
