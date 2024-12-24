@@ -1,4 +1,4 @@
-use std::f32::EPSILON;
+use std::{cmp::Ordering, f32::EPSILON};
 
 use argmin::core::ArgminFloat;
 use nalgebra::{Point3, Vector3, U3};
@@ -93,13 +93,20 @@ fn try_project_curve<T: FloatingPoint + ArgminFloat>(
         .zip(weights.into_iter())
         .map(|(p, w)| {
             let ray = NurbsCurve3D::polyline(&[p + offset, p + direction * ray_length], true);
-            let its = surface.find_intersections(&ray, None)?;
-            if its.is_empty() {
-                Err(anyhow::anyhow!("No intersection found"))
-            } else {
-                let uv = its[0].a().1;
-                Ok(Point3::new(uv.0 * w, uv.1 * w, w))
-            }
+            let closest = surface
+                .find_intersections(&ray, None)?
+                .into_iter()
+                .map(|it| {
+                    let pt = it.a().0;
+                    let dist = (p - pt).norm_squared();
+                    (dist, it)
+                })
+                .min_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal));
+            let closest = closest
+                .ok_or_else(|| anyhow::anyhow!("No intersection found"))?
+                .1;
+            let uv = closest.a().1;
+            Ok(Point3::new(uv.0 * w, uv.1 * w, w))
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
     NurbsCurve2D::try_new(curve.degree(), pts, curve.knots().to_vec())
