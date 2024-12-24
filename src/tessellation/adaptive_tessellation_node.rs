@@ -8,7 +8,7 @@ use crate::{
     prelude::{AdaptiveTessellationOptions, NurbsSurface},
 };
 
-use super::SurfacePoint;
+use super::{constraint::Constraint, SurfacePoint};
 
 /// Node for adaptive tessellation of a surface
 pub struct AdaptiveTessellationNode<T: RealField, D: DimName>
@@ -24,6 +24,7 @@ where
     pub(crate) mid_points: [Option<SurfacePoint<T, DimNameDiff<D, U1>>>; 4],
     pub(crate) horizontal: bool,
     pub(crate) center: Vector2<T>,
+    pub(crate) constraint: Option<Constraint>,
 }
 
 impl<T: FloatingPoint, D: DimName> AdaptiveTessellationNode<T, D>
@@ -45,7 +46,13 @@ where
             mid_points: [None, None, None, None],
             horizontal: false,
             center: Vector2::zeros(),
+            constraint: None,
         }
+    }
+
+    pub fn with_constraint(mut self, constraint: Constraint) -> Self {
+        self.constraint = Some(constraint);
+        self
     }
 
     pub fn id(&self) -> usize {
@@ -258,11 +265,13 @@ where
             > options.norm_tolerance
             || (self.corners[2].normal() - self.corners[3].normal()).norm_squared()
                 > options.norm_tolerance;
+        let vertical = vertical && !matches!(self.constraint, Some(Constraint::Vertical));
 
         let horizontal = (self.corners[1].normal() - self.corners[2].normal()).norm_squared()
             > options.norm_tolerance
             || (self.corners[3].normal() - self.corners[0].normal()).norm_squared()
                 > options.norm_tolerance;
+        let horizontal = horizontal && !matches!(self.constraint, Some(Constraint::Horizontal));
 
         match (vertical, horizontal) {
             (true, true) => DividableDirection::Both,
