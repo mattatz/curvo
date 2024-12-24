@@ -1,11 +1,11 @@
-use std::{cmp::Ordering, f32::EPSILON};
+use std::cmp::Ordering;
 
 use argmin::core::ArgminFloat;
-use nalgebra::{Point3, Vector3, U3};
+use nalgebra::{Matrix4, Point3, Vector3, U3};
 
 use crate::{
     curve::{NurbsCurve2D, NurbsCurve3D},
-    misc::FloatingPoint,
+    misc::{FloatingPoint, Invertible, Transformable},
     prelude::{BoundingBox, HasIntersection, Intersects},
 };
 
@@ -67,12 +67,24 @@ impl<T: FloatingPoint> TrimmedSurface<T> {
         &self.surface
     }
 
+    pub fn surface_mut(&mut self) -> &mut NurbsSurface3D<T> {
+        &mut self.surface
+    }
+
     pub fn exterior(&self) -> Option<&NurbsCurve2D<T>> {
         self.exterior.as_ref()
     }
 
+    pub fn exterior_mut(&mut self) -> Option<&mut NurbsCurve2D<T>> {
+        self.exterior.as_mut()
+    }
+
     pub fn interiors(&self) -> &[NurbsCurve2D<T>] {
         &self.interiors
+    }
+
+    pub fn interiors_mut(&mut self) -> &mut [NurbsCurve2D<T>] {
+        &mut self.interiors
     }
 }
 
@@ -110,6 +122,24 @@ fn try_project_curve<T: FloatingPoint + ArgminFloat>(
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
     NurbsCurve2D::try_new(curve.degree(), pts, curve.knots().to_vec())
+}
+
+/// Enable to transform a Trimmed surface by a given DxD matrix
+impl<'a, T: FloatingPoint> Transformable<&'a Matrix4<T>> for TrimmedSurface<T> {
+    fn transform(&mut self, transform: &'a Matrix4<T>) {
+        self.surface.transform(transform);
+    }
+}
+
+impl<T: FloatingPoint> Invertible for TrimmedSurface<T> {
+    /// Reverse the direction of the surface
+    fn invert(&mut self) {
+        self.surface.invert();
+        if let Some(curve) = self.exterior.as_mut() {
+            curve.invert();
+        }
+        self.interiors.iter_mut().for_each(|curve| curve.invert());
+    }
 }
 
 #[cfg(feature = "serde")]
