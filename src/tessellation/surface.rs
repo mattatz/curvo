@@ -3,6 +3,7 @@ use super::adaptive_tessellation_processor::AdaptiveTessellationProcessor;
 use super::surface_tessellation::SurfaceTessellation;
 use super::SurfacePoint;
 use super::{adaptive_tessellation_node::AdaptiveTessellationNode, Tessellation};
+use itertools::Itertools;
 use nalgebra::{
     allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, Vector2, U1,
 };
@@ -60,39 +61,42 @@ where
                 .collect()
         };
 
-        let mut pts = vec![];
-
-        vs.iter().for_each(|v| {
-            let mut row = vec![];
-            us.iter().for_each(|u| {
-                let ds = self.rational_derivatives(*u, *v, 1);
-                let norm = ds[1][0].cross(&ds[0][1]).normalize();
-                row.push(SurfacePoint {
-                    point: ds[0][0].clone().into(),
-                    normal: norm,
-                    uv: Vector2::new(*u, *v),
-                    is_normal_degenerated: false,
+        let pts = vs
+            .iter()
+            .map(|v| {
+                let row = us.iter().map(|u| {
+                    let ds = self.rational_derivatives(*u, *v, 1);
+                    let norm = ds[1][0].cross(&ds[0][1]).normalize();
+                    SurfacePoint {
+                        point: ds[0][0].clone().into(),
+                        normal: norm,
+                        uv: Vector2::new(*u, *v),
+                        is_normal_degenerated: false,
+                    }
                 });
-            });
-            pts.push(row);
-        });
+                row.collect_vec()
+            })
+            .collect_vec();
 
-        let mut divs = vec![];
         let divs_u = us.len() - 1;
         let divs_v = vs.len() - 1;
-        for i in 0..divs_v {
-            for j in 0..divs_u {
-                let iv = divs_v - i;
-                let corners = [
-                    pts[iv - 1][j].clone(),
-                    pts[iv - 1][j + 1].clone(),
-                    pts[iv][j + 1].clone(),
-                    pts[iv][j].clone(),
-                ];
-                let node = AdaptiveTessellationNode::new(divs.len(), corners, None);
-                divs.push(node);
-            }
-        }
+        let pts = &pts;
+
+        let divs = (0..divs_u)
+            .flat_map(|i| {
+                (0..divs_v).map(move |j| {
+                    let iv = divs_v - j;
+                    let corners = [
+                        pts[iv - 1][i].clone(),
+                        pts[iv - 1][i + 1].clone(),
+                        pts[iv][i + 1].clone(),
+                        pts[iv][i].clone(),
+                    ];
+                    let index = i * divs_v + j;
+                    AdaptiveTessellationNode::new(index, corners, None)
+                })
+            })
+            .collect_vec();
 
         let nodes = if !is_adaptive {
             divs
