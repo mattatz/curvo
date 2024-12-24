@@ -1,9 +1,12 @@
+use std::f32::EPSILON;
+
 use argmin::core::ArgminFloat;
-use nalgebra::{Point3, Vector3};
+use nalgebra::{Point3, Vector3, U3};
 
 use crate::{
     curve::{NurbsCurve2D, NurbsCurve3D},
     misc::FloatingPoint,
+    prelude::{BoundingBox, HasIntersection, Intersects},
 };
 
 use super::NurbsSurface3D;
@@ -73,20 +76,30 @@ impl<T: FloatingPoint> TrimmedSurface<T> {
     }
 }
 
+/// Try to project a 3D curve onto a 3D surface to get a 2D curve in parameter space
 fn try_project_curve<T: FloatingPoint + ArgminFloat>(
     surface: &NurbsSurface3D<T>,
     curve: &NurbsCurve3D<T>,
     direction: &Vector3<T>,
 ) -> anyhow::Result<NurbsCurve2D<T>> {
+    let b0: BoundingBox<T, U3> = surface.into();
+    let b1: BoundingBox<T, U3> = curve.into();
+    let ray_length = (b0.center() - b1.center()).norm() + b0.size().norm() + b1.size().norm();
+    let offset = -direction * T::epsilon();
     let weights = curve.weights();
     let pts = curve
         .dehomogenized_control_points()
         .iter()
         .zip(weights.into_iter())
         .map(|(p, w)| {
-            surface
-                .find_closest_parameter(p)
-                .map(|(x, y)| Point3::new(x * w, y * w, w))
+            let ray = NurbsCurve3D::polyline(&[p + offset, p + direction * ray_length], true);
+            let its = surface.find_intersections(&ray, None)?;
+            if its.is_empty() {
+                Err(anyhow::anyhow!("No intersection found"))
+            } else {
+                let uv = its[0].a().1;
+                Ok(Point3::new(uv.0 * w, uv.1 * w, w))
+            }
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
     NurbsCurve2D::try_new(curve.degree(), pts, curve.knots().to_vec())

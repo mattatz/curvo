@@ -7,7 +7,7 @@ pub mod surface_tessellation;
 pub mod tessellation_compound_curve;
 pub mod tessellation_curve;
 pub mod tessellation_region;
-// pub mod trimmed_surface;
+pub mod trimmed_surface;
 
 pub use surface_point::*;
 
