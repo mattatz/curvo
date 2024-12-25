@@ -178,19 +178,19 @@ where
 
     /// Check if the node has bad normals
     fn has_bad_normals(&self) -> bool {
-        self.corners.iter().any(|c| c.is_normal_degenerated)
+        self.corners.iter().any(|c| c.is_normal_degenerated())
     }
 
     fn fix_normals(&mut self) {
         let l = self.corners.len();
 
         for i in 0..l {
-            if self.corners[i].is_normal_degenerated {
+            if self.corners[i].is_normal_degenerated() {
                 //get neighbors
                 let v1 = &self.corners[(i + 1) % l];
                 let v2 = &self.corners[(i + 3) % l];
                 //correct the normal
-                self.corners[i].normal = if v1.is_normal_degenerated {
+                self.corners[i].normal = if v1.is_normal_degenerated() {
                     v2.normal.clone()
                 } else {
                     v1.normal.clone()
@@ -272,16 +272,16 @@ where
     let pt = derivs[0][0].clone();
     let norm = derivs[1][0].cross(&derivs[0][1]);
     let is_normal_degenerated = norm.magnitude_squared() < T::default_epsilon();
-    SurfacePoint {
-        point: pt.into(),
-        normal: if !is_normal_degenerated {
+    SurfacePoint::new(
+        uv,
+        pt.into(),
+        if !is_normal_degenerated {
             norm.normalize()
         } else {
             norm
         },
-        uv,
         is_normal_degenerated,
-    }
+    )
 }
 
 /// Enum to represent the direction in which a node can be divided

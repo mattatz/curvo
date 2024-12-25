@@ -67,12 +67,7 @@ where
                 let row = us.iter().map(|u| {
                     let ds = self.rational_derivatives(*u, *v, 1);
                     let norm = ds[1][0].cross(&ds[0][1]).normalize();
-                    SurfacePoint {
-                        point: ds[0][0].clone().into(),
-                        normal: norm,
-                        uv: Vector2::new(*u, *v),
-                        is_normal_degenerated: false,
-                    }
+                    SurfacePoint::new(Vector2::new(*u, *v), ds[0][0].clone().into(), norm, false)
                 });
                 row.collect_vec()
             })
