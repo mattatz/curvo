@@ -82,17 +82,17 @@ where
         let divs_v = vs.len() - 1;
         let pts = &pts;
 
-        let divs = (0..divs_u)
+        let divs = (0..divs_v)
             .flat_map(|i| {
-                (0..divs_v).map(move |j| {
-                    let iv = divs_v - j;
+                (0..divs_u).map(move |j| {
+                    let iv = divs_v - i;
                     let corners = [
-                        pts[iv - 1][i].clone(),
-                        pts[iv - 1][i + 1].clone(),
-                        pts[iv][i + 1].clone(),
-                        pts[iv][i].clone(),
+                        pts[iv - 1][j].clone(),
+                        pts[iv - 1][j + 1].clone(),
+                        pts[iv][j + 1].clone(),
+                        pts[iv][j].clone(),
                     ];
-                    let index = i * divs_v + j;
+                    let index = i * divs_u + j;
                     AdaptiveTessellationNode::new(index, corners, None)
                 })
             })
