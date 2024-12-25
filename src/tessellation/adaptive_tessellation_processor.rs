@@ -112,10 +112,10 @@ where
         let dividable = node.should_divide(self.surface, options, current_depth);
 
         node.horizontal = match dividable {
-            DividableDirection::Both => horizontal,
-            DividableDirection::Vertical => false,
-            DividableDirection::Horizontal => true,
-            DividableDirection::None => {
+            Some(DividableDirection::Both) => horizontal,
+            Some(DividableDirection::Vertical) => false,
+            Some(DividableDirection::Horizontal) => true,
+            None => {
                 return;
             }
         };

@@ -244,19 +244,19 @@ where
         surface: &NurbsSurface<T, D>,
         options: &AdaptiveTessellationOptions<T>,
         current_depth: usize,
-    ) -> DividableDirection {
+    ) -> Option<DividableDirection> {
         if current_depth < options.min_depth {
-            return DividableDirection::Both;
+            return Some(DividableDirection::Both);
         }
 
         if current_depth >= options.max_depth {
-            return DividableDirection::None;
+            return None;
         }
 
         if self.has_bad_normals() {
             self.fix_normals();
             //don't divide any further when encountering a degenerate normal
-            return DividableDirection::None;
+            return None;
         }
 
         // println!("{}, {}", surface.v_degree() >= 2, surface.u_degree() >= 2);
@@ -274,9 +274,9 @@ where
         let horizontal = horizontal && !matches!(self.constraint, Some(Constraint::Horizontal));
 
         match (vertical, horizontal) {
-            (true, true) => DividableDirection::Both,
-            (true, false) => DividableDirection::Vertical,
-            (false, true) => DividableDirection::Horizontal,
+            (true, true) => Some(DividableDirection::Both),
+            (true, false) => Some(DividableDirection::Vertical),
+            (false, true) => Some(DividableDirection::Horizontal),
             (false, false) => {
                 let center = self.center(surface);
                 if (center.normal() - self.corners[0].normal()).norm_squared()
@@ -288,9 +288,9 @@ where
                     || (center.normal() - self.corners[3].normal()).norm_squared()
                         > options.norm_tolerance
                 {
-                    DividableDirection::Both
+                    Some(DividableDirection::Both)
                 } else {
-                    DividableDirection::None
+                    None
                 }
             }
         }
@@ -303,5 +303,4 @@ pub enum DividableDirection {
     Both,
     Vertical,
     Horizontal,
-    None,
 }
