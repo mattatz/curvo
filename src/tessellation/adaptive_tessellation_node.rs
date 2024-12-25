@@ -6,9 +6,10 @@ use nalgebra::{
 use crate::{
     misc::FloatingPoint,
     prelude::{AdaptiveTessellationOptions, NurbsSurface},
+    surface::UVDirection,
 };
 
-use super::{constraint::Constraint, SurfacePoint};
+use super::SurfacePoint;
 
 /// Node for adaptive tessellation of a surface
 pub struct AdaptiveTessellationNode<T: RealField, D: DimName>
@@ -22,9 +23,9 @@ where
     pub(crate) corners: [SurfacePoint<T, DimNameDiff<D, U1>>; 4],
     pub(crate) neighbors: [Option<usize>; 4], // [south, east, north, west] order (east & west are u direction, north & south are v direction)
     pub(crate) mid_points: [Option<SurfacePoint<T, DimNameDiff<D, U1>>>; 4],
-    pub(crate) horizontal: bool,
+    pub(crate) direction: UVDirection,
     pub(crate) center: Vector2<T>,
-    pub(crate) constraint: Option<Constraint>,
+    pub(crate) constraint: Option<UVDirection>,
 }
 
 impl<T: FloatingPoint, D: DimName> AdaptiveTessellationNode<T, D>
@@ -44,13 +45,13 @@ where
             neighbors: neighbors.unwrap_or([None, None, None, None]),
             children: vec![],
             mid_points: [None, None, None, None],
-            horizontal: false,
+            direction: UVDirection::V,
             center: Vector2::zeros(),
             constraint: None,
         }
     }
 
-    pub fn with_constraint(mut self, constraint: Constraint) -> Self {
+    pub fn with_constraint(mut self, constraint: UVDirection) -> Self {
         self.constraint = Some(constraint);
         self
     }
@@ -110,8 +111,8 @@ where
             return vec![self.corners[edge_index].clone()];
         }
 
-        if self.horizontal {
-            match edge_index {
+        match self.direction {
+            UVDirection::U => match edge_index {
                 0 => nodes[self.children[0]].get_edge_corners(nodes, 0),
                 1 => [
                     nodes[self.children[0]].get_edge_corners(nodes, 1),
@@ -125,10 +126,8 @@ where
                 ]
                 .concat(),
                 _ => vec![],
-            }
-        } else {
-            //vertical case
-            match edge_index {
+            },
+            UVDirection::V => match edge_index {
                 0 => [
                     nodes[self.children[0]].get_edge_corners(nodes, 0),
                     nodes[self.children[1]].get_edge_corners(nodes, 0),
@@ -142,7 +141,7 @@ where
                 .concat(),
                 3 => nodes[self.children[0]].get_edge_corners(nodes, 3),
                 _ => vec![],
-            }
+            },
         }
     }
 
@@ -261,22 +260,22 @@ where
 
         // println!("{}, {}", surface.v_degree() >= 2, surface.u_degree() >= 2);
 
-        let vertical = (self.corners[0].normal() - self.corners[1].normal()).norm_squared()
+        let v_direction = (self.corners[0].normal() - self.corners[1].normal()).norm_squared()
             > options.norm_tolerance
             || (self.corners[2].normal() - self.corners[3].normal()).norm_squared()
                 > options.norm_tolerance;
-        let vertical = vertical && !matches!(self.constraint, Some(Constraint::Vertical));
+        let v_direction = v_direction && !matches!(self.constraint, Some(UVDirection::V));
 
-        let horizontal = (self.corners[1].normal() - self.corners[2].normal()).norm_squared()
+        let u_direction = (self.corners[1].normal() - self.corners[2].normal()).norm_squared()
             > options.norm_tolerance
             || (self.corners[3].normal() - self.corners[0].normal()).norm_squared()
                 > options.norm_tolerance;
-        let horizontal = horizontal && !matches!(self.constraint, Some(Constraint::Horizontal));
+        let u_direction = u_direction && !matches!(self.constraint, Some(UVDirection::U));
 
-        match (vertical, horizontal) {
+        match (u_direction, v_direction) {
             (true, true) => Some(DividableDirection::Both),
-            (true, false) => Some(DividableDirection::Vertical),
-            (false, true) => Some(DividableDirection::Horizontal),
+            (true, false) => Some(DividableDirection::U),
+            (false, true) => Some(DividableDirection::V),
             (false, false) => {
                 let center = self.center(surface);
                 if (center.normal() - self.corners[0].normal()).norm_squared()
@@ -301,6 +300,6 @@ where
 #[derive(Debug)]
 pub enum DividableDirection {
     Both,
-    Vertical,
-    Horizontal,
+    U,
+    V,
 }
