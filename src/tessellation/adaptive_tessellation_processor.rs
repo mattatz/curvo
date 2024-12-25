@@ -86,8 +86,7 @@ where
         self.iterate(id, options, 0, direction);
     }
 
-    /// Iterate over the nodes and divide them if necessary
-    /// todo: should not divide if a degree on current direction is 1 & duplicate vertices to avoid share a normal
+    /// iterate over the nodes and divide them if necessary
     fn iterate(
         &mut self,
         id: usize,
@@ -128,7 +127,7 @@ where
                         node.corners[3].clone(),
                     ];
 
-                    node.children = vec![id0, id1];
+                    node.assign_children([id0, id1]);
 
                     //assign neighbors to bottom node
                     let bottom_neighbors = [
@@ -165,7 +164,7 @@ where
                         node.evaluate_mid_point(self.surface, 2),
                     ];
 
-                    node.children = vec![id0, id1];
+                    node.assign_children([id0, id1]);
 
                     let left_neighbors = [
                         node.neighbors[0],

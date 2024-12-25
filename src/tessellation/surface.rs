@@ -109,10 +109,10 @@ where
             for iv in 0..divs_v {
                 for iu in 0..divs_u {
                     let index = iv * divs_u + iu;
-                    let s = processor.south(index, iv, divs_u, divs_v).map(|n| n.id);
-                    let e = processor.east(index, iu, divs_u).map(|n| n.id);
-                    let n = processor.north(index, iv, divs_u).map(|n| n.id);
-                    let w = processor.west(index, iv).map(|n| n.id);
+                    let s = processor.south(index, iv, divs_u, divs_v).map(|n| n.id());
+                    let e = processor.east(index, iu, divs_u).map(|n| n.id());
+                    let n = processor.north(index, iv, divs_u).map(|n| n.id());
+                    let w = processor.west(index, iv).map(|n| n.id());
                     let node = processor.nodes.get_mut(index).unwrap();
                     node.neighbors = [s, e, n, w];
                     processor.divide(index, &options);

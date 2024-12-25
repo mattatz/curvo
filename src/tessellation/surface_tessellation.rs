@@ -114,11 +114,6 @@ where
                     }
                 }
             };
-        } else {
-            node.children.iter().for_each(|child| {
-                let c = &nodes[*child];
-                self.triangulate(surface, nodes, c);
-            });
         }
     }
 

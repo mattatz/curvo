@@ -18,14 +18,14 @@ where
     DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
-    pub(crate) id: usize,
-    pub(crate) children: Vec<usize>,
+    id: usize,
+    children: Option<[usize; 2]>,
     pub(crate) corners: [SurfacePoint<T, DimNameDiff<D, U1>>; 4], // [left-bottom, right-bottom, right-top, left-top] order
     pub(crate) neighbors: [Option<usize>; 4], // [south, east, north, west] order (east & west are u direction, north & south are v direction)
-    pub(crate) mid_points: [Option<SurfacePoint<T, DimNameDiff<D, U1>>>; 4],
+    mid_points: [Option<SurfacePoint<T, DimNameDiff<D, U1>>>; 4], // [south, east, north, west] order
     pub(crate) direction: UVDirection,
-    pub(crate) center: Vector2<T>,
-    pub(crate) constraint: Option<UVDirection>,
+    center: Vector2<T>,
+    constraint: Option<UVDirection>,
 }
 
 impl<T: FloatingPoint, D: DimName> AdaptiveTessellationNode<T, D>
@@ -39,14 +39,15 @@ where
         corners: [SurfacePoint<T, DimNameDiff<D, U1>>; 4],
         neighbors: Option<[Option<usize>; 4]>,
     ) -> Self {
+        let center = (corners[0].uv + corners[2].uv) * T::from_f64(0.5).unwrap();
         Self {
             id,
             corners,
-            neighbors: neighbors.unwrap_or([None, None, None, None]),
-            children: vec![],
+            neighbors: neighbors.unwrap_or([None; 4]),
+            children: None,
             mid_points: [None, None, None, None],
             direction: UVDirection::V,
-            center: Vector2::zeros(),
+            center,
             constraint: None,
         }
     }
@@ -61,44 +62,23 @@ where
     }
 
     pub fn is_leaf(&self) -> bool {
-        self.children.is_empty()
+        self.children.is_none()
+    }
+
+    pub fn assign_children(&mut self, children: [usize; 2]) {
+        self.children = Some(children);
     }
 
     pub fn center(&self, surface: &NurbsSurface<T, D>) -> SurfacePoint<T, DimNameDiff<D, U1>> {
-        self.evaluate_surface(surface, self.center)
+        evaluate_surface(surface, self.center)
     }
 
     pub fn evaluate_corners(&mut self, surface: &NurbsSurface<T, D>) {
-        //eval the center
-        let inv = T::from_f64(0.5).unwrap();
-        self.center = (self.corners[0].uv + self.corners[2].uv) * inv;
-
         //eval all of the corners
-        for i in 0..4 {
-            let c = &self.corners[i];
-            let evaled = self.evaluate_surface(surface, c.uv);
-            self.corners[i] = evaled;
-        }
-    }
-
-    fn evaluate_surface(
-        &self,
-        surface: &NurbsSurface<T, D>,
-        uv: Vector2<T>,
-    ) -> SurfacePoint<T, DimNameDiff<D, U1>> {
-        let derivs = surface.rational_derivatives(uv.x, uv.y, 1);
-        let pt = derivs[0][0].clone();
-        let mut norm = derivs[1][0].cross(&derivs[0][1]);
-        let degen = norm.magnitude_squared() < T::default_epsilon();
-        if !degen {
-            norm = norm.normalize();
-        }
-        SurfacePoint {
-            point: pt.into(),
-            normal: norm,
-            uv,
-            is_normal_degenerated: degen,
-        }
+        self.corners.iter_mut().for_each(|pt| {
+            let e = evaluate_surface(surface, pt.uv);
+            *pt = e;
+        });
     }
 
     fn get_edge_corners(
@@ -106,42 +86,43 @@ where
         nodes: &Vec<Self>,
         edge_index: usize,
     ) -> Vec<SurfacePoint<T, DimNameDiff<D, U1>>> {
-        //if its a leaf, there are no children to obtain uvs from
-        if self.is_leaf() {
-            return vec![self.corners[edge_index].clone()];
-        }
-
-        match self.direction {
-            UVDirection::U => match edge_index {
-                0 => nodes[self.children[0]].get_edge_corners(nodes, 0),
-                1 => [
-                    nodes[self.children[0]].get_edge_corners(nodes, 1),
-                    nodes[self.children[1]].get_edge_corners(nodes, 1),
-                ]
-                .concat(),
-                2 => nodes[self.children[1]].get_edge_corners(nodes, 2),
-                3 => [
-                    nodes[self.children[1]].get_edge_corners(nodes, 3),
-                    nodes[self.children[0]].get_edge_corners(nodes, 3),
-                ]
-                .concat(),
-                _ => vec![],
+        match &self.children {
+            Some(children) => match self.direction {
+                UVDirection::U => match edge_index {
+                    0 => nodes[children[0]].get_edge_corners(nodes, 0),
+                    1 => [
+                        nodes[children[0]].get_edge_corners(nodes, 1),
+                        nodes[children[1]].get_edge_corners(nodes, 1),
+                    ]
+                    .concat(),
+                    2 => nodes[children[1]].get_edge_corners(nodes, 2),
+                    3 => [
+                        nodes[children[1]].get_edge_corners(nodes, 3),
+                        nodes[children[0]].get_edge_corners(nodes, 3),
+                    ]
+                    .concat(),
+                    _ => vec![],
+                },
+                UVDirection::V => match edge_index {
+                    0 => [
+                        nodes[children[0]].get_edge_corners(nodes, 0),
+                        nodes[children[1]].get_edge_corners(nodes, 0),
+                    ]
+                    .concat(),
+                    1 => nodes[children[1]].get_edge_corners(nodes, 1),
+                    2 => [
+                        nodes[children[1]].get_edge_corners(nodes, 2),
+                        nodes[children[0]].get_edge_corners(nodes, 2),
+                    ]
+                    .concat(),
+                    3 => nodes[children[0]].get_edge_corners(nodes, 3),
+                    _ => vec![],
+                },
             },
-            UVDirection::V => match edge_index {
-                0 => [
-                    nodes[self.children[0]].get_edge_corners(nodes, 0),
-                    nodes[self.children[1]].get_edge_corners(nodes, 0),
-                ]
-                .concat(),
-                1 => nodes[self.children[1]].get_edge_corners(nodes, 1),
-                2 => [
-                    nodes[self.children[1]].get_edge_corners(nodes, 2),
-                    nodes[self.children[0]].get_edge_corners(nodes, 2),
-                ]
-                .concat(),
-                3 => nodes[self.children[0]].get_edge_corners(nodes, 3),
-                _ => vec![],
-            },
+            None => {
+                //if its a leaf, there are no children to obtain uvs from
+                vec![self.corners[edge_index].clone()]
+            }
         }
     }
 
@@ -182,25 +163,25 @@ where
             None => {
                 match index {
                     0 => {
-                        self.mid_points[0] = Some(self.evaluate_surface(
+                        self.mid_points[0] = Some(evaluate_surface(
                             surface,
                             Vector2::new(self.center.x, self.corners[0].uv.y),
                         ));
                     }
                     1 => {
-                        self.mid_points[1] = Some(self.evaluate_surface(
+                        self.mid_points[1] = Some(evaluate_surface(
                             surface,
                             Vector2::new(self.corners[1].uv.x, self.center.y),
                         ));
                     }
                     2 => {
-                        self.mid_points[2] = Some(self.evaluate_surface(
+                        self.mid_points[2] = Some(evaluate_surface(
                             surface,
                             Vector2::new(self.center.x, self.corners[2].uv.y),
                         ));
                     }
                     3 => {
-                        self.mid_points[3] = Some(self.evaluate_surface(
+                        self.mid_points[3] = Some(evaluate_surface(
                             surface,
                             Vector2::new(self.corners[0].uv.x, self.center.y),
                         ));
@@ -291,6 +272,32 @@ where
                 }
             }
         }
+    }
+}
+
+/// Evaluate the surface at a given uv coordinate
+fn evaluate_surface<T: FloatingPoint, D: DimName>(
+    surface: &NurbsSurface<T, D>,
+    uv: Vector2<T>,
+) -> SurfacePoint<T, DimNameDiff<D, U1>>
+where
+    D: DimNameSub<U1>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+{
+    let derivs = surface.rational_derivatives(uv.x, uv.y, 1);
+    let pt = derivs[0][0].clone();
+    let norm = derivs[1][0].cross(&derivs[0][1]);
+    let is_normal_degenerated = norm.magnitude_squared() < T::default_epsilon();
+    SurfacePoint {
+        point: pt.into(),
+        normal: if !is_normal_degenerated {
+            norm.normalize()
+        } else {
+            norm
+        },
+        uv,
+        is_normal_degenerated,
     }
 }
 
