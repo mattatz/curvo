@@ -20,7 +20,7 @@ where
 {
     pub(crate) id: usize,
     pub(crate) children: Vec<usize>,
-    pub(crate) corners: [SurfacePoint<T, DimNameDiff<D, U1>>; 4],
+    pub(crate) corners: [SurfacePoint<T, DimNameDiff<D, U1>>; 4], // [left-bottom, right-bottom, right-top, left-top] order
     pub(crate) neighbors: [Option<usize>; 4], // [south, east, north, west] order (east & west are u direction, north & south are v direction)
     pub(crate) mid_points: [Option<SurfacePoint<T, DimNameDiff<D, U1>>>; 4],
     pub(crate) direction: UVDirection,

@@ -84,15 +84,15 @@ where
 
         let divs = (0..divs_v)
             .flat_map(|i| {
-                (0..divs_u).map(move |j| {
-                    let iv = divs_v - i;
+                let iv = divs_v - i;
+                (0..divs_u).map(move |iu| {
                     let corners = [
-                        pts[iv - 1][j].clone(),
-                        pts[iv - 1][j + 1].clone(),
-                        pts[iv][j + 1].clone(),
-                        pts[iv][j].clone(),
+                        pts[iv - 1][iu].clone(),
+                        pts[iv - 1][iu + 1].clone(),
+                        pts[iv][iu + 1].clone(),
+                        pts[iv][iu].clone(),
                     ];
-                    let index = i * divs_u + j;
+                    let index = i * divs_u + iu;
                     AdaptiveTessellationNode::new(index, corners, None)
                 })
             })
