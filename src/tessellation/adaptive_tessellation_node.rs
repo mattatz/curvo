@@ -25,7 +25,7 @@ where
     pub(crate) neighbors: [Option<usize>; 4], // [south, east, north, west] order (east & west are u direction, north & south are v direction)
     mid_points: [Option<SurfacePoint<T, DimNameDiff<D, U1>>>; 4], // [south, east, north, west] order
     pub(crate) direction: UVDirection,
-    center: Vector2<T>,
+    uv_center: Vector2<T>,
     constraint: Option<UVDirection>,
 }
 
@@ -40,7 +40,7 @@ where
         corners: [SurfacePoint<T, DimNameDiff<D, U1>>; 4],
         neighbors: Option<[Option<usize>; 4]>,
     ) -> Self {
-        let center = (corners[0].uv + corners[2].uv) * T::from_f64(0.5).unwrap();
+        let uv_center = (corners[0].uv + corners[2].uv) * T::from_f64(0.5).unwrap();
         Self {
             id,
             corners,
@@ -48,7 +48,7 @@ where
             children: None,
             mid_points: [None, None, None, None],
             direction: UVDirection::V,
-            center,
+            uv_center,
             constraint: None,
         }
     }
@@ -70,8 +70,9 @@ where
         self.children = Some(children);
     }
 
+    /// Evaluate the center of the node
     pub fn center(&self, surface: &NurbsSurface<T, D>) -> SurfacePoint<T, DimNameDiff<D, U1>> {
-        evaluate_surface(surface, self.center)
+        evaluate_surface(surface, self.uv_center)
     }
 
     pub fn evaluate_corners(&mut self, surface: &NurbsSurface<T, D>) {
@@ -164,10 +165,14 @@ where
             Some(ref p) => p.clone(),
             None => {
                 let uv = match direction {
-                    NeighborDirection::South => Vector2::new(self.center.x, self.corners[0].uv.y),
-                    NeighborDirection::East => Vector2::new(self.corners[1].uv.x, self.center.y),
-                    NeighborDirection::North => Vector2::new(self.center.x, self.corners[2].uv.y),
-                    NeighborDirection::West => Vector2::new(self.corners[0].uv.x, self.center.y),
+                    NeighborDirection::South => {
+                        Vector2::new(self.uv_center.x, self.corners[0].uv.y)
+                    }
+                    NeighborDirection::East => Vector2::new(self.corners[1].uv.x, self.uv_center.y),
+                    NeighborDirection::North => {
+                        Vector2::new(self.uv_center.x, self.corners[2].uv.y)
+                    }
+                    NeighborDirection::West => Vector2::new(self.corners[0].uv.x, self.uv_center.y),
                 };
                 let pt = evaluate_surface(surface, uv);
                 self.mid_points[index] = Some(pt.clone());
@@ -259,12 +264,12 @@ where
 }
 
 /// Evaluate the surface at a given uv coordinate
-fn evaluate_surface<T: FloatingPoint, D: DimName>(
+fn evaluate_surface<T: FloatingPoint, D>(
     surface: &NurbsSurface<T, D>,
     uv: Vector2<T>,
 ) -> SurfacePoint<T, DimNameDiff<D, U1>>
 where
-    D: DimNameSub<U1>,
+    D: DimName + DimNameSub<U1>,
     DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
