@@ -81,7 +81,7 @@ where
         }
     }
 
-    pub fn evaluate_surface(
+    fn evaluate_surface(
         &self,
         surface: &NurbsSurface<T, D>,
         uv: Vector2<T>,
@@ -101,7 +101,7 @@ where
         }
     }
 
-    pub fn get_edge_corners(
+    fn get_edge_corners(
         &self,
         nodes: &Vec<Self>,
         edge_index: usize,
@@ -212,14 +212,12 @@ where
         }
     }
 
-    pub fn has_bad_normals(&self) -> bool {
-        self.corners[0].is_normal_degenerated
-            || self.corners[1].is_normal_degenerated
-            || self.corners[2].is_normal_degenerated
-            || self.corners[3].is_normal_degenerated
+    /// Check if the node has bad normals
+    fn has_bad_normals(&self) -> bool {
+        self.corners.iter().any(|c| c.is_normal_degenerated)
     }
 
-    pub fn fix_normals(&mut self) {
+    fn fix_normals(&mut self) {
         let l = self.corners.len();
 
         for i in 0..l {

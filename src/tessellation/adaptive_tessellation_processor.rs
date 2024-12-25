@@ -32,12 +32,10 @@ where
     pub fn north(
         &self,
         index: usize,
-        i: usize,
-        _j: usize,
+        iv: usize,
         divs_u: usize,
-        _divs_v: usize,
     ) -> Option<&AdaptiveTessellationNode<T, D>> {
-        if i == 0 {
+        if iv == 0 {
             None
         } else {
             Some(&self.nodes[index - divs_u])
@@ -47,12 +45,11 @@ where
     pub fn south(
         &self,
         index: usize,
-        i: usize,
-        _j: usize,
+        iv: usize,
         divs_u: usize,
         divs_v: usize,
     ) -> Option<&AdaptiveTessellationNode<T, D>> {
-        if i == divs_v - 1 {
+        if iv == divs_v - 1 {
             None
         } else {
             Some(&self.nodes[index + divs_u])
@@ -62,27 +59,18 @@ where
     pub fn east(
         &self,
         index: usize,
-        _i: usize,
-        j: usize,
+        iu: usize,
         divs_u: usize,
-        _divs_v: usize,
     ) -> Option<&AdaptiveTessellationNode<T, D>> {
-        if j == divs_u - 1 {
+        if iu == divs_u - 1 {
             None
         } else {
             Some(&self.nodes[index + 1])
         }
     }
 
-    pub fn west(
-        &self,
-        index: usize,
-        _i: usize,
-        j: usize,
-        _divs_u: usize,
-        _divs_v: usize,
-    ) -> Option<&AdaptiveTessellationNode<T, D>> {
-        if j == 0 {
+    pub fn west(&self, index: usize, iv: usize) -> Option<&AdaptiveTessellationNode<T, D>> {
+        if iv == 0 {
             None
         } else {
             Some(&self.nodes[index - 1])

@@ -106,16 +106,16 @@ where
                 nodes: divs,
             };
 
-            for i in 0..divs_v {
-                for j in 0..divs_u {
-                    let ci = i * divs_u + j;
-                    let s = processor.south(ci, i, j, divs_u, divs_v).map(|n| n.id);
-                    let e = processor.east(ci, i, j, divs_u, divs_v).map(|n| n.id);
-                    let n = processor.north(ci, i, j, divs_u, divs_v).map(|n| n.id);
-                    let w = processor.west(ci, i, j, divs_u, divs_v).map(|n| n.id);
-                    let node = processor.nodes.get_mut(ci).unwrap();
+            for iv in 0..divs_v {
+                for iu in 0..divs_u {
+                    let index = iv * divs_u + iu;
+                    let s = processor.south(index, iv, divs_u, divs_v).map(|n| n.id);
+                    let e = processor.east(index, iu, divs_u).map(|n| n.id);
+                    let n = processor.north(index, iv, divs_u).map(|n| n.id);
+                    let w = processor.west(index, iv).map(|n| n.id);
+                    let node = processor.nodes.get_mut(index).unwrap();
                     node.neighbors = [s, e, n, w];
-                    processor.divide(ci, &options);
+                    processor.divide(index, &options);
                 }
             }
 
