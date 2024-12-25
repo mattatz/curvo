@@ -125,8 +125,8 @@ fn try_project_curve<T: FloatingPoint + ArgminFloat>(
 ) -> anyhow::Result<NurbsCurve2D<T>> {
     let b0: BoundingBox<T, U3> = surface.into();
     let b1: BoundingBox<T, U3> = curve.into();
-    let l0 = ComplexField::abs(b0.size().dot(&direction));
-    let l1 = ComplexField::abs(b1.size().dot(&direction));
+    let l0 = ComplexField::abs(b0.size().dot(direction));
+    let l1 = ComplexField::abs(b1.size().dot(direction));
     let ray_length = (b0.center() - b1.center()).norm() + l0 + l1;
     let offset = direction * T::one();
     let weights = curve.weights();
