@@ -6,7 +6,7 @@ use crate::{
 };
 
 use super::{
-    adaptive_tessellation_node::DividableDirection,
+    adaptive_tessellation_node::{DividableDirection, NeighborDirection},
     adaptive_tessellation_option::AdaptiveTessellationOptions,
 };
 
@@ -117,12 +117,12 @@ where
                     let bottom = [
                         node.corners[0].clone(),
                         node.corners[1].clone(),
-                        node.evaluate_mid_point(self.surface, 1),
-                        node.evaluate_mid_point(self.surface, 3),
+                        node.evaluate_mid_point(self.surface, NeighborDirection::East),
+                        node.evaluate_mid_point(self.surface, NeighborDirection::West),
                     ];
                     let top = [
-                        node.evaluate_mid_point(self.surface, 3),
-                        node.evaluate_mid_point(self.surface, 1),
+                        node.evaluate_mid_point(self.surface, NeighborDirection::West),
+                        node.evaluate_mid_point(self.surface, NeighborDirection::East),
                         node.corners[2].clone(),
                         node.corners[3].clone(),
                     ];
@@ -153,15 +153,15 @@ where
                 UVDirection::V => {
                     let left = [
                         node.corners[0].clone(),
-                        node.evaluate_mid_point(self.surface, 0),
-                        node.evaluate_mid_point(self.surface, 2),
+                        node.evaluate_mid_point(self.surface, NeighborDirection::South),
+                        node.evaluate_mid_point(self.surface, NeighborDirection::North),
                         node.corners[3].clone(),
                     ];
                     let right = [
-                        node.evaluate_mid_point(self.surface, 0),
+                        node.evaluate_mid_point(self.surface, NeighborDirection::South),
                         node.corners[1].clone(),
                         node.corners[2].clone(),
-                        node.evaluate_mid_point(self.surface, 2),
+                        node.evaluate_mid_point(self.surface, NeighborDirection::North),
                     ];
 
                     node.assign_children([id0, id1]);

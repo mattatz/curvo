@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use nalgebra::{
     allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, RealField, Vector2,
     U1,
@@ -143,11 +144,11 @@ where
 
                 //clip the range of uvs to match self one
                 let idx = edge_index % 2;
-                let mut corner: Vec<_> = corners
+                let corner = corners
                     .into_iter()
                     .filter(|c| c.uv[idx] > orig[0].uv[idx] + e && c.uv[idx] < orig[2].uv[idx] - e)
-                    .collect();
-                corner.reverse();
+                    .rev()
+                    .collect_vec();
                 [base_arr, corner].concat()
             }
         }
@@ -156,39 +157,21 @@ where
     pub fn evaluate_mid_point(
         &mut self,
         surface: &NurbsSurface<T, D>,
-        index: usize,
+        direction: NeighborDirection,
     ) -> SurfacePoint<T, DimNameDiff<D, U1>> {
+        let index = direction as usize;
         match self.mid_points[index] {
             Some(ref p) => p.clone(),
             None => {
-                match index {
-                    0 => {
-                        self.mid_points[0] = Some(evaluate_surface(
-                            surface,
-                            Vector2::new(self.center.x, self.corners[0].uv.y),
-                        ));
-                    }
-                    1 => {
-                        self.mid_points[1] = Some(evaluate_surface(
-                            surface,
-                            Vector2::new(self.corners[1].uv.x, self.center.y),
-                        ));
-                    }
-                    2 => {
-                        self.mid_points[2] = Some(evaluate_surface(
-                            surface,
-                            Vector2::new(self.center.x, self.corners[2].uv.y),
-                        ));
-                    }
-                    3 => {
-                        self.mid_points[3] = Some(evaluate_surface(
-                            surface,
-                            Vector2::new(self.corners[0].uv.x, self.center.y),
-                        ));
-                    }
-                    _ => {}
+                let uv = match direction {
+                    NeighborDirection::South => Vector2::new(self.center.x, self.corners[0].uv.y),
+                    NeighborDirection::East => Vector2::new(self.corners[1].uv.x, self.center.y),
+                    NeighborDirection::North => Vector2::new(self.center.x, self.corners[2].uv.y),
+                    NeighborDirection::West => Vector2::new(self.corners[0].uv.x, self.center.y),
                 };
-                self.mid_points[index].clone().unwrap()
+                let pt = evaluate_surface(surface, uv);
+                self.mid_points[index] = Some(pt.clone());
+                pt
             }
         }
     }
@@ -307,4 +290,13 @@ pub enum DividableDirection {
     Both,
     U,
     V,
+}
+
+/// Enum to represent the direction of a neighbor
+#[derive(Debug, Clone, Copy)]
+pub enum NeighborDirection {
+    South = 0,
+    East = 1,
+    North = 2,
+    West = 3,
 }
