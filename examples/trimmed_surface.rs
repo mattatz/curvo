@@ -170,8 +170,8 @@ fn setup(
 
     let plane_surface = NurbsSurface::plane(
         Point3::new(2.5, 0., 5.),
-        (Vector3::x() * 2.5),
-        (Vector3::z() * 5.),
+        Vector3::x() * 2.5,
+        Vector3::z() * 5.,
     );
     let trimmed = TrimmedSurface::new(
         plane_surface.clone(),
