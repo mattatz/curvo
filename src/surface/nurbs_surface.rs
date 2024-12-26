@@ -543,10 +543,7 @@ where
         y_axis: OVector<T, DimNameDiff<D, U1>>,
     ) -> Self
     where
-        D: DimNameSub<U1>,
         <D as DimNameSub<U1>>::Output: DimNameAdd<U1>,
-        DefaultAllocator: Allocator<D>,
-        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
         DefaultAllocator: Allocator<<<D as DimNameSub<U1>>::Output as DimNameAdd<U1>>::Output>,
     {
         let control_points = vec![
