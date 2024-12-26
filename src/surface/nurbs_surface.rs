@@ -530,6 +530,61 @@ where
         flipped
     }
 
+    /// Create a plane shaped NURBS surface
+    /// Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point3, Vector3};
+    /// let plane = NurbsSurface3D::<f64>::plane(Point3::origin(), Vector3::x(), Vector3::y());
+    /// ```
+    pub fn plane(
+        center: OPoint<T, DimNameDiff<D, U1>>,
+        x_axis: OVector<T, DimNameDiff<D, U1>>,
+        y_axis: OVector<T, DimNameDiff<D, U1>>,
+    ) -> Self
+    where
+        D: DimNameSub<U1>,
+        <D as DimNameSub<U1>>::Output: DimNameAdd<U1>,
+        DefaultAllocator: Allocator<D>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+        DefaultAllocator: Allocator<<<D as DimNameSub<U1>>::Output as DimNameAdd<U1>>::Output>,
+    {
+        let control_points = vec![
+            vec![
+                OPoint::from_slice(
+                    (center.clone() - x_axis.clone() - y_axis.clone())
+                        .to_homogeneous()
+                        .as_slice(),
+                ),
+                OPoint::from_slice(
+                    (center.clone() + x_axis.clone() - y_axis.clone())
+                        .to_homogeneous()
+                        .as_slice(),
+                ),
+            ],
+            vec![
+                OPoint::from_slice(
+                    (center.clone() - x_axis.clone() + y_axis.clone())
+                        .to_homogeneous()
+                        .as_slice(),
+                ),
+                OPoint::from_slice(
+                    (center.clone() + x_axis + y_axis)
+                        .to_homogeneous()
+                        .as_slice(),
+                ),
+            ],
+        ];
+
+        Self {
+            u_degree: 1,
+            v_degree: 1,
+            u_knots: KnotVector::new(vec![T::zero(), T::zero(), T::one(), T::one()]),
+            v_knots: KnotVector::new(vec![T::zero(), T::zero(), T::one(), T::one()]),
+            control_points,
+        }
+    }
+
     /// Extrude a NURBS curve to create a NURBS surface
     pub fn extrude(
         profile: &NurbsCurve<T, D>,

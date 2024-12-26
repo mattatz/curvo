@@ -168,8 +168,11 @@ fn setup(
         ));
     };
 
-    let profile = NurbsCurve3D::polyline(&[Point3::origin(), Point3::new(5., 0., 0.)], true);
-    let plane_surface = NurbsSurface::extrude(&profile, &(Vector3::z() * 10.));
+    let plane_surface = NurbsSurface::plane(
+        Point3::new(2.5, 0., 5.),
+        (Vector3::x() * 2.5),
+        (Vector3::z() * 5.),
+    );
     let trimmed = TrimmedSurface::new(
         plane_surface.clone(),
         None,

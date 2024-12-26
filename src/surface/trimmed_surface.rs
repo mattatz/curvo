@@ -174,6 +174,12 @@ fn try_map_curve_closest_point<T: FloatingPoint + ArgminFloat>(
     NurbsCurve2D::try_new(curve.degree(), pts, curve.knots().to_vec())
 }
 
+impl<T: FloatingPoint> From<NurbsSurface3D<T>> for TrimmedSurface<T> {
+    fn from(value: NurbsSurface3D<T>) -> Self {
+        Self::new(value, None, vec![])
+    }
+}
+
 /// Enable to transform a Trimmed surface by a given DxD matrix
 impl<'a, T: FloatingPoint> Transformable<&'a Matrix4<T>> for TrimmedSurface<T> {
     fn transform(&mut self, transform: &'a Matrix4<T>) {
