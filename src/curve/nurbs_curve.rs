@@ -129,7 +129,6 @@ where
     where
         D: DimNameSub<U1>,
         <D as DimNameSub<U1>>::Output: DimNameAdd<U1>,
-        DefaultAllocator: Allocator<D>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
         DefaultAllocator: Allocator<<<D as DimNameSub<U1>>::Output as DimNameAdd<U1>>::Output>,
     {
