@@ -18,9 +18,9 @@ where
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     /// The surface to tessellate
-    pub(crate) surface: &'a NurbsSurface<T, D>,
+    surface: &'a NurbsSurface<T, D>,
     /// The created nodes for the tessellation
-    pub(crate) nodes: Vec<AdaptiveTessellationNode<T, D>>,
+    nodes: Vec<AdaptiveTessellationNode<T, D>>,
 }
 
 impl<'a, T: FloatingPoint, D: DimName> AdaptiveTessellationProcessor<'a, T, D>
@@ -29,6 +29,25 @@ where
     DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
+    pub fn new(
+        surface: &'a NurbsSurface<T, D>,
+        nodes: Vec<AdaptiveTessellationNode<T, D>>,
+    ) -> Self {
+        Self { surface, nodes }
+    }
+
+    pub fn nodes(&self) -> &[AdaptiveTessellationNode<T, D>] {
+        &self.nodes
+    }
+
+    pub fn nodes_mut(&mut self) -> &mut [AdaptiveTessellationNode<T, D>] {
+        &mut self.nodes
+    }
+
+    pub fn into_nodes(self) -> Vec<AdaptiveTessellationNode<T, D>> {
+        self.nodes
+    }
+
     pub fn north(
         &self,
         index: usize,

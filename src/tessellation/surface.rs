@@ -77,7 +77,7 @@ where
         let divs_v = vs.len() - 1;
         let pts = &pts;
 
-        let divs = (0..divs_v)
+        let nodes = (0..divs_v)
             .flat_map(|i| {
                 let iv = divs_v - i;
                 (0..divs_u).map(move |iu| {
@@ -94,12 +94,9 @@ where
             .collect_vec();
 
         let nodes = if !is_adaptive {
-            divs
+            nodes
         } else {
-            let mut processor = AdaptiveTessellationProcessor {
-                surface: self,
-                nodes: divs,
-            };
+            let mut processor = AdaptiveTessellationProcessor::new(self, nodes);
 
             for iv in 0..divs_v {
                 for iu in 0..divs_u {
@@ -108,13 +105,13 @@ where
                     let e = processor.east(index, iu, divs_u).map(|n| n.id());
                     let n = processor.north(index, iv, divs_u).map(|n| n.id());
                     let w = processor.west(index, iv).map(|n| n.id());
-                    let node = processor.nodes.get_mut(index).unwrap();
+                    let node = processor.nodes_mut().get_mut(index).unwrap();
                     node.neighbors = [s, e, n, w];
                     processor.divide(index, &options);
                 }
             }
 
-            processor.nodes
+            processor.into_nodes()
         };
 
         SurfaceTessellation::new(self, &nodes)
