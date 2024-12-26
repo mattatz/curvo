@@ -536,6 +536,17 @@ where
     /// use curvo::prelude::*;
     /// use nalgebra::{Point3, Vector3};
     /// let plane = NurbsSurface3D::<f64>::plane(Point3::origin(), Vector3::x(), Vector3::y());
+    /// assert_eq!(plane.u_degree(), 1);
+    /// assert_eq!(plane.v_degree(), 1);
+    /// let (ud, vd) = plane.knots_domain();
+    /// let p00 = plane.point_at(ud.0, vd.0);
+    /// let p10 = plane.point_at(ud.1, vd.0);
+    /// let p11 = plane.point_at(ud.1, vd.1);
+    /// let p01 = plane.point_at(ud.0, vd.1);
+    /// assert_eq!(p00, Point3::new(-1.0, -1.0, 0.0));
+    /// assert_eq!(p10, Point3::new(1.0, -1.0, 0.0));
+    /// assert_eq!(p11, Point3::new(1.0, 1.0, 0.0));
+    /// assert_eq!(p01, Point3::new(-1.0, 1.0, 0.0));
     /// ```
     pub fn plane(
         center: OPoint<T, DimNameDiff<D, U1>>,
@@ -554,14 +565,14 @@ where
                         .as_slice(),
                 ),
                 OPoint::from_slice(
-                    (center.clone() + x_axis.clone() - y_axis.clone())
+                    (center.clone() - x_axis.clone() + y_axis.clone())
                         .to_homogeneous()
                         .as_slice(),
                 ),
             ],
             vec![
                 OPoint::from_slice(
-                    (center.clone() - x_axis.clone() + y_axis.clone())
+                    (center.clone() + x_axis.clone() - y_axis.clone())
                         .to_homogeneous()
                         .as_slice(),
                 ),
