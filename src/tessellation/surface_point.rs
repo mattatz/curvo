@@ -33,6 +33,10 @@ where
         }
     }
 
+    pub fn into_tuple(self) -> (Vector2<T>, OPoint<T, D>, OVector<T, D>) {
+        (self.uv, self.point, self.normal)
+    }
+
     pub fn normal(&self) -> &OVector<T, D> {
         &self.normal
     }

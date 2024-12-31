@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use nalgebra::{
     allocator::Allocator, Const, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint,
     OVector, Vector2, U1,
@@ -61,28 +62,25 @@ where
         node: &AdaptiveTessellationNode<T, D>,
     ) {
         if node.is_leaf() {
-            let mut base_index = self.points.len();
-            let mut uvs = vec![];
-            let mut ids = vec![];
-            let mut split_id = 0;
-            for i in 0..4 {
-                let edge_corners = node.get_all_corners(nodes, i);
-                if edge_corners.len() == 2 {
-                    split_id = i + 1;
-                }
+            let corners = (0..4).map(|i| node.get_all_corners(nodes, i)).collect_vec();
+            let split_id = corners
+                .iter()
+                .position(|c| c.len() == 2)
+                .map(|i| i + 1)
+                .unwrap_or(0);
+            let uvs = corners.into_iter().flatten().collect_vec();
 
-                uvs.extend(edge_corners);
+            let base_index = self.points.len();
+            let n = uvs.len();
+            let ids = (0..n).map(|i| base_index + i).collect_vec();
+            for corner in uvs.into_iter() {
+                let (uv, point, normal) = corner.into_tuple();
+                self.points.push(point);
+                self.normals.push(normal);
+                self.uvs.push(uv);
             }
 
-            uvs.iter().for_each(|corner| {
-                self.points.push(corner.point.clone());
-                self.normals.push(corner.normal.clone());
-                self.uvs.push(corner.uv);
-                ids.push(base_index);
-                base_index += 1;
-            });
-
-            match uvs.len() {
+            match n {
                 4 => {
                     self.faces.push([ids[0], ids[1], ids[3]]);
                     self.faces.push([ids[3], ids[1], ids[2]]);
