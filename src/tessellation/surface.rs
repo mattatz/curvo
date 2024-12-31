@@ -24,7 +24,7 @@ where
     /// or else it will be tessellated adaptively based on the options
     /// this `adaptive` means that the surface will be tessellated based on the curvature of the surface
     fn tessellate(&self, adaptive_options: Self::Option) -> Self::Output {
-        let nodes = surface_adaptive_tessellate(self, adaptive_options);
+        let nodes = surface_adaptive_tessellate(self, None, adaptive_options);
         SurfaceTessellation::new(self, &nodes)
     }
 }
@@ -32,13 +32,43 @@ where
 /// A struct representing constraints at the seam of a surface tessellation
 #[derive(Clone, Debug)]
 pub struct SeamConstraints<T: FloatingPoint> {
-    u_min: Option<Vec<T>>,
-    v_min: Option<Vec<T>>,
-    u_max: Option<Vec<T>>,
-    v_max: Option<Vec<T>>,
+    v_parameters_at_u_min: Option<Vec<T>>,
+    u_parameters_at_v_min: Option<Vec<T>>,
+    v_parameters_at_u_max: Option<Vec<T>>,
+    u_parameters_at_v_max: Option<Vec<T>>,
 }
 
-impl<T: FloatingPoint> SeamConstraints<T> {}
+impl<T: FloatingPoint> SeamConstraints<T> {
+    pub fn u_parameters(&self) -> Option<Vec<T>> {
+        self.sorted_parameters(
+            self.u_parameters_at_v_min.as_ref(),
+            self.u_parameters_at_v_max.as_ref(),
+        )
+    }
+
+    pub fn v_parameters(&self) -> Option<Vec<T>> {
+        self.sorted_parameters(
+            self.v_parameters_at_u_min.as_ref(),
+            self.v_parameters_at_u_max.as_ref(),
+        )
+    }
+
+    fn sorted_parameters(&self, min: Option<&Vec<T>>, max: Option<&Vec<T>>) -> Option<Vec<T>> {
+        match (min, max) {
+            (None, None) => None,
+            (None, Some(ma)) => Some(ma.clone()),
+            (Some(mi), None) => Some(mi.clone()),
+            (Some(mi), Some(ma)) => Some(
+                mi.iter()
+                    .chain(ma.iter())
+                    .sorted_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                    .dedup()
+                    .cloned()
+                    .collect(),
+            ),
+        }
+    }
+}
 
 impl<T: FloatingPoint, D: DimName> ConstrainedTessellation for NurbsSurface<T, D>
 where
@@ -57,7 +87,7 @@ where
         constraints: Self::Constraint,
         adaptive_options: Self::Option,
     ) -> Self::Output {
-        let nodes = surface_adaptive_tessellate(self, adaptive_options);
+        let nodes = surface_adaptive_tessellate(self, Some(constraints), adaptive_options);
         SurfaceTessellation::new(self, &nodes)
     }
 }
@@ -65,6 +95,7 @@ where
 /// Tessellate the surface adaptively
 fn surface_adaptive_tessellate<T: FloatingPoint, D: DimName>(
     s: &NurbsSurface<T, D>,
+    constraints: Option<SeamConstraints<T>>,
     adaptive_options: Option<AdaptiveTessellationOptions<T>>,
 ) -> Vec<AdaptiveTessellationNode<T, D>>
 where
@@ -107,6 +138,23 @@ where
         (0..=divs_v)
             .map(|i| vmin + dv * T::from_usize(i).unwrap())
             .collect()
+    };
+
+    // insert seam parameters to us & vs if constraints are provided
+    let (us, vs) = if let Some(c) = constraints {
+        let us = if let Some(iu) = c.u_parameters() {
+            us
+        } else {
+            us
+        };
+        let vs = if let Some(iv) = c.v_parameters() {
+            vs
+        } else {
+            vs
+        };
+        (us, vs)
+    } else {
+        (us, vs)
     };
 
     let pts = vs
