@@ -17,3 +17,15 @@ pub trait Tessellation {
     type Output;
     fn tessellate(&self, options: Self::Option) -> Self::Output;
 }
+
+/// A trait for tessellating a shape with constraints
+pub trait ConstrainedTessellation {
+    type Constraint;
+    type Option;
+    type Output;
+    fn constrained_tessalate(
+        &self,
+        constraints: Self::Constraint,
+        options: Self::Option,
+    ) -> Self::Output;
+}

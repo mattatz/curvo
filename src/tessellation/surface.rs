@@ -1,8 +1,8 @@
 use super::adaptive_tessellation_option::AdaptiveTessellationOptions;
 use super::adaptive_tessellation_processor::AdaptiveTessellationProcessor;
 use super::surface_tessellation::SurfaceTessellation;
-use super::SurfacePoint;
 use super::{adaptive_tessellation_node::AdaptiveTessellationNode, Tessellation};
+use super::{ConstrainedTessellation, SurfacePoint};
 use itertools::Itertools;
 use nalgebra::{
     allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, Vector2, U1,
@@ -115,5 +115,33 @@ where
         };
 
         SurfaceTessellation::new(self, &nodes)
+    }
+}
+
+/// A struct representing constraints at the seam of a surface tessellation
+#[derive(Clone, Debug)]
+pub struct SurfaceTessellationSeam<T: FloatingPoint> {
+    u0: Option<Vec<T>>,
+    v0: Option<Vec<T>>,
+    u1: Option<Vec<T>>,
+    v1: Option<Vec<T>>,
+}
+
+impl<T: FloatingPoint, D: DimName> ConstrainedTessellation for NurbsSurface<T, D>
+where
+    D: DimNameSub<U1>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+{
+    type Constraint = SurfaceTessellationSeam<T>;
+    type Option = Option<AdaptiveTessellationOptions<T>>;
+    type Output = SurfaceTessellation<T, D>;
+
+    fn constrained_tessalate(
+        &self,
+        constraints: Self::Constraint,
+        options: Self::Option,
+    ) -> Self::Output {
+        todo!()
     }
 }
