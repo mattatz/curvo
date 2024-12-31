@@ -172,17 +172,21 @@ where
     let pts = &pts;
 
     let nodes = (0..divs_v)
-        .flat_map(|i| {
-            let iv = divs_v - i;
+        .flat_map(|iv: usize| {
+            let iv_r = divs_v - iv;
             (0..divs_u).map(move |iu| {
                 let corners = [
-                    pts[iv - 1][iu].clone(),
-                    pts[iv - 1][iu + 1].clone(),
-                    pts[iv][iu + 1].clone(),
-                    pts[iv][iu].clone(),
+                    pts[iv_r - 1][iu].clone(),
+                    pts[iv_r - 1][iu + 1].clone(),
+                    pts[iv_r][iu + 1].clone(),
+                    pts[iv_r][iu].clone(),
                 ];
-                let index = i * divs_u + iu;
-                AdaptiveTessellationNode::new(index, corners, None)
+                let index = iv * divs_u + iu;
+                let s = south(index, iv, divs_u, divs_v);
+                let e = east(index, iu, divs_u);
+                let n = north(index, iv, divs_u);
+                let w = west(index, iv);
+                AdaptiveTessellationNode::new(index, corners, [s, e, n, w])
             })
         })
         .collect_vec();
@@ -195,12 +199,6 @@ where
         for iv in 0..divs_v {
             for iu in 0..divs_u {
                 let index = iv * divs_u + iu;
-                let s = south(index, iv, divs_u, divs_v);
-                let e = east(index, iu, divs_u);
-                let n = north(index, iv, divs_u);
-                let w = west(index, iv);
-                let node = processor.nodes_mut().get_mut(index).unwrap();
-                node.neighbors = [s, e, n, w];
                 processor.divide(index, &options);
             }
         }

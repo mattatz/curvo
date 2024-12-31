@@ -36,14 +36,6 @@ where
         Self { surface, nodes }
     }
 
-    pub fn nodes(&self) -> &[AdaptiveTessellationNode<T, D>] {
-        &self.nodes
-    }
-
-    pub fn nodes_mut(&mut self) -> &mut [AdaptiveTessellationNode<T, D>] {
-        &mut self.nodes
-    }
-
     pub fn into_nodes(self) -> Vec<AdaptiveTessellationNode<T, D>> {
         self.nodes
     }
@@ -117,8 +109,8 @@ where
                     ];
 
                     (
-                        AdaptiveTessellationNode::new(id0, bottom, Some(bottom_neighbors)),
-                        AdaptiveTessellationNode::new(id1, top, Some(top_neighbors)),
+                        AdaptiveTessellationNode::new(id0, bottom, bottom_neighbors),
+                        AdaptiveTessellationNode::new(id1, top, top_neighbors),
                     )
                 }
                 UVDirection::V => {
@@ -151,8 +143,8 @@ where
                     ];
 
                     (
-                        AdaptiveTessellationNode::new(id0, left, Some(left_neighbors)),
-                        AdaptiveTessellationNode::new(id1, right, Some(right_neighbors)),
+                        AdaptiveTessellationNode::new(id0, left, left_neighbors),
+                        AdaptiveTessellationNode::new(id1, right, right_neighbors),
                     )
                 }
             }

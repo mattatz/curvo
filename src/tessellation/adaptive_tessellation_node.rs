@@ -38,13 +38,13 @@ where
     pub fn new(
         id: usize,
         corners: [SurfacePoint<T, DimNameDiff<D, U1>>; 4],
-        neighbors: Option<[Option<usize>; 4]>,
+        neighbors: [Option<usize>; 4],
     ) -> Self {
         let uv_center = (corners[0].uv + corners[2].uv) * T::from_f64(0.5).unwrap();
         Self {
             id,
             corners,
-            neighbors: neighbors.unwrap_or([None; 4]),
+            neighbors,
             children: None,
             mid_points: [None, None, None, None],
             direction: UVDirection::V,
