@@ -24,8 +24,7 @@ where
     /// or else it will be tessellated adaptively based on the options
     /// this `adaptive` means that the surface will be tessellated based on the curvature of the surface
     fn tessellate(&self, adaptive_options: Self::Option) -> Self::Output {
-        let nodes = surface_adaptive_tessellate(self, None, adaptive_options);
-        SurfaceTessellation::new(self, &nodes)
+        surface_adaptive_tessellate(self, None, adaptive_options)
     }
 }
 
@@ -87,8 +86,7 @@ where
         constraints: Self::Constraint,
         adaptive_options: Self::Option,
     ) -> Self::Output {
-        let nodes = surface_adaptive_tessellate(self, Some(constraints), adaptive_options);
-        SurfaceTessellation::new(self, &nodes)
+        surface_adaptive_tessellate(self, Some(constraints), adaptive_options)
     }
 }
 
@@ -97,7 +95,7 @@ fn surface_adaptive_tessellate<T: FloatingPoint, D: DimName>(
     s: &NurbsSurface<T, D>,
     constraints: Option<SeamConstraints<T>>,
     adaptive_options: Option<AdaptiveTessellationOptions<T>>,
-) -> Vec<AdaptiveTessellationNode<T, D>>
+) -> SurfaceTessellation<T, D>
 where
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<D>,
@@ -143,12 +141,12 @@ where
     // insert seam parameters to us & vs if constraints are provided
     let (us, vs) = if let Some(c) = constraints {
         let us = if let Some(iu) = c.u_parameters() {
-            us
+            merge_sorted_parameters(us, iu)
         } else {
             us
         };
         let vs = if let Some(iv) = c.v_parameters() {
-            vs
+            merge_sorted_parameters(vs, iv)
         } else {
             vs
         };
@@ -189,7 +187,7 @@ where
         })
         .collect_vec();
 
-    if !is_adaptive {
+    let nodes = if !is_adaptive {
         nodes
     } else {
         let mut processor = AdaptiveTessellationProcessor::new(s, nodes);
@@ -208,5 +206,28 @@ where
         }
 
         processor.into_nodes()
+    };
+
+    SurfaceTessellation::new(s, &nodes)
+}
+
+/// Merge two sorted vectors
+fn merge_sorted_parameters<T: FloatingPoint>(p0: Vec<T>, p1: Vec<T>) -> Vec<T> {
+    let mut c0 = 0;
+    let mut c1 = 0;
+    let mut res = vec![];
+    while c0 < p0.len() && c1 < p1.len() {
+        if p0[c0] < p1[c1] {
+            res.push(p0[c0]);
+            c0 += 1;
+        } else if p0[c0] > p1[c1] {
+            res.push(p1[c1]);
+            c1 += 1;
+        } else {
+            res.push(p0[c0]);
+            c0 += 1;
+            c1 += 1;
+        }
     }
+    res
 }
