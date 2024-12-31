@@ -195,10 +195,10 @@ where
         for iv in 0..divs_v {
             for iu in 0..divs_u {
                 let index = iv * divs_u + iu;
-                let s = processor.south(index, iv, divs_u, divs_v).map(|n| n.id());
-                let e = processor.east(index, iu, divs_u).map(|n| n.id());
-                let n = processor.north(index, iv, divs_u).map(|n| n.id());
-                let w = processor.west(index, iv).map(|n| n.id());
+                let s = south(index, iv, divs_u, divs_v);
+                let e = east(index, iu, divs_u);
+                let n = north(index, iv, divs_u);
+                let w = west(index, iv);
                 let node = processor.nodes_mut().get_mut(index).unwrap();
                 node.neighbors = [s, e, n, w];
                 processor.divide(index, &options);
@@ -209,6 +209,38 @@ where
     };
 
     SurfaceTessellation::new(s, &nodes)
+}
+
+fn north(index: usize, iv: usize, divs_u: usize) -> Option<usize> {
+    if iv == 0 {
+        None
+    } else {
+        Some(index - divs_u)
+    }
+}
+
+fn south(index: usize, iv: usize, divs_u: usize, divs_v: usize) -> Option<usize> {
+    if iv == divs_v - 1 {
+        None
+    } else {
+        Some(index + divs_u)
+    }
+}
+
+fn east(index: usize, iu: usize, divs_u: usize) -> Option<usize> {
+    if iu == divs_u - 1 {
+        None
+    } else {
+        Some(index + 1)
+    }
+}
+
+fn west(index: usize, iv: usize) -> Option<usize> {
+    if iv == 0 {
+        None
+    } else {
+        Some(index - 1)
+    }
 }
 
 /// Merge two sorted vectors

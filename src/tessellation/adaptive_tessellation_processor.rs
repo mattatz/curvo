@@ -48,54 +48,6 @@ where
         self.nodes
     }
 
-    pub fn north(
-        &self,
-        index: usize,
-        iv: usize,
-        divs_u: usize,
-    ) -> Option<&AdaptiveTessellationNode<T, D>> {
-        if iv == 0 {
-            None
-        } else {
-            Some(&self.nodes[index - divs_u])
-        }
-    }
-
-    pub fn south(
-        &self,
-        index: usize,
-        iv: usize,
-        divs_u: usize,
-        divs_v: usize,
-    ) -> Option<&AdaptiveTessellationNode<T, D>> {
-        if iv == divs_v - 1 {
-            None
-        } else {
-            Some(&self.nodes[index + divs_u])
-        }
-    }
-
-    pub fn east(
-        &self,
-        index: usize,
-        iu: usize,
-        divs_u: usize,
-    ) -> Option<&AdaptiveTessellationNode<T, D>> {
-        if iu == divs_u - 1 {
-            None
-        } else {
-            Some(&self.nodes[index + 1])
-        }
-    }
-
-    pub fn west(&self, index: usize, iv: usize) -> Option<&AdaptiveTessellationNode<T, D>> {
-        if iv == 0 {
-            None
-        } else {
-            Some(&self.nodes[index - 1])
-        }
-    }
-
     pub fn divide(&mut self, id: usize, options: &AdaptiveTessellationOptions<T>) {
         let direction = if self.surface.u_degree() > 1 {
             UVDirection::U
