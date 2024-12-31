@@ -24,108 +24,21 @@ where
     /// or else it will be tessellated adaptively based on the options
     /// this `adaptive` means that the surface will be tessellated based on the curvature of the surface
     fn tessellate(&self, adaptive_options: Self::Option) -> Self::Output {
-        let is_adaptive = adaptive_options.is_some();
-        let options = adaptive_options.unwrap_or_default();
-
-        let us: Vec<_> = if self.u_degree() <= 1 {
-            self.u_knots()
-                .iter()
-                .skip(1)
-                .take(self.u_knots().len() - 2)
-                .cloned()
-                .collect()
-        } else {
-            let min_u = (self.control_points().len() - 1) * 2;
-            let divs_u = options.min_divs_u.max(min_u);
-            let (umin, umax) = self.u_knots_domain();
-            let du = (umax - umin) / T::from_usize(divs_u).unwrap();
-            (0..=divs_u)
-                .map(|i| umin + du * T::from_usize(i).unwrap())
-                .collect()
-        };
-
-        let vs: Vec<_> = if self.v_degree() <= 1 {
-            self.v_knots()
-                .iter()
-                .skip(1)
-                .take(self.v_knots().len() - 2)
-                .cloned()
-                .collect()
-        } else {
-            let min_v = (self.control_points()[0].len() - 1) * 2;
-            let divs_v = options.min_divs_v.max(min_v);
-            let (vmin, vmax) = self.v_knots_domain();
-            let dv = (vmax - vmin) / T::from_usize(divs_v).unwrap();
-            (0..=divs_v)
-                .map(|i| vmin + dv * T::from_usize(i).unwrap())
-                .collect()
-        };
-
-        let pts = vs
-            .iter()
-            .map(|v| {
-                let row = us.iter().map(|u| {
-                    let ds = self.rational_derivatives(*u, *v, 1);
-                    let norm = ds[1][0].cross(&ds[0][1]).normalize();
-                    SurfacePoint::new(Vector2::new(*u, *v), ds[0][0].clone().into(), norm, false)
-                });
-                row.collect_vec()
-            })
-            .collect_vec();
-
-        let divs_u = us.len() - 1;
-        let divs_v = vs.len() - 1;
-        let pts = &pts;
-
-        let nodes = (0..divs_v)
-            .flat_map(|i| {
-                let iv = divs_v - i;
-                (0..divs_u).map(move |iu| {
-                    let corners = [
-                        pts[iv - 1][iu].clone(),
-                        pts[iv - 1][iu + 1].clone(),
-                        pts[iv][iu + 1].clone(),
-                        pts[iv][iu].clone(),
-                    ];
-                    let index = i * divs_u + iu;
-                    AdaptiveTessellationNode::new(index, corners, None)
-                })
-            })
-            .collect_vec();
-
-        let nodes = if !is_adaptive {
-            nodes
-        } else {
-            let mut processor = AdaptiveTessellationProcessor::new(self, nodes);
-
-            for iv in 0..divs_v {
-                for iu in 0..divs_u {
-                    let index = iv * divs_u + iu;
-                    let s = processor.south(index, iv, divs_u, divs_v).map(|n| n.id());
-                    let e = processor.east(index, iu, divs_u).map(|n| n.id());
-                    let n = processor.north(index, iv, divs_u).map(|n| n.id());
-                    let w = processor.west(index, iv).map(|n| n.id());
-                    let node = processor.nodes_mut().get_mut(index).unwrap();
-                    node.neighbors = [s, e, n, w];
-                    processor.divide(index, &options);
-                }
-            }
-
-            processor.into_nodes()
-        };
-
+        let nodes = surface_adaptive_tessellate(self, adaptive_options);
         SurfaceTessellation::new(self, &nodes)
     }
 }
 
 /// A struct representing constraints at the seam of a surface tessellation
 #[derive(Clone, Debug)]
-pub struct SurfaceTessellationSeam<T: FloatingPoint> {
-    u0: Option<Vec<T>>,
-    v0: Option<Vec<T>>,
-    u1: Option<Vec<T>>,
-    v1: Option<Vec<T>>,
+pub struct SeamConstraints<T: FloatingPoint> {
+    u_min: Option<Vec<T>>,
+    v_min: Option<Vec<T>>,
+    u_max: Option<Vec<T>>,
+    v_max: Option<Vec<T>>,
 }
+
+impl<T: FloatingPoint> SeamConstraints<T> {}
 
 impl<T: FloatingPoint, D: DimName> ConstrainedTessellation for NurbsSurface<T, D>
 where
@@ -133,15 +46,119 @@ where
     DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
-    type Constraint = SurfaceTessellationSeam<T>;
+    type Constraint = SeamConstraints<T>;
     type Option = Option<AdaptiveTessellationOptions<T>>;
     type Output = SurfaceTessellation<T, D>;
 
+    /// Tessellate the surface into a meshable form with constraints on the seam
+    /// Parameters on the seam are computed before surface tessellation to ensure that the subdivided vertices are the same at the seam
     fn constrained_tessalate(
         &self,
         constraints: Self::Constraint,
-        options: Self::Option,
+        adaptive_options: Self::Option,
     ) -> Self::Output {
-        todo!()
+        let nodes = surface_adaptive_tessellate(self, adaptive_options);
+        SurfaceTessellation::new(self, &nodes)
+    }
+}
+
+/// Tessellate the surface adaptively
+fn surface_adaptive_tessellate<T: FloatingPoint, D: DimName>(
+    s: &NurbsSurface<T, D>,
+    adaptive_options: Option<AdaptiveTessellationOptions<T>>,
+) -> Vec<AdaptiveTessellationNode<T, D>>
+where
+    D: DimNameSub<U1>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+{
+    let is_adaptive = adaptive_options.is_some();
+    let options = adaptive_options.unwrap_or_default();
+
+    let us: Vec<_> = if s.u_degree() <= 1 {
+        s.u_knots()
+            .iter()
+            .skip(1)
+            .take(s.u_knots().len() - 2)
+            .cloned()
+            .collect()
+    } else {
+        let min_u = (s.control_points().len() - 1) * 2;
+        let divs_u = options.min_divs_u.max(min_u);
+        let (umin, umax) = s.u_knots_domain();
+        let du = (umax - umin) / T::from_usize(divs_u).unwrap();
+        (0..=divs_u)
+            .map(|i| umin + du * T::from_usize(i).unwrap())
+            .collect()
+    };
+
+    let vs: Vec<_> = if s.v_degree() <= 1 {
+        s.v_knots()
+            .iter()
+            .skip(1)
+            .take(s.v_knots().len() - 2)
+            .cloned()
+            .collect()
+    } else {
+        let min_v = (s.control_points()[0].len() - 1) * 2;
+        let divs_v = options.min_divs_v.max(min_v);
+        let (vmin, vmax) = s.v_knots_domain();
+        let dv = (vmax - vmin) / T::from_usize(divs_v).unwrap();
+        (0..=divs_v)
+            .map(|i| vmin + dv * T::from_usize(i).unwrap())
+            .collect()
+    };
+
+    let pts = vs
+        .iter()
+        .map(|v| {
+            let row = us.iter().map(|u| {
+                let ds = s.rational_derivatives(*u, *v, 1);
+                let norm = ds[1][0].cross(&ds[0][1]).normalize();
+                SurfacePoint::new(Vector2::new(*u, *v), ds[0][0].clone().into(), norm, false)
+            });
+            row.collect_vec()
+        })
+        .collect_vec();
+
+    let divs_u = us.len() - 1;
+    let divs_v = vs.len() - 1;
+    let pts = &pts;
+
+    let nodes = (0..divs_v)
+        .flat_map(|i| {
+            let iv = divs_v - i;
+            (0..divs_u).map(move |iu| {
+                let corners = [
+                    pts[iv - 1][iu].clone(),
+                    pts[iv - 1][iu + 1].clone(),
+                    pts[iv][iu + 1].clone(),
+                    pts[iv][iu].clone(),
+                ];
+                let index = i * divs_u + iu;
+                AdaptiveTessellationNode::new(index, corners, None)
+            })
+        })
+        .collect_vec();
+
+    if !is_adaptive {
+        nodes
+    } else {
+        let mut processor = AdaptiveTessellationProcessor::new(s, nodes);
+
+        for iv in 0..divs_v {
+            for iu in 0..divs_u {
+                let index = iv * divs_u + iu;
+                let s = processor.south(index, iv, divs_u, divs_v).map(|n| n.id());
+                let e = processor.east(index, iu, divs_u).map(|n| n.id());
+                let n = processor.north(index, iv, divs_u).map(|n| n.id());
+                let w = processor.west(index, iv).map(|n| n.id());
+                let node = processor.nodes_mut().get_mut(index).unwrap();
+                node.neighbors = [s, e, n, w];
+                processor.divide(index, &options);
+            }
+        }
+
+        processor.into_nodes()
     }
 }
