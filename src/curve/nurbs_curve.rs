@@ -460,11 +460,7 @@ where
         // the Bezier segments will not be generated correctly,
         // so reduce the number of segments by the amount that falls below the required duplication degree.
         let required_multiplicity = self.degree + 1;
-        let i = if start < required_multiplicity {
-            required_multiplicity - start
-        } else {
-            0
-        };
+        let i = required_multiplicity.saturating_sub(start);
         let j = if end < required_multiplicity {
             segments.len() - (required_multiplicity - end)
         } else {
@@ -1244,7 +1240,7 @@ where
         let k = self.degree;
         let n = self.control_points.len();
         let idx = self.knots.add(knot);
-        let start = if idx > k { idx - k } else { 0 };
+        let start = idx.saturating_sub(k);
         let end = if idx > n {
             self.control_points
                 .push(self.control_points.last().unwrap().clone());
