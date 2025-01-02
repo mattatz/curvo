@@ -37,7 +37,42 @@ pub struct SeamConstraints<T: FloatingPoint> {
     u_parameters_at_v_max: Option<Vec<T>>,
 }
 
+impl<T: FloatingPoint> Default for SeamConstraints<T> {
+    fn default() -> Self {
+        Self {
+            v_parameters_at_u_min: None,
+            u_parameters_at_v_min: None,
+            v_parameters_at_u_max: None,
+            u_parameters_at_v_max: None,
+        }
+    }
+}
+
 impl<T: FloatingPoint> SeamConstraints<T> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_v_parameters_at_u_min(mut self, v_parameters: Vec<T>) -> Self {
+        self.v_parameters_at_u_min = Some(v_parameters);
+        self
+    }
+
+    pub fn with_u_parameters_at_v_min(mut self, u_parameters: Vec<T>) -> Self {
+        self.u_parameters_at_v_min = Some(u_parameters);
+        self
+    }
+
+    pub fn with_v_parameters_at_u_max(mut self, v_parameters: Vec<T>) -> Self {
+        self.v_parameters_at_u_max = Some(v_parameters);
+        self
+    }
+
+    pub fn with_u_parameters_at_v_max(mut self, u_parameters: Vec<T>) -> Self {
+        self.u_parameters_at_v_max = Some(u_parameters);
+        self
+    }
+
     pub fn u_parameters(&self) -> Option<Vec<T>> {
         self.sorted_parameters(
             self.u_parameters_at_v_min.as_ref(),
@@ -139,7 +174,7 @@ where
     };
 
     // insert seam parameters to us & vs if constraints are provided
-    let (us, vs) = if let Some(c) = constraints {
+    let (us, vs) = if let Some(c) = constraints.as_ref() {
         let us = if let Some(iu) = c.u_parameters() {
             merge_sorted_parameters(us, iu)
         } else {
@@ -171,9 +206,23 @@ where
     let divs_v = vs.len() - 1;
     let pts = &pts;
 
+    let (u_min_constraint, u_max_constraint, v_min_constraint, v_max_constraint) = constraints
+        .as_ref()
+        .map(|c| {
+            let u_in_v_min = c.u_parameters_at_v_min.is_some();
+            let u_in_v_max = c.u_parameters_at_v_max.is_some();
+            let v_in_u_min = c.v_parameters_at_u_min.is_some();
+            let v_in_u_max = c.v_parameters_at_u_max.is_some();
+            (u_in_v_min, u_in_v_max, v_in_u_min, v_in_u_max)
+        })
+        .unwrap_or((false, false, false, false));
+
     let nodes = (0..divs_v)
         .flat_map(|iv: usize| {
             let iv_r = divs_v - iv;
+            let u_min = iv == 0 && u_min_constraint;
+            let u_max = iv == divs_v - 1 && u_max_constraint;
+            let u_constraint = u_min || u_max;
             (0..divs_u).map(move |iu| {
                 let corners = [
                     pts[iv_r - 1][iu].clone(),
@@ -186,7 +235,12 @@ where
                 let e = east(index, iu, divs_u);
                 let n = north(index, iv, divs_u);
                 let w = west(index, iv);
+                let v_min = iu == 0 && v_min_constraint;
+                let v_max = iu == divs_u - 1 && v_max_constraint;
+                let v_constraint = v_min || v_max;
                 AdaptiveTessellationNode::new(index, corners, [s, e, n, w])
+                    .with_u_constraint(u_constraint)
+                    .with_u_constraint(v_constraint)
             })
         })
         .collect_vec();

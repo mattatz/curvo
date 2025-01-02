@@ -26,7 +26,8 @@ where
     mid_points: [Option<SurfacePoint<T, DimNameDiff<D, U1>>>; 4], // [south, east, north, west] order
     pub(crate) direction: UVDirection,
     uv_center: Vector2<T>,
-    constraint: Option<UVDirection>,
+    u_constraint: bool,
+    v_constraint: bool,
 }
 
 impl<T: FloatingPoint, D: DimName> AdaptiveTessellationNode<T, D>
@@ -49,12 +50,18 @@ where
             mid_points: [None, None, None, None],
             direction: UVDirection::V,
             uv_center,
-            constraint: None,
+            u_constraint: false,
+            v_constraint: false,
         }
     }
 
-    pub fn with_constraint(mut self, constraint: UVDirection) -> Self {
-        self.constraint = Some(constraint);
+    pub fn with_u_constraint(mut self, constraint: bool) -> Self {
+        self.u_constraint = constraint;
+        self
+    }
+
+    pub fn with_v_constraint(mut self, constraint: bool) -> Self {
+        self.v_constraint = constraint;
         self
     }
 
@@ -231,13 +238,13 @@ where
             > options.norm_tolerance
             || (self.corners[2].normal() - self.corners[3].normal()).norm_squared()
                 > options.norm_tolerance;
-        let v_direction = v_direction && !matches!(self.constraint, Some(UVDirection::V));
+        let v_direction = v_direction && !self.v_constraint;
 
         let u_direction = (self.corners[1].normal() - self.corners[2].normal()).norm_squared()
             > options.norm_tolerance
             || (self.corners[3].normal() - self.corners[0].normal()).norm_squared()
                 > options.norm_tolerance;
-        let u_direction = u_direction && !matches!(self.constraint, Some(UVDirection::U));
+        let u_direction = u_direction && !self.u_constraint;
 
         match (u_direction, v_direction) {
             (true, true) => Some(DividableDirection::Both),

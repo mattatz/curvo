@@ -44,8 +44,8 @@ approx = { version = "0.5", default-features = false }
 serde_json = "1.0.134"
 
 [features]
-default = []
-# default = ["bevy"] # for debugging example
+# default = []
+default = ["bevy"] # for debugging example
 bevy = [
   "dep:easer",
   "dep:rand_distr",
@@ -169,5 +169,10 @@ required-features = ["bevy"]
 [[example]]
 name = "split_surface"
 path = "examples/split_surface.rs"
+required-features = ["bevy"]
+
+[[example]]
+name = "constrained_surface_tesselation"
+path = "examples/constrained_surface_tesselation.rs"
 required-features = ["bevy"]
 

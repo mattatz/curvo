@@ -121,27 +121,6 @@ pub fn add_surface(
     let tess = surface.tessellate(Some(option));
     let tess = tess.cast::<f32>();
 
-    let mut line_list = Mesh::new(bevy::render::mesh::PrimitiveTopology::LineList, default());
-    let normal_length = 0.15;
-    let normals = tess.normals();
-
-    let vertices = tess
-        .points()
-        .iter()
-        .enumerate()
-        .flat_map(|(i, p)| {
-            let pt: Vec3 = (*p).into();
-            let normal: Vec3 = normals[i].normalize().into();
-            [pt, pt + normal * normal_length]
-        })
-        .map(|p| p.to_array())
-        .collect();
-
-    line_list.insert_attribute(
-        Mesh::ATTRIBUTE_POSITION,
-        VertexAttributeValues::Float32x3(vertices),
-    );
-
     let vertices = tess.points().iter().map(|pt| (*pt).into()).collect();
     let normals = tess.normals().iter().map(|n| (*n).into()).collect();
     let uvs = tess.uvs().iter().map(|uv| (*uv).into()).collect();

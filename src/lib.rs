@@ -29,8 +29,8 @@ pub mod prelude {
     pub use crate::split::*;
     pub use crate::surface::*;
     pub use crate::tessellation::{
-        adaptive_tessellation_option::AdaptiveTessellationOptions, surface_tessellation::*,
-        Tessellation,
+        adaptive_tessellation_option::AdaptiveTessellationOptions, surface::SeamConstraints,
+        surface_tessellation::*, ConstrainedTessellation, Tessellation,
     };
     pub use crate::trim::*;
 }
