@@ -190,22 +190,6 @@ where
         (us, vs)
     };
 
-    let pts = vs
-        .iter()
-        .map(|v| {
-            let row = us.iter().map(|u| {
-                let ds = s.rational_derivatives(*u, *v, 1);
-                let norm = ds[1][0].cross(&ds[0][1]).normalize();
-                SurfacePoint::new(Vector2::new(*u, *v), ds[0][0].clone().into(), norm, false)
-            });
-            row.collect_vec()
-        })
-        .collect_vec();
-
-    let divs_u = us.len() - 1;
-    let divs_v = vs.len() - 1;
-    let pts = &pts;
-
     let (u_min_constraint, u_max_constraint, v_min_constraint, v_max_constraint) = constraints
         .as_ref()
         .map(|c| {
@@ -217,12 +201,36 @@ where
         })
         .unwrap_or((false, false, false, false));
 
-    let nodes = (0..divs_v)
-        .flat_map(|iv: usize| {
-            let iv_r = divs_v - iv;
+    let divs_u = us.len() - 1;
+    let divs_v = vs.len() - 1;
+
+    let pts = vs
+        .iter()
+        .enumerate()
+        .map(|(iv, v)| {
             let u_min = iv == 0 && u_min_constraint;
             let u_max = iv == divs_v - 1 && u_max_constraint;
             let u_constraint = u_min || u_max;
+
+            let row = us.iter().enumerate().map(|(iu, u)| {
+                let ds = s.rational_derivatives(*u, *v, 1);
+                let norm = ds[1][0].cross(&ds[0][1]).normalize();
+                let v_min = iu == 0 && v_min_constraint;
+                let v_max = iu == divs_u - 1 && v_max_constraint;
+                let v_constraint = v_min || v_max;
+                SurfacePoint::new(Vector2::new(*u, *v), ds[0][0].clone().into(), norm, false)
+                    .with_u_constraint(u_constraint)
+                    .with_v_constraint(v_constraint)
+            });
+            row.collect_vec()
+        })
+        .collect_vec();
+
+    let pts = &pts;
+
+    let nodes = (0..divs_v)
+        .flat_map(|iv: usize| {
+            let iv_r = divs_v - iv;
             (0..divs_u).map(move |iu| {
                 let corners = [
                     pts[iv_r - 1][iu].clone(),
@@ -235,12 +243,7 @@ where
                 let e = east(index, iu, divs_u);
                 let n = north(index, iv, divs_u);
                 let w = west(index, iv);
-                let v_min = iu == 0 && v_min_constraint;
-                let v_max = iu == divs_u - 1 && v_max_constraint;
-                let v_constraint = v_min || v_max;
                 AdaptiveTessellationNode::new(index, corners, [s, e, n, w])
-                    .with_u_constraint(u_constraint)
-                    .with_u_constraint(v_constraint)
             })
         })
         .collect_vec();

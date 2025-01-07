@@ -13,6 +13,8 @@ where
     pub point: OPoint<T, D>,
     pub normal: OVector<T, D>,
     is_normal_degenerated: bool,
+    u_constraint: bool,
+    v_constraint: bool,
 }
 
 impl<T: RealField, D: DimName> SurfacePoint<T, D>
@@ -30,7 +32,27 @@ where
             point,
             normal,
             is_normal_degenerated,
+            u_constraint: false,
+            v_constraint: false,
         }
+    }
+
+    pub fn with_u_constraint(mut self, u_constraint: bool) -> Self {
+        self.u_constraint = u_constraint;
+        self
+    }
+
+    pub fn with_v_constraint(mut self, v_constraint: bool) -> Self {
+        self.v_constraint = v_constraint;
+        self
+    }
+
+    pub fn is_u_constrained(&self) -> bool {
+        self.u_constraint
+    }
+
+    pub fn is_v_constrained(&self) -> bool {
+        self.v_constraint
     }
 
     pub fn into_tuple(self) -> (Vector2<T>, OPoint<T, D>, OVector<T, D>) {

@@ -26,8 +26,6 @@ where
     mid_points: [Option<SurfacePoint<T, DimNameDiff<D, U1>>>; 4], // [south, east, north, west] order
     pub(crate) direction: UVDirection,
     uv_center: Vector2<T>,
-    u_constraint: bool,
-    v_constraint: bool,
 }
 
 impl<T: FloatingPoint, D: DimName> AdaptiveTessellationNode<T, D>
@@ -50,19 +48,7 @@ where
             mid_points: [None, None, None, None],
             direction: UVDirection::V,
             uv_center,
-            u_constraint: false,
-            v_constraint: false,
         }
-    }
-
-    pub fn with_u_constraint(mut self, constraint: bool) -> Self {
-        self.u_constraint = constraint;
-        self
-    }
-
-    pub fn with_v_constraint(mut self, constraint: bool) -> Self {
-        self.v_constraint = constraint;
-        self
     }
 
     pub fn id(&self) -> usize {
@@ -162,6 +148,7 @@ where
         }
     }
 
+    /// Evaluate the mid point of the node
     pub fn evaluate_mid_point(
         &mut self,
         surface: &NurbsSurface<T, D>,
@@ -238,19 +225,21 @@ where
             > options.norm_tolerance
             || (self.corners[2].normal() - self.corners[3].normal()).norm_squared()
                 > options.norm_tolerance;
-        let v_direction = v_direction && !self.v_constraint;
+        let v_direction = v_direction && self.corners.iter().all(|c| !c.is_u_constrained());
 
         let u_direction = (self.corners[1].normal() - self.corners[2].normal()).norm_squared()
             > options.norm_tolerance
             || (self.corners[3].normal() - self.corners[0].normal()).norm_squared()
                 > options.norm_tolerance;
-        let u_direction = u_direction && !self.u_constraint;
+        let u_direction = u_direction && self.corners.iter().all(|c| !c.is_v_constrained());
 
         match (u_direction, v_direction) {
             (true, true) => Some(DividableDirection::Both),
             (true, false) => Some(DividableDirection::U),
             (false, true) => Some(DividableDirection::V),
             (false, false) => {
+                None
+                /*
                 let center = self.center(surface);
                 if (center.normal() - self.corners[0].normal()).norm_squared()
                     > options.norm_tolerance
@@ -265,6 +254,7 @@ where
                 } else {
                     None
                 }
+                */
             }
         }
     }
