@@ -13,8 +13,14 @@ where
     pub point: OPoint<T, D>,
     pub normal: OVector<T, D>,
     is_normal_degenerated: bool,
+    // constraints to be divided
     u_constraint: bool,
     v_constraint: bool,
+    // flags to indicate if this point is on the boundary or not
+    u_min: bool,
+    u_max: bool,
+    v_min: bool,
+    v_max: bool,
 }
 
 impl<T: RealField, D: DimName> SurfacePoint<T, D>
@@ -34,16 +40,16 @@ where
             is_normal_degenerated,
             u_constraint: false,
             v_constraint: false,
+            u_min: false,
+            u_max: false,
+            v_min: false,
+            v_max: false,
         }
     }
 
-    pub fn with_u_constraint(mut self, u_constraint: bool) -> Self {
-        self.u_constraint = u_constraint;
-        self
-    }
-
-    pub fn with_v_constraint(mut self, v_constraint: bool) -> Self {
-        self.v_constraint = v_constraint;
+    pub fn with_constraints(mut self, u: bool, v: bool) -> Self {
+        self.u_constraint = u;
+        self.v_constraint = v;
         self
     }
 
@@ -53,6 +59,30 @@ where
 
     pub fn is_v_constrained(&self) -> bool {
         self.v_constraint
+    }
+
+    pub fn with_boundary(mut self, u_min: bool, u_max: bool, v_min: bool, v_max: bool) -> Self {
+        self.u_min = u_min;
+        self.u_max = u_max;
+        self.v_min = v_min;
+        self.v_max = v_max;
+        self
+    }
+
+    pub fn is_u_min(&self) -> bool {
+        self.u_min
+    }
+
+    pub fn is_u_max(&self) -> bool {
+        self.u_max
+    }
+
+    pub fn is_v_min(&self) -> bool {
+        self.v_min
+    }
+
+    pub fn is_v_max(&self) -> bool {
+        self.v_max
     }
 
     pub fn into_tuple(self) -> (Vector2<T>, OPoint<T, D>, OVector<T, D>) {

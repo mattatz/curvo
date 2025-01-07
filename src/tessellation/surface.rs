@@ -1,5 +1,6 @@
 use super::adaptive_tessellation_option::AdaptiveTessellationOptions;
 use super::adaptive_tessellation_processor::AdaptiveTessellationProcessor;
+use super::boundary_constraints::BoundaryConstraints;
 use super::surface_tessellation::SurfaceTessellation;
 use super::{adaptive_tessellation_node::AdaptiveTessellationNode, Tessellation};
 use super::{ConstrainedTessellation, SurfacePoint};
@@ -28,94 +29,18 @@ where
     }
 }
 
-/// A struct representing constraints at the seam of a surface tessellation
-#[derive(Clone, Debug)]
-pub struct SeamConstraints<T: FloatingPoint> {
-    v_parameters_at_u_min: Option<Vec<T>>,
-    u_parameters_at_v_min: Option<Vec<T>>,
-    v_parameters_at_u_max: Option<Vec<T>>,
-    u_parameters_at_v_max: Option<Vec<T>>,
-}
-
-impl<T: FloatingPoint> Default for SeamConstraints<T> {
-    fn default() -> Self {
-        Self {
-            v_parameters_at_u_min: None,
-            u_parameters_at_v_min: None,
-            v_parameters_at_u_max: None,
-            u_parameters_at_v_max: None,
-        }
-    }
-}
-
-impl<T: FloatingPoint> SeamConstraints<T> {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_v_parameters_at_u_min(mut self, v_parameters: Vec<T>) -> Self {
-        self.v_parameters_at_u_min = Some(v_parameters);
-        self
-    }
-
-    pub fn with_u_parameters_at_v_min(mut self, u_parameters: Vec<T>) -> Self {
-        self.u_parameters_at_v_min = Some(u_parameters);
-        self
-    }
-
-    pub fn with_v_parameters_at_u_max(mut self, v_parameters: Vec<T>) -> Self {
-        self.v_parameters_at_u_max = Some(v_parameters);
-        self
-    }
-
-    pub fn with_u_parameters_at_v_max(mut self, u_parameters: Vec<T>) -> Self {
-        self.u_parameters_at_v_max = Some(u_parameters);
-        self
-    }
-
-    pub fn u_parameters(&self) -> Option<Vec<T>> {
-        self.sorted_parameters(
-            self.u_parameters_at_v_min.as_ref(),
-            self.u_parameters_at_v_max.as_ref(),
-        )
-    }
-
-    pub fn v_parameters(&self) -> Option<Vec<T>> {
-        self.sorted_parameters(
-            self.v_parameters_at_u_min.as_ref(),
-            self.v_parameters_at_u_max.as_ref(),
-        )
-    }
-
-    fn sorted_parameters(&self, min: Option<&Vec<T>>, max: Option<&Vec<T>>) -> Option<Vec<T>> {
-        match (min, max) {
-            (None, None) => None,
-            (None, Some(ma)) => Some(ma.clone()),
-            (Some(mi), None) => Some(mi.clone()),
-            (Some(mi), Some(ma)) => Some(
-                mi.iter()
-                    .chain(ma.iter())
-                    .sorted_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-                    .dedup()
-                    .cloned()
-                    .collect(),
-            ),
-        }
-    }
-}
-
 impl<T: FloatingPoint, D: DimName> ConstrainedTessellation for NurbsSurface<T, D>
 where
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
-    type Constraint = SeamConstraints<T>;
+    type Constraint = BoundaryConstraints<T>;
     type Option = Option<AdaptiveTessellationOptions<T>>;
     type Output = SurfaceTessellation<T, D>;
 
-    /// Tessellate the surface into a meshable form with constraints on the seam
-    /// Parameters on the seam are computed before surface tessellation to ensure that the subdivided vertices are the same at the seam
+    /// Tessellate the surface into a meshable form with constraints on the boundary
+    /// Parameters on the boundary are computed before surface tessellation to ensure that the subdivided vertices are the same at the boundary
     fn constrained_tessalate(
         &self,
         constraints: Self::Constraint,
@@ -128,7 +53,7 @@ where
 /// Tessellate the surface adaptively
 fn surface_adaptive_tessellate<T: FloatingPoint, D: DimName>(
     s: &NurbsSurface<T, D>,
-    constraints: Option<SeamConstraints<T>>,
+    constraints: Option<BoundaryConstraints<T>>,
     adaptive_options: Option<AdaptiveTessellationOptions<T>>,
 ) -> SurfaceTessellation<T, D>
 where
@@ -173,7 +98,7 @@ where
             .collect()
     };
 
-    // insert seam parameters to us & vs if constraints are provided
+    // insert boundary parameters to us & vs if constraints are provided
     let (us, vs) = if let Some(c) = constraints.as_ref() {
         let us = if let Some(iu) = c.u_parameters() {
             merge_sorted_parameters(us, iu)
@@ -193,10 +118,10 @@ where
     let (u_min_constraint, u_max_constraint, v_min_constraint, v_max_constraint) = constraints
         .as_ref()
         .map(|c| {
-            let u_in_v_min = c.u_parameters_at_v_min.is_some();
-            let u_in_v_max = c.u_parameters_at_v_max.is_some();
-            let v_in_u_min = c.v_parameters_at_u_min.is_some();
-            let v_in_u_max = c.v_parameters_at_u_max.is_some();
+            let u_in_v_min = c.u_parameters_at_v_min().is_some();
+            let u_in_v_max = c.u_parameters_at_v_max().is_some();
+            let v_in_u_min = c.v_parameters_at_u_min().is_some();
+            let v_in_u_max = c.v_parameters_at_u_max().is_some();
             (u_in_v_min, u_in_v_max, v_in_u_min, v_in_u_max)
         })
         .unwrap_or((false, false, false, false));
@@ -208,19 +133,19 @@ where
         .iter()
         .enumerate()
         .map(|(iv, v)| {
-            let u_min = iv == 0 && u_min_constraint;
-            let u_max = iv == divs_v - 1 && u_max_constraint;
-            let u_constraint = u_min || u_max;
+            let u_min = iv == 0;
+            let u_max = iv == divs_v - 1;
+            let u_constraint = (u_min && u_min_constraint) || (u_max && u_max_constraint);
 
             let row = us.iter().enumerate().map(|(iu, u)| {
                 let ds = s.rational_derivatives(*u, *v, 1);
                 let norm = ds[1][0].cross(&ds[0][1]).normalize();
-                let v_min = iu == 0 && v_min_constraint;
-                let v_max = iu == divs_u - 1 && v_max_constraint;
-                let v_constraint = v_min || v_max;
+                let v_min = iu == 0;
+                let v_max = iu == divs_u - 1;
+                let v_constraint = (v_min && v_min_constraint) || (v_max && v_max_constraint);
                 SurfacePoint::new(Vector2::new(*u, *v), ds[0][0].clone().into(), norm, false)
-                    .with_u_constraint(u_constraint)
-                    .with_v_constraint(v_constraint)
+                    .with_constraints(u_constraint, v_constraint)
+                    .with_boundary(u_min, u_max, v_min, v_max)
             });
             row.collect_vec()
         })
@@ -263,7 +188,7 @@ where
         processor.into_nodes()
     };
 
-    SurfaceTessellation::new(s, &nodes)
+    SurfaceTessellation::new(s, &nodes, constraints)
 }
 
 fn north(index: usize, iv: usize, divs_u: usize) -> Option<usize> {

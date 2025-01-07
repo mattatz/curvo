@@ -10,6 +10,8 @@ use crate::{
     tessellation::adaptive_tessellation_node::AdaptiveTessellationNode,
 };
 
+use super::boundary_constraints::BoundaryConstraints;
+
 /// Surface tessellation representation
 /// This struct is used to create a mesh data from surface
 #[derive(Clone, Debug)]
@@ -38,7 +40,11 @@ where
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     /// Create a new surface tessellation from surface and adaptive tessellation nodes
-    pub fn new(surface: &NurbsSurface<T, D>, nodes: &Vec<AdaptiveTessellationNode<T, D>>) -> Self {
+    pub fn new(
+        surface: &NurbsSurface<T, D>,
+        nodes: &Vec<AdaptiveTessellationNode<T, D>>,
+        constraints: Option<BoundaryConstraints<T>>,
+    ) -> Self {
         let mut tess = Self {
             points: Default::default(),
             normals: Default::default(),
