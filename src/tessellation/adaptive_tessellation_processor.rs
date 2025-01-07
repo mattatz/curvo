@@ -77,18 +77,15 @@ where
         let (c0, c1) = {
             match node.direction {
                 UVDirection::U => {
+                    let east = node.evaluate_mid_point(self.surface, NeighborDirection::East);
+                    let west = node.evaluate_mid_point(self.surface, NeighborDirection::West);
                     let bottom = [
                         node.corners[0].clone(),
                         node.corners[1].clone(),
-                        node.evaluate_mid_point(self.surface, NeighborDirection::East),
-                        node.evaluate_mid_point(self.surface, NeighborDirection::West),
+                        east.clone(),
+                        west.clone(),
                     ];
-                    let top = [
-                        node.evaluate_mid_point(self.surface, NeighborDirection::West),
-                        node.evaluate_mid_point(self.surface, NeighborDirection::East),
-                        node.corners[2].clone(),
-                        node.corners[3].clone(),
-                    ];
+                    let top = [west, east, node.corners[2].clone(), node.corners[3].clone()];
 
                     node.assign_children([id0, id1]);
 
@@ -114,17 +111,20 @@ where
                     )
                 }
                 UVDirection::V => {
+                    let south = node.evaluate_mid_point(self.surface, NeighborDirection::South);
+                    let north = node.evaluate_mid_point(self.surface, NeighborDirection::North);
+
                     let left = [
                         node.corners[0].clone(),
-                        node.evaluate_mid_point(self.surface, NeighborDirection::South),
-                        node.evaluate_mid_point(self.surface, NeighborDirection::North),
+                        south.clone(),
+                        north.clone(),
                         node.corners[3].clone(),
                     ];
                     let right = [
-                        node.evaluate_mid_point(self.surface, NeighborDirection::South),
+                        south,
                         node.corners[1].clone(),
                         node.corners[2].clone(),
-                        node.evaluate_mid_point(self.surface, NeighborDirection::North),
+                        north,
                     ];
 
                     node.assign_children([id0, id1]);
