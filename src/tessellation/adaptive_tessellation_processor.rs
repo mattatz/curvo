@@ -61,7 +61,6 @@ where
         let id1 = id0 + 1;
 
         let node = self.nodes.get_mut(id).unwrap();
-        node.evaluate_corners(self.surface);
 
         let dividable = node.should_divide(self.surface, options, current_depth);
 

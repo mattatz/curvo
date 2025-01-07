@@ -68,14 +68,6 @@ where
         evaluate_surface(surface, self.uv_center)
     }
 
-    pub fn evaluate_corners(&mut self, surface: &NurbsSurface<T, D>) {
-        //eval all of the corners
-        self.corners.iter_mut().for_each(|pt| {
-            let e = evaluate_surface(surface, pt.uv);
-            *pt = e;
-        });
-    }
-
     fn get_edge_corners(
         &self,
         nodes: &Vec<Self>,
@@ -201,7 +193,7 @@ where
     /// Check if the node should be divided
     pub fn should_divide(
         &mut self,
-        surface: &NurbsSurface<T, D>,
+        _surface: &NurbsSurface<T, D>,
         options: &AdaptiveTessellationOptions<T>,
         current_depth: usize,
     ) -> Option<DividableDirection> {
