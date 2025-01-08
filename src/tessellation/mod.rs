@@ -24,7 +24,7 @@ pub trait ConstrainedTessellation {
     type Constraint;
     type Option;
     type Output;
-    fn constrained_tessalate(
+    fn constrained_tessellate(
         &self,
         constraints: Self::Constraint,
         options: Self::Option,

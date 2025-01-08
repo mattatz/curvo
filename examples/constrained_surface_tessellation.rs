@@ -106,7 +106,7 @@ fn setup(
     let option = AdaptiveTessellationOptions {
         ..Default::default()
     };
-    let tess = surface.constrained_tessalate(boundary, Some(option));
+    let tess = surface.constrained_tessellate(boundary, Some(option));
     let tess = tess.cast::<f32>();
 
     let vertices = tess.points().iter().map(|pt| (*pt).into()).collect_vec();

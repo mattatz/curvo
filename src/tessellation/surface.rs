@@ -41,7 +41,7 @@ where
 
     /// Tessellate the surface into a meshable form with constraints on the boundary
     /// Parameters on the boundary are computed before surface tessellation to ensure that the subdivided vertices are the same at the boundary
-    fn constrained_tessalate(
+    fn constrained_tessellate(
         &self,
         constraints: Self::Constraint,
         adaptive_options: Self::Option,
