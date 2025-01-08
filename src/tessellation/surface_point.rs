@@ -1,5 +1,6 @@
 use nalgebra::{
-    allocator::Allocator, DefaultAllocator, DimName, OPoint, OVector, RealField, Vector2,
+    allocator::Allocator, DefaultAllocator, DimName, DimNameSub, OPoint, OVector, RealField,
+    Vector2, U1,
 };
 
 /// Surface point representation
@@ -91,6 +92,14 @@ where
 
     pub fn normal(&self) -> &OVector<T, D> {
         &self.normal
+    }
+
+    pub fn point(&self) -> &OPoint<T, D> {
+        &self.point
+    }
+
+    pub fn uv(&self) -> &Vector2<T> {
+        &self.uv
     }
 
     pub fn is_normal_degenerated(&self) -> bool {

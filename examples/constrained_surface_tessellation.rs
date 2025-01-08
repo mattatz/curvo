@@ -1,7 +1,7 @@
 use std::f64::consts::FRAC_PI_2;
 
 use bevy::{
-    color::palettes::css::RED,
+    color::palettes::css::{RED, TOMATO},
     prelude::*,
     render::{
         camera::ScalingMode,
@@ -15,6 +15,7 @@ use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use bevy_points::{
     material::PointsShaderSettings, mesh::PointsMesh, plugin::PointsPlugin, prelude::PointsMaterial,
 };
+use itertools::Itertools;
 use materials::*;
 use misc::{add_surface, add_surface_normals};
 use nalgebra::{Point3, Rotation3, Translation3, Vector3};
@@ -49,47 +50,6 @@ fn setup(
     mut points_materials: ResMut<Assets<PointsMaterial>>,
     mut normal_materials: ResMut<'_, Assets<NormalMaterial>>,
 ) {
-    let add_surface_tess =
-        |surf: &NurbsSurface3D<f64>,
-         commands: &mut Commands<'_, '_>,
-         meshes: &mut ResMut<'_, Assets<Mesh>>,
-         line_materials: &mut ResMut<'_, Assets<LineMaterial>>,
-         _normal_materials: &mut ResMut<'_, Assets<NormalMaterial>>,
-         points_materials: &mut ResMut<'_, Assets<PointsMaterial>>| {
-            let option = AdaptiveTessellationOptions {
-                norm_tolerance: 1e-2,
-                ..Default::default()
-            };
-            let tess = surf.tessellate(Some(option));
-            let tess = tess.cast::<f32>();
-            // let tess = surf.regular_tessellate(32, 32);
-            add_surface_normals(&tess, commands, meshes, line_materials);
-
-            let points = surf.regular_sample_points(32, 32);
-            commands
-                .spawn((
-                    Mesh3d(
-                        meshes.add(PointsMesh {
-                            vertices: points
-                                .iter()
-                                .flat_map(|row| row.iter().map(|pt| pt.cast::<f32>().into()))
-                                .collect(),
-                            ..Default::default()
-                        }),
-                    ),
-                    MeshMaterial3d(points_materials.add(PointsMaterial {
-                        settings: PointsShaderSettings {
-                            point_size: 0.05,
-                            color: RED.into(),
-                            ..Default::default()
-                        },
-                        ..Default::default()
-                    })),
-                    Visibility::Hidden,
-                ))
-                .insert(Name::new("points"));
-        };
-
     let interpolation_target = vec![
         Point3::new(-1.0, -1.0, 0.),
         Point3::new(1.0, -1.0, 0.),
@@ -106,27 +66,105 @@ fn setup(
     let front = interpolated.transformed(&(translation.inverse()).into());
     let back = interpolated.transformed(&m.into());
 
+    let (umin, umax) = front.knots_domain();
+
     let surface = NurbsSurface::try_loft(&[front, back], Some(3)).unwrap();
 
-    let seam = SeamConstraints::default();
+    let u_parameters = vec![
+        umin,
+        (umin + umax) * 0.25,
+        (umin + umax) * 0.5,
+        (umin + umax) * 0.75,
+        umax,
+    ];
+    let vmin = surface.v_knots_domain().0;
+
+    let boundary = BoundaryConstraints::default().with_u_parameters_at_v_min(u_parameters.clone());
+
+    commands.spawn((
+        Mesh3d(
+            meshes.add(PointsMesh {
+                vertices: u_parameters
+                    .iter()
+                    .map(|u| surface.point_at(*u, vmin).cast::<f32>().into())
+                    .collect_vec(),
+                ..Default::default()
+            }),
+        ),
+        MeshMaterial3d(points_materials.add(PointsMaterial {
+            settings: PointsShaderSettings {
+                point_size: 0.05,
+                color: TOMATO.into(),
+                ..Default::default()
+            },
+            circle: true,
+            ..Default::default()
+        })),
+    ));
 
     // let tess = surface.tessellate(Some(Default::default()));
-    let tess = surface.constrained_tessalate(seam, Some(Default::default()));
+    let option = AdaptiveTessellationOptions {
+        ..Default::default()
+    };
+    let tess = surface.constrained_tessalate(boundary, Some(option));
     let tess = tess.cast::<f32>();
 
-    let vertices = tess.points().iter().map(|pt| (*pt).into()).collect();
+    let vertices = tess.points().iter().map(|pt| (*pt).into()).collect_vec();
+    commands.spawn((
+        Mesh3d(meshes.add(PointsMesh {
+            vertices: vertices.clone(),
+            ..Default::default()
+        })),
+        MeshMaterial3d(points_materials.add(PointsMaterial {
+            settings: PointsShaderSettings {
+                point_size: 0.02,
+                color: Color::WHITE.into(),
+                ..Default::default()
+            },
+            circle: true,
+            ..Default::default()
+        })),
+    ));
+
     let normals = tess.normals().iter().map(|n| (*n).into()).collect();
     let uvs = tess.uvs().iter().map(|uv| (*uv).into()).collect();
     let indices = tess
         .faces()
         .iter()
         .flat_map(|f| f.iter().map(|i| *i as u32))
-        .collect();
+        .collect_vec();
+
+    let mesh = Mesh::new(PrimitiveTopology::LineList, default()).with_inserted_attribute(
+        Mesh::ATTRIBUTE_POSITION,
+        // triangle edges
+        VertexAttributeValues::Float32x3(
+            indices
+                .chunks(3)
+                .flat_map(|idx| {
+                    [
+                        vertices[idx[0] as usize].into(),
+                        vertices[idx[1] as usize].into(),
+                        vertices[idx[1] as usize].into(),
+                        vertices[idx[2] as usize].into(),
+                        vertices[idx[2] as usize].into(),
+                        vertices[idx[0] as usize].into(),
+                    ]
+                })
+                .collect_vec(),
+        ),
+    );
+    commands.spawn((
+        Mesh3d(meshes.add(mesh)),
+        MeshMaterial3d(line_materials.add(LineMaterial {
+            color: Color::WHITE.into(),
+            ..Default::default()
+        })),
+    ));
 
     let mesh = Mesh::new(PrimitiveTopology::TriangleList, default())
         .with_inserted_attribute(
             Mesh::ATTRIBUTE_POSITION,
-            VertexAttributeValues::Float32x3(vertices),
+            VertexAttributeValues::Float32x3(vertices.into_iter().map(|v| v.into()).collect()),
         )
         .with_inserted_attribute(
             Mesh::ATTRIBUTE_NORMAL,

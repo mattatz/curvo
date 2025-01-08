@@ -13,6 +13,7 @@ use crate::{
 use super::SurfacePoint;
 
 /// Node for adaptive tessellation of a surface
+#[derive(Clone, Debug)]
 pub struct AdaptiveTessellationNode<T: RealField, D: DimName>
 where
     D: DimNameSub<U1>,

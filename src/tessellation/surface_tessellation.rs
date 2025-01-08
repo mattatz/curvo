@@ -10,7 +10,7 @@ use crate::{
     tessellation::adaptive_tessellation_node::AdaptiveTessellationNode,
 };
 
-use super::boundary_constraints::BoundaryConstraints;
+use super::boundary_constraints::{BoundaryConstraints, BoundaryEvaluation};
 
 /// Surface tessellation representation
 /// This struct is used to create a mesh data from surface
@@ -52,9 +52,11 @@ where
             uvs: Default::default(),
         };
 
-        // Triangulate only leaf nodes
-        nodes.iter().filter(|n| n.is_leaf()).for_each(|node| {
-            tess.triangulate(surface, nodes, node);
+        let boundary_evaluation = constraints.map(|c| BoundaryEvaluation::new(surface, &c));
+
+        // Triangulate all nodes
+        nodes.iter().for_each(|node| {
+            tess.triangulate(surface, nodes, node, boundary_evaluation.as_ref());
         });
 
         tess
@@ -66,6 +68,7 @@ where
         surface: &NurbsSurface<T, D>,
         nodes: &Vec<AdaptiveTessellationNode<T, D>>,
         node: &AdaptiveTessellationNode<T, D>,
+        boundary_evaluation: Option<&BoundaryEvaluation<T, D>>,
     ) {
         if node.is_leaf() {
             let corners = (0..4).map(|i| node.get_all_corners(nodes, i)).collect_vec();
@@ -75,6 +78,26 @@ where
                 .map(|i| i + 1)
                 .unwrap_or(0);
             let uvs = corners.into_iter().flatten().collect_vec();
+
+            let uvs = if let Some(boundary_evaluation) = boundary_evaluation {
+                uvs.iter()
+                    .map(|uv| {
+                        if uv.is_u_min() {
+                            boundary_evaluation.closest_point_at_u_min(uv)
+                        } else if uv.is_u_max() {
+                            boundary_evaluation.closest_point_at_u_max(uv)
+                        } else if uv.is_v_min() {
+                            boundary_evaluation.closest_point_at_v_min(uv)
+                        } else if uv.is_v_max() {
+                            boundary_evaluation.closest_point_at_v_max(uv)
+                        } else {
+                            uv.clone()
+                        }
+                    })
+                    .collect_vec()
+            } else {
+                uvs
+            };
 
             let base_index = self.points.len();
             let n = uvs.len();

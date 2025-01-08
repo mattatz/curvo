@@ -1,9 +1,11 @@
 use itertools::Itertools;
 use nalgebra::{
-    allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, U1,
+    allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, Vector2, U1,
 };
 
 use crate::{misc::FloatingPoint, surface::NurbsSurface};
+
+use super::SurfacePoint;
 
 /// A struct representing constraints at the boundary of a surface tessellation
 #[derive(Clone, Debug)]
@@ -105,10 +107,10 @@ where
     DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
-    pub(crate) u_points_at_v_min: Option<Vec<OPoint<T, DimNameDiff<D, U1>>>>,
-    pub(crate) u_points_at_v_max: Option<Vec<OPoint<T, DimNameDiff<D, U1>>>>,
-    pub(crate) v_points_at_u_min: Option<Vec<OPoint<T, DimNameDiff<D, U1>>>>,
-    pub(crate) v_points_at_u_max: Option<Vec<OPoint<T, DimNameDiff<D, U1>>>>,
+    pub(crate) u_points_at_v_min: Option<Vec<SurfacePoint<T, DimNameDiff<D, U1>>>>,
+    pub(crate) u_points_at_v_max: Option<Vec<SurfacePoint<T, DimNameDiff<D, U1>>>>,
+    pub(crate) v_points_at_u_min: Option<Vec<SurfacePoint<T, DimNameDiff<D, U1>>>>,
+    pub(crate) v_points_at_u_max: Option<Vec<SurfacePoint<T, DimNameDiff<D, U1>>>>,
 }
 
 impl<T: FloatingPoint, D: DimName> BoundaryEvaluation<T, D>
@@ -120,31 +122,102 @@ where
     /// Create a new boundary evaluation
     pub fn new(surface: &NurbsSurface<T, D>, constraints: &BoundaryConstraints<T>) -> Self {
         let (u, v) = surface.knots_domain();
+
+        let evaluate = |uv: Vector2<T>| {
+            let deriv = surface.rational_derivatives(uv.x, uv.y, 1);
+            let pt = deriv[0][0].clone();
+            let norm = deriv[1][0].cross(&deriv[0][1]);
+            let is_normal_degenerated = norm.magnitude_squared() < T::default_epsilon();
+            SurfacePoint::new(uv, pt.into(), norm, is_normal_degenerated)
+        };
+
         Self {
             u_points_at_v_min: constraints.u_parameters_at_v_min().map(|u_parameters| {
                 u_parameters
                     .iter()
-                    .map(|u| surface.point_at(*u, v.0))
+                    .map(|u| evaluate(Vector2::new(*u, v.0)))
                     .collect()
             }),
             u_points_at_v_max: constraints.u_parameters_at_v_max().map(|u_parameters| {
                 u_parameters
                     .iter()
-                    .map(|u| surface.point_at(*u, v.1))
+                    .map(|u| evaluate(Vector2::new(*u, v.1)))
                     .collect()
             }),
             v_points_at_u_min: constraints.v_parameters_at_u_min().map(|v_parameters| {
                 v_parameters
                     .iter()
-                    .map(|v| surface.point_at(u.0, *v))
+                    .map(|v| evaluate(Vector2::new(u.0, *v)))
                     .collect()
             }),
             v_points_at_u_max: constraints.v_parameters_at_u_max().map(|v_parameters| {
                 v_parameters
                     .iter()
-                    .map(|v| surface.point_at(u.1, *v))
+                    .map(|v| evaluate(Vector2::new(u.1, *v)))
                     .collect()
             }),
         }
+    }
+
+    pub fn closest_point_at_u_min(
+        &self,
+        point: &SurfacePoint<T, DimNameDiff<D, U1>>,
+    ) -> SurfacePoint<T, DimNameDiff<D, U1>> {
+        if let Some(u_points) = self.u_points_at_v_min.as_ref() {
+            self.closest_point(point, u_points)
+        } else {
+            point.clone()
+        }
+    }
+
+    pub fn closest_point_at_u_max(
+        &self,
+        point: &SurfacePoint<T, DimNameDiff<D, U1>>,
+    ) -> SurfacePoint<T, DimNameDiff<D, U1>> {
+        if let Some(u_points) = self.u_points_at_v_max.as_ref() {
+            self.closest_point(point, u_points)
+        } else {
+            point.clone()
+        }
+    }
+
+    pub fn closest_point_at_v_min(
+        &self,
+        point: &SurfacePoint<T, DimNameDiff<D, U1>>,
+    ) -> SurfacePoint<T, DimNameDiff<D, U1>> {
+        if let Some(v_points) = self.v_points_at_u_min.as_ref() {
+            self.closest_point(point, v_points)
+        } else {
+            point.clone()
+        }
+    }
+
+    pub fn closest_point_at_v_max(
+        &self,
+        point: &SurfacePoint<T, DimNameDiff<D, U1>>,
+    ) -> SurfacePoint<T, DimNameDiff<D, U1>> {
+        if let Some(v_points) = self.v_points_at_u_max.as_ref() {
+            self.closest_point(point, v_points)
+        } else {
+            point.clone()
+        }
+    }
+
+    /// Find the closest point to the given point from the list of points
+    fn closest_point(
+        &self,
+        point: &SurfacePoint<T, DimNameDiff<D, U1>>,
+        points: &Vec<SurfacePoint<T, DimNameDiff<D, U1>>>,
+    ) -> SurfacePoint<T, DimNameDiff<D, U1>> {
+        points
+            .iter()
+            .map(|p| {
+                let dist = (p.point() - point.point()).norm_squared();
+                (p, dist)
+            })
+            .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+            .unwrap()
+            .0
+            .clone()
     }
 }
