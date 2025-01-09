@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use nalgebra::{
-    allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, Vector2, U1,
+    allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, Vector2, U1,
 };
 
 use crate::{misc::FloatingPoint, surface::NurbsSurface};
@@ -207,7 +207,7 @@ where
     fn closest_point(
         &self,
         point: &SurfacePoint<T, DimNameDiff<D, U1>>,
-        points: &Vec<SurfacePoint<T, DimNameDiff<D, U1>>>,
+        points: &[SurfacePoint<T, DimNameDiff<D, U1>>],
     ) -> SurfacePoint<T, DimNameDiff<D, U1>> {
         points
             .iter()

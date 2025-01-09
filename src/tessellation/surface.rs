@@ -51,12 +51,13 @@ where
 }
 
 /// Tessellate the surface adaptively
-fn surface_adaptive_tessellate<T: FloatingPoint, D: DimName>(
+fn surface_adaptive_tessellate<T: FloatingPoint, D>(
     s: &NurbsSurface<T, D>,
     constraints: Option<BoundaryConstraints<T>>,
     adaptive_options: Option<AdaptiveTessellationOptions<T>>,
 ) -> SurfaceTessellation<T, D>
 where
+    D: DimName,
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,

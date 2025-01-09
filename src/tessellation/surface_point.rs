@@ -1,6 +1,5 @@
 use nalgebra::{
-    allocator::Allocator, DefaultAllocator, DimName, DimNameSub, OPoint, OVector, RealField,
-    Vector2, U1,
+    allocator::Allocator, DefaultAllocator, DimName, OPoint, OVector, RealField, Vector2,
 };
 
 /// Surface point representation
