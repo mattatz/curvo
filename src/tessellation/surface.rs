@@ -241,5 +241,13 @@ fn merge_sorted_parameters<T: FloatingPoint>(p0: Vec<T>, p1: Vec<T>) -> Vec<T> {
             c1 += 1;
         }
     }
+
+    // append the remaining elements
+    if c0 < p0.len() {
+        res.extend_from_slice(&p0[c0..]);
+    } else if c1 < p1.len() {
+        res.extend_from_slice(&p1[c1..]);
+    }
+
     res
 }
