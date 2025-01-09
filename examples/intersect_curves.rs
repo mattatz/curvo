@@ -31,7 +31,6 @@ fn main() {
         .add_plugins(PanOrbitCameraPlugin)
         .add_plugins(PointsPlugin)
         .add_plugins(AppPlugin)
-        // .add_plugins(WorldInspectorPlugin::new())
         .run();
 }
 struct AppPlugin;
