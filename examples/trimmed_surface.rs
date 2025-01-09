@@ -14,6 +14,7 @@ use nalgebra::{Point2, Point3, Point4, Vector2, Vector3};
 
 use curvo::prelude::*;
 use rand::Rng;
+use systems::screenshot_on_spacebar;
 mod materials;
 mod misc;
 mod systems;
@@ -39,8 +40,8 @@ struct AppPlugin;
 
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
-        app.add_systems(Startup, setup);
-        // .add_systems(Update, screenshot_on_spacebar);
+        app.add_systems(Startup, setup)
+            .add_systems(Update, screenshot_on_spacebar);
     }
 }
 
@@ -182,7 +183,7 @@ fn setup(
         ],
     );
 
-    let offset = 10.0;
+    let offset = 5.0;
 
     let trimming_curve = NurbsCurve3D::try_circle(
         &Point3::new(2.5, 5.0, 2.5),
