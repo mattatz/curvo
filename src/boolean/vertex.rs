@@ -33,7 +33,7 @@ impl<'a, T: FloatingPoint> Vertex<'a, T> {
     }
 }
 
-impl<'a, T: FloatingPoint> HasParameter<T> for Vertex<'a, T> {
+impl<T: FloatingPoint> HasParameter<T> for Vertex<'_, T> {
     fn parameter(&self) -> T {
         self.parameter
     }

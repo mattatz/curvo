@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use nalgebra::{
     allocator::Allocator, Const, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint,
     OVector, Vector2, U1,
@@ -8,6 +9,8 @@ use crate::{
     misc::FloatingPoint, prelude::NurbsSurface,
     tessellation::adaptive_tessellation_node::AdaptiveTessellationNode,
 };
+
+use super::boundary_constraints::{BoundaryConstraints, BoundaryEvaluation};
 
 /// Surface tessellation representation
 /// This struct is used to create a mesh data from surface
@@ -37,7 +40,11 @@ where
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     /// Create a new surface tessellation from surface and adaptive tessellation nodes
-    pub fn new(surface: &NurbsSurface<T, D>, nodes: &Vec<AdaptiveTessellationNode<T, D>>) -> Self {
+    pub fn new(
+        surface: &NurbsSurface<T, D>,
+        nodes: &Vec<AdaptiveTessellationNode<T, D>>,
+        constraints: Option<BoundaryConstraints<T>>,
+    ) -> Self {
         let mut tess = Self {
             points: Default::default(),
             normals: Default::default(),
@@ -45,9 +52,11 @@ where
             uvs: Default::default(),
         };
 
-        // Triangulate only leaf nodes
-        nodes.iter().filter(|n| n.is_leaf()).for_each(|node| {
-            tess.triangulate(surface, nodes, node);
+        let boundary_evaluation = constraints.map(|c| BoundaryEvaluation::new(surface, &c));
+
+        // Triangulate all nodes
+        nodes.iter().for_each(|node| {
+            tess.triangulate(surface, nodes, node, boundary_evaluation.as_ref());
         });
 
         tess
@@ -59,30 +68,48 @@ where
         surface: &NurbsSurface<T, D>,
         nodes: &Vec<AdaptiveTessellationNode<T, D>>,
         node: &AdaptiveTessellationNode<T, D>,
+        boundary_evaluation: Option<&BoundaryEvaluation<T, D>>,
     ) {
         if node.is_leaf() {
-            let mut base_index = self.points.len();
-            let mut uvs = vec![];
-            let mut ids = vec![];
-            let mut split_id = 0;
-            for i in 0..4 {
-                let edge_corners = node.get_all_corners(nodes, i);
-                if edge_corners.len() == 2 {
-                    split_id = i + 1;
-                }
+            let corners = (0..4).map(|i| node.get_all_corners(nodes, i)).collect_vec();
+            let split_id = corners
+                .iter()
+                .position(|c| c.len() == 2)
+                .map(|i| i + 1)
+                .unwrap_or(0);
+            let uvs = corners.into_iter().flatten().collect_vec();
 
-                uvs.extend(edge_corners);
+            let uvs = if let Some(boundary_evaluation) = boundary_evaluation {
+                uvs.iter()
+                    .map(|uv| {
+                        if uv.is_u_min() {
+                            boundary_evaluation.closest_point_at_u_min(uv)
+                        } else if uv.is_u_max() {
+                            boundary_evaluation.closest_point_at_u_max(uv)
+                        } else if uv.is_v_min() {
+                            boundary_evaluation.closest_point_at_v_min(uv)
+                        } else if uv.is_v_max() {
+                            boundary_evaluation.closest_point_at_v_max(uv)
+                        } else {
+                            uv.clone()
+                        }
+                    })
+                    .collect_vec()
+            } else {
+                uvs
+            };
+
+            let base_index = self.points.len();
+            let n = uvs.len();
+            let ids = (0..n).map(|i| base_index + i).collect_vec();
+            for corner in uvs.into_iter() {
+                let (uv, point, normal) = corner.into_tuple();
+                self.points.push(point);
+                self.normals.push(normal);
+                self.uvs.push(uv);
             }
 
-            uvs.iter().for_each(|corner| {
-                self.points.push(corner.point.clone());
-                self.normals.push(corner.normal.clone());
-                self.uvs.push(corner.uv);
-                ids.push(base_index);
-                base_index += 1;
-            });
-
-            match uvs.len() {
+            match n {
                 4 => {
                     self.faces.push([ids[0], ids[1], ids[3]]);
                     self.faces.push([ids[3], ids[1], ids[2]]);
@@ -114,11 +141,6 @@ where
                     }
                 }
             };
-        } else {
-            node.children.iter().for_each(|child| {
-                let c = &nodes[*child];
-                self.triangulate(surface, nodes, c);
-            });
         }
     }
 

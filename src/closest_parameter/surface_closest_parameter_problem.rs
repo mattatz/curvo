@@ -30,7 +30,7 @@ where
     }
 }
 
-impl<'a, T: FloatingPoint, D: DimName> CostFunction for SurfaceClosestParameterProblem<'a, T, D>
+impl<T: FloatingPoint, D: DimName> CostFunction for SurfaceClosestParameterProblem<'_, T, D>
 where
     DefaultAllocator: Allocator<D>,
     D: DimNameSub<U1>,
@@ -46,7 +46,7 @@ where
     }
 }
 
-impl<'a, T: FloatingPoint, D: DimName> Gradient for SurfaceClosestParameterProblem<'a, T, D>
+impl<T: FloatingPoint, D: DimName> Gradient for SurfaceClosestParameterProblem<'_, T, D>
 where
     DefaultAllocator: Allocator<D>,
     D: DimNameSub<U1>,
@@ -62,7 +62,7 @@ where
     }
 }
 
-impl<'a, T: FloatingPoint, D: DimName> Hessian for SurfaceClosestParameterProblem<'a, T, D>
+impl<T: FloatingPoint, D: DimName> Hessian for SurfaceClosestParameterProblem<'_, T, D>
 where
     DefaultAllocator: Allocator<D>,
     D: DimNameSub<U1>,

@@ -530,6 +530,69 @@ where
         flipped
     }
 
+    /// Create a plane shaped NURBS surface
+    /// Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point3, Vector3};
+    /// let plane = NurbsSurface3D::<f64>::plane(Point3::origin(), Vector3::x(), Vector3::y());
+    /// assert_eq!(plane.u_degree(), 1);
+    /// assert_eq!(plane.v_degree(), 1);
+    /// let (ud, vd) = plane.knots_domain();
+    /// let p00 = plane.point_at(ud.0, vd.0);
+    /// let p10 = plane.point_at(ud.1, vd.0);
+    /// let p11 = plane.point_at(ud.1, vd.1);
+    /// let p01 = plane.point_at(ud.0, vd.1);
+    /// assert_eq!(p00, Point3::new(-1.0, -1.0, 0.0));
+    /// assert_eq!(p10, Point3::new(1.0, -1.0, 0.0));
+    /// assert_eq!(p11, Point3::new(1.0, 1.0, 0.0));
+    /// assert_eq!(p01, Point3::new(-1.0, 1.0, 0.0));
+    /// ```
+    pub fn plane(
+        center: OPoint<T, DimNameDiff<D, U1>>,
+        x_axis: OVector<T, DimNameDiff<D, U1>>,
+        y_axis: OVector<T, DimNameDiff<D, U1>>,
+    ) -> Self
+    where
+        <D as DimNameSub<U1>>::Output: DimNameAdd<U1>,
+        DefaultAllocator: Allocator<<<D as DimNameSub<U1>>::Output as DimNameAdd<U1>>::Output>,
+    {
+        let control_points = vec![
+            vec![
+                OPoint::from_slice(
+                    (center.clone() - x_axis.clone() - y_axis.clone())
+                        .to_homogeneous()
+                        .as_slice(),
+                ),
+                OPoint::from_slice(
+                    (center.clone() - x_axis.clone() + y_axis.clone())
+                        .to_homogeneous()
+                        .as_slice(),
+                ),
+            ],
+            vec![
+                OPoint::from_slice(
+                    (center.clone() + x_axis.clone() - y_axis.clone())
+                        .to_homogeneous()
+                        .as_slice(),
+                ),
+                OPoint::from_slice(
+                    (center.clone() + x_axis + y_axis)
+                        .to_homogeneous()
+                        .as_slice(),
+                ),
+            ],
+        ];
+
+        Self {
+            u_degree: 1,
+            v_degree: 1,
+            u_knots: KnotVector::new(vec![T::zero(), T::zero(), T::one(), T::one()]),
+            v_knots: KnotVector::new(vec![T::zero(), T::zero(), T::one(), T::one()]),
+            control_points,
+        }
+    }
+
     /// Extrude a NURBS curve to create a NURBS surface
     pub fn extrude(
         profile: &NurbsCurve<T, D>,

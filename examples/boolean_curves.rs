@@ -5,7 +5,6 @@ use bevy::{
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
 
-use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_normal_material::{material::NormalMaterial, plugin::NormalMaterialPlugin};
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use bevy_points::{mesh::PointsMesh, plugin::PointsPlugin, prelude::PointsMaterial};
@@ -37,7 +36,6 @@ fn main() {
         .add_plugins(PanOrbitCameraPlugin)
         .add_plugins(PointsPlugin)
         .add_plugins(NormalMaterialPlugin)
-        .add_plugins(WorldInspectorPlugin::new())
         .add_plugins(AppPlugin)
         .run();
 }

@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use nalgebra::{
     allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, RealField, Vector2,
     U1,
@@ -6,24 +7,26 @@ use nalgebra::{
 use crate::{
     misc::FloatingPoint,
     prelude::{AdaptiveTessellationOptions, NurbsSurface},
+    surface::UVDirection,
 };
 
 use super::SurfacePoint;
 
 /// Node for adaptive tessellation of a surface
+#[derive(Clone, Debug)]
 pub struct AdaptiveTessellationNode<T: RealField, D: DimName>
 where
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
-    pub(crate) id: usize,
-    pub(crate) children: Vec<usize>,
-    pub(crate) corners: [SurfacePoint<T, DimNameDiff<D, U1>>; 4],
+    id: usize,
+    children: Option<[usize; 2]>,
+    pub(crate) corners: [SurfacePoint<T, DimNameDiff<D, U1>>; 4], // [left-bottom, right-bottom, right-top, left-top] order
     pub(crate) neighbors: [Option<usize>; 4], // [south, east, north, west] order (east & west are u direction, north & south are v direction)
-    pub(crate) mid_points: [Option<SurfacePoint<T, DimNameDiff<D, U1>>>; 4],
-    pub(crate) horizontal: bool,
-    pub(crate) center: Vector2<T>,
+    mid_points: [Option<SurfacePoint<T, DimNameDiff<D, U1>>>; 4], // [south, east, north, west] order
+    pub(crate) direction: UVDirection,
+    uv_center: Vector2<T>,
 }
 
 impl<T: FloatingPoint, D: DimName> AdaptiveTessellationNode<T, D>
@@ -35,16 +38,17 @@ where
     pub fn new(
         id: usize,
         corners: [SurfacePoint<T, DimNameDiff<D, U1>>; 4],
-        neighbors: Option<[Option<usize>; 4]>,
+        neighbors: [Option<usize>; 4],
     ) -> Self {
+        let uv_center = (corners[0].uv + corners[2].uv) * T::from_f64(0.5).unwrap();
         Self {
             id,
             corners,
-            neighbors: neighbors.unwrap_or([None, None, None, None]),
-            children: vec![],
+            neighbors,
+            children: None,
             mid_points: [None, None, None, None],
-            horizontal: false,
-            center: Vector2::zeros(),
+            direction: UVDirection::V,
+            uv_center,
         }
     }
 
@@ -53,88 +57,59 @@ where
     }
 
     pub fn is_leaf(&self) -> bool {
-        self.children.is_empty()
+        self.children.is_none()
     }
 
+    pub fn assign_children(&mut self, children: [usize; 2]) {
+        self.children = Some(children);
+    }
+
+    /// Evaluate the center of the node
     pub fn center(&self, surface: &NurbsSurface<T, D>) -> SurfacePoint<T, DimNameDiff<D, U1>> {
-        self.evaluate_surface(surface, self.center)
+        evaluate_surface(surface, self.uv_center)
     }
 
-    pub fn evaluate_corners(&mut self, surface: &NurbsSurface<T, D>) {
-        //eval the center
-        let inv = T::from_f64(0.5).unwrap();
-        self.center = (self.corners[0].uv + self.corners[2].uv) * inv;
-
-        //eval all of the corners
-        for i in 0..4 {
-            let c = &self.corners[i];
-            let evaled = self.evaluate_surface(surface, c.uv);
-            self.corners[i] = evaled;
-        }
-    }
-
-    pub fn evaluate_surface(
-        &self,
-        surface: &NurbsSurface<T, D>,
-        uv: Vector2<T>,
-    ) -> SurfacePoint<T, DimNameDiff<D, U1>> {
-        let derivs = surface.rational_derivatives(uv.x, uv.y, 1);
-        let pt = derivs[0][0].clone();
-        let mut norm = derivs[1][0].cross(&derivs[0][1]);
-        let degen = norm.magnitude_squared() < T::default_epsilon();
-        if !degen {
-            norm = norm.normalize();
-        }
-        SurfacePoint {
-            point: pt.into(),
-            normal: norm,
-            uv,
-            is_normal_degenerated: degen,
-        }
-    }
-
-    pub fn get_edge_corners(
+    fn get_edge_corners(
         &self,
         nodes: &Vec<Self>,
         edge_index: usize,
     ) -> Vec<SurfacePoint<T, DimNameDiff<D, U1>>> {
-        //if its a leaf, there are no children to obtain uvs from
-        if self.is_leaf() {
-            return vec![self.corners[edge_index].clone()];
-        }
-
-        if self.horizontal {
-            match edge_index {
-                0 => nodes[self.children[0]].get_edge_corners(nodes, 0),
-                1 => [
-                    nodes[self.children[0]].get_edge_corners(nodes, 1),
-                    nodes[self.children[1]].get_edge_corners(nodes, 1),
-                ]
-                .concat(),
-                2 => nodes[self.children[1]].get_edge_corners(nodes, 2),
-                3 => [
-                    nodes[self.children[1]].get_edge_corners(nodes, 3),
-                    nodes[self.children[0]].get_edge_corners(nodes, 3),
-                ]
-                .concat(),
-                _ => vec![],
-            }
-        } else {
-            //vertical case
-            match edge_index {
-                0 => [
-                    nodes[self.children[0]].get_edge_corners(nodes, 0),
-                    nodes[self.children[1]].get_edge_corners(nodes, 0),
-                ]
-                .concat(),
-                1 => nodes[self.children[1]].get_edge_corners(nodes, 1),
-                2 => [
-                    nodes[self.children[1]].get_edge_corners(nodes, 2),
-                    nodes[self.children[0]].get_edge_corners(nodes, 2),
-                ]
-                .concat(),
-                3 => nodes[self.children[0]].get_edge_corners(nodes, 3),
-                _ => vec![],
+        match &self.children {
+            Some(children) => match self.direction {
+                UVDirection::U => match edge_index {
+                    0 => nodes[children[0]].get_edge_corners(nodes, 0),
+                    1 => [
+                        nodes[children[0]].get_edge_corners(nodes, 1),
+                        nodes[children[1]].get_edge_corners(nodes, 1),
+                    ]
+                    .concat(),
+                    2 => nodes[children[1]].get_edge_corners(nodes, 2),
+                    3 => [
+                        nodes[children[1]].get_edge_corners(nodes, 3),
+                        nodes[children[0]].get_edge_corners(nodes, 3),
+                    ]
+                    .concat(),
+                    _ => vec![],
+                },
+                UVDirection::V => match edge_index {
+                    0 => [
+                        nodes[children[0]].get_edge_corners(nodes, 0),
+                        nodes[children[1]].get_edge_corners(nodes, 0),
+                    ]
+                    .concat(),
+                    1 => nodes[children[1]].get_edge_corners(nodes, 1),
+                    2 => [
+                        nodes[children[1]].get_edge_corners(nodes, 2),
+                        nodes[children[0]].get_edge_corners(nodes, 2),
+                    ]
+                    .concat(),
+                    3 => nodes[children[0]].get_edge_corners(nodes, 3),
+                    _ => vec![],
+                },
+            },
+            None => {
+                //if its a leaf, there are no children to obtain uvs from
+                vec![self.corners[edge_index].clone()]
             }
         }
     }
@@ -156,73 +131,58 @@ where
 
                 //clip the range of uvs to match self one
                 let idx = edge_index % 2;
-                let mut corner: Vec<_> = corners
+                let corner = corners
                     .into_iter()
                     .filter(|c| c.uv[idx] > orig[0].uv[idx] + e && c.uv[idx] < orig[2].uv[idx] - e)
-                    .collect();
-                corner.reverse();
+                    .rev()
+                    .collect_vec();
                 [base_arr, corner].concat()
             }
         }
     }
 
+    /// Evaluate the mid point of the node
     pub fn evaluate_mid_point(
         &mut self,
         surface: &NurbsSurface<T, D>,
-        index: usize,
+        direction: NeighborDirection,
     ) -> SurfacePoint<T, DimNameDiff<D, U1>> {
+        let index = direction as usize;
         match self.mid_points[index] {
             Some(ref p) => p.clone(),
             None => {
-                match index {
-                    0 => {
-                        self.mid_points[0] = Some(self.evaluate_surface(
-                            surface,
-                            Vector2::new(self.center.x, self.corners[0].uv.y),
-                        ));
+                let uv = match direction {
+                    NeighborDirection::South => {
+                        Vector2::new(self.uv_center.x, self.corners[0].uv.y)
                     }
-                    1 => {
-                        self.mid_points[1] = Some(self.evaluate_surface(
-                            surface,
-                            Vector2::new(self.corners[1].uv.x, self.center.y),
-                        ));
+                    NeighborDirection::East => Vector2::new(self.corners[1].uv.x, self.uv_center.y),
+                    NeighborDirection::North => {
+                        Vector2::new(self.uv_center.x, self.corners[2].uv.y)
                     }
-                    2 => {
-                        self.mid_points[2] = Some(self.evaluate_surface(
-                            surface,
-                            Vector2::new(self.center.x, self.corners[2].uv.y),
-                        ));
-                    }
-                    3 => {
-                        self.mid_points[3] = Some(self.evaluate_surface(
-                            surface,
-                            Vector2::new(self.corners[0].uv.x, self.center.y),
-                        ));
-                    }
-                    _ => {}
+                    NeighborDirection::West => Vector2::new(self.corners[0].uv.x, self.uv_center.y),
                 };
-                self.mid_points[index].clone().unwrap()
+                let pt = evaluate_surface(surface, uv);
+                self.mid_points[index] = Some(pt.clone());
+                pt
             }
         }
     }
 
-    pub fn has_bad_normals(&self) -> bool {
-        self.corners[0].is_normal_degenerated
-            || self.corners[1].is_normal_degenerated
-            || self.corners[2].is_normal_degenerated
-            || self.corners[3].is_normal_degenerated
+    /// Check if the node has bad normals
+    fn has_bad_normals(&self) -> bool {
+        self.corners.iter().any(|c| c.is_normal_degenerated())
     }
 
-    pub fn fix_normals(&mut self) {
+    fn fix_normals(&mut self) {
         let l = self.corners.len();
 
         for i in 0..l {
-            if self.corners[i].is_normal_degenerated {
+            if self.corners[i].is_normal_degenerated() {
                 //get neighbors
                 let v1 = &self.corners[(i + 1) % l];
                 let v2 = &self.corners[(i + 3) % l];
                 //correct the normal
-                self.corners[i].normal = if v1.is_normal_degenerated {
+                self.corners[i].normal = if v1.is_normal_degenerated() {
                     v2.normal.clone()
                 } else {
                     v1.normal.clone()
@@ -234,41 +194,45 @@ where
     /// Check if the node should be divided
     pub fn should_divide(
         &mut self,
-        surface: &NurbsSurface<T, D>,
+        _surface: &NurbsSurface<T, D>,
         options: &AdaptiveTessellationOptions<T>,
         current_depth: usize,
-    ) -> DividableDirection {
+    ) -> Option<DividableDirection> {
         if current_depth < options.min_depth {
-            return DividableDirection::Both;
+            return Some(DividableDirection::Both);
         }
 
         if current_depth >= options.max_depth {
-            return DividableDirection::None;
+            return None;
         }
 
         if self.has_bad_normals() {
             self.fix_normals();
             //don't divide any further when encountering a degenerate normal
-            return DividableDirection::None;
+            return None;
         }
 
         // println!("{}, {}", surface.v_degree() >= 2, surface.u_degree() >= 2);
 
-        let vertical = (self.corners[0].normal() - self.corners[1].normal()).norm_squared()
+        let v_direction = (self.corners[0].normal() - self.corners[1].normal()).norm_squared()
             > options.norm_tolerance
             || (self.corners[2].normal() - self.corners[3].normal()).norm_squared()
                 > options.norm_tolerance;
+        let v_direction = v_direction && self.corners.iter().all(|c| !c.is_u_constrained());
 
-        let horizontal = (self.corners[1].normal() - self.corners[2].normal()).norm_squared()
+        let u_direction = (self.corners[1].normal() - self.corners[2].normal()).norm_squared()
             > options.norm_tolerance
             || (self.corners[3].normal() - self.corners[0].normal()).norm_squared()
                 > options.norm_tolerance;
+        let u_direction = u_direction && self.corners.iter().all(|c| !c.is_v_constrained());
 
-        match (vertical, horizontal) {
-            (true, true) => DividableDirection::Both,
-            (true, false) => DividableDirection::Vertical,
-            (false, true) => DividableDirection::Horizontal,
+        match (u_direction, v_direction) {
+            (true, true) => Some(DividableDirection::Both),
+            (true, false) => Some(DividableDirection::U),
+            (false, true) => Some(DividableDirection::V),
             (false, false) => {
+                None
+                /*
                 let center = self.center(surface);
                 if (center.normal() - self.corners[0].normal()).norm_squared()
                     > options.norm_tolerance
@@ -279,20 +243,55 @@ where
                     || (center.normal() - self.corners[3].normal()).norm_squared()
                         > options.norm_tolerance
                 {
-                    DividableDirection::Both
+                    Some(DividableDirection::Both)
                 } else {
-                    DividableDirection::None
+                    None
                 }
+                */
             }
         }
     }
+}
+
+/// Evaluate the surface at a given uv coordinate
+fn evaluate_surface<T: FloatingPoint, D>(
+    surface: &NurbsSurface<T, D>,
+    uv: Vector2<T>,
+) -> SurfacePoint<T, DimNameDiff<D, U1>>
+where
+    D: DimName + DimNameSub<U1>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+{
+    let derivs = surface.rational_derivatives(uv.x, uv.y, 1);
+    let pt = derivs[0][0].clone();
+    let norm = derivs[1][0].cross(&derivs[0][1]);
+    let is_normal_degenerated = norm.magnitude_squared() < T::default_epsilon();
+    SurfacePoint::new(
+        uv,
+        pt.into(),
+        if !is_normal_degenerated {
+            norm.normalize()
+        } else {
+            norm
+        },
+        is_normal_degenerated,
+    )
 }
 
 /// Enum to represent the direction in which a node can be divided
 #[derive(Debug)]
 pub enum DividableDirection {
     Both,
-    Vertical,
-    Horizontal,
-    None,
+    U,
+    V,
+}
+
+/// Enum to represent the direction of a neighbor
+#[derive(Debug, Clone, Copy)]
+pub enum NeighborDirection {
+    South = 0,
+    East = 1,
+    North = 2,
+    West = 3,
 }

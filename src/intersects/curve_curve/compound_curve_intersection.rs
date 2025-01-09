@@ -57,8 +57,8 @@ where
     }
 }
 
-impl<'a, T: FloatingPoint, D: DimName> HasIntersectionParameter<T, T>
-    for CompoundCurveIntersection<'a, T, D>
+impl<T: FloatingPoint, D: DimName> HasIntersectionParameter<T, T>
+    for CompoundCurveIntersection<'_, T, D>
 where
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<D>,

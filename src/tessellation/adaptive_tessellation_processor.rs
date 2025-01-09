@@ -1,12 +1,12 @@
 use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, U1};
 
 use crate::{
-    misc::FloatingPoint, prelude::NurbsSurface,
+    misc::FloatingPoint, prelude::NurbsSurface, surface::UVDirection,
     tessellation::adaptive_tessellation_node::AdaptiveTessellationNode,
 };
 
 use super::{
-    adaptive_tessellation_node::DividableDirection,
+    adaptive_tessellation_node::{DividableDirection, NeighborDirection},
     adaptive_tessellation_option::AdaptiveTessellationOptions,
 };
 
@@ -18,9 +18,9 @@ where
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     /// The surface to tessellate
-    pub(crate) surface: &'a NurbsSurface<T, D>,
+    surface: &'a NurbsSurface<T, D>,
     /// The created nodes for the tessellation
-    pub(crate) nodes: Vec<AdaptiveTessellationNode<T, D>>,
+    nodes: Vec<AdaptiveTessellationNode<T, D>>,
 }
 
 impl<'a, T: FloatingPoint, D: DimName> AdaptiveTessellationProcessor<'a, T, D>
@@ -29,167 +29,123 @@ where
     DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
-    pub fn north(
-        &self,
-        index: usize,
-        i: usize,
-        _j: usize,
-        divs_u: usize,
-        _divs_v: usize,
-    ) -> Option<&AdaptiveTessellationNode<T, D>> {
-        if i == 0 {
-            None
-        } else {
-            Some(&self.nodes[index - divs_u])
-        }
+    pub fn new(
+        surface: &'a NurbsSurface<T, D>,
+        nodes: Vec<AdaptiveTessellationNode<T, D>>,
+    ) -> Self {
+        Self { surface, nodes }
     }
 
-    pub fn south(
-        &self,
-        index: usize,
-        i: usize,
-        _j: usize,
-        divs_u: usize,
-        divs_v: usize,
-    ) -> Option<&AdaptiveTessellationNode<T, D>> {
-        if i == divs_v - 1 {
-            None
-        } else {
-            Some(&self.nodes[index + divs_u])
-        }
-    }
-
-    pub fn east(
-        &self,
-        index: usize,
-        _i: usize,
-        j: usize,
-        divs_u: usize,
-        _divs_v: usize,
-    ) -> Option<&AdaptiveTessellationNode<T, D>> {
-        if j == divs_u - 1 {
-            None
-        } else {
-            Some(&self.nodes[index + 1])
-        }
-    }
-
-    pub fn west(
-        &self,
-        index: usize,
-        _i: usize,
-        j: usize,
-        _divs_u: usize,
-        _divs_v: usize,
-    ) -> Option<&AdaptiveTessellationNode<T, D>> {
-        if j == 0 {
-            None
-        } else {
-            Some(&self.nodes[index - 1])
-        }
+    pub fn into_nodes(self) -> Vec<AdaptiveTessellationNode<T, D>> {
+        self.nodes
     }
 
     pub fn divide(&mut self, id: usize, options: &AdaptiveTessellationOptions<T>) {
-        let horizontal = self.surface.u_degree() > 1;
-        self.iterate(id, options, 0, horizontal);
+        let direction = if self.surface.u_degree() > 1 {
+            UVDirection::U
+        } else {
+            UVDirection::V
+        };
+        self.iterate(id, options, 0, direction);
     }
 
-    /// Iterate over the nodes and divide them if necessary
-    /// todo: should not divide if a degree on current direction is 1 & duplicate vertices to avoid share a normal
+    /// iterate over the nodes and divide them if necessary
     fn iterate(
         &mut self,
         id: usize,
         options: &AdaptiveTessellationOptions<T>,
         current_depth: usize,
-        horizontal: bool,
+        direction: UVDirection,
     ) {
         let id0 = self.nodes.len();
         let id1 = id0 + 1;
 
         let node = self.nodes.get_mut(id).unwrap();
-        node.evaluate_corners(self.surface);
 
         let dividable = node.should_divide(self.surface, options, current_depth);
 
-        node.horizontal = match dividable {
-            DividableDirection::Both => horizontal,
-            DividableDirection::Vertical => false,
-            DividableDirection::Horizontal => true,
-            DividableDirection::None => {
+        node.direction = match dividable {
+            Some(DividableDirection::Both) => direction,
+            Some(DividableDirection::U) => UVDirection::U,
+            Some(DividableDirection::V) => UVDirection::V,
+            None => {
                 return;
             }
         };
 
         let (c0, c1) = {
-            if node.horizontal {
-                let bottom = [
-                    node.corners[0].clone(),
-                    node.corners[1].clone(),
-                    node.evaluate_mid_point(self.surface, 1),
-                    node.evaluate_mid_point(self.surface, 3),
-                ];
-                let top = [
-                    node.evaluate_mid_point(self.surface, 3),
-                    node.evaluate_mid_point(self.surface, 1),
-                    node.corners[2].clone(),
-                    node.corners[3].clone(),
-                ];
+            match node.direction {
+                UVDirection::U => {
+                    let east = node.evaluate_mid_point(self.surface, NeighborDirection::East);
+                    let west = node.evaluate_mid_point(self.surface, NeighborDirection::West);
+                    let bottom = [
+                        node.corners[0].clone(),
+                        node.corners[1].clone(),
+                        east.clone(),
+                        west.clone(),
+                    ];
+                    let top = [west, east, node.corners[2].clone(), node.corners[3].clone()];
 
-                node.children = vec![id0, id1];
+                    node.assign_children([id0, id1]);
 
-                //assign neighbors to bottom node
-                let bottom_neighbors = [
-                    node.neighbors[0],
-                    node.neighbors[1],
-                    Some(id1),
-                    node.neighbors[3],
-                ];
+                    //assign neighbors to bottom node
+                    let bottom_neighbors = [
+                        node.neighbors[0],
+                        node.neighbors[1],
+                        Some(id1),
+                        node.neighbors[3],
+                    ];
 
-                //assign neighbors to top node
-                let top_neighbors = [
-                    Some(id0),
-                    node.neighbors[1],
-                    node.neighbors[2],
-                    node.neighbors[3],
-                ];
+                    //assign neighbors to top node
+                    let top_neighbors = [
+                        Some(id0),
+                        node.neighbors[1],
+                        node.neighbors[2],
+                        node.neighbors[3],
+                    ];
 
-                (
-                    AdaptiveTessellationNode::new(id0, bottom, Some(bottom_neighbors)),
-                    AdaptiveTessellationNode::new(id1, top, Some(top_neighbors)),
-                )
-            } else {
-                let left = [
-                    node.corners[0].clone(),
-                    node.evaluate_mid_point(self.surface, 0),
-                    node.evaluate_mid_point(self.surface, 2),
-                    node.corners[3].clone(),
-                ];
-                let right = [
-                    node.evaluate_mid_point(self.surface, 0),
-                    node.corners[1].clone(),
-                    node.corners[2].clone(),
-                    node.evaluate_mid_point(self.surface, 2),
-                ];
+                    (
+                        AdaptiveTessellationNode::new(id0, bottom, bottom_neighbors),
+                        AdaptiveTessellationNode::new(id1, top, top_neighbors),
+                    )
+                }
+                UVDirection::V => {
+                    let south = node.evaluate_mid_point(self.surface, NeighborDirection::South);
+                    let north = node.evaluate_mid_point(self.surface, NeighborDirection::North);
 
-                node.children = vec![id0, id1];
+                    let left = [
+                        node.corners[0].clone(),
+                        south.clone(),
+                        north.clone(),
+                        node.corners[3].clone(),
+                    ];
+                    let right = [
+                        south,
+                        node.corners[1].clone(),
+                        node.corners[2].clone(),
+                        north,
+                    ];
 
-                let left_neighbors = [
-                    node.neighbors[0],
-                    Some(id1),
-                    node.neighbors[2],
-                    node.neighbors[3],
-                ];
-                let right_neighbors = [
-                    node.neighbors[0],
-                    node.neighbors[1],
-                    node.neighbors[2],
-                    Some(id0),
-                ];
+                    node.assign_children([id0, id1]);
 
-                (
-                    AdaptiveTessellationNode::new(id0, left, Some(left_neighbors)),
-                    AdaptiveTessellationNode::new(id1, right, Some(right_neighbors)),
-                )
+                    let left_neighbors = [
+                        node.neighbors[0],
+                        Some(id1),
+                        node.neighbors[2],
+                        node.neighbors[3],
+                    ];
+                    let right_neighbors = [
+                        node.neighbors[0],
+                        node.neighbors[1],
+                        node.neighbors[2],
+                        Some(id0),
+                    ];
+
+                    (
+                        AdaptiveTessellationNode::new(id0, left, left_neighbors),
+                        AdaptiveTessellationNode::new(id1, right, right_neighbors),
+                    )
+                }
             }
         };
 
@@ -198,7 +154,7 @@ where
 
         //divide all children recursively
         for child in [id0, id1] {
-            self.iterate(child, options, current_depth + 1, !horizontal);
+            self.iterate(child, options, current_depth + 1, direction.opposite());
         }
     }
 }

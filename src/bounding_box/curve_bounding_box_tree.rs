@@ -44,7 +44,7 @@ where
     }
 }
 
-impl<'a, T: FloatingPoint, D: DimName> BoundingBoxTree<T, D> for CurveBoundingBoxTree<'a, T, D>
+impl<T: FloatingPoint, D: DimName> BoundingBoxTree<T, D> for CurveBoundingBoxTree<'_, T, D>
 where
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<D>,

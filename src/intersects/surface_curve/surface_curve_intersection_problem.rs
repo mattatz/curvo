@@ -28,7 +28,7 @@ where
     }
 }
 
-impl<'a, T: FloatingPoint, D: DimName> Gradient for SurfaceCurveIntersectionProblem<'a, T, D>
+impl<T: FloatingPoint, D: DimName> Gradient for SurfaceCurveIntersectionProblem<'_, T, D>
 where
     DefaultAllocator: Allocator<D>,
     D: DimNameSub<U1>,
@@ -48,7 +48,7 @@ where
     }
 }
 
-impl<'a, T: FloatingPoint, D: DimName> CostFunction for SurfaceCurveIntersectionProblem<'a, T, D>
+impl<T: FloatingPoint, D: DimName> CostFunction for SurfaceCurveIntersectionProblem<'_, T, D>
 where
     DefaultAllocator: Allocator<D>,
     D: DimNameSub<U1>,
