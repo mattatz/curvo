@@ -61,7 +61,7 @@ fn setup(
             norm_tolerance: 1e-2,
             ..Default::default()
         };
-        let tess = surface.tessellate(Some(option)).cast::<f32>();
+        let tess = surface.tessellate(Some(option)).unwrap().cast::<f32>();
         let vertices = tess.points().iter().map(|pt| (*pt).into()).collect();
         let normals = tess.normals().iter().map(|n| (*n).into()).collect();
         let uvs = tess.uvs().iter().map(|uv| (*uv).into()).collect();

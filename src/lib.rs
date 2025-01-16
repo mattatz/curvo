@@ -31,7 +31,8 @@ pub mod prelude {
     pub use crate::tessellation::{
         adaptive_tessellation_option::AdaptiveTessellationOptions,
         boundary_constraints::BoundaryConstraints, surface_tessellation::*,
-        ConstrainedTessellation, Tessellation,
+        trimmed_surface_constraints::TrimmedSurfaceConstraints, ConstrainedTessellation,
+        Tessellation,
     };
     pub use crate::trim::*;
 }
