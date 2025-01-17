@@ -11,9 +11,7 @@ use spade::{ConstrainedDelaunayTriangulation, HasPosition, SpadeNum, Triangulati
 use crate::curve::NurbsCurve2D;
 use crate::misc::FloatingPoint;
 use crate::misc::PolygonBoundary;
-use crate::prelude::{
-    BoundaryConstraints, Contains, SurfaceTessellation3D, TrimmedSurfaceConstraints,
-};
+use crate::prelude::{Contains, SurfaceTessellation3D, TrimmedSurfaceConstraints};
 use crate::surface::{NurbsSurface3D, TrimmedSurface};
 
 #[derive(Debug, Clone, Copy)]
