@@ -51,40 +51,46 @@ The supported features also include finding the closest point on NURBS curves, f
 ## Usage
 
 ```rust
-// Create a set of points to interpolate
-let points = vec![
-    Point3::new(-1.0, -1.0, 0.),
-    Point3::new(1.0, -1.0, 0.),
-    Point3::new(1.0, 1.0, 0.),
-    Point3::new(-1.0, 1.0, 0.),
-    Point3::new(-1.0, 2.0, 0.),
-    Point3::new(1.0, 2.5, 0.),
-];
+use curvo::prelude::*;
+use nalgebra::{Point3, Rotation3, Translation3, Vector3};
+use std::f64::consts::FRAC_PI_2;
 
-// Create a NURBS curve that interpolates the given points with degree 3
-// You can also specify the precision of the curve by generic type (f32 or f64)
-let interpolated = NurbsCurve3D::<f64>::try_interpolate(&points, 3).unwrap();
+fn main() {
+  // Create a set of points to interpolate
+  let points = vec![
+      Point3::new(-1.0, -1.0, 0.),
+      Point3::new(1.0, -1.0, 0.),
+      Point3::new(1.0, 1.0, 0.),
+      Point3::new(-1.0, 1.0, 0.),
+      Point3::new(-1.0, 2.0, 0.),
+      Point3::new(1.0, 2.5, 0.),
+  ];
 
-// NURBS curve & surface can be transformed by nalgebra's matrix
-let rotation = Rotation3::from_axis_angle(&Vector3::z_axis(), FRAC_PI_2);
-let translation = Translation3::new(0., 0., 3.);
-let transform_matrix = translation * rotation; // nalgebra::Isometry3
+  // Create a NURBS curve that interpolates the given points with degree 3
+  // You can also specify the precision of the curve by generic type (f32 or f64)
+  let interpolated = NurbsCurve3D::<f64>::try_interpolate(&points, 3).unwrap();
 
-// Transform the curve by the given matrix (nalgebra::Isometry3 into nalgebra::Matrix4)
-let offsetted = interpolated.transformed(&transform_matrix.into());
+  // NURBS curve & surface can be transformed by nalgebra's matrix
+  let rotation = Rotation3::from_axis_angle(&Vector3::z_axis(), FRAC_PI_2);
+  let translation = Translation3::new(0., 0., 3.);
+  let transform_matrix = translation * rotation; // nalgebra::Isometry3
 
-// Create a NURBS surface by lofting two NURBS curves
-let lofted = NurbsSurface::try_loft(
-  &[interpolated, offsetted],
-  Some(3), // degree of v direction
-).unwrap();
+  // Transform the curve by the given matrix (nalgebra::Isometry3 into nalgebra::Matrix4)
+  let offsetted = interpolated.transformed(&transform_matrix.into());
 
-// Tessellate the surface in adaptive manner about curvature for efficient rendering
-let option = AdaptiveTessellationOptions {
-    norm_tolerance: 1e-4,
-    ..Default::default()
-};
-let tessellation = lofted.tessellate(Some(option));
+  // Create a NURBS surface by lofting two NURBS curves
+  let lofted = NurbsSurface::try_loft(
+    &[interpolated, offsetted],
+    Some(3), // degree of v direction
+  ).unwrap();
+
+  // Tessellate the surface in adaptive manner about curvature for efficient rendering
+  let option = AdaptiveTessellationOptions {
+      norm_tolerance: 1e-4,
+      ..Default::default()
+  };
+  let tessellation = lofted.tessellate(Some(option));
+}
 
 ```
 
