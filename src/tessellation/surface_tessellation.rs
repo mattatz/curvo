@@ -77,32 +77,42 @@ where
                 .position(|c| c.len() == 2)
                 .map(|i| i + 1)
                 .unwrap_or(0);
-            let uvs = corners.into_iter().flatten().collect_vec();
+            let pts = corners.into_iter().flatten().collect_vec();
 
-            let uvs = if let Some(boundary_evaluation) = boundary_evaluation {
-                uvs.iter()
-                    .map(|uv| {
-                        if uv.is_u_min() {
-                            boundary_evaluation.closest_point_at_u_min(uv)
-                        } else if uv.is_u_max() {
-                            boundary_evaluation.closest_point_at_u_max(uv)
-                        } else if uv.is_v_min() {
-                            boundary_evaluation.closest_point_at_v_min(uv)
-                        } else if uv.is_v_max() {
-                            boundary_evaluation.closest_point_at_v_max(uv)
-                        } else {
-                            uv.clone()
+            let pts = if let Some(boundary_evaluation) = boundary_evaluation {
+                pts.into_iter()
+                    .map(|pt| {
+                        if pt.is_u_min() {
+                            if let Some(closest) = boundary_evaluation.closest_point_at_u_min(&pt) {
+                                return closest;
+                            }
                         }
+                        if pt.is_u_max() {
+                            if let Some(closest) = boundary_evaluation.closest_point_at_u_max(&pt) {
+                                return closest;
+                            }
+                        }
+                        if pt.is_v_min() {
+                            if let Some(closest) = boundary_evaluation.closest_point_at_v_min(&pt) {
+                                return closest;
+                            }
+                        }
+                        if pt.is_v_max() {
+                            if let Some(closest) = boundary_evaluation.closest_point_at_v_max(&pt) {
+                                return closest;
+                            }
+                        }
+                        pt
                     })
                     .collect_vec()
             } else {
-                uvs
+                pts
             };
 
             let base_index = self.points.len();
-            let n = uvs.len();
+            let n = pts.len();
             let ids = (0..n).map(|i| base_index + i).collect_vec();
-            for corner in uvs.into_iter() {
+            for corner in pts.into_iter() {
                 let (uv, point, normal) = corner.into_tuple();
                 self.points.push(point);
                 self.normals.push(normal);

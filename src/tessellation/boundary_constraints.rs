@@ -162,44 +162,44 @@ where
     pub fn closest_point_at_u_min(
         &self,
         point: &SurfacePoint<T, DimNameDiff<D, U1>>,
-    ) -> SurfacePoint<T, DimNameDiff<D, U1>> {
+    ) -> Option<SurfacePoint<T, DimNameDiff<D, U1>>> {
         if let Some(u_points) = self.u_points_at_v_min.as_ref() {
-            self.closest_point(point, u_points)
+            Some(self.closest_point(point, u_points))
         } else {
-            point.clone()
+            None
         }
     }
 
     pub fn closest_point_at_u_max(
         &self,
         point: &SurfacePoint<T, DimNameDiff<D, U1>>,
-    ) -> SurfacePoint<T, DimNameDiff<D, U1>> {
+    ) -> Option<SurfacePoint<T, DimNameDiff<D, U1>>> {
         if let Some(u_points) = self.u_points_at_v_max.as_ref() {
-            self.closest_point(point, u_points)
+            Some(self.closest_point(point, u_points))
         } else {
-            point.clone()
+            None
         }
     }
 
     pub fn closest_point_at_v_min(
         &self,
         point: &SurfacePoint<T, DimNameDiff<D, U1>>,
-    ) -> SurfacePoint<T, DimNameDiff<D, U1>> {
+    ) -> Option<SurfacePoint<T, DimNameDiff<D, U1>>> {
         if let Some(v_points) = self.v_points_at_u_min.as_ref() {
-            self.closest_point(point, v_points)
+            Some(self.closest_point(point, v_points))
         } else {
-            point.clone()
+            None
         }
     }
 
     pub fn closest_point_at_v_max(
         &self,
         point: &SurfacePoint<T, DimNameDiff<D, U1>>,
-    ) -> SurfacePoint<T, DimNameDiff<D, U1>> {
+    ) -> Option<SurfacePoint<T, DimNameDiff<D, U1>>> {
         if let Some(v_points) = self.v_points_at_u_max.as_ref() {
-            self.closest_point(point, v_points)
+            Some(self.closest_point(point, v_points))
         } else {
-            point.clone()
+            None
         }
     }
 
