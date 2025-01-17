@@ -212,9 +212,9 @@ fn trimmed_surface_adaptive_tessellate<T: FloatingPoint + SpadeNum>(
                 .map(|exterior| exterior.contains(&center, ()).unwrap_or(false))
                 .unwrap_or(true)
                 && (uv_interior_boundaries.is_empty()
-                    || uv_interior_boundaries
+                    || !uv_interior_boundaries
                         .iter()
-                        .any(|interior| !interior.contains(&center, ()).unwrap_or(false)))
+                        .any(|interior| interior.contains(&center, ()).unwrap_or(false)))
             {
                 let a = vmap[&vs[0].fix()];
                 let b = vmap[&vs[1].fix()];
