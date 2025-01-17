@@ -162,45 +162,37 @@ where
     pub fn closest_point_at_u_min(
         &self,
         point: &SurfacePoint<T, DimNameDiff<D, U1>>,
-    ) -> SurfacePoint<T, DimNameDiff<D, U1>> {
-        if let Some(u_points) = self.u_points_at_v_min.as_ref() {
-            self.closest_point(point, u_points)
-        } else {
-            point.clone()
-        }
+    ) -> Option<SurfacePoint<T, DimNameDiff<D, U1>>> {
+        self.u_points_at_v_min
+            .as_ref()
+            .map(|u_points| self.closest_point(point, u_points))
     }
 
     pub fn closest_point_at_u_max(
         &self,
         point: &SurfacePoint<T, DimNameDiff<D, U1>>,
-    ) -> SurfacePoint<T, DimNameDiff<D, U1>> {
-        if let Some(u_points) = self.u_points_at_v_max.as_ref() {
-            self.closest_point(point, u_points)
-        } else {
-            point.clone()
-        }
+    ) -> Option<SurfacePoint<T, DimNameDiff<D, U1>>> {
+        self.u_points_at_v_max
+            .as_ref()
+            .map(|u_points| self.closest_point(point, u_points))
     }
 
     pub fn closest_point_at_v_min(
         &self,
         point: &SurfacePoint<T, DimNameDiff<D, U1>>,
-    ) -> SurfacePoint<T, DimNameDiff<D, U1>> {
-        if let Some(v_points) = self.v_points_at_u_min.as_ref() {
-            self.closest_point(point, v_points)
-        } else {
-            point.clone()
-        }
+    ) -> Option<SurfacePoint<T, DimNameDiff<D, U1>>> {
+        self.v_points_at_u_min
+            .as_ref()
+            .map(|v_points| self.closest_point(point, v_points))
     }
 
     pub fn closest_point_at_v_max(
         &self,
         point: &SurfacePoint<T, DimNameDiff<D, U1>>,
-    ) -> SurfacePoint<T, DimNameDiff<D, U1>> {
-        if let Some(v_points) = self.v_points_at_u_max.as_ref() {
-            self.closest_point(point, v_points)
-        } else {
-            point.clone()
-        }
+    ) -> Option<SurfacePoint<T, DimNameDiff<D, U1>>> {
+        self.v_points_at_u_max
+            .as_ref()
+            .map(|v_points| self.closest_point(point, v_points))
     }
 
     /// Find the closest point to the given point from the list of points

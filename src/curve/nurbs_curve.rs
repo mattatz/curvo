@@ -1338,8 +1338,6 @@ where
 
     /// Try to refine the curve by inserting knots
     pub fn try_refine_knot(&mut self, knots_to_insert: Vec<T>) -> anyhow::Result<()> {
-        // anyhow::ensure!(self.is_clamped(), "Curve must be clamped to refine knots");
-
         if knots_to_insert.is_empty() {
             return Ok(());
         }
