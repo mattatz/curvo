@@ -25,6 +25,10 @@ impl<T: FloatingPoint> Vertex<T> {
     pub fn new(point: Point3<T>, normal: Vector3<T>, uv: Vector2<T>) -> Self {
         Self { point, normal, uv }
     }
+
+    pub fn point(&self) -> Point3<T> {
+        self.point
+    }
 }
 
 impl<T: FloatingPoint + SpadeNum> HasPosition for Vertex<T> {
@@ -151,7 +155,22 @@ fn trimmed_surface_adaptive_tessellate<T: FloatingPoint + SpadeNum>(
     });
 
     let insert_constraint = |t: &mut Tri<T>, vertices: &[Vertex<T>]| {
-        let handles = vertices.iter().map(|v| t.insert(*v)).collect_vec();
+        let skip = if let (Some(first), Some(last)) = (vertices.first(), vertices.last()) {
+            // if the input vertices are closed, skip the first vertex to avoid adding a duplicate constraint
+            if first.point() == last.point() {
+                1
+            } else {
+                0
+            }
+        } else {
+            0
+        };
+
+        let handles = vertices
+            .iter()
+            .skip(skip)
+            .map(|v| t.insert(*v))
+            .collect_vec();
         handles
             .into_iter()
             .circular_tuple_windows()
