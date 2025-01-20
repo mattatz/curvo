@@ -42,7 +42,7 @@ serde_json = "1.0.135"
 
 [features]
 default = []
-# default = ["bevy"] # for debugging example
+# default = ["bevy", "serde"] # for debugging example
 bevy = [
   "dep:easer",
   "dep:rand_distr",
