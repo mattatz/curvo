@@ -284,6 +284,7 @@ fn tessellate_uv_curve_adaptive<T: FloatingPoint>(
                     knots[i + 1],
                     tolerance,
                 );
+                #[allow(clippy::iter_skip_zero)]
                 if i == 1 {
                     evaluated.into_iter().skip(0)
                 } else {
