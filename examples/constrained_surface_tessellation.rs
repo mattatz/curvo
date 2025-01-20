@@ -17,7 +17,6 @@ use bevy_points::{
 };
 use itertools::Itertools;
 use materials::*;
-use misc::{add_surface, add_surface_normals};
 use nalgebra::{Point3, Rotation3, Translation3, Vector3};
 
 use curvo::prelude::*;
@@ -70,13 +69,9 @@ fn setup(
 
     let surface = NurbsSurface::try_loft(&[front, back], Some(3)).unwrap();
 
-    let u_parameters = vec![
-        umin,
-        (umin + umax) * 0.25,
-        (umin + umax) * 0.5,
-        (umin + umax) * 0.75,
-        umax,
-    ];
+    let u_parameters = (0..=8)
+        .map(|i| umin + (umax - umin) * i as f64 / 8.)
+        .collect_vec();
     let vmin = surface.v_knots_domain().0;
 
     let boundary = BoundaryConstraints::default().with_u_parameters_at_v_min(u_parameters.clone());

@@ -1,7 +1,6 @@
 use nalgebra::{
     allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, U1,
 };
-use rand::{rngs::ThreadRng, Rng};
 
 use crate::{
     curve::NurbsCurve,
@@ -25,10 +24,9 @@ where
             return self.dehomogenized_control_points();
         }
 
-        let mut rng = rand::thread_rng();
         let tol = tolerance.unwrap_or(T::from_f64(1e-3).unwrap());
         let (start, end) = self.knots_domain();
-        tessellate_adaptive(self, start, end, tol, &mut rng)
+        tessellate_adaptive(self, start, end, tol)
     }
 }
 
@@ -39,7 +37,6 @@ fn tessellate_adaptive<T: FloatingPoint, D>(
     start: T,
     end: T,
     tol: T,
-    rng: &mut ThreadRng,
 ) -> Vec<OPoint<T, DimNameDiff<D, U1>>>
 where
     D: DimName + DimNameSub<U1>,
@@ -54,8 +51,7 @@ where
 
     let p3 = curve.point_at(end);
 
-    let t = 0.5_f64 + 0.2_f64 * rng.gen::<f64>();
-    let mid = start + delta * T::from_f64(t).unwrap();
+    let mid = start + delta * T::from_f64(0.5).unwrap();
     let p2 = curve.point_at(mid);
 
     let diff = &p1 - &p3;
@@ -64,8 +60,8 @@ where
         || !three_points_are_flat(&p1, &p2, &p3, tol)
     {
         let exact_mid = start + (end - start) * T::from_f64(0.5).unwrap();
-        let mut left_pts = tessellate_adaptive(curve, start, exact_mid, tol, rng);
-        let right_pts = tessellate_adaptive(curve, exact_mid, end, tol, rng);
+        let mut left_pts = tessellate_adaptive(curve, start, exact_mid, tol);
+        let right_pts = tessellate_adaptive(curve, exact_mid, end, tol);
         left_pts.pop();
         [left_pts, right_pts].concat()
     } else {

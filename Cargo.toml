@@ -1,6 +1,6 @@
 [package]
 name = "curvo"
-version = "0.1.45"
+version = "0.1.46"
 authors = ["Masatatsu Nakamura <masatatsu.nakamura@gmail.com"]
 edition = "2021"
 keywords = ["nurbs", "modeling", "graphics", "3d"]
@@ -42,7 +42,7 @@ serde_json = "1.0.135"
 
 [features]
 default = []
-# default = ["bevy"] # for debugging example
+# default = ["bevy", "serde"] # for debugging example
 bevy = [
   "dep:easer",
   "dep:rand_distr",
