@@ -269,15 +269,47 @@ fn tessellate_uv_curve_adaptive<T: FloatingPoint>(
     surface: &NurbsSurface3D<T>,
     tolerance: T,
 ) -> Vec<Vertex<T>> {
-    let (start, end) = curve.knots_domain();
-    let pts = iterate_uv_curve_tessellation(curve, surface, start, end, tolerance);
-    pts.into_iter()
-        .map(|uv| {
-            let p = surface.point_at(uv.x, uv.y);
-            let n = surface.normal_at(uv.x, uv.y);
-            Vertex::new(p, n, uv.coords)
-        })
-        .collect_vec()
+    let degree = curve.degree();
+    match degree {
+        1 => {
+            // if the curve is a linear curve, should start tessellation from the knots
+            let knots = curve.knots();
+            let n = knots.len();
+
+            let pts = (1..n - 2).flat_map(|i| {
+                let evaluated = iterate_uv_curve_tessellation(
+                    curve,
+                    surface,
+                    knots[i],
+                    knots[i + 1],
+                    tolerance,
+                );
+                if i == 1 {
+                    evaluated.into_iter().skip(0)
+                } else {
+                    evaluated.into_iter().skip(1)
+                }
+            });
+
+            pts.map(|uv| {
+                let p = surface.point_at(uv.x, uv.y);
+                let n = surface.normal_at(uv.x, uv.y);
+                Vertex::new(p, n, uv.coords)
+            })
+            .collect_vec()
+        }
+        _ => {
+            let (start, end) = curve.knots_domain();
+            let pts = iterate_uv_curve_tessellation(curve, surface, start, end, tolerance);
+            pts.into_iter()
+                .map(|uv| {
+                    let p = surface.point_at(uv.x, uv.y);
+                    let n = surface.normal_at(uv.x, uv.y);
+                    Vertex::new(p, n, uv.coords)
+                })
+                .collect_vec()
+        }
+    }
 }
 
 fn iterate_uv_curve_tessellation<T: FloatingPoint>(
@@ -298,9 +330,14 @@ fn iterate_uv_curve_tessellation<T: FloatingPoint>(
     let (p3, n3) = curve.point_tangent_at(end);
 
     let flag = {
-        let diff = n2 - n1;
-        let diff2 = n3 - n2;
-        (diff - diff2).norm() > normal_tolerance
+        if curve.degree() == 1 {
+            // if the curve is a linear curve, we don't need to tessellate it by normal
+            false
+        } else {
+            let diff = n2 - n1;
+            let diff2 = n3 - n2;
+            (diff - diff2).norm() > normal_tolerance
+        }
     } || {
         let sn1 = surface.normal_at(p1.x, p1.y);
         let sn2 = surface.normal_at(p2.x, p2.y);
