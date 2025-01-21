@@ -1275,6 +1275,186 @@ where
         Ok(())
     }
 
+    /// Try to remove a knot from the curve
+    /// Returns the number of knots removed
+    /// `tolerance` defines the acceptable deviation in the curve's shape.
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::Point3;
+    /// let mut polyline = NurbsCurve3D::polyline(
+    ///     &vec![
+    ///         Point3::new(0., 0., 0.),
+    ///         Point3::new(1., 0., 0.),
+    ///         Point3::new(2., 0., 0.),
+    ///         Point3::new(3., 1., 0.),
+    ///         Point3::new(4., 2., 0.),
+    ///     ],
+    ///     false,
+    /// );
+    /// assert_eq!(polyline.control_points().len(), 5);
+    /// assert_eq!(polyline.knots().len(), 7);
+    ///
+    /// let res = polyline.try_remove_knot(1.0, None).unwrap();
+    /// assert_eq!(res, 1);
+    /// assert_eq!(polyline.control_points().len(), 4);
+    /// assert_eq!(polyline.knots().len(), 6);
+    /// ```
+    pub fn try_remove_knot(&mut self, knot: T, tolerance: Option<T>) -> anyhow::Result<usize> {
+        let tolerance = tolerance.unwrap_or(T::from_f64(1e-6).unwrap());
+
+        let n = self.control_points.len() - 1;
+        let m = n + self.degree + 1;
+
+        let r = self
+            .knots
+            .iter()
+            .position(|k| *k == knot)
+            .ok_or(anyhow::anyhow!("Knot not found"))?; // index of the knot
+
+        let multiplicities = self.knots.multiplicity();
+        let mult = multiplicities
+            .into_iter()
+            .find(|m| *m.knot() == knot)
+            .ok_or(anyhow::anyhow!("Knot not found"))?;
+        let s = mult.multiplicity();
+        let p = self.degree();
+        let ord = p + 1;
+
+        if r <= p {
+            return Err(anyhow::anyhow!(
+                "Knot is too close to the start of the curve"
+            ));
+        }
+        let mut first = r - p;
+
+        if r <= s {
+            return Err(anyhow::anyhow!("Knot is not removable"));
+        }
+        let mut last = r - s;
+
+        let mut removed_knots = self.knots.to_vec();
+        let mut removed_control_points = self.control_points.to_vec();
+        let mut temp = vec![OPoint::<T, D>::origin(); 2 * (m + 1)];
+
+        let mut t = 0usize;
+
+        // use multiplicity as # of times to remove knot
+        for _ in 0..s {
+            let off = first - 1;
+            temp[0] = removed_control_points[off].clone();
+
+            let idx_temp_right = last + 1 - off;
+            let idx_pw_right = (last + 1) as usize;
+            temp[idx_temp_right] = removed_control_points[idx_pw_right].clone();
+
+            let mut i = first;
+            let mut j = last;
+            let mut ii = 1usize;
+            let mut jj = idx_temp_right - 1;
+
+            while j >= i && (j - i) > t {
+                // compute new control points for one removal step
+                let alfi =
+                    (knot - removed_knots[i]) / (removed_knots[i + ord + t] - removed_knots[i]);
+                let alfj =
+                    (knot - removed_knots[j - t]) / (removed_knots[j + ord] - removed_knots[j - t]);
+
+                let left = &temp[ii - 1];
+                let right = &temp[jj + 1];
+
+                let temp_ii =
+                    ((&removed_control_points[i].coords - &left.coords * (T::one() - alfi)) / alfi)
+                        .into();
+
+                let temp_jj = ((&removed_control_points[j].coords - &right.coords * alfj)
+                    / (T::one() - alfj))
+                    .into();
+
+                temp[ii] = temp_ii;
+                temp[jj] = temp_jj;
+
+                i += 1;
+                j -= 1;
+                ii += 1;
+                jj -= 1;
+            }
+
+            // check if knot removable
+            let remove = if j >= i && (j - i) < t {
+                let left = &temp[ii - 1];
+                let right = &temp[jj + 1];
+                (left - right).norm() <= tolerance
+            } else {
+                let alfi =
+                    (knot - removed_knots[i]) / (removed_knots[i + ord + t] - removed_knots[i]);
+
+                let pwi = &removed_control_points[i];
+                let lo = &temp[ii - 1];
+                let hi = &temp[ii + t + 1];
+
+                let interpolated = &hi.coords * alfi + &lo.coords * (T::one() - alfi);
+                let delta = &pwi.coords - interpolated;
+                delta.norm() <= tolerance
+            };
+
+            if !remove {
+                break;
+            }
+
+            let mut i2 = first;
+            let mut j2 = last;
+            while j2 >= i2 && (j2 - i2) > t {
+                removed_control_points[i2] = temp[i2 - off].clone();
+                removed_control_points[j2] = temp[j2 - off].clone();
+
+                i2 += 1;
+                j2 -= 1;
+            }
+
+            // expand first and last
+            first -= 1;
+            last += 1;
+
+            t += 1;
+        }
+
+        // shift knots and control points to the front
+        if t > 0 {
+            // shift knots
+            for k in (r + 1)..=m {
+                removed_knots[k - t] = removed_knots[k];
+            }
+
+            // truncate knots
+            removed_knots.truncate(m + 1 - t);
+
+            // shift control points
+            let fout = (2 * r - s - p) / 2;
+            let mut j = fout;
+            let mut i = j;
+            for k in 1..t {
+                if k % 2 == 1 {
+                    i += 1;
+                } else {
+                    j = j.saturating_sub(1);
+                }
+            }
+            for k in (i + 1)..=n {
+                removed_control_points[j] = removed_control_points[k].clone();
+                j += 1;
+            }
+
+            // truncate control points
+            removed_control_points.truncate(n + 1 - t);
+
+            self.knots = KnotVector::new(removed_knots);
+            self.control_points = removed_control_points;
+        }
+
+        Ok(t)
+    }
+
     /// Check if the curve is clamped
     pub fn is_clamped(&self) -> bool {
         self.knots.is_clamped(self.degree)
