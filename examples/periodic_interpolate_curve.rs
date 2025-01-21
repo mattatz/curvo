@@ -131,7 +131,7 @@ fn setup(
             NurbsCurve3D::try_periodic_interpolate(&interpolation_target, degree, knot).unwrap();
         add_curve(
             &curve,
-            color.into(),
+            Some(color.into()),
             Some(1e-8),
             &mut commands,
             &mut meshes,

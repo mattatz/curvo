@@ -80,7 +80,7 @@ fn setup(
 
     add_curve(
         &polyline_curve.elevate_dimension(),
-        WHITE.into(),
+        Some(WHITE.into()),
         Some(1e-8),
         &mut commands,
         &mut meshes,

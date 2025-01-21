@@ -95,7 +95,7 @@ fn setup(
             Ok(curve) => {
                 add_curve(
                     &curve,
-                    WHITE.into(),
+                    None,
                     Some(1e-8),
                     &mut commands,
                     &mut meshes,

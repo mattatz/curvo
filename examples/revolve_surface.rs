@@ -71,7 +71,7 @@ fn setup(
     let profile = NurbsCurve3D::try_interpolate(&points, 3).unwrap();
     add_curve(
         &profile,
-        WHITE.into(),
+        Some(WHITE.into()),
         Some(1e-3),
         &mut commands,
         &mut meshes,

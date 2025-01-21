@@ -86,7 +86,7 @@ fn setup(
     let rail = NurbsCurve3D::try_interpolate(&points, 3).unwrap();
     add_curve(
         &rail,
-        WHITE.into(),
+        Some(WHITE.into()),
         Some(1e-3),
         &mut commands,
         &mut meshes,
