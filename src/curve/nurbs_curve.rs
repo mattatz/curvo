@@ -484,6 +484,65 @@ where
         length.ok_or(anyhow::anyhow!("Failed to compute the length of the curve"))
     }
 
+    /// Compute the parameter at a given length
+    /// `tolerance` defines the precision of the result (default: 1e-4)
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point2, Vector2};
+    /// use approx::assert_relative_eq;
+    /// let unit_circle = NurbsCurve2D::try_circle(
+    ///     &Point2::origin(),
+    ///     &Vector2::x(),
+    ///     &Vector2::y(),
+    ///     1.
+    /// ).unwrap();
+    /// let u = unit_circle.try_parameter_at_length(std::f64::consts::PI, Some(1e-4)).unwrap();
+    /// assert_relative_eq!(u, std::f64::consts::PI, epsilon = 1e-4);
+    ///
+    /// let polyline = NurbsCurve2D::polyline(&[Point2::new(0., 0.), Point2::new(1., 0.), Point2::new(1., 1.)], false);
+    /// let u = polyline.try_parameter_at_length(1.5, Some(1e-4)).unwrap();
+    /// assert_relative_eq!(u, 1.5, epsilon = 1e-4);
+    /// ```
+    pub fn try_parameter_at_length(&self, length: T, tolerance: Option<T>) -> anyhow::Result<T>
+    where
+        D: DimName + DimNameSub<U1>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+    {
+        if length < T::default_epsilon() {
+            return Ok(self.knots_domain().0);
+        }
+
+        let segments = self.try_decompose_bezier_segments()?;
+        let gauss = GaussLegendre::new(16 + self.degree)?;
+        let tolerance = tolerance.unwrap_or(T::from_f64(1e-4).unwrap());
+
+        let mut acc_length = T::zero();
+
+        for segment in segments {
+            let (_, end) = segment.knots_domain();
+            let segment_length = compute_bezier_segment_length(&segment, end, &gauss);
+
+            let l = length - acc_length;
+            acc_length += segment_length;
+
+            if length <= acc_length + T::default_epsilon() {
+                let p = compute_bezier_segment_parameter_at_length(
+                    &segment,
+                    l,
+                    tolerance,
+                    segment_length,
+                    &gauss,
+                );
+                return Ok(p);
+            }
+        }
+
+        Err(anyhow::anyhow!(
+            "Failed to compute the parameter at the given length"
+        ))
+    }
+
     /// Divide a NURBS curve by a given length
     /// # Example
     /// ```
@@ -1870,9 +1929,9 @@ where
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     let (k0, k1) = s.knots_domain();
-    if length < T::zero() {
+    if length <= T::zero() {
         return k0;
-    } else if length > total_length {
+    } else if total_length <= length {
         return k1;
     }
 
