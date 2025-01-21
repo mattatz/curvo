@@ -13,25 +13,25 @@ use crate::LineMaterial;
 #[allow(unused)]
 pub fn add_curve(
     curve: &NurbsCurve3D<f64>,
-    color: Color,
-    option: Option<f64>,
+    color: Option<Color>,
+    tolerance: Option<f64>,
     commands: &mut Commands<'_, '_>,
     meshes: &mut ResMut<'_, Assets<Mesh>>,
     line_materials: &mut ResMut<'_, Assets<LineMaterial>>,
 ) {
-    let samples = curve.tessellate(option);
+    let samples = curve.tessellate(tolerance);
     let line_vertices: Vec<_> = samples
         .iter()
         .map(|p| p.cast::<f32>())
         .map(|p| p.into())
         .collect();
     let n = line_vertices.len();
-    let line = Mesh::new(PrimitiveTopology::LineStrip, default())
-        .with_inserted_attribute(
-            Mesh::ATTRIBUTE_POSITION,
-            VertexAttributeValues::Float32x3(line_vertices),
-        )
-        .with_inserted_attribute(
+    let mut line = Mesh::new(PrimitiveTopology::LineStrip, default()).with_inserted_attribute(
+        Mesh::ATTRIBUTE_POSITION,
+        VertexAttributeValues::Float32x3(line_vertices),
+    );
+    if color.is_none() {
+        line.insert_attribute(
             Mesh::ATTRIBUTE_COLOR,
             VertexAttributeValues::Float32x4(
                 (0..n)
@@ -40,10 +40,11 @@ pub fn add_curve(
                     .collect(),
             ),
         );
+    }
     commands.spawn((
         Mesh3d(meshes.add(line)),
         MeshMaterial3d(line_materials.add(LineMaterial {
-            color,
+            color: color.unwrap_or(Color::WHITE.into()),
             ..Default::default()
         })),
     ));
