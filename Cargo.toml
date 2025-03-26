@@ -12,15 +12,15 @@ license = "MIT"
 readme = "README.md"
 
 [dependencies]
-anyhow = "1.0.95"
+anyhow = "1.0.97"
 nalgebra = { version = "0.33.2", features = ["serde-serialize"] }
 num-traits = "0.2.19"
-rand = "0.8.5"
-rand_distr = { version = "0.4.3", default-features = false, optional = true }
+rand = "0.9.0"
+rand_distr = { version = "0.5.1", default-features = false, optional = true }
 robust = { version = "1.1.0" }
 easer = { version = "0.3.0", optional = true }
 simba = { version = "0.9.0", default-features = false }
-spade = { version = "2.12.1" }
+spade = { version = "2.13.1" }
 gauss-quad = "0.2.2"
 bevy = { version = "0.15.1", optional = true }
 bevy_egui = { version = "0.31.1", optional = true }
@@ -31,14 +31,14 @@ bevy_points = { version = "0.7.0", optional = true }
 argmin = "0.10.0"
 itertools = "0.14.0"
 log = { version = "0.4", optional = true }
-serde = { version = "1.0.217", optional = true }
+serde = { version = "1.0.219", optional = true }
 
 [target.wasm32-unknown-unknown.dependencies]
 argmin = { version = "0.10.0", features = ["wasm-bindgen"] }
 
 [dev-dependencies]
 approx = { version = "0.5", default-features = false }
-serde_json = "1.0.135"
+serde_json = "1.0.140"
 
 [features]
 default = []
