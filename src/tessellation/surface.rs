@@ -65,6 +65,11 @@ where
     let is_adaptive = adaptive_options.is_some();
     let options = adaptive_options.unwrap_or_default();
 
+    // if constraints are provided, we only need to tessellate the surface at the control points
+    // otherwise, we need to tessellate the surface at twice the number of control points
+    // to ensure that the surface is tessellated enough to capture the curvature
+    let min_divs_multiplier = if constraints.is_some() { 1 } else { 2 };
+
     let us: Vec<_> = if s.u_degree() <= 1 {
         s.u_knots()
             .iter()
@@ -73,7 +78,7 @@ where
             .cloned()
             .collect()
     } else {
-        let min_u = s.control_points().len() - 1;
+        let min_u = (s.control_points().len() - 1) * min_divs_multiplier;
         let divs_u = options.min_divs_u.max(min_u);
         let (umin, umax) = s.u_knots_domain();
         let du = (umax - umin) / T::from_usize(divs_u).unwrap();
@@ -90,7 +95,7 @@ where
             .cloned()
             .collect()
     } else {
-        let min_v = s.control_points()[0].len() - 1;
+        let min_v = (s.control_points()[0].len() - 1) * min_divs_multiplier;
         let divs_v = options.min_divs_v.max(min_v);
         let (vmin, vmax) = s.v_knots_domain();
         let dv = (vmax - vmin) / T::from_usize(divs_v).unwrap();
