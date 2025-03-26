@@ -50,7 +50,7 @@ fn setup(
     _points_materials: ResMut<Assets<PointsMaterial>>,
     mut normal_materials: ResMut<'_, Assets<NormalMaterial>>,
 ) {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let n = 10;
     let depth = 8.;
     let min_radius = 1.0;
@@ -58,7 +58,7 @@ fn setup(
 
     let points: Vec<_> = (0..n)
         .map(|i| {
-            let g = rng.gen::<f64>();
+            let g = rng.random::<f64>();
             let t = i as f64 / n as f64;
             let rad = min_radius + g * (max_radius - min_radius);
             let r = 0_f64;

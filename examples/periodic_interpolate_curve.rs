@@ -90,7 +90,7 @@ fn setup(
 
     let interpolation_target: Vec<Point3<f64>> = (0..8)
         .map(|_i| {
-            let sample: [f64; 3] = UnitSphere.sample(&mut rand::thread_rng());
+            let sample: [f64; 3] = UnitSphere.sample(&mut rand::rng());
             Point3::from_slice(&sample) * 5.
         })
         .collect();
