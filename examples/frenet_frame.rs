@@ -41,7 +41,7 @@ fn setup(
     mut meshes: ResMut<Assets<Mesh>>,
     mut line_materials: ResMut<Assets<LineMaterial>>,
 ) {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let n = 12;
     let min_radius = 0.25;
     let max_radius = 2.5;
@@ -49,7 +49,7 @@ fn setup(
 
     let points: Vec<_> = (0..n)
         .map(|i| {
-            let g = rng.gen::<f64>();
+            let g = rng.random::<f64>();
             let t = i as f64 / n as f64;
             let r = t * TAU;
             let rad = min_radius + g * (max_radius - min_radius);

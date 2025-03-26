@@ -25,7 +25,7 @@ where
             return self.dehomogenized_control_points();
         }
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let tol = tolerance.unwrap_or(T::from_f64(1e-3).unwrap());
         let (start, end) = self.knots_domain();
         tessellate_adaptive(self, start, end, tol, &mut rng)
@@ -54,7 +54,7 @@ where
 
     let p3 = curve.point_at(end);
 
-    let t = 0.5_f64 + 0.2_f64 * rng.gen::<f64>();
+    let t = 0.5_f64 + 0.2_f64 * rng.random::<f64>();
     let mid = start + delta * T::from_f64(t).unwrap();
     let p2 = curve.point_at(mid);
 

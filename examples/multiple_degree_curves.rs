@@ -163,7 +163,7 @@ fn reset(
 
         let pts: Vec<Point3<f32>> = (0..settings.num_control_points)
             .map(|_i| {
-                let sample: [f32; 3] = UnitSphere.sample(&mut rand::thread_rng());
+                let sample: [f32; 3] = UnitSphere.sample(&mut rand::rng());
                 Point3::from_slice(&sample)
             })
             .collect();

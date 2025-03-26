@@ -137,7 +137,7 @@ fn setup(
             (0..N)
                 .map(|j| {
                     let x = i as f64 - hn;
-                    let y = (rng.gen::<f64>() - 0.5) * 2.;
+                    let y = (rng.random::<f64>() - 0.5) * 2.;
                     let z = (j as f64) - hn;
                     Point4::new(x, y, z, 1.)
                 })
