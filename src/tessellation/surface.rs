@@ -73,7 +73,7 @@ where
             .cloned()
             .collect()
     } else {
-        let min_u = (s.control_points().len() - 1) * 2;
+        let min_u = s.control_points().len() - 1;
         let divs_u = options.min_divs_u.max(min_u);
         let (umin, umax) = s.u_knots_domain();
         let du = (umax - umin) / T::from_usize(divs_u).unwrap();
@@ -90,7 +90,7 @@ where
             .cloned()
             .collect()
     } else {
-        let min_v = (s.control_points()[0].len() - 1) * 2;
+        let min_v = s.control_points()[0].len() - 1;
         let divs_v = options.min_divs_v.max(min_v);
         let (vmin, vmax) = s.v_knots_domain();
         let dv = (vmax - vmin) / T::from_usize(divs_v).unwrap();
