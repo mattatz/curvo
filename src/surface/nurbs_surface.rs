@@ -18,7 +18,7 @@ use crate::{
         binomial::Binomial, transformable::Transformable, transpose_control_points, FloatingPoint,
         Invertible, Ray,
     },
-    prelude::{KnotVector, SurfaceTessellation, Tessellation},
+    prelude::{AdaptiveTessellationOptions, KnotVector, SurfaceTessellation, Tessellation},
     SurfaceClosestParameterNewton, SurfaceClosestParameterProblem,
 };
 
@@ -944,7 +944,11 @@ where
         });
         */
 
-        let tess = self.tessellate(None);
+        let tess = self.tessellate(Some(AdaptiveTessellationOptions {
+            min_divs_u: (self.control_points().len() - 1) * 2,
+            min_divs_v: (self.control_points()[0].len() - 1) * 2,
+            ..Default::default()
+        }));
         tess.points().iter().enumerate().for_each(|(i, pt)| {
             let d = point - pt;
             let d = d.norm_squared();
