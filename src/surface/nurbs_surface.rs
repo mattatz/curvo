@@ -811,14 +811,28 @@ where
     }
 
     /// Try to create boundary curves of the surface
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point3, Vector3};
+    /// use approx::assert_relative_eq;
+    /// let circle = NurbsCurve3D::try_circle(&Point3::origin(), &Vector3::x(), &Vector3::y(), 1.).unwrap();
+    /// let extruded = NurbsSurface3D::extrude(&circle, &Vector3::z());
+    /// let [c0, c1, c2, c3] = extruded.try_boundary_curves().unwrap();
+    /// assert_relative_eq!(c0.point_at(c0.knots_domain().1), c1.point_at(c1.knots_domain().0), epsilon = 1e-8);
+    /// assert_relative_eq!(c1.point_at(c1.knots_domain().1), c2.point_at(c2.knots_domain().0), epsilon = 1e-8);
+    /// assert_relative_eq!(c2.point_at(c2.knots_domain().1), c3.point_at(c3.knots_domain().0), epsilon = 1e-8);
+    /// assert_relative_eq!(c3.point_at(c3.knots_domain().1), c0.point_at(c0.knots_domain().0), epsilon = 1e-8);
+    /// ```
     pub fn try_boundary_curves(&self) -> anyhow::Result<[NurbsCurve<T, D>; 4]> {
         let (u_start, u_end) = self.u_knots_domain();
         let (v_start, v_end) = self.v_knots_domain();
         Ok([
-            self.try_isocurve(u_start, UVDirection::U)?,
-            self.try_isocurve(v_start, UVDirection::V)?,
-            self.try_isocurve(u_end, UVDirection::U)?,
-            self.try_isocurve(v_end, UVDirection::V)?,
+            // clock-wised order
+            self.try_isocurve(u_start, UVDirection::U)?, // v along (00 to 01)
+            self.try_isocurve(v_end, UVDirection::V)?,   // u along (01 to 11)
+            self.try_isocurve(u_end, UVDirection::U)?.inverse(), // v along (11 to 10)
+            self.try_isocurve(v_start, UVDirection::V)?.inverse(), // u along (10 to 00)
         ])
     }
 
