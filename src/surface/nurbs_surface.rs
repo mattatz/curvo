@@ -828,7 +828,7 @@ where
         let (u_start, u_end) = self.u_knots_domain();
         let (v_start, v_end) = self.v_knots_domain();
         Ok([
-            // clock-wised order
+            // clockwise order
             self.try_isocurve(u_start, UVDirection::U)?, // v along (00 to 01)
             self.try_isocurve(v_end, UVDirection::V)?,   // u along (01 to 11)
             self.try_isocurve(u_end, UVDirection::U)?.inverse(), // v along (11 to 10)
