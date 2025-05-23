@@ -885,7 +885,12 @@ where
     /// assert_eq!(start, 0.);
     /// assert_eq!(end, std::f64::consts::FRAC_PI_2);
     /// assert_relative_eq!(arc.point_at(start), Point2::new(1., 0.), epsilon = 1e-10);
+    /// let mid = (start + end) / 2.;
+    /// let mid_point = mid.cos() * Vector2::x() + mid.sin() * Vector2::y();
+    /// assert_relative_eq!(arc.point_at(mid), Point2::from(mid_point), epsilon = 1e-10);
     /// assert_relative_eq!(arc.point_at(end), Point2::new(0., 1.), epsilon = 1e-10);
+    /// assert_relative_eq!(arc.tangent_at(start).normalize(), Vector2::new(0., 1.), epsilon = 1e-10);
+    /// assert_relative_eq!(arc.tangent_at(end).normalize(), Vector2::new(-1., 0.), epsilon = 1e-10);
     /// ```
     pub fn try_arc(
         center: &OPoint<T, DimNameDiff<D, U1>>,
@@ -901,7 +906,113 @@ where
     {
         let x_axis = x_axis.normalize() * radius;
         let y_axis = y_axis.normalize() * radius;
-        Self::try_ellipse_arc(center, &x_axis, &y_axis, start_angle, end_angle)
+        // return Self::try_ellipse_arc(center, &x_axis, &y_axis, start_angle, end_angle);
+
+        let frac_1_2 = T::from_f64(0.5).unwrap();
+        let frac_1_4 = T::from_f64(0.25).unwrap();
+
+        let mut angle = end_angle - start_angle;
+        let a_lim = (frac_1_2 + T::default_epsilon().sqrt()) * T::pi();
+        let span_count = if angle <= a_lim {
+            1
+        } else if angle <= T::from_f64(2.0).unwrap() * a_lim {
+            2
+        } else if angle <= T::from_f64(3.0).unwrap() * a_lim {
+            4
+        } else {
+            4
+        };
+
+        let cv_count = span_count * 2 + 1;
+        let mut cv: Vec<OPoint<T, DimNameDiff<D, U1>>> = vec![OPoint::origin(); cv_count];
+        let mut weights = vec![T::one(); cv_count];
+
+        let arc_point_at = |t: T| center + &x_axis * radius * t.cos() + &y_axis * radius * t.sin();
+
+        let start_point = arc_point_at(start_angle);
+        let end_point = arc_point_at(end_angle);
+
+        match span_count {
+            1 => {
+                cv[0] = start_point;
+                cv[1] = arc_point_at(start_angle + angle * frac_1_2);
+                cv[2] = end_point;
+            }
+            2 => {
+                cv[0] = start_point;
+                cv[1] = arc_point_at(start_angle + angle * frac_1_4);
+                cv[2] = arc_point_at(start_angle + angle * frac_1_2);
+                cv[3] = arc_point_at(start_angle + angle * (frac_1_2 + frac_1_4));
+                cv[4] = end_point;
+                angle *= frac_1_2;
+            }
+            _ => {
+                // 4 span
+                let d = [0.125, 0.250, 0.375, 0.500, 0.625, 0.750, 0.875];
+                cv[0] = start_point;
+                for (i, k) in d.into_iter().enumerate() {
+                    cv[i + 1] = arc_point_at(start_angle + angle * T::from_f64(k).unwrap());
+                }
+                cv[8] = end_point;
+                angle *= frac_1_4;
+            }
+        }
+
+        let a = (frac_1_2 * angle).cos();
+        let b = a - T::one();
+        let c = angle;
+
+        let span2 = span_count * 2;
+        let degree = 2;
+        let knot_len = cv_count + degree + 1;
+        let mut knots = vec![start_angle; knot_len];
+
+        for i in (1..span2).step_by(2) {
+            cv[i].coords = cv[i].coords.clone() + center.coords.clone() * b;
+            weights[i] = a;
+
+            let oi = i + 1;
+            knots[oi + 1] = knots[oi - 1] + c;
+            knots[oi + 2] = knots[oi - 1] + c;
+        }
+
+        for i in 0..(degree + 1) {
+            knots[cv_count + i] = end_angle;
+        }
+
+        for j in (1..span2).step_by(2) {
+            let w = weights[j];
+            let winv = T::one() / w;
+            for axis in 0..(D::dim() - 1) {
+                let a = cv[j][axis] * winv;
+                let b = T::from_f64(arc_de_fuzz(a.to_f64().unwrap())).unwrap();
+                if a != b {
+                    cv[j][axis] = b * w;
+                }
+            }
+        }
+
+        let control_points = cv
+            .into_iter()
+            .enumerate()
+            .map(|(i, p)| {
+                let mut coords = vec![];
+                let w = weights[i];
+                for j in 0..(D::dim() - 1) {
+                    coords.push(p[j]);
+                }
+                coords.push(w);
+                OPoint::from_slice(&coords)
+            })
+            .collect();
+
+        let n = Self {
+            control_points,
+            degree,
+            knots: KnotVector::new(knots),
+        };
+
+        Ok(n)
     }
 
     /// Try to create an ellipse arc curve
@@ -2194,6 +2305,24 @@ fn try_solve_interpolation<T: FloatingPoint>(
     }
 
     Ok(control_points)
+}
+
+#[inline]
+fn arc_de_fuzz(d: f64) -> f64 {
+    // 0.0078125 = 1.0/128.0 exactly
+    // Using 2^n scale factors insures no loss of precision
+    // but preserves fractional values that are multiples of 1/128.
+    //
+    // Fuzz tol should be scale * 2^m * ON_EPSILON for m >= 1
+
+    let scaled = d * 128.0;
+    let i = scaled.trunc();
+    let f = scaled.fract();
+    if f != 0.0 && f.abs() <= 1024.0 * std::f64::EPSILON {
+        i * 0.0078125
+    } else {
+        d
+    }
 }
 
 #[cfg(feature = "serde")]
