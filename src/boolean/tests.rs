@@ -37,10 +37,11 @@ fn compound_circle(radius: f64) -> CompoundCurve<f64, U3> {
     let o = Point2::origin();
     let dx = Vector2::x();
     let dy = Vector2::y();
-    CompoundCurve::new(vec![
+    CompoundCurve::try_new(vec![
         NurbsCurve2D::try_arc(&o, &dx, &dy, radius, 0., PI).unwrap(),
         NurbsCurve2D::try_arc(&o, &dx, &dy, radius, PI, TAU).unwrap(),
     ])
+    .unwrap()
 }
 
 fn rectangular_annulus(width: f64, height: f64, square_size: f64) -> Region<f64> {

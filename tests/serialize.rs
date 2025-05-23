@@ -18,7 +18,7 @@ fn test_curve_serialization() {
     let der: NurbsCurve3D<f64> = serde_json::from_str(&json).unwrap();
     assert_curve_eq(&curve, &der);
 
-    let compound = CompoundCurve::new(vec![curve.clone()]);
+    let compound = CompoundCurve::try_new(vec![curve.clone()]).unwrap();
     let json = serde_json::to_string_pretty(&compound).unwrap();
     let der: CompoundCurve<f64, U4> = serde_json::from_str(&json).unwrap();
     compound.spans().iter().enumerate().for_each(|(i, span)| {

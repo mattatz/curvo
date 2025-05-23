@@ -26,9 +26,14 @@ impl<T: FloatingPoint, D: DimName> CompoundCurve<T, D>
 where
     DefaultAllocator: Allocator<D>,
 {
+    /// Create a new compound curve from a list of spans without checking if the spans are connected.
+    pub fn new_unchecked(spans: Vec<NurbsCurve<T, D>>) -> Self {
+        Self { spans }
+    }
+
     /// Create a new compound curve from a list of spans.
     /// The spans must be connected.
-    pub fn new(spans: Vec<NurbsCurve<T, D>>) -> Self
+    pub fn try_new(spans: Vec<NurbsCurve<T, D>>) -> anyhow::Result<Self>
     where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
@@ -62,14 +67,13 @@ where
                             if current == 0 {
                                 connected.insert(current, next.inverse());
                             } else {
-                                println!("Cannot handle opposite direction");
+                                anyhow::bail!("Cannot handle opposite direction");
                             }
                         }
                     }
                 }
                 None => {
-                    println!("No connection found");
-                    break;
+                    anyhow::bail!("No connection found");
                 }
             }
         }
@@ -85,7 +89,7 @@ where
             knot_offset = curve.knots().last();
         });
 
-        Self { spans: connected }
+        Ok(Self { spans: connected })
     }
 
     pub fn spans(&self) -> &[NurbsCurve<T, D>] {
@@ -117,10 +121,10 @@ where
     /// let o = Point2::origin();
     /// let dx = Vector2::x();
     /// let dy = Vector2::y();
-    /// let compound = CompoundCurve::new(vec![
+    /// let compound = CompoundCurve::try_new(vec![
     ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., 0., PI).unwrap(),
     ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., PI, TAU).unwrap(),
-    /// ]);
+    /// ]).unwrap();
     /// assert_relative_eq!(compound.point_at(0.).unwrap(), Point2::new(1., 0.), epsilon = 1e-5);
     /// assert_relative_eq!(compound.point_at(FRAC_PI_2).unwrap(), Point2::new(0., 1.), epsilon = 1e-5);
     /// assert_relative_eq!(compound.point_at(PI).unwrap(), Point2::new(-1., 0.), epsilon = 1e-5);
@@ -145,10 +149,10 @@ where
     /// let o = Point2::origin();
     /// let dx = Vector2::x();
     /// let dy = Vector2::y();
-    /// let compound = CompoundCurve::new(vec![
+    /// let compound = CompoundCurve::try_new(vec![
     ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., 0., PI).unwrap(),
     ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., PI, TAU).unwrap(),
-    /// ]);
+    /// ]).unwrap();
     /// assert_relative_eq!(compound.tangent_at(0.).unwrap().normalize(), Vector2::y(), epsilon = 1e-10);
     /// assert_relative_eq!(compound.tangent_at(PI).unwrap().normalize(), -Vector2::y(), epsilon = 1e-10);
     /// assert_relative_eq!(compound.tangent_at(TAU).unwrap().normalize(), Vector2::y(), epsilon = 1e-10);
@@ -171,10 +175,10 @@ where
     /// let o = Point2::origin();
     /// let dx = Vector2::x();
     /// let dy = Vector2::y();
-    /// let circle = CompoundCurve::new(vec![
+    /// let circle = CompoundCurve::try_new(vec![
     ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., 0., PI).unwrap(),
     ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., PI, TAU).unwrap(),
-    /// ]);
+    /// ]).unwrap();
     /// assert!(circle.is_closed());
     /// ```
     pub fn is_closed(&self) -> bool
@@ -203,7 +207,7 @@ where
     /// let o = Point2::origin();
     /// let dx = Vector2::x();
     /// let dy = Vector2::y();
-    /// let compound = CompoundCurve::new(vec![
+    /// let compound = CompoundCurve::new_unchecked(vec![
     ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., 0., PI).unwrap(),
     ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., PI, TAU).unwrap(),
     /// ]);
@@ -231,10 +235,10 @@ where
     /// let o = Point2::origin();
     /// let dx = Vector2::x();
     /// let dy = Vector2::y();
-    /// let compound = CompoundCurve::new(vec![
+    /// let compound = CompoundCurve::try_new(vec![
     ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., 0., PI).unwrap(),
     ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., PI, TAU).unwrap(),
-    /// ]);
+    /// ]).unwrap();
     /// assert_relative_eq!(compound.find_closest_point(&Point2::new(3.0, 0.0)).unwrap(), Point2::new(1., 0.));
     /// ```
     pub fn find_closest_point(
@@ -285,7 +289,7 @@ where
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     fn from(value: NurbsCurve<T, D>) -> Self {
-        Self::new(vec![value])
+        Self::new_unchecked(vec![value])
     }
 }
 
