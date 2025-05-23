@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use argmin::core::ArgminFloat;
 use nalgebra::{
     allocator::Allocator, Const, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OMatrix,
-    OPoint, U1,
+    OPoint, OVector, U1,
 };
 
 use crate::{
@@ -96,6 +96,18 @@ where
         &mut self.spans
     }
 
+    /// Find the span containing the parameter t.
+    fn find_span(&self, t: T) -> Option<&NurbsCurve<T, D>>
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+    {
+        self.spans.iter().find(|span| {
+            let (d0, d1) = span.knots_domain();
+            (d0..=d1).contains(&t)
+        })
+    }
+
     /// Evaluate the curve containing the parameter t at the given parameter t.
     /// ```
     /// use curvo::prelude::*;
@@ -120,11 +132,34 @@ where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
-        let span = self.spans.iter().find(|span| {
-            let (d0, d1) = span.knots_domain();
-            (d0..=d1).contains(&t)
-        });
+        let span = self.find_span(t);
         span.map(|span| span.point_at(t))
+    }
+
+    /// Evaluate the tangent vector of the curve containing the parameter t at the given parameter t.
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point2, Vector2};
+    /// use std::f64::consts::{PI, TAU};
+    /// use approx::assert_relative_eq;
+    /// let o = Point2::origin();
+    /// let dx = Vector2::x();
+    /// let dy = Vector2::y();
+    /// let compound = CompoundCurve::new(vec![
+    ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., 0., PI).unwrap(),
+    ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., PI, TAU).unwrap(),
+    /// ]);
+    /// assert_relative_eq!(compound.tangent_at(0.).unwrap().normalize(), Vector2::y(), epsilon = 1e-10);
+    /// assert_relative_eq!(compound.tangent_at(PI).unwrap().normalize(), -Vector2::y(), epsilon = 1e-10);
+    /// assert_relative_eq!(compound.tangent_at(TAU).unwrap().normalize(), Vector2::y(), epsilon = 1e-10);
+    /// ```
+    pub fn tangent_at(&self, t: T) -> Option<OVector<T, DimNameDiff<D, U1>>>
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+    {
+        let span = self.find_span(t);
+        span.map(|span| span.tangent_at(t))
     }
 
     /// Check if the curve is closed.
