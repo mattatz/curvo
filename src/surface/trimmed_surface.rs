@@ -7,6 +7,7 @@ use crate::{
     curve::{NurbsCurve2D, NurbsCurve3D},
     misc::{FloatingPoint, Invertible, Transformable},
     prelude::{BoundingBox, HasIntersection, Intersects},
+    region::{CompoundCurve, CompoundCurve2D, CompoundCurve3D},
 };
 
 use super::NurbsSurface3D;
@@ -16,15 +17,15 @@ use super::NurbsSurface3D;
 #[derive(Debug, Clone)]
 pub struct TrimmedSurface<T: FloatingPoint> {
     surface: NurbsSurface3D<T>,
-    exterior: Option<NurbsCurve2D<T>>,
-    interiors: Vec<NurbsCurve2D<T>>,
+    exterior: Option<CompoundCurve<T, U3>>,
+    interiors: Vec<CompoundCurve<T, U3>>,
 }
 
 impl<T: FloatingPoint> TrimmedSurface<T> {
     pub fn new(
         surface: NurbsSurface3D<T>,
-        exterior: Option<NurbsCurve2D<T>>,
-        interiors: Vec<NurbsCurve2D<T>>,
+        exterior: Option<CompoundCurve<T, U3>>,
+        interiors: Vec<CompoundCurve<T, U3>>,
     ) -> Self {
         Self {
             surface,
@@ -58,8 +59,8 @@ impl<T: FloatingPoint> TrimmedSurface<T> {
             .collect::<anyhow::Result<Vec<_>>>()?;
         Ok(Self {
             surface,
-            exterior,
-            interiors,
+            exterior: exterior.map(|curve| curve.into()),
+            interiors: interiors.into_iter().map(|curve| curve.into()).collect(),
         })
     }
 
@@ -67,8 +68,8 @@ impl<T: FloatingPoint> TrimmedSurface<T> {
     /// This is a more stable method than `try_projection` but may not be as accurate
     pub fn try_map_closest_point(
         surface: NurbsSurface3D<T>,
-        exterior: Option<NurbsCurve3D<T>>,
-        interiors: Vec<NurbsCurve3D<T>>,
+        exterior: Option<CompoundCurve3D<T>>,
+        interiors: Vec<CompoundCurve3D<T>>,
     ) -> anyhow::Result<Self>
     where
         T: ArgminFloat,
@@ -87,8 +88,8 @@ impl<T: FloatingPoint> TrimmedSurface<T> {
             .collect::<anyhow::Result<Vec<_>>>()?;
         Ok(Self {
             surface,
-            exterior,
-            interiors,
+            exterior: exterior.map(|curve| curve.into()),
+            interiors: interiors.into_iter().map(|curve| curve.into()).collect(),
         })
     }
 
@@ -100,19 +101,19 @@ impl<T: FloatingPoint> TrimmedSurface<T> {
         &mut self.surface
     }
 
-    pub fn exterior(&self) -> Option<&NurbsCurve2D<T>> {
+    pub fn exterior(&self) -> Option<&CompoundCurve<T, U3>> {
         self.exterior.as_ref()
     }
 
-    pub fn exterior_mut(&mut self) -> Option<&mut NurbsCurve2D<T>> {
+    pub fn exterior_mut(&mut self) -> Option<&mut CompoundCurve<T, U3>> {
         self.exterior.as_mut()
     }
 
-    pub fn interiors(&self) -> &[NurbsCurve2D<T>] {
+    pub fn interiors(&self) -> &[CompoundCurve<T, U3>] {
         &self.interiors
     }
 
-    pub fn interiors_mut(&mut self) -> &mut [NurbsCurve2D<T>] {
+    pub fn interiors_mut(&mut self) -> &mut [CompoundCurve<T, U3>] {
         &mut self.interiors
     }
 }
@@ -159,19 +160,26 @@ fn try_project_curve<T: FloatingPoint + ArgminFloat>(
 /// Try to map a 3D curve onto a 3D surface to get a 2D curve in parameter space using the closest point
 fn try_map_curve_closest_point<T: FloatingPoint + ArgminFloat>(
     surface: &NurbsSurface3D<T>,
-    curve: &NurbsCurve3D<T>,
-) -> anyhow::Result<NurbsCurve2D<T>> {
-    let weights = curve.weights();
-    let pts = curve
-        .dehomogenized_control_points()
+    curve: &CompoundCurve3D<T>,
+) -> anyhow::Result<CompoundCurve2D<T>> {
+    let spans = curve
+        .spans()
         .iter()
-        .zip(weights.into_iter())
-        .map(|(p, w)| {
-            let uv = surface.find_closest_parameter(p)?;
-            Ok(Point3::new(uv.0 * w, uv.1 * w, w))
+        .map(|curve| {
+            let weights = curve.weights();
+            let pts = curve
+                .dehomogenized_control_points()
+                .iter()
+                .zip(weights.into_iter())
+                .map(|(p, w)| {
+                    let uv = surface.find_closest_parameter(p)?;
+                    Ok(Point3::new(uv.0 * w, uv.1 * w, w))
+                })
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            NurbsCurve2D::try_new(curve.degree(), pts, curve.knots().to_vec())
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
-    NurbsCurve2D::try_new(curve.degree(), pts, curve.knots().to_vec())
+    Ok(CompoundCurve2D::new_unchecked(spans))
 }
 
 impl<T: FloatingPoint> From<NurbsSurface3D<T>> for TrimmedSurface<T> {
