@@ -88,7 +88,7 @@ impl<T: FloatingPoint> TrimmedSurface<T> {
             .collect::<anyhow::Result<Vec<_>>>()?;
         Ok(Self {
             surface,
-            exterior: exterior,
+            exterior,
             interiors: interiors.into_iter().collect(),
         })
     }

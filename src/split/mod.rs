@@ -1,5 +1,3 @@
-
-
 pub mod split_nurbs_curve;
 pub mod split_nurbs_surface;
 

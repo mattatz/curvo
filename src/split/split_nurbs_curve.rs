@@ -1,10 +1,7 @@
 use itertools::Itertools;
 use nalgebra::{allocator::Allocator, DefaultAllocator, DimName};
 
-use crate::{
-    curve::NurbsCurve,
-    misc::FloatingPoint,
-};
+use crate::{curve::NurbsCurve, misc::FloatingPoint};
 
 use super::Split;
 
