@@ -17,7 +17,7 @@ where
     type Output = Vec<OPoint<T, DimNameDiff<D, U1>>>;
 
     fn tessellate(&self, tolerance: Option<T>) -> Self::Output {
-        let closed = self.is_closed();
+        let closed = self.is_closed(tolerance);
         if closed {
             let pts = self
                 .spans()

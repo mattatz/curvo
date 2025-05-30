@@ -204,16 +204,16 @@ where
     ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., 0., PI).unwrap(),
     ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., PI, TAU).unwrap(),
     /// ]).unwrap();
-    /// assert!(circle.is_closed());
+    /// assert!(circle.is_closed(None));
     /// ```
-    pub fn is_closed(&self) -> bool
+    pub fn is_closed(&self, epsilon: Option<T>) -> bool
     where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
         let start = self.spans.first().map(|s| s.point_at(s.knots_domain().0));
         let end = self.spans.last().map(|s| s.point_at(s.knots_domain().1));
-        let eps = T::default_epsilon() * T::from_usize(10).unwrap();
+        let eps = epsilon.unwrap_or(T::default_epsilon() * T::from_usize(10).unwrap());
         match (start, end) {
             (Some(start), Some(end)) => {
                 let delta = start - end;
