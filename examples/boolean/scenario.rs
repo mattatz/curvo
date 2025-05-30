@@ -117,7 +117,7 @@ fn compound_circle() -> CurveVariant {
     let o = Point2::origin();
     let dx = Vector2::x();
     let dy = Vector2::y();
-    CompoundCurve::new(vec![
+    CompoundCurve::try_new(vec![
         NurbsCurve2D::try_arc(&o, &dx, &dy, 1., 0., PI).unwrap(),
         NurbsCurve2D::try_arc(&o, &dx, &dy, 1., PI, TAU).unwrap(),
     ])
@@ -129,7 +129,7 @@ fn compound_rounded_rectangle() -> CurveVariant {
     let radius = 1.0;
     let dx = Vector2::x();
     let dy = Vector2::y();
-    CompoundCurve::new(vec![
+    CompoundCurve::try_new(vec![
         NurbsCurve2D::try_arc(
             &Point2::new(length, 0.),
             &dx,
@@ -166,7 +166,7 @@ fn compound_rounded_t_shape() -> CurveVariant {
     let radius = 0.5;
     let dx = Vector2::x();
     let dy = Vector2::y();
-    CompoundCurve::new(vec![
+    CompoundCurve::try_new(vec![
         NurbsCurve2D::try_arc(
             &Point2::new(w_length, 0.),
             &dx,

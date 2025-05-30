@@ -390,7 +390,7 @@ where
             spans.iter().for_each(|span| {
                 info.add_span(span.clone());
             });
-            let region = Region::new(CompoundCurve::new(spans), vec![]);
+            let region = Region::new(CompoundCurve::try_new(spans)?, vec![]);
             regions.push(region);
         }
     }

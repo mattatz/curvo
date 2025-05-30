@@ -22,10 +22,10 @@ impl<T: FloatingPoint + ArgminFloat> Contains<T, Const<2>> for CompoundCurve<T, 
     /// let o = Point2::origin();
     /// let dx = Vector2::x();
     /// let dy = Vector2::y();
-    /// let compound = CompoundCurve::new(vec![
+    /// let compound = CompoundCurve::try_new(vec![
     ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., 0., PI).unwrap(),
     ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., PI, TAU).unwrap(),
-    /// ]);
+    /// ]).unwrap();
     /// assert!(compound.contains(&Point2::new(0.0, 0.0), None).unwrap());
     /// assert!(!compound.contains(&Point2::new(3.0, 0.), None).unwrap());
     /// assert!(compound.contains(&Point2::new(1.0, 0.0), None).unwrap());

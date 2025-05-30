@@ -885,7 +885,12 @@ where
     /// assert_eq!(start, 0.);
     /// assert_eq!(end, std::f64::consts::FRAC_PI_2);
     /// assert_relative_eq!(arc.point_at(start), Point2::new(1., 0.), epsilon = 1e-10);
+    /// let mid = (start + end) / 2.;
+    /// let mid_point = mid.cos() * Vector2::x() + mid.sin() * Vector2::y();
+    /// assert_relative_eq!(arc.point_at(mid), Point2::from(mid_point), epsilon = 1e-10);
     /// assert_relative_eq!(arc.point_at(end), Point2::new(0., 1.), epsilon = 1e-10);
+    /// assert_relative_eq!(arc.tangent_at(start).normalize(), Vector2::new(0., 1.), epsilon = 1e-10);
+    /// assert_relative_eq!(arc.tangent_at(end).normalize(), Vector2::new(-1., 0.), epsilon = 1e-10);
     /// ```
     pub fn try_arc(
         center: &OPoint<T, DimNameDiff<D, U1>>,

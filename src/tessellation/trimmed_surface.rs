@@ -12,6 +12,7 @@ use crate::curve::NurbsCurve2D;
 use crate::misc::FloatingPoint;
 use crate::misc::PolygonBoundary;
 use crate::prelude::{Contains, SurfaceTessellation3D, TrimmedSurfaceConstraints};
+use crate::region::CompoundCurve2D;
 use crate::surface::{NurbsSurface3D, TrimmedSurface};
 
 #[derive(Debug, Clone, Copy)]
@@ -94,7 +95,11 @@ fn trimmed_surface_adaptive_tessellate<T: FloatingPoint + SpadeNum>(
                         Vertex::new(p, n, uv.coords)
                     })
                     .collect_vec(),
-                None => tessellate_uv_curve_adaptive(curve, s.surface(), curve_tessellation_option),
+                None => tessellate_uv_compound_curve_adaptive(
+                    curve,
+                    s.surface(),
+                    curve_tessellation_option,
+                ),
             });
             let interiors = s
                 .interiors()
@@ -110,23 +115,29 @@ fn trimmed_surface_adaptive_tessellate<T: FloatingPoint + SpadeNum>(
                             Vertex::new(p, n, uv.coords)
                         })
                         .collect_vec(),
-                    None => {
-                        tessellate_uv_curve_adaptive(curve, s.surface(), curve_tessellation_option)
-                    }
+                    None => tessellate_uv_compound_curve_adaptive(
+                        curve,
+                        s.surface(),
+                        curve_tessellation_option,
+                    ),
                 })
                 .collect_vec();
             (exterior, interiors)
         }
         None => {
             let exterior = s.exterior().map(|curve| {
-                tessellate_uv_curve_adaptive(curve, s.surface(), curve_tessellation_option)
+                tessellate_uv_compound_curve_adaptive(curve, s.surface(), curve_tessellation_option)
             });
 
             let interiors = s
                 .interiors()
                 .iter()
                 .map(|curve| {
-                    tessellate_uv_curve_adaptive(curve, s.surface(), curve_tessellation_option)
+                    tessellate_uv_compound_curve_adaptive(
+                        curve,
+                        s.surface(),
+                        curve_tessellation_option,
+                    )
                 })
                 .collect_vec();
             (exterior, interiors)
@@ -261,6 +272,26 @@ fn trimmed_surface_adaptive_tessellate<T: FloatingPoint + SpadeNum>(
         normals,
         uvs,
     })
+}
+
+/// Tessellate the compound curve using an adaptive algorithm recursively
+fn tessellate_uv_compound_curve_adaptive<T: FloatingPoint>(
+    curve: &CompoundCurve2D<T>,
+    surface: &NurbsSurface3D<T>,
+    tolerance: T,
+) -> Vec<Vertex<T>> {
+    curve
+        .spans()
+        .iter()
+        .enumerate()
+        .flat_map(|(i, span)| {
+            let mut vertices = tessellate_uv_curve_adaptive(span, surface, tolerance);
+            if i > 0 {
+                vertices.remove(0); // Skip the first vertex for spans after the first
+            }
+            vertices
+        })
+        .collect_vec()
 }
 
 /// Tessellate the curve using an adaptive algorithm recursively

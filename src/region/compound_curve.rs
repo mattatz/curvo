@@ -1,9 +1,10 @@
 use std::cmp::Ordering;
 
 use argmin::core::ArgminFloat;
+use itertools::Itertools;
 use nalgebra::{
     allocator::Allocator, Const, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OMatrix,
-    OPoint, U1,
+    OPoint, OVector, U1,
 };
 
 use crate::{
@@ -22,13 +23,23 @@ where
     spans: Vec<NurbsCurve<T, D>>,
 }
 
+/// 2D compound curve alias
+pub type CompoundCurve2D<T> = CompoundCurve<T, Const<3>>;
+/// 3D compound curve alias
+pub type CompoundCurve3D<T> = CompoundCurve<T, Const<4>>;
+
 impl<T: FloatingPoint, D: DimName> CompoundCurve<T, D>
 where
     DefaultAllocator: Allocator<D>,
 {
+    /// Create a new compound curve from a list of spans without checking if the spans are connected.
+    pub fn new_unchecked(spans: Vec<NurbsCurve<T, D>>) -> Self {
+        Self { spans }
+    }
+
     /// Create a new compound curve from a list of spans.
     /// The spans must be connected.
-    pub fn new(spans: Vec<NurbsCurve<T, D>>) -> Self
+    pub fn try_new(spans: Vec<NurbsCurve<T, D>>) -> anyhow::Result<Self>
     where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
@@ -62,14 +73,13 @@ where
                             if current == 0 {
                                 connected.insert(current, next.inverse());
                             } else {
-                                println!("Cannot handle opposite direction");
+                                anyhow::bail!("Cannot handle opposite direction");
                             }
                         }
                     }
                 }
                 None => {
-                    println!("No connection found");
-                    break;
+                    anyhow::bail!("No connection found");
                 }
             }
         }
@@ -85,7 +95,7 @@ where
             knot_offset = curve.knots().last();
         });
 
-        Self { spans: connected }
+        Ok(Self { spans: connected })
     }
 
     pub fn spans(&self) -> &[NurbsCurve<T, D>] {
@@ -94,6 +104,37 @@ where
 
     pub fn spans_mut(&mut self) -> &mut [NurbsCurve<T, D>] {
         &mut self.spans
+    }
+
+    /// Get the domain of the compound curve
+    pub fn knots_domain(&self) -> (T, T) {
+        let knots = self.spans.iter().map(|span| span.knots_domain());
+        knots.reduce(|a, b| (a.0.min(b.0), a.1.max(b.1))).unwrap()
+    }
+
+    /// Find the index of the span containing the parameter t.
+    pub fn find_span_index(&self, t: T) -> usize {
+        let index = self.spans.iter().find_position(|span| {
+            let (d0, d1) = span.knots_domain();
+            (d0..=d1).contains(&t)
+        });
+        if let Some((index, _)) = index {
+            index
+        } else if t < self.spans[0].knots_domain().0 {
+            0
+        } else {
+            self.spans.len() - 1
+        }
+    }
+
+    /// Find the span containing the parameter t.
+    pub fn find_span(&self, t: T) -> &NurbsCurve<T, D>
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+    {
+        let index = self.find_span_index(t);
+        &self.spans[index]
     }
 
     /// Evaluate the curve containing the parameter t at the given parameter t.
@@ -105,26 +146,49 @@ where
     /// let o = Point2::origin();
     /// let dx = Vector2::x();
     /// let dy = Vector2::y();
-    /// let compound = CompoundCurve::new(vec![
+    /// let compound = CompoundCurve::try_new(vec![
     ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., 0., PI).unwrap(),
     ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., PI, TAU).unwrap(),
-    /// ]);
-    /// assert_relative_eq!(compound.point_at(0.).unwrap(), Point2::new(1., 0.), epsilon = 1e-5);
-    /// assert_relative_eq!(compound.point_at(FRAC_PI_2).unwrap(), Point2::new(0., 1.), epsilon = 1e-5);
-    /// assert_relative_eq!(compound.point_at(PI).unwrap(), Point2::new(-1., 0.), epsilon = 1e-5);
-    /// assert_relative_eq!(compound.point_at(PI + FRAC_PI_2).unwrap(), Point2::new(0., -1.), epsilon = 1e-5);
-    /// assert_relative_eq!(compound.point_at(TAU).unwrap(), Point2::new(1., 0.), epsilon = 1e-5);
+    /// ]).unwrap();
+    /// assert_relative_eq!(compound.point_at(0.), Point2::new(1., 0.), epsilon = 1e-5);
+    /// assert_relative_eq!(compound.point_at(FRAC_PI_2), Point2::new(0., 1.), epsilon = 1e-5);
+    /// assert_relative_eq!(compound.point_at(PI), Point2::new(-1., 0.), epsilon = 1e-5);
+    /// assert_relative_eq!(compound.point_at(PI + FRAC_PI_2), Point2::new(0., -1.), epsilon = 1e-5);
+    /// assert_relative_eq!(compound.point_at(TAU), Point2::new(1., 0.), epsilon = 1e-5);
     /// ```
-    pub fn point_at(&self, t: T) -> Option<OPoint<T, DimNameDiff<D, U1>>>
+    pub fn point_at(&self, t: T) -> OPoint<T, DimNameDiff<D, U1>>
     where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
-        let span = self.spans.iter().find(|span| {
-            let (d0, d1) = span.knots_domain();
-            (d0..=d1).contains(&t)
-        });
-        span.map(|span| span.point_at(t))
+        let span = self.find_span(t);
+        span.point_at(t)
+    }
+
+    /// Evaluate the tangent vector of the curve containing the parameter t at the given parameter t.
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point2, Vector2};
+    /// use std::f64::consts::{PI, TAU};
+    /// use approx::assert_relative_eq;
+    /// let o = Point2::origin();
+    /// let dx = Vector2::x();
+    /// let dy = Vector2::y();
+    /// let compound = CompoundCurve::try_new(vec![
+    ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., 0., PI).unwrap(),
+    ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., PI, TAU).unwrap(),
+    /// ]).unwrap();
+    /// assert_relative_eq!(compound.tangent_at(0.).normalize(), Vector2::y(), epsilon = 1e-10);
+    /// assert_relative_eq!(compound.tangent_at(PI).normalize(), -Vector2::y(), epsilon = 1e-10);
+    /// assert_relative_eq!(compound.tangent_at(TAU).normalize(), Vector2::y(), epsilon = 1e-10);
+    /// ```
+    pub fn tangent_at(&self, t: T) -> OVector<T, DimNameDiff<D, U1>>
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+    {
+        let span = self.find_span(t);
+        span.tangent_at(t)
     }
 
     /// Check if the curve is closed.
@@ -136,20 +200,20 @@ where
     /// let o = Point2::origin();
     /// let dx = Vector2::x();
     /// let dy = Vector2::y();
-    /// let circle = CompoundCurve::new(vec![
+    /// let circle = CompoundCurve::try_new(vec![
     ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., 0., PI).unwrap(),
     ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., PI, TAU).unwrap(),
-    /// ]);
-    /// assert!(circle.is_closed());
+    /// ]).unwrap();
+    /// assert!(circle.is_closed(None));
     /// ```
-    pub fn is_closed(&self) -> bool
+    pub fn is_closed(&self, epsilon: Option<T>) -> bool
     where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
         let start = self.spans.first().map(|s| s.point_at(s.knots_domain().0));
         let end = self.spans.last().map(|s| s.point_at(s.knots_domain().1));
-        let eps = T::default_epsilon() * T::from_usize(10).unwrap();
+        let eps = epsilon.unwrap_or(T::default_epsilon() * T::from_usize(10).unwrap());
         match (start, end) {
             (Some(start), Some(end)) => {
                 let delta = start - end;
@@ -168,7 +232,7 @@ where
     /// let o = Point2::origin();
     /// let dx = Vector2::x();
     /// let dy = Vector2::y();
-    /// let compound = CompoundCurve::new(vec![
+    /// let compound = CompoundCurve::new_unchecked(vec![
     ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., 0., PI).unwrap(),
     ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., PI, TAU).unwrap(),
     /// ]);
@@ -196,10 +260,10 @@ where
     /// let o = Point2::origin();
     /// let dx = Vector2::x();
     /// let dy = Vector2::y();
-    /// let compound = CompoundCurve::new(vec![
+    /// let compound = CompoundCurve::try_new(vec![
     ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., 0., PI).unwrap(),
     ///     NurbsCurve2D::try_arc(&o, &dx, &dy, 1., PI, TAU).unwrap(),
-    /// ]);
+    /// ]).unwrap();
     /// assert_relative_eq!(compound.find_closest_point(&Point2::new(3.0, 0.0)).unwrap(), Point2::new(1., 0.));
     /// ```
     pub fn find_closest_point(
@@ -250,7 +314,7 @@ where
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     fn from(value: NurbsCurve<T, D>) -> Self {
-        Self::new(vec![value])
+        Self::new_unchecked(vec![value])
     }
 }
 

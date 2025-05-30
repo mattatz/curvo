@@ -26,7 +26,7 @@ where
         }
 
         let mut rng = rand::rng();
-        let tol = tolerance.unwrap_or(T::from_f64(1e-3).unwrap());
+        let tol = tolerance.unwrap_or(T::from_f64(1e-6).unwrap());
         let (start, end) = self.knots_domain();
         tessellate_adaptive(self, start, end, tol, &mut rng)
     }
