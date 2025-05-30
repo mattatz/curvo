@@ -19,18 +19,9 @@ jobs:
 
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: 1.81.0
-          override: true
-          components: rustfmt, clippy
-
-      - uses: actions-rs/install@v0.1
-        with:
-          crate: cargo-audit
-          version: latest
+      - uses: dtolnay/rust-toolchain@1.86.0
 
       - name: Run cargo fmt
         if: ${{ matrix.node_index == 'fmt' }}
