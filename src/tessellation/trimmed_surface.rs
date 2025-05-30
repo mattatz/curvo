@@ -12,7 +12,7 @@ use crate::curve::NurbsCurve2D;
 use crate::misc::FloatingPoint;
 use crate::misc::PolygonBoundary;
 use crate::prelude::{Contains, SurfaceTessellation3D, TrimmedSurfaceConstraints};
-use crate::region::{CompoundCurve, CompoundCurve2D};
+use crate::region::CompoundCurve2D;
 use crate::surface::{NurbsSurface3D, TrimmedSurface};
 
 #[derive(Debug, Clone, Copy)]
@@ -283,8 +283,7 @@ fn tessellate_uv_compound_curve_adaptive<T: FloatingPoint>(
     curve
         .spans()
         .iter()
-        .map(|span| tessellate_uv_curve_adaptive(span, surface, tolerance))
-        .flatten()
+        .flat_map(|span| tessellate_uv_curve_adaptive(span, surface, tolerance))
         .collect_vec()
 }
 

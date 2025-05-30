@@ -130,7 +130,8 @@ mod tests {
         let compound_circle = CompoundCurve::try_new(vec![
             NurbsCurve2D::try_arc(&o, &dx, &dy, 1., 0., PI).unwrap(),
             NurbsCurve2D::try_arc(&o, &dx, &dy, 1., PI, TAU).unwrap(),
-        ]).unwrap();
+        ])
+        .unwrap();
         let rectangle = NurbsCurve2D::polyline(
             &[
                 Point2::new(0., 2.),
@@ -185,7 +186,8 @@ mod tests {
         let compound_circle = CompoundCurve::try_new(vec![
             NurbsCurve2D::try_arc(&o, &dx, &dy, 1., 0., PI).unwrap(),
             NurbsCurve2D::try_arc(&o, &dx, &dy, 1., PI, TAU).unwrap(),
-        ]).unwrap();
+        ])
+        .unwrap();
         let compound_rectangle = CompoundCurve::try_new(vec![
             NurbsCurve2D::polyline(
                 &[
@@ -203,7 +205,8 @@ mod tests {
                 ],
                 true,
             ),
-        ]).unwrap();
+        ])
+        .unwrap();
 
         let intersections = compound_circle
             .find_intersections(&compound_rectangle, Some(OPTIONS))

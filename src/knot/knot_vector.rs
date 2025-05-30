@@ -26,11 +26,11 @@ impl<T: RealField + Copy> KnotVector<T> {
     pub fn uniform(n: usize, degree: usize) -> Self {
         let mut knots = vec![];
         let m = degree;
-        knots.extend(std::iter::repeat(T::zero()).take(m));
+        knots.extend(std::iter::repeat_n(T::zero(), m));
         for i in 0..n {
             knots.push(T::from_usize(i).unwrap());
         }
-        knots.extend(std::iter::repeat(T::from_usize(n - 1).unwrap()).take(m));
+        knots.extend(std::iter::repeat_n(T::from_usize(n - 1).unwrap(), m));
         Self(knots)
     }
 
