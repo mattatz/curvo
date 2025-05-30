@@ -283,7 +283,14 @@ fn tessellate_uv_compound_curve_adaptive<T: FloatingPoint>(
     curve
         .spans()
         .iter()
-        .flat_map(|span| tessellate_uv_curve_adaptive(span, surface, tolerance))
+        .enumerate()
+        .flat_map(|(i, span)| {
+            let mut vertices = tessellate_uv_curve_adaptive(span, surface, tolerance);
+            if i > 0 {
+                vertices.remove(0); // Skip the first vertex for spans after the first
+            }
+            vertices
+        })
         .collect_vec()
 }
 
