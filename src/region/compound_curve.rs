@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 
 use argmin::core::ArgminFloat;
+use itertools::Itertools;
 use nalgebra::{
     allocator::Allocator, Const, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OMatrix,
     OPoint, OVector, U1,
@@ -111,26 +112,29 @@ where
         knots.reduce(|a, b| (a.0.min(b.0), a.1.max(b.1))).unwrap()
     }
 
+    /// Find the index of the span containing the parameter t.
+    pub fn find_span_index(&self, t: T) -> usize {
+        let index = self.spans.iter().find_position(|span| {
+            let (d0, d1) = span.knots_domain();
+            (d0..=d1).contains(&t)
+        });
+        if let Some((index, _)) = index {
+            index
+        } else if t < self.spans[0].knots_domain().0 {
+            0
+        } else {
+            self.spans.len() - 1
+        }
+    }
+
     /// Find the span containing the parameter t.
-    fn find_span(&self, t: T) -> &NurbsCurve<T, D>
+    pub fn find_span(&self, t: T) -> &NurbsCurve<T, D>
     where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
-        let span = self.spans.iter().find(|span| {
-            let (d0, d1) = span.knots_domain();
-            (d0..=d1).contains(&t)
-        });
-        match span {
-            Some(span) => span,
-            None => {
-                if t < self.spans[0].knots_domain().0 {
-                    &self.spans[0]
-                } else {
-                    &self.spans[self.spans.len() - 1]
-                }
-            }
-        }
+        let index = self.find_span_index(t);
+        &self.spans[index]
     }
 
     /// Evaluate the curve containing the parameter t at the given parameter t.

@@ -1,3 +1,4 @@
+pub mod split_compound_curve;
 pub mod split_nurbs_curve;
 pub mod split_nurbs_surface;
 
