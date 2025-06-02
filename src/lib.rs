@@ -63,6 +63,7 @@ mod curve;
 mod intersects;
 mod knot;
 mod misc;
+mod offset;
 mod polygon_mesh;
 mod region;
 mod split;
@@ -79,6 +80,7 @@ pub mod prelude {
     pub use crate::intersects::*;
     pub use crate::knot::*;
     pub use crate::misc::*;
+    pub use crate::offset::*;
     pub use crate::polygon_mesh::*;
     pub use crate::region::*;
     pub use crate::split::*;
