@@ -28,20 +28,20 @@ where
         let mut rng = rand::rng();
         let tol = tolerance.unwrap_or(T::from_f64(1e-6).unwrap());
         let (start, end) = self.knots_domain();
-        tessellate_curve_adaptive(self, start, end, tol, &mut rng, |_t, p| p)
+        tessellate_curve_adaptive(self, start, end, tol, &mut rng, &|_t, p| p)
     }
 }
 
 /// Tessellate the curve using an adaptive algorithm recursively
 /// if the curve between [start ~ end] is flat enough, it will return the two end points
 /// f is a function that maps the t and point to a new type P
-pub(crate) fn tessellate_curve_adaptive<T: FloatingPoint, D, P, F>(
+pub(crate) fn tessellate_curve_adaptive<'a, T: FloatingPoint, D, P, F>(
     curve: &NurbsCurve<T, D>,
     start: T,
     end: T,
     tol: T,
     rng: &mut ThreadRng,
-    f: F,
+    f: &'a F,
 ) -> Vec<P>
 where
     D: DimName + DimNameSub<U1>,
@@ -68,8 +68,8 @@ where
         || !three_points_are_flat(&p1, &p2, &p3, tol)
     {
         let exact_mid = start + (end - start) * T::from_f64(0.5).unwrap();
-        let mut left_pts = tessellate_curve_adaptive(curve, start, exact_mid, tol, rng, &f);
-        let right_pts = tessellate_curve_adaptive(curve, exact_mid, end, tol, rng, &f);
+        let mut left_pts = tessellate_curve_adaptive(curve, start, exact_mid, tol, rng, f);
+        let right_pts = tessellate_curve_adaptive(curve, exact_mid, end, tol, rng, f);
         left_pts.pop();
         [left_pts, right_pts].concat()
     } else {
