@@ -1,9 +1,10 @@
 use bevy::{
     prelude::*,
+    asset::weak_handle,
     render::render_resource::{AsBindGroup, ShaderRef, ShaderType},
 };
 
-const SHADER_HANDLE: Handle<Shader> = Handle::weak_from_u128(16376858152701542574);
+const SHADER_HANDLE: Handle<Shader> = weak_handle!("558d5700-88d3-405b-aa87-82f925828be3");
 
 #[derive(AsBindGroup, Asset, TypePath, Debug, Clone)]
 #[bind_group_data(LineMaterialKey)]
