@@ -296,7 +296,7 @@ fn update(
     */
 
     let p0 = set.p0();
-    let camera_transform = p0.single();
+    let camera_transform = p0.single().unwrap();
 
     let intersections = c1.find_intersection(&c2, None);
     if let Ok(intersections) = intersections {

@@ -1,7 +1,7 @@
 use std::f64::consts::FRAC_PI_2;
 
 use bevy::{prelude::*, render::mesh::PrimitiveTopology};
-use bevy_egui::{egui, EguiContexts, EguiPlugin};
+use bevy_egui::{egui, EguiContextPass, EguiContexts, EguiPlugin};
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 
 use bevy_normal_material::{plugin::NormalMaterialPlugin, prelude::NormalMaterial};
@@ -39,7 +39,9 @@ fn main() {
         .add_plugins(InfiniteGridPlugin)
         .add_plugins(PanOrbitCameraPlugin)
         .add_plugins(NormalMaterialPlugin)
-        .add_plugins(EguiPlugin)
+        .add_plugins(EguiPlugin {
+            enable_multipass_for_primary_context: true,
+        })
         .add_plugins(AppPlugin)
         .run();
 }
@@ -49,7 +51,8 @@ impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.insert_resource(Setting::default())
             .add_systems(Startup, setup)
-            .add_systems(Update, (split_animation, update_ui));
+            .add_systems(EguiContextPass, (update_ui))
+            .add_systems(Update, (split_animation));
     }
 }
 
@@ -106,7 +109,7 @@ fn split_animation(
     first: Query<&Mesh3d, With<FirstSurface>>,
     setting: Res<Setting>,
 ) {
-    let profile = profile.single();
+    let profile = profile.single().unwrap();
     let direction = setting.direction;
     let (u, v) = profile.0.knots_domain();
     let sec = time.elapsed_secs_f64() * 2.;
@@ -117,7 +120,7 @@ fn split_animation(
     let t = rng.0 + (rng.1 - rng.0) * (0.5 + 0.5 * sec.sin());
     let option = SplitSurfaceOption::new(t, direction);
     let (s0, _s1) = profile.0.try_split(option).unwrap();
-    let first = first.single();
+    let first = first.single().unwrap();
     let mesh = surface_2_mesh(
         &s0,
         Some(AdaptiveTessellationOptions {

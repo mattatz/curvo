@@ -60,11 +60,13 @@ fn setup(
         surface.clone(),
         Some(
             NurbsCurve2D::try_circle(&Point2::new(0.5, 0.5), &Vector2::x(), &Vector2::y(), 0.45)
-                .unwrap(),
+                .unwrap()
+                .into(),
         ),
         vec![
             NurbsCurve2D::try_circle(&Point2::new(0.5, 0.5), &Vector2::x(), &Vector2::y(), 0.2)
-                .unwrap(),
+                .unwrap()
+                .into(),
         ],
     );
 

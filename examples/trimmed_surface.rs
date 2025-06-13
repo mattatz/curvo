@@ -179,7 +179,8 @@ fn setup(
         None,
         vec![
             NurbsCurve2D::try_circle(&Point2::new(0.5, 0.5), &Vector2::x(), &Vector2::y(), 0.25)
-                .unwrap(),
+                .unwrap()
+                .into(),
         ],
     );
 

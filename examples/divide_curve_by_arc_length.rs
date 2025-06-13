@@ -3,7 +3,7 @@ use bevy::{
     prelude::*,
     render::mesh::{PrimitiveTopology, VertexAttributeValues},
 };
-use bevy_egui::{egui, EguiContexts, EguiPlugin};
+use bevy_egui::{egui, EguiContextPass, EguiContexts, EguiPlugin};
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 
 use bevy_normal_material::plugin::NormalMaterialPlugin;
@@ -29,7 +29,9 @@ fn main() {
         .add_plugins(PanOrbitCameraPlugin)
         .add_plugins(PointsPlugin)
         .add_plugins(NormalMaterialPlugin)
-        .add_plugins(EguiPlugin)
+        .add_plugins(EguiPlugin {
+            enable_multipass_for_primary_context: true,
+        })
         .add_plugins(AppPlugin)
         .run();
 }
@@ -50,10 +52,11 @@ impl Plugin for AppPlugin {
             .add_systems(
                 PreUpdate,
                 (absorb_egui_inputs,)
-                    .after(bevy_egui::systems::process_input_system)
-                    .before(bevy_egui::EguiSet::BeginPass),
+                    .after(bevy_egui::input::write_egui_input_system)
+                    .before(bevy_egui::begin_pass_system),
             )
-            .add_systems(Update, (update_ui, divide_by_arc_length));
+            .add_systems(EguiContextPass, (update_ui))
+            .add_systems(Update, (divide_by_arc_length));
     }
 }
 
@@ -124,7 +127,7 @@ fn update_ui(
     profile: Query<&ProfileCurve>,
     mut settings: ResMut<Setting>,
 ) {
-    let profile = profile.single();
+    let profile = profile.single().unwrap();
     egui::Window::new("divide curve by arc length example")
         .collapsible(false)
         .drag_to_scroll(false)
@@ -148,7 +151,7 @@ fn update_ui(
 }
 
 fn divide_by_arc_length(profile: Query<&ProfileCurve>, settings: Res<Setting>, mut gizmos: Gizmos) {
-    let profile = profile.single();
+    let profile = profile.single().unwrap();
     let range = settings.max_arc_length - settings.min_arc_length;
     let r = ((settings.arc_length / range).min(1e-1)) as f32;
     let p3d = profile.0.elevate_dimension();

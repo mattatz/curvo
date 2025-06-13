@@ -281,7 +281,7 @@ fn update(
     */
 
     let p0 = set.p0();
-    let camera_position = p0.single().translation;
+    let camera_position = p0.single().unwrap().translation;
 
     let intersections = transformed_surface.find_intersection(&transformed_curve, None);
     if let Ok(intersections) = intersections {

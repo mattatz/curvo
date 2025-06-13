@@ -92,13 +92,13 @@ fn split_animation(
     second: Query<&Mesh3d, With<SecondCurve>>,
     mut gizmos: Gizmos,
 ) {
-    let profile = profile.single();
+    let profile = profile.single().unwrap();
     let (start, end) = profile.0.knots_domain();
     let sec = time.elapsed_secs_f64();
     let t = start + (end - start) * (0.5 + 0.5 * sec.sin());
     let (c0, c1) = profile.0.try_split(t).unwrap();
-    let first = first.single();
-    let second = second.single();
+    let first = first.single().unwrap();
+    let second = second.single().unwrap();
 
     let tesselate = |curve: &NurbsCurve2D<f64>| {
         curve
