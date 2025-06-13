@@ -2,7 +2,7 @@ use nalgebra::{
     allocator::Allocator, DefaultAllocator, DimName, DimNameAdd, DimNameSum, OPoint, U1,
 };
 
-use crate::{curve::NurbsCurve, misc::FloatingPoint};
+use crate::{curve::NurbsCurve, misc::FloatingPoint, region::CompoundCurve};
 
 /// Elevate the dimension of the geometry
 pub trait ElevateDimension {
@@ -59,5 +59,20 @@ where
         }
 
         NurbsCurve::new_unchecked(self.degree(), control_points, self.knots().clone())
+    }
+}
+
+impl<T: FloatingPoint, D: DimName> ElevateDimension for CompoundCurve<T, D>
+where
+    D: DimNameAdd<U1>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameSum<D, U1>>,
+{
+    type Output = CompoundCurve<T, DimNameSum<D, U1>>;
+
+    /// Elevate the dimension of the compound curve (e.g., 2D -> 3D)
+    fn elevate_dimension(&self) -> Self::Output {
+        let spans = self.spans().iter().map(|s| s.elevate_dimension()).collect();
+        CompoundCurve::new_unchecked(spans)
     }
 }

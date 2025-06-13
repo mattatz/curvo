@@ -3,6 +3,7 @@ use bevy::{
     prelude::*,
     render::mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
 };
+use bevy_egui::EguiContexts;
 use bevy_normal_material::prelude::NormalMaterial;
 use curvo::prelude::{
     AdaptiveTessellationOptions, CompoundCurve3D, NurbsCurve3D, NurbsSurface3D,
@@ -11,7 +12,7 @@ use curvo::prelude::{
 
 use crate::LineMaterial;
 
-enum CurveVariant<'a> {
+pub enum CurveVariant<'a> {
     NurbsCurve(&'a NurbsCurve3D<f64>),
     CompoundCurve(&'a CompoundCurve3D<f64>),
 }
@@ -40,14 +41,13 @@ pub fn add_curve<'a, C: Into<CurveVariant<'a>>>(
     let curve: CurveVariant<'a> = curve.into();
 
     let samples = match curve {
-        CurveVariant::NurbsCurve(n) => {
-            n.tessellate(tolerance)
-        },
-        CurveVariant::CompoundCurve(c) => {
-            c.spans().iter().map(|span| {
-                span.tessellate(tolerance)
-            }).flatten().collect()
-        },
+        CurveVariant::NurbsCurve(n) => n.tessellate(tolerance),
+        CurveVariant::CompoundCurve(c) => c
+            .spans()
+            .iter()
+            .map(|span| span.tessellate(tolerance))
+            .flatten()
+            .collect(),
     };
 
     let line_vertices: Vec<_> = samples
@@ -218,4 +218,11 @@ pub fn add_surface_normals(
             })),
         ))
         .insert(Name::new("normal"));
+}
+
+#[allow(unused)]
+pub fn absorb_egui_inputs(mut mouse: ResMut<ButtonInput<MouseButton>>, mut contexts: EguiContexts) {
+    if contexts.ctx_mut().is_pointer_over_area() {
+        mouse.reset_all();
+    }
 }

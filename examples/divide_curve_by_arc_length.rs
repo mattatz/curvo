@@ -13,7 +13,9 @@ use materials::*;
 use nalgebra::Point2;
 
 use curvo::prelude::*;
+use misc::*;
 mod materials;
+mod misc;
 
 fn main() {
     App::new()
@@ -114,12 +116,6 @@ fn setup(
         PanOrbitCamera::default(),
     ));
     commands.spawn(InfiniteGridBundle::default());
-}
-
-fn absorb_egui_inputs(mut mouse: ResMut<ButtonInput<MouseButton>>, mut contexts: EguiContexts) {
-    if contexts.ctx_mut().is_pointer_over_area() {
-        mouse.reset_all();
-    }
 }
 
 fn update_ui(
