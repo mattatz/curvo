@@ -8,7 +8,7 @@ use num_traits::NumCast;
 
 use crate::curve::{NurbsCurve2D, NurbsCurve3D};
 use crate::offset::CurveOffsetCornerType;
-use crate::region::CompoundCurve2D;
+use crate::region::{CompoundCurve, CompoundCurve2D};
 use crate::tessellation::tessellation_curve::tessellate_curve_adaptive;
 use crate::{curve::NurbsCurve, misc::FloatingPoint, offset::Offset};
 
@@ -257,7 +257,50 @@ where
                     }
                     Ok(Self::polyline(&scanned, false).into())
                 }
-                CurveOffsetCornerType::Round => todo!(),
+                CurveOffsetCornerType::Round => {
+                    // scan to create rounded corner by arc
+                    let mut spans = vec![];
+                    let n = vertices.len();
+                    let mut cursor = 0;
+                    let n = vertices.len();
+                    let mut scanned: Vec<Point2<T>> = vec![vertices[0].clone().into()];
+
+                    while cursor < n {
+                        if cursor + 3 >= n {
+                            let rest: Vec<Point2<T>> = vertices[cursor + 1..]
+                                .iter()
+                                .map(|v| v.clone().into())
+                                .collect_vec();
+                            scanned.extend(rest);
+                            break;
+                        }
+
+                        let v1 = &vertices[cursor + 1];
+                        scanned.push(v1.inner().clone());
+
+                        if let Vertex::Intersection(_) = v1 {
+                            cursor += 1;
+                            continue;
+                        }
+
+                        spans.push(Self::polyline(&scanned, false));
+
+                        let v2 = &vertices[cursor + 2];
+
+                        // create arc between v1 and v2
+
+                        cursor += 2;
+                        scanned = vec![v2.inner().clone()];
+                    }
+
+                    if !scanned.is_empty() {
+                        spans.push(Self::polyline(&scanned, false));
+                    }
+
+                    println!("spans: {:?}", spans.len());
+
+                    Ok(CompoundCurve::new_unchecked(spans))
+                }
                 CurveOffsetCornerType::Smooth => todo!(),
                 CurveOffsetCornerType::Chamfer => Self::try_interpolate(
                     &vertices.into_iter().map(|v| v.into()).collect_vec(),

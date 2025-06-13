@@ -83,8 +83,7 @@ impl Plugin for AppPlugin {
                     .before(bevy_egui::begin_pass_system),
             )
             .add_systems(EguiContextPass, update_ui)
-            .add_systems(Update, gizmos_offset_curve)
-        ;
+            .add_systems(Update, gizmos_offset_curve);
     }
 }
 
@@ -139,13 +138,18 @@ fn setup(
     );
 
     let option = CurveOffsetOption::default()
+        .with_corner_type(CurveOffsetCornerType::Round)
         .with_distance(settings.distance)
         .with_normal_tolerance(1e-4);
-    let offset_curve = curve.offset(option).unwrap();
+    let offset_curve = curve.offset(option.clone()).unwrap();
+    let offset_curve_vertex = curve
+        .offset(option.clone().with_corner_type(CurveOffsetCornerType::None))
+        .unwrap();
 
     commands.spawn((ProfileCurve(curve),));
-    commands.spawn((OffsetCurve(offset_curve.clone()),));
-    commands.spawn((OffsetVertex(offset_curve),));
+    commands.spawn((OffsetCurve(offset_curve),));
+
+    commands.spawn((OffsetVertex(offset_curve_vertex),));
 
     let scale = 5.;
     commands.spawn((
@@ -177,9 +181,7 @@ fn update_ui(
         .min_width(420.)
         .max_width(420.)
         .show(contexts.ctx_mut(), |ui| {
-            let response = ui.add(
-                egui::DragValue::new(&mut settings.distance).speed(1e-2)
-            );
+            let response = ui.add(egui::DragValue::new(&mut settings.distance).speed(1e-2));
             if response.changed() {
                 let profile = profile.single().unwrap();
                 let mut offset_curve = offset_curve.single_mut().unwrap();
@@ -203,18 +205,32 @@ fn update_ui(
         });
 }
 
-fn gizmos_offset_curve(offset_curve: Query<&OffsetCurve>, offset_vertex: Query<&OffsetVertex>, mut gizmos: Gizmos) {
+fn gizmos_offset_curve(
+    offset_curve: Query<&OffsetCurve>,
+    offset_vertex: Query<&OffsetVertex>,
+    mut gizmos: Gizmos,
+) {
     let offset_curve = offset_curve.single().unwrap();
     offset_curve.0.spans().iter().for_each(|span| {
         let c = span.elevate_dimension();
-        let tess = c.tessellate(None).into_iter().map(|p| p.cast::<f32>().into()).collect_vec();
+        let tess = c
+            .tessellate(None)
+            .into_iter()
+            .map(|p| p.cast::<f32>().into())
+            .collect_vec();
         gizmos.linestrip(tess, WHITE);
     });
 
+    /*
     let offset_vertex = offset_vertex.single().unwrap();
     offset_vertex.0.spans().iter().for_each(|span| {
         let c = span.elevate_dimension();
-        let tess = c.tessellate(None).into_iter().map(|p| p.cast::<f32>().into()).collect_vec();
+        let tess = c
+            .tessellate(None)
+            .into_iter()
+            .map(|p| p.cast::<f32>().into())
+            .collect_vec();
         gizmos.linestrip(tess, YELLOW);
     });
+    */
 }
