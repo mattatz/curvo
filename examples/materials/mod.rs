@@ -1,6 +1,6 @@
 use bevy::{
-    prelude::*,
     asset::weak_handle,
+    prelude::*,
     render::render_resource::{AsBindGroup, ShaderRef, ShaderType},
 };
 
