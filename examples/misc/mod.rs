@@ -5,21 +5,51 @@ use bevy::{
 };
 use bevy_normal_material::prelude::NormalMaterial;
 use curvo::prelude::{
-    AdaptiveTessellationOptions, NurbsCurve3D, NurbsSurface3D, SurfaceTessellation3D, Tessellation,
+    AdaptiveTessellationOptions, CompoundCurve3D, NurbsCurve3D, NurbsSurface3D,
+    SurfaceTessellation3D, Tessellation,
 };
 
 use crate::LineMaterial;
 
+enum CurveVariant<'a> {
+    NurbsCurve(&'a NurbsCurve3D<f64>),
+    CompoundCurve(&'a CompoundCurve3D<f64>),
+}
+
+impl<'a> From<&'a NurbsCurve3D<f64>> for CurveVariant<'a> {
+    fn from(curve: &'a NurbsCurve3D<f64>) -> Self {
+        CurveVariant::NurbsCurve(curve)
+    }
+}
+
+impl<'a> From<&'a CompoundCurve3D<f64>> for CurveVariant<'a> {
+    fn from(curve: &'a CompoundCurve3D<f64>) -> Self {
+        CurveVariant::CompoundCurve(curve)
+    }
+}
+
 #[allow(unused)]
-pub fn add_curve(
-    curve: &NurbsCurve3D<f64>,
+pub fn add_curve<'a, C: Into<CurveVariant<'a>>>(
+    curve: C,
     color: Option<Color>,
     tolerance: Option<f64>,
     commands: &mut Commands<'_, '_>,
     meshes: &mut ResMut<'_, Assets<Mesh>>,
     line_materials: &mut ResMut<'_, Assets<LineMaterial>>,
 ) {
-    let samples = curve.tessellate(tolerance);
+    let curve: CurveVariant<'a> = curve.into();
+
+    let samples = match curve {
+        CurveVariant::NurbsCurve(n) => {
+            n.tessellate(tolerance)
+        },
+        CurveVariant::CompoundCurve(c) => {
+            c.spans().iter().map(|span| {
+                span.tessellate(tolerance)
+            }).flatten().collect()
+        },
+    };
+
     let line_vertices: Vec<_> = samples
         .iter()
         .map(|p| p.cast::<f32>())
