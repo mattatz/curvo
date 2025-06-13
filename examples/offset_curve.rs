@@ -26,17 +26,14 @@ use misc::*;
 
 #[derive(Resource)]
 struct Setting {
-    pub min_distance: f64,
-    pub max_distance: f64,
+    pub corner_type: CurveOffsetCornerType,
     pub distance: f64,
 }
 
 impl Default for Setting {
     fn default() -> Self {
         Self {
-            min_distance: -10.0,
-            max_distance: 10.0,
-            // distance: 0.1,
+            corner_type: CurveOffsetCornerType::Round,
             distance: -0.1,
         }
     }
@@ -82,6 +79,7 @@ impl Plugin for AppPlugin {
                     .after(bevy_egui::input::write_egui_input_system)
                     .before(bevy_egui::begin_pass_system),
             )
+            .add_systems(Update, update_curve.run_if(resource_changed::<Setting>))
             .add_systems(EguiContextPass, update_ui)
             .add_systems(Update, gizmos_offset_curve);
     }
@@ -167,13 +165,34 @@ fn setup(
     ));
 }
 
-fn update_ui(
-    mut contexts: EguiContexts,
-    mut settings: ResMut<Setting>,
+fn update_curve(
+    settings: Res<Setting>,
     profile: Query<&ProfileCurve>,
     mut offset_curve: Query<&mut OffsetCurve>,
     mut offset_vertex: Query<&mut OffsetVertex>,
 ) {
+    let profile = profile.single().unwrap();
+    let mut offset_curve = offset_curve.single_mut().unwrap();
+    let option = CurveOffsetOption::default()
+        .with_corner_type(settings.corner_type.clone())
+        .with_distance(settings.distance)
+        .with_normal_tolerance(1e-4);
+    let res = profile.0.offset(option);
+    if let Ok(res) = res {
+        offset_curve.update(res);
+    }
+
+    let option = CurveOffsetOption::default()
+        .with_corner_type(CurveOffsetCornerType::None)
+        .with_distance(settings.distance)
+        .with_normal_tolerance(1e-4);
+    let res = profile.0.offset(option);
+    if let Ok(res) = res {
+        offset_vertex.single_mut().unwrap().0 = res;
+    }
+}
+
+fn update_ui(mut contexts: EguiContexts, mut settings: ResMut<Setting>) {
     egui::Window::new("offset curve")
         .collapsible(false)
         .drag_to_scroll(false)
@@ -181,27 +200,38 @@ fn update_ui(
         .min_width(420.)
         .max_width(420.)
         .show(contexts.ctx_mut(), |ui| {
-            let response = ui.add(egui::DragValue::new(&mut settings.distance).speed(1e-2));
-            if response.changed() {
-                let profile = profile.single().unwrap();
-                let mut offset_curve = offset_curve.single_mut().unwrap();
-                let option = CurveOffsetOption::default()
-                    .with_distance(settings.distance)
-                    .with_normal_tolerance(1e-4);
-                let res = profile.0.offset(option);
-                if let Ok(res) = res {
-                    offset_curve.update(res);
-                }
+            ui.heading("corner type");
+            ui.group(|g| {
+                g.horizontal(|ui| {
+                    ui.selectable_value(
+                        &mut settings.corner_type,
+                        CurveOffsetCornerType::Sharp,
+                        "Sharp",
+                    );
+                    ui.selectable_value(
+                        &mut settings.corner_type,
+                        CurveOffsetCornerType::Round,
+                        "Round",
+                    );
+                    ui.selectable_value(
+                        &mut settings.corner_type,
+                        CurveOffsetCornerType::Smooth,
+                        "Smooth",
+                    );
+                    ui.selectable_value(
+                        &mut settings.corner_type,
+                        CurveOffsetCornerType::Chamfer,
+                        "Chamfer",
+                    );
+                });
+            });
 
-                let option = CurveOffsetOption::default()
-                    .with_corner_type(CurveOffsetCornerType::None)
-                    .with_distance(settings.distance)
-                    .with_normal_tolerance(1e-4);
-                let res = profile.0.offset(option);
-                if let Ok(res) = res {
-                    offset_vertex.single_mut().unwrap().0 = res;
-                }
-            }
+            ui.heading("distance");
+            ui.group(|g| {
+                g.horizontal(|ui| {
+                    ui.add(egui::DragValue::new(&mut settings.distance).speed(1e-2));
+                });
+            });
         });
 }
 
@@ -214,7 +244,7 @@ fn gizmos_offset_curve(
     offset_curve.0.spans().iter().for_each(|span| {
         let c = span.elevate_dimension();
         let tess = c
-            .tessellate(None)
+            .tessellate(Some(1e-8))
             .into_iter()
             .map(|p| p.cast::<f32>().into())
             .collect_vec();

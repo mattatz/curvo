@@ -119,7 +119,8 @@ where
         let offset = tess
             .into_iter()
             .map(|(p, tangent)| {
-                let normal = Vector2::new(tangent.y, -tangent.x);
+                let t = tangent.normalize();
+                let normal = Vector2::new(t.y, -t.x);
                 p + normal * distance
             })
             .collect_vec();
@@ -204,6 +205,7 @@ where
 
             return match corner_type {
                 CurveOffsetCornerType::None => Ok(Self::polyline(&offset, false).into()),
+                // CurveOffsetCornerType::None => Ok(Self::polyline(&vertices.into_iter().map(|v| v.into()).collect_vec(), false).into()),
                 CurveOffsetCornerType::Sharp => {
                     // scan to connect vertices
                     let n = vertices.len();
@@ -285,9 +287,17 @@ where
 
                         spans.push(Self::polyline(&scanned, false));
 
+                        let v0 = &vertices[cursor];
+                        let t = (v1.inner() - v0.inner()).normalize();
+                        let n = Vector2::new(t.y, -t.x);
+                        let d = n * distance;
+                        let center = v1.inner() - d;
                         let v2 = &vertices[cursor + 2];
 
                         // create arc between v1 and v2
+                        let arc = Self::try_arc(&center, &n, &-t, distance, T::zero(), T::frac_pi_2())?;
+                        // let arc = Self::try_arc(&center, &-t, &n, distance, T::zero(), T::frac_pi_2())?;
+                        spans.push(arc);
 
                         cursor += 2;
                         scanned = vec![v2.inner().clone()];
