@@ -139,7 +139,7 @@ fn try_project_curve<T: FloatingPoint + ArgminFloat>(
             let ray =
                 NurbsCurve3D::polyline(&[p - offset, p + offset + direction * ray_length], true);
             let closest = surface
-                .find_intersections(&ray, None)?
+                .find_intersection(&ray, None)?
                 .into_iter()
                 .map(|it| {
                     let pt = it.a().0;

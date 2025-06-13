@@ -68,7 +68,7 @@ mod tests {
         b: &NurbsCurve<T, Const<3>>,
         option: Option<CurveIntersectionSolverOptions<T>>,
     ) -> anyhow::Result<Vec<CurveCurveIntersection<Point2<T>, T>>> {
-        let intersections = a.find_intersections(b, option.clone())?;
+        let intersections = a.find_intersection(b, option.clone())?;
         let n = intersections.len();
 
         let filtered = intersections

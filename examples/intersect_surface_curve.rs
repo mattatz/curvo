@@ -165,7 +165,7 @@ fn setup(
     */
 
     /*
-    let intersections = surface.find_intersections(&circle, None);
+    let intersections = surface.find_intersection(&circle, None);
     if let Ok(intersections) = intersections {
         commands.spawn((
             Mesh3d(
@@ -283,7 +283,7 @@ fn update(
     let p0 = set.p0();
     let camera_position = p0.single().translation;
 
-    let intersections = transformed_surface.find_intersections(&transformed_curve, None);
+    let intersections = transformed_surface.find_intersection(&transformed_curve, None);
     if let Ok(intersections) = intersections {
         intersections.iter().for_each(|it| {
             let p: Vec3 = it.a().0.cast::<f32>().into();

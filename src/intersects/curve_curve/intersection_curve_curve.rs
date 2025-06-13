@@ -60,7 +60,7 @@ where
     ///     ..Default::default()
     /// };
     ///
-    /// let mut intersections = unit_circle.find_intersections(&line, Some(options)).unwrap();
+    /// let mut intersections = unit_circle.find_intersection(&line, Some(options)).unwrap();
     /// assert_eq!(intersections.len(), 2);
     ///
     /// intersections.sort_by(|i0, i1| {
@@ -71,7 +71,7 @@ where
     /// let p1 = &intersections[1];
     /// assert_relative_eq!(p1.a().0, Point2::new(1.0, 0.0), epsilon = 1e-5);
     /// ```
-    fn find_intersections(
+    fn find_intersection(
         &'a self,
         other: &'a NurbsCurve<T, D>,
         option: Self::Option,

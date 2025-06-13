@@ -12,5 +12,5 @@ pub trait Intersects<'a, T> {
     type Output;
     type Option;
 
-    fn find_intersections(&'a self, other: T, option: Self::Option) -> Self::Output;
+    fn find_intersection(&'a self, other: T, option: Self::Option) -> Self::Output;
 }

@@ -46,7 +46,7 @@ fn problem_case() {
     let delta: f64 = 17.58454421724;
     let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);
     let clip = clip.transformed(&trans.into());
-    let intersections = subject.find_intersections(&clip, Some(OPTIONS)).unwrap();
+    let intersections = subject.find_intersection(&clip, Some(OPTIONS)).unwrap();
     assert_eq!(intersections.len(), 2);
 }
 
@@ -81,6 +81,6 @@ fn problem_case2() {
     let delta: f64 = 1.2782841177;
     let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);
     let clip = clip.transformed(&trans.into());
-    let intersections = subject.find_intersections(&clip, Some(OPTIONS)).unwrap();
+    let intersections = subject.find_intersection(&clip, Some(OPTIONS)).unwrap();
     assert_eq!(intersections.len(), 2);
 }

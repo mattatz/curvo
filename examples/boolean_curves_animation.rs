@@ -221,7 +221,7 @@ fn boolean(
 
         /*
         let intersections = subject
-            .find_intersections(&other, Some(option.clone()))
+            .find_intersection(&other, Some(option.clone()))
             .unwrap();
 
         intersections.iter().for_each(|it| {

@@ -22,7 +22,7 @@ impl<'a, T: FloatingPoint + ArgminFloat> Boolean<&'a NurbsCurve<T, U3>> for Nurb
         other: &'a NurbsCurve<T, U3>,
         option: Self::Option,
     ) -> Self::Output {
-        let intersections = self.find_intersections(other, option.clone())?;
+        let intersections = self.find_intersection(other, option.clone())?;
         let intersections = intersections
             .into_iter()
             .map(|it| CompoundCurveIntersection::new(self, other, it))
@@ -42,7 +42,7 @@ impl<'a, T: FloatingPoint + ArgminFloat> Boolean<&'a CompoundCurve<T, U3>> for N
         other: &'a CompoundCurve<T, U3>,
         option: Self::Option,
     ) -> Self::Output {
-        let intersections = other.find_intersections(self, option.clone())?;
+        let intersections = other.find_intersection(self, option.clone())?;
         let mut sorted = intersections
             .into_iter()
             .sorted_by(|x, y| {
