@@ -100,6 +100,19 @@ where
         })
     }
 
+    /// Create a new NURBS curve without checking the validity of the control points and knots
+    pub fn new_unchecked(
+        degree: usize,
+        control_points: Vec<OPoint<T, D>>,
+        knots: KnotVector<T>,
+    ) -> Self {
+        Self {
+            degree,
+            control_points,
+            knots,
+        }
+    }
+
     /// Create a new NURBS curve with a 1 degree as a polyline
     /// # Example
     /// ```
@@ -1053,52 +1066,6 @@ where
                 .collect(),
             knots: KnotVector::new(knots),
         })
-    }
-
-    /// Elevate the dimension of the curve (e.g., 2D -> 3D)
-    /// # Example
-    /// ```
-    /// use curvo::prelude::*;
-    /// use nalgebra::Point2;
-    /// let points: Vec<Point2<f64>> = vec![
-    ///     Point2::new(-1.0, -1.0),
-    ///     Point2::new(1.0, -1.0),
-    ///     Point2::new(1.0, 1.0),
-    ///     Point2::new(-1.0, 1.0),
-    /// ];
-    /// let curve2d = NurbsCurve2D::try_interpolate(&points, 3).unwrap();
-    /// let curve3d: NurbsCurve3D<f64> = curve2d.elevate_dimension();
-    /// let (start, end) = curve2d.knots_domain();
-    /// let (p0, p1) = (curve2d.point_at(start), curve2d.point_at(end));
-    /// let (p2, p3) = (curve3d.point_at(start), curve3d.point_at(end));
-    /// assert_eq!(p0.x, p2.x);
-    /// assert_eq!(p0.y, p2.y);
-    /// assert_eq!(p2.z, 0.0);
-    /// assert_eq!(p1.x, p3.x);
-    /// assert_eq!(p1.y, p3.y);
-    /// assert_eq!(p3.z, 0.0);
-    /// ```
-    pub fn elevate_dimension(&self) -> NurbsCurve<T, DimNameSum<D, U1>>
-    where
-        D: DimNameAdd<U1>,
-        DefaultAllocator: Allocator<DimNameSum<D, U1>>,
-    {
-        let mut control_points = vec![];
-        for p in self.control_points.iter() {
-            let mut coords = vec![];
-            for i in 0..(D::dim() - 1) {
-                coords.push(p[i]);
-            }
-            coords.push(T::zero()); // set a zero in the last dimension
-            coords.push(p[D::dim() - 1]);
-            control_points.push(OPoint::from_slice(&coords));
-        }
-
-        NurbsCurve {
-            control_points,
-            degree: self.degree,
-            knots: self.knots.clone(),
-        }
     }
 
     /// Try to elevate the degree of the curve
