@@ -294,6 +294,11 @@ where
                         let center = v1.inner() - d;
                         let v2 = &vertices[cursor + 2];
 
+                        let d0 = v1.inner() - center;
+                        let d1 = v2.inner() - center;
+                        let angle = d0.angle(&d1);
+                        let angle = angle.abs();
+
                         // create arc between v1 and v2
                         let arc = Self::try_arc(
                             &center,
@@ -301,7 +306,7 @@ where
                             &t,
                             distance.abs(),
                             T::zero(),
-                            T::frac_pi_2()
+                            angle,
                         )?;
                         spans.push(arc);
 
