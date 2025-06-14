@@ -262,7 +262,6 @@ where
                 CurveOffsetCornerType::Round => {
                     // scan to create rounded corner by arc
                     let mut spans = vec![];
-                    let n = vertices.len();
                     let mut cursor = 0;
                     let n = vertices.len();
                     let mut scanned: Vec<Point2<T>> = vec![vertices[0].clone().into()];
@@ -289,14 +288,21 @@ where
 
                         let v0 = &vertices[cursor];
                         let t = (v1.inner() - v0.inner()).normalize();
+                        let sign = distance.signum();
                         let n = Vector2::new(t.y, -t.x);
                         let d = n * distance;
                         let center = v1.inner() - d;
                         let v2 = &vertices[cursor + 2];
 
                         // create arc between v1 and v2
-                        let arc = Self::try_arc(&center, &n, &-t, distance, T::zero(), T::frac_pi_2())?;
-                        // let arc = Self::try_arc(&center, &-t, &n, distance, T::zero(), T::frac_pi_2())?;
+                        let arc = Self::try_arc(
+                            &center,
+                            &(n * sign),
+                            &t,
+                            distance.abs(),
+                            T::zero(),
+                            T::frac_pi_2()
+                        )?;
                         spans.push(arc);
 
                         cursor += 2;
@@ -306,8 +312,6 @@ where
                     if !scanned.is_empty() {
                         spans.push(Self::polyline(&scanned, false));
                     }
-
-                    println!("spans: {:?}", spans.len());
 
                     Ok(CompoundCurve::new_unchecked(spans))
                 }
