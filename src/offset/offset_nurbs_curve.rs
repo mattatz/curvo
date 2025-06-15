@@ -233,11 +233,11 @@ where
 
                         // find the intersection of the line v0-v1 & v2-v3
                         let v0 = &vertices[cursor];
-                        let d0 = (v1.inner() - v0.inner()).normalize() * delta;
-                        let l0 = to_line_helper(v0.inner(), &(v1.inner() + d0));
-
                         let v2 = &vertices[cursor + 2];
                         let v3 = &vertices[cursor + 3];
+
+                        let d0 = (v1.inner() - v0.inner()).normalize() * delta;
+                        let l0 = to_line_helper(v0.inner(), &(v1.inner() + d0));
                         let d1 = (v3.inner() - v2.inner()).normalize() * delta;
                         let l1 = to_line_helper(&(v2.inner() - d1), v3.inner());
 
@@ -260,33 +260,10 @@ where
                     Ok(Self::polyline(&scanned, false).into())
                 }
                 CurveOffsetCornerType::Round => {
-                    // scan to create rounded corner by arc
-                    let mut spans = vec![];
-                    let mut cursor = 0;
-                    let n = vertices.len();
-                    let mut scanned: Vec<Point2<T>> = vec![vertices[0].clone().into()];
-
-                    while cursor < n {
-                        if cursor + 3 >= n {
-                            let rest: Vec<Point2<T>> = vertices[cursor + 1..]
-                                .iter()
-                                .map(|v| v.clone().into())
-                                .collect_vec();
-                            scanned.extend(rest);
-                            break;
-                        }
-
-                        let v1 = &vertices[cursor + 1];
-                        scanned.push(v1.inner().clone());
-
-                        if let Vertex::Intersection(_) = v1 {
-                            cursor += 1;
-                            continue;
-                        }
-
-                        spans.push(Self::polyline(&scanned, false));
-
+                    // scan to create rounded corners by arc
+                    let spans = try_scan_to_connect_vertices(&vertices, |cursor| {
                         let v0 = &vertices[cursor];
+                        let v1 = &vertices[cursor + 1];
                         let t = (v1.inner() - v0.inner()).normalize();
                         let sign = distance.signum();
                         let n = Vector2::new(t.y, -t.x);
@@ -308,19 +285,36 @@ where
                             T::zero(),
                             angle,
                         )?;
-                        spans.push(arc);
-
-                        cursor += 2;
-                        scanned = vec![v2.inner().clone()];
-                    }
-
-                    if !scanned.is_empty() {
-                        spans.push(Self::polyline(&scanned, false));
-                    }
+                        Ok(arc)
+                    })?;
 
                     Ok(CompoundCurve::new_unchecked(spans))
                 }
-                CurveOffsetCornerType::Smooth => todo!(),
+                CurveOffsetCornerType::Smooth => {
+                    // scan to create smooth corners by arc
+                    let frac_2_3 = T::from_f64(2.0 / 3.0).unwrap();
+                    let d = distance.abs() * frac_2_3;
+                    let spans = try_scan_to_connect_vertices(&vertices, |cursor| {
+                        let v0 = &vertices[cursor];
+                        let v1 = &vertices[cursor + 1];
+                        let v2 = &vertices[cursor + 2];
+                        let v3 = &vertices[cursor + 3];
+
+                        let d10 = (v1.inner() - v0.inner()).normalize() * d;
+                        let d32 = (v3.inner() - v2.inner()).normalize() * d;
+
+                        // create arc between v1 and v2
+                        let arc = NurbsCurve2D::bezier(&[
+                            v1.inner().clone(),
+                            v1.inner() + d10,
+                            v2.inner() - d32,
+                            v2.inner().clone(),
+                        ]);
+                        Ok(arc)
+                    })?;
+
+                    Ok(CompoundCurve::new_unchecked(spans))
+                }
                 CurveOffsetCornerType::Chamfer => Self::try_interpolate(
                     &vertices.into_iter().map(|v| v.into()).collect_vec(),
                     self.degree(),
@@ -332,6 +326,54 @@ where
 
         todo!()
     }
+}
+
+/// scan vertices to connect them by a given corner function
+fn try_scan_to_connect_vertices<T: FloatingPoint, F>(
+    vertices: &[Vertex<T>],
+    generate_corner_arc: F,
+) -> anyhow::Result<Vec<NurbsCurve2D<T>>>
+where
+    F: Fn(usize) -> anyhow::Result<NurbsCurve2D<T>>,
+{
+    let mut spans = vec![];
+    let n = vertices.len();
+    let mut cursor = 0;
+    let mut scanned: Vec<Point2<T>> = vec![vertices[0].clone().into()];
+
+    while cursor < n {
+        if cursor + 3 >= n {
+            let rest: Vec<Point2<T>> = vertices[cursor + 1..]
+                .iter()
+                .map(|v| v.clone().into())
+                .collect_vec();
+            scanned.extend(rest);
+            break;
+        }
+
+        let v1 = &vertices[cursor + 1];
+        scanned.push(v1.inner().clone());
+
+        if let Vertex::Intersection(_) = v1 {
+            cursor += 1;
+            continue;
+        }
+
+        spans.push(NurbsCurve2D::polyline(&scanned, false));
+
+        let arc = generate_corner_arc(cursor)?;
+        spans.push(arc);
+
+        let v2 = &vertices[cursor + 2];
+        cursor += 2;
+        scanned = vec![v2.inner().clone()];
+    }
+
+    if !scanned.is_empty() {
+        spans.push(NurbsCurve2D::polyline(&scanned, false));
+    }
+
+    Ok(spans)
 }
 
 impl<'a, T> Offset<'a, T> for NurbsCurve3D<T>
