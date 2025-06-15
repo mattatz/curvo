@@ -173,6 +173,53 @@ where
         }
     }
 
+    /// Create a bezier curve from a list of control points
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::Point2;
+    /// let points = vec![
+    ///     Point2::new(-1.0, -1.0),
+    ///     Point2::new(1.0, -1.0),
+    ///     Point2::new(1.0, 1.0),
+    ///     Point2::new(-1.0, 1.0),
+    /// ];
+    /// let bezier_curve = NurbsCurve2D::bezier(&points);
+    /// println!("bezier_curve: {:?}", bezier_curve);
+    /// assert_eq!(bezier_curve.degree(), 3);
+    /// assert_eq!(bezier_curve.knots().len(), 8);
+    /// let domain = bezier_curve.knots_domain();
+    /// assert_eq!(domain, (0.0, 1.0));
+    /// let start = bezier_curve.point_at(domain.0);
+    /// let end = bezier_curve.point_at(domain.1);
+    /// assert_eq!(start, points[0]);
+    /// assert_eq!(end, points[points.len() - 1]);
+    /// ```
+    pub fn bezier(points: &[OPoint<T, DimNameDiff<D, U1>>]) -> Self
+    where
+        D: DimNameSub<U1>,
+        <D as DimNameSub<U1>>::Output: DimNameAdd<U1>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+        DefaultAllocator: Allocator<<<D as DimNameSub<U1>>::Output as DimNameAdd<U1>>::Output>,
+    {
+        let degree = points.len() - 1;
+        let knots = vec![T::zero(); degree + 1]
+            .into_iter()
+            .chain(vec![T::one(); degree + 1])
+            .collect_vec();
+        Self {
+            degree,
+            knots: KnotVector::new(knots),
+            control_points: points
+                .iter()
+                .map(|p| {
+                    let coord = p.to_homogeneous();
+                    OPoint::from_slice(coord.as_slice())
+                })
+                .collect(),
+        }
+    }
+
     /// Create a dehomogenized version of the curve
     pub fn dehomogenize(&self) -> NurbsCurve<T, DimNameDiff<D, U1>>
     where

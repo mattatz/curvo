@@ -69,6 +69,11 @@ path = "examples/periodic_interpolate_curve.rs"
 required-features = ["bevy"]
 
 [[example]]
+name = "bezier_curve"
+path = "examples/bezier_curve.rs"
+required-features = ["bevy"]
+
+[[example]]
 name = "circle_curve"
 path = "examples/circle_curve.rs"
 required-features = ["bevy"]
