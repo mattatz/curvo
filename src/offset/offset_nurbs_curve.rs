@@ -249,7 +249,7 @@ where
                         pts
                     };
 
-                    vec![NurbsCurve2D::polyline(&pts, false).into()]
+                    return Ok(vec![NurbsCurve2D::polyline(&pts, false).into()]);
                 }
                 CurveOffsetCornerType::Round => {
                     let spans = try_connect(&segments, |cursor| {
@@ -330,7 +330,44 @@ where
                 }
             };
 
-            return Ok(vec![CompoundCurve::new_unchecked(spans)]);
+            // connect polylines
+            let mut res = vec![];
+            let mut cursor = None;
+
+            let connect = |i: usize, j: usize| {
+                let pts = spans[i..j].iter().flat_map(|c| {
+                    c.dehomogenized_control_points()
+                }).dedup().collect_vec();
+                NurbsCurve2D::polyline(&pts, false)
+            };
+
+            let n = spans.len();
+            for i in 0..n {
+                if spans[i].degree() != 1 {
+                    res.push(spans[i].clone());
+                    if let Some(cursor) = cursor {
+                        let m = i.saturating_sub(cursor);
+                        if m > 0 {
+                            let polyline = connect(cursor, i);
+                            res.push(polyline);
+                        }
+                    }
+                    cursor = None;
+                } else {
+                    if cursor.is_none() {
+                        cursor = Some(i);
+                    }
+                }
+            }
+
+            if let Some(cursor) = cursor {
+                if n - cursor > 0 {
+                    let polyline = connect(cursor, n);
+                    res.push(polyline);
+                }
+            }
+
+            return Ok(vec![CompoundCurve::new_unchecked_aligned(res)]);
         } else {
             let tess = tessellate_nurbs_curve(self, tol);
         };
