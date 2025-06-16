@@ -76,24 +76,6 @@ impl<T: FloatingPoint> From<Vertex<T>> for Point2<T> {
 }
 
 impl<T: FloatingPoint> Vertex<T> {
-    pub fn point<P: geo::CoordNum>(p: geo::Point<P>) -> Self {
-        let x = p.x().to_f64().unwrap();
-        let y = p.y().to_f64().unwrap();
-        Vertex::Point(Point2::new(
-            T::from_f64(x).unwrap(),
-            T::from_f64(y).unwrap(),
-        ))
-    }
-
-    pub fn intersection<P: geo::CoordNum>(p: geo::Point<P>) -> Self {
-        let x = p.x().to_f64().unwrap();
-        let y = p.y().to_f64().unwrap();
-        Vertex::Intersection(Point2::new(
-            T::from_f64(x).unwrap(),
-            T::from_f64(y).unwrap(),
-        ))
-    }
-
     pub fn inner(&self) -> &Point2<T> {
         match self {
             Vertex::Point(p) => p,
