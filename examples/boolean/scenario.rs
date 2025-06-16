@@ -121,6 +121,7 @@ fn compound_circle() -> CurveVariant {
         NurbsCurve2D::try_arc(&o, &dx, &dy, 1., 0., PI).unwrap(),
         NurbsCurve2D::try_arc(&o, &dx, &dy, 1., PI, TAU).unwrap(),
     ])
+    .unwrap()
     .into()
 }
 
@@ -157,6 +158,7 @@ fn compound_rounded_rectangle() -> CurveVariant {
             false,
         ),
     ])
+    .unwrap()
     .into()
 }
 
@@ -204,6 +206,7 @@ fn compound_rounded_t_shape() -> CurveVariant {
             false,
         ),
     ])
+    .unwrap()
     .into()
 }
 

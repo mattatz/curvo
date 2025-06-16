@@ -37,6 +37,25 @@ where
         Self { spans }
     }
 
+    /// Create a new compound curve from a list of spans without checking if the spans are connected.
+    /// The knot vectors of the spans are aligned to the first span's knot vector.
+    pub fn new_unchecked_aligned(spans: Vec<NurbsCurve<T, D>>) -> Self {
+        // Align knot vectors
+        // The first knot vector starts at 0, the rest are aligned to the previous knot vector
+        let mut knot_offset = T::zero();
+
+        let mut spans = spans;
+        spans.iter_mut().for_each(|curve| {
+            let start = curve.knots().first();
+            curve.knots_mut().iter_mut().for_each(|v| {
+                *v = *v - start + knot_offset;
+            });
+            knot_offset = curve.knots().last();
+        });
+
+        Self { spans }
+    }
+
     /// Create a new compound curve from a list of spans.
     /// The spans must be connected.
     pub fn try_new(spans: Vec<NurbsCurve<T, D>>) -> anyhow::Result<Self>
@@ -84,18 +103,7 @@ where
             }
         }
 
-        // Align knot vectors
-        // The first knot vector starts at 0, the rest are aligned to the previous knot vector
-        let mut knot_offset = T::zero();
-        connected.iter_mut().for_each(|curve| {
-            let start = curve.knots().first();
-            curve.knots_mut().iter_mut().for_each(|v| {
-                *v = *v - start + knot_offset;
-            });
-            knot_offset = curve.knots().last();
-        });
-
-        Ok(Self { spans: connected })
+        Ok(Self::new_unchecked_aligned(connected))
     }
 
     pub fn spans(&self) -> &[NurbsCurve<T, D>] {
@@ -381,7 +389,7 @@ where
             {
                 struct FieldVisitor;
 
-                impl<'de> Visitor<'de> for FieldVisitor {
+                impl Visitor<'_> for FieldVisitor {
                     type Value = Field;
 
                     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

@@ -47,7 +47,7 @@ where
     ///     Point3::new(-2.0, 0.0, 0.0),
     ///     Point3::new(2.0, 0.0, 0.0),
     /// ], false);
-    /// let intersections = unit_sphere.find_intersections(&line, None).unwrap();
+    /// let intersections = unit_sphere.find_intersection(&line, None).unwrap();
     /// assert_eq!(intersections.len(), 2);
     ///
     /// let it0 = &intersections[0];
@@ -58,7 +58,7 @@ where
     /// let p1 = it1.a().0;
     /// assert_relative_eq!(p1.x, 1., epsilon = 1e-5);
     /// ```
-    fn find_intersections(
+    fn find_intersection(
         &'a self,
         other: &'a NurbsCurve<T, D>,
         option: Self::Option,

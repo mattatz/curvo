@@ -22,7 +22,7 @@ impl<'a, T: FloatingPoint + ArgminFloat> Boolean<&'a NurbsCurve<T, U3>> for Comp
         other: &'a NurbsCurve<T, U3>,
         option: Self::Option,
     ) -> Self::Output {
-        let intersections = self.find_intersections(other, option.clone())?;
+        let intersections = self.find_intersection(other, option.clone())?;
         clip(self, other, operation, option, intersections)
     }
 }
@@ -40,7 +40,7 @@ impl<'a, T: FloatingPoint + ArgminFloat> Boolean<&'a CompoundCurve<T, U3>>
         other: &'a CompoundCurve<T, U3>,
         option: Self::Option,
     ) -> Self::Output {
-        let intersections = self.find_intersections(other, option.clone())?;
+        let intersections = self.find_intersection(other, option.clone())?;
         clip(self, other, operation, option, intersections)
     }
 }

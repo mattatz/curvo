@@ -91,7 +91,7 @@ fn animate(
     let st = easer::functions::Expo::ease_in(t, 0., 1., 1.);
     let et = easer::functions::Expo::ease_out(t, 0., 1., 1.);
 
-    let tr = source.get_single_mut();
+    let tr = source.single_mut();
     let tr = if let Ok(mut tr) = tr {
         tr.rotate_local_y(delta * 0.25);
         *tr
@@ -155,10 +155,10 @@ fn reset(
         settings.time_since_last_update = 0.;
 
         source.iter().for_each(|e| {
-            commands.entity(e).despawn_recursive();
+            commands.entity(e).despawn();
         });
         profile.iter().for_each(|e| {
-            commands.entity(e).despawn_recursive();
+            commands.entity(e).despawn();
         });
 
         let pts: Vec<Point3<f32>> = (0..settings.num_control_points)

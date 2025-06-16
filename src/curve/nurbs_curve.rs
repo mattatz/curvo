@@ -7,7 +7,7 @@ use itertools::Itertools;
 use nalgebra::allocator::Allocator;
 use nalgebra::{
     Const, DMatrix, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff, DimNameSub,
-    DimNameSum, OMatrix, OPoint, OVector, RealField, Rotation3, UnitVector3, Vector3, U1,
+    OMatrix, OPoint, OVector, RealField, Rotation3, UnitVector3, Vector3, U1,
 };
 use simba::scalar::SupersetOf;
 
@@ -100,6 +100,19 @@ where
         })
     }
 
+    /// Create a new NURBS curve without checking the validity of the control points and knots
+    pub fn new_unchecked(
+        degree: usize,
+        control_points: Vec<OPoint<T, D>>,
+        knots: KnotVector<T>,
+    ) -> Self {
+        Self {
+            degree,
+            control_points,
+            knots,
+        }
+    }
+
     /// Create a new NURBS curve with a 1 degree as a polyline
     /// # Example
     /// ```
@@ -149,6 +162,53 @@ where
 
         Self {
             degree: 1,
+            knots: KnotVector::new(knots),
+            control_points: points
+                .iter()
+                .map(|p| {
+                    let coord = p.to_homogeneous();
+                    OPoint::from_slice(coord.as_slice())
+                })
+                .collect(),
+        }
+    }
+
+    /// Create a bezier curve from a list of control points
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::Point2;
+    /// let points = vec![
+    ///     Point2::new(-1.0, -1.0),
+    ///     Point2::new(1.0, -1.0),
+    ///     Point2::new(1.0, 1.0),
+    ///     Point2::new(-1.0, 1.0),
+    /// ];
+    /// let bezier_curve = NurbsCurve2D::bezier(&points);
+    /// println!("bezier_curve: {:?}", bezier_curve);
+    /// assert_eq!(bezier_curve.degree(), 3);
+    /// assert_eq!(bezier_curve.knots().len(), 8);
+    /// let domain = bezier_curve.knots_domain();
+    /// assert_eq!(domain, (0.0, 1.0));
+    /// let start = bezier_curve.point_at(domain.0);
+    /// let end = bezier_curve.point_at(domain.1);
+    /// assert_eq!(start, points[0]);
+    /// assert_eq!(end, points[points.len() - 1]);
+    /// ```
+    pub fn bezier(points: &[OPoint<T, DimNameDiff<D, U1>>]) -> Self
+    where
+        D: DimNameSub<U1>,
+        <D as DimNameSub<U1>>::Output: DimNameAdd<U1>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+        DefaultAllocator: Allocator<<<D as DimNameSub<U1>>::Output as DimNameAdd<U1>>::Output>,
+    {
+        let degree = points.len() - 1;
+        let knots = vec![T::zero(); degree + 1]
+            .into_iter()
+            .chain(vec![T::one(); degree + 1])
+            .collect_vec();
+        Self {
+            degree,
             knots: KnotVector::new(knots),
             control_points: points
                 .iter()
@@ -1055,52 +1115,6 @@ where
         })
     }
 
-    /// Elevate the dimension of the curve (e.g., 2D -> 3D)
-    /// # Example
-    /// ```
-    /// use curvo::prelude::*;
-    /// use nalgebra::Point2;
-    /// let points: Vec<Point2<f64>> = vec![
-    ///     Point2::new(-1.0, -1.0),
-    ///     Point2::new(1.0, -1.0),
-    ///     Point2::new(1.0, 1.0),
-    ///     Point2::new(-1.0, 1.0),
-    /// ];
-    /// let curve2d = NurbsCurve2D::try_interpolate(&points, 3).unwrap();
-    /// let curve3d: NurbsCurve3D<f64> = curve2d.elevate_dimension();
-    /// let (start, end) = curve2d.knots_domain();
-    /// let (p0, p1) = (curve2d.point_at(start), curve2d.point_at(end));
-    /// let (p2, p3) = (curve3d.point_at(start), curve3d.point_at(end));
-    /// assert_eq!(p0.x, p2.x);
-    /// assert_eq!(p0.y, p2.y);
-    /// assert_eq!(p2.z, 0.0);
-    /// assert_eq!(p1.x, p3.x);
-    /// assert_eq!(p1.y, p3.y);
-    /// assert_eq!(p3.z, 0.0);
-    /// ```
-    pub fn elevate_dimension(&self) -> NurbsCurve<T, DimNameSum<D, U1>>
-    where
-        D: DimNameAdd<U1>,
-        DefaultAllocator: Allocator<DimNameSum<D, U1>>,
-    {
-        let mut control_points = vec![];
-        for p in self.control_points.iter() {
-            let mut coords = vec![];
-            for i in 0..(D::dim() - 1) {
-                coords.push(p[i]);
-            }
-            coords.push(T::zero()); // set a zero in the last dimension
-            coords.push(p[D::dim() - 1]);
-            control_points.push(OPoint::from_slice(&coords));
-        }
-
-        NurbsCurve {
-            control_points,
-            degree: self.degree,
-            knots: self.knots.clone(),
-        }
-    }
-
     /// Try to elevate the degree of the curve
     pub fn try_elevate_degree(&self, target_degree: usize) -> anyhow::Result<Self> {
         if target_degree <= self.degree {
@@ -1804,6 +1818,91 @@ where
             knots: self.knots.cast(),
         }
     }
+
+    /// Try to reduce knots of the curve as much as possible
+    /// Returns the total number of knots removed
+    /// `tolerance` defines the acceptable deviation in the curve's shape.
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::Point3;
+    ///
+    /// // Create a curve with redundant knots
+    /// let points = vec![
+    ///     Point3::new(0., 0., 0.),
+    ///     Point3::new(1., 0., 0.),
+    ///     Point3::new(2., 0., 0.),
+    ///     Point3::new(3., 1., 0.),
+    ///     Point3::new(4., 2., 0.),
+    /// ];
+    /// let mut curve = NurbsCurve3D::polyline(&points, false);
+    ///
+    /// // Add some redundant knots
+    /// curve.try_add_knot(0.5).unwrap();
+    /// curve.try_add_knot(1.5).unwrap();
+    /// curve.try_add_knot(2.5).unwrap();
+    ///
+    /// let original_knot_count = curve.knots().len();
+    /// let original_control_point_count = curve.control_points().len();
+    ///
+    /// // Reduce knots
+    /// let removed_count = curve.try_reduce_knots(Some(1e-6)).unwrap();
+    ///
+    /// let final_knot_count = curve.knots().len();
+    /// let final_control_point_count = curve.control_points().len();
+    ///
+    /// // Verify that knots and control points were reduced
+    /// assert!(final_knot_count < original_knot_count);
+    /// assert!(final_control_point_count <= original_control_point_count);
+    /// assert!(removed_count > 0);
+    /// ```
+    pub fn try_reduce_knots(&mut self, tolerance: Option<T>) -> anyhow::Result<usize> {
+        let tolerance = tolerance.unwrap_or(T::from_f64(1e-6).unwrap());
+        let mut total_removed = 0;
+        let mut changed = true;
+
+        // Continue until no more knots can be removed
+        while changed {
+            changed = false;
+            let multiplicities = self.knots.multiplicity();
+
+            // Try to remove knots starting from those with highest multiplicity
+            // and avoid the first and last knots (domain boundaries)
+            let mut candidates: Vec<_> = multiplicities
+                .iter()
+                .filter(|m| {
+                    let knot = *m.knot();
+                    let first_knot = self.knots.first();
+                    let last_knot = self.knots.last();
+                    // Skip boundary knots and knots with multiplicity 0
+                    knot != first_knot && knot != last_knot && m.multiplicity() > 0
+                })
+                .collect();
+
+            // Sort by multiplicity (descending) to prioritize removing high-multiplicity knots
+            candidates.sort_by_key(|m| std::cmp::Reverse(m.multiplicity()));
+
+            for mult_info in candidates {
+                let knot = *mult_info.knot();
+
+                // Try to remove this knot as many times as possible
+                let mut local_removed = 0;
+                loop {
+                    match self.try_remove_knot(knot, Some(tolerance)) {
+                        Ok(removed) if removed > 0 => {
+                            local_removed += removed;
+                            changed = true;
+                        }
+                        _ => break, // Can't remove this knot anymore
+                    }
+                }
+
+                total_removed += local_removed;
+            }
+        }
+
+        Ok(total_removed)
+    }
 }
 
 /// Enable to transform a NURBS curve by a given DxD matrix
@@ -2248,7 +2347,7 @@ where
             {
                 struct FieldVisitor;
 
-                impl<'de> Visitor<'de> for FieldVisitor {
+                impl Visitor<'_> for FieldVisitor {
                     type Value = Field;
 
                     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

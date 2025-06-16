@@ -48,6 +48,8 @@ The supported features also include finding the closest point on NURBS curves, f
 
 <img src="https://github.com/user-attachments/assets/904c1a97-9f14-4bb6-9e41-6beebd62882f" width="360px" alt="Trimmed surface" />
 
+<img src="https://github.com/user-attachments/assets/6b0583e4-01d4-447e-9347-c7b8bd0bc8af" width="360px" alt="Offset curve" />
+
 ## Usage
 
 ```rust

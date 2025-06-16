@@ -24,7 +24,7 @@ where
 
     /// Find the intersection points with another curve
     #[allow(clippy::type_complexity)]
-    fn find_intersections(
+    fn find_intersection(
         &'a self,
         other: &'a NurbsCurve<T, D>,
         options: Self::Option,
@@ -33,7 +33,7 @@ where
             .spans()
             .iter()
             .map(|span| {
-                span.find_intersections(other, options.clone())
+                span.find_intersection(other, options.clone())
                     .map(|intersections| {
                         intersections
                             .into_iter()
@@ -81,7 +81,7 @@ where
 
     /// Find the intersection points with another compound curve
     #[allow(clippy::type_complexity)]
-    fn find_intersections(
+    fn find_intersection(
         &'a self,
         other: &'a CompoundCurve<T, D>,
         options: Self::Option,
@@ -89,7 +89,7 @@ where
         let res: anyhow::Result<Vec<_>> = other
             .spans()
             .iter()
-            .map(|span| self.find_intersections(span, options.clone()))
+            .map(|span| self.find_intersection(span, options.clone()))
             .collect();
 
         Ok(res?.into_iter().flatten().collect())
@@ -143,7 +143,7 @@ mod tests {
             true,
         );
         let intersections = compound_circle
-            .find_intersections(&rectangle, Some(OPTIONS))
+            .find_intersection(&rectangle, Some(OPTIONS))
             .unwrap();
         assert_eq!(intersections.len(), 2);
         assert!(contains(
@@ -163,7 +163,7 @@ mod tests {
             true,
         );
         let intersections = compound_circle
-            .find_intersections(&square, Some(OPTIONS))
+            .find_intersection(&square, Some(OPTIONS))
             .unwrap();
         assert_eq!(intersections.len(), 4);
         assert!(contains(
@@ -209,7 +209,7 @@ mod tests {
         .unwrap();
 
         let intersections = compound_circle
-            .find_intersections(&compound_rectangle, Some(OPTIONS))
+            .find_intersection(&compound_rectangle, Some(OPTIONS))
             .unwrap();
         assert_eq!(intersections.len(), 4);
     }

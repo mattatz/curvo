@@ -198,8 +198,8 @@ fn find_closest_point(
     camera: Query<(&Camera, &GlobalTransform)>,
     mut gizmos: Gizmos,
 ) {
-    let w = window.single();
-    let (camera, camera_transform) = camera.single();
+    let w = window.single().unwrap();
+    let (camera, camera_transform) = camera.single().unwrap();
     if let Some(ray) = w
         .cursor_position()
         .and_then(|cursor| camera.viewport_to_world(camera_transform, cursor).ok())
@@ -207,7 +207,7 @@ fn find_closest_point(
         if let Some(d) = ray.intersect_plane(Vec3::ZERO, InfinitePlane3d::new(Vec3::Z)) {
             let pt = ray.get_point(d);
             gizmos.circle(pt, 0.1, GRAY);
-            let curve = curves.single();
+            let curve = curves.single().unwrap();
             let p = Point3::from(pt).cast();
             let closest = curve.0.find_closest_point(&p);
             if let Ok(closest) = closest {

@@ -181,7 +181,7 @@ fn setup(
         */
 
     /*
-    let intersections = curve.find_intersections(&circle, None);
+    let intersections = curve.find_intersection(&circle, None);
     if let Ok(intersections) = intersections {
         commands
             .spawn(MaterialMeshBundle {
@@ -296,9 +296,9 @@ fn update(
     */
 
     let p0 = set.p0();
-    let camera_transform = p0.single();
+    let camera_transform = p0.single().unwrap();
 
-    let intersections = c1.find_intersections(&c2, None);
+    let intersections = c1.find_intersection(&c2, None);
     if let Ok(intersections) = intersections {
         intersections.iter().for_each(|it| {
             let p: Vec3 = it.a().0.coords.to_homogeneous().cast::<f32>().into();
