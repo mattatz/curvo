@@ -1,3 +1,5 @@
+use std::marker::PhantomData;
+
 use geo::LineIntersection;
 use itertools::Itertools;
 use nalgebra::allocator::Allocator;
@@ -125,151 +127,114 @@ where
             })
             .collect_vec();
 
-        // find intersections
+        let is_closed = self.is_closed();
 
         if self.degree() == 1 {
-            let lines = offset
-                .chunks(2)
+            let pts = self.dehomogenized_control_points();
+            let segments = pts
+                .windows(2)
                 .map(|w| {
                     let p0 = &w[0];
                     let p1 = &w[1];
-                    to_line_helper(p0, p1)
+                    let tangent = p1 - p0;
+                    let t = tangent.normalize();
+                    let normal = Vector2::new(t.y, -t.x);
+                    let d = normal * distance;
+                    let start = p0 + d;
+                    let end = p1 + d;
+                    PointSegment::new(start, end)
                 })
                 .collect_vec();
 
-            let its = lines
+            let n = if is_closed {
+                segments.len() + 1
+            } else {
+                segments.len()
+            };
+            let intersections = segments
+                .iter()
+                .cycle()
+                .take(n)
+                .collect_vec()
                 .windows(2)
                 .map(|w| {
-                    let l0 = &w[0];
-                    let l1 = &w[1];
-                    geo::algorithm::line_intersection::line_intersection(l0.clone(), l1.clone())
+                    if let Some(p) = w[0].intersects(&w[1]) {
+                        Vertex::Intersection(p)
+                    } else {
+                        Vertex::Point(w[0].end)
+                    }
                 })
                 .collect_vec();
 
-            let n = lines.len();
-            let vertices: Vec<Vertex<T>> = lines
+            let slen = segments.len();
+            let segments = segments
                 .into_iter()
                 .enumerate()
-                .flat_map(|(i, line)| {
-                    if i == 0 {
-                        // head
-                        match &its[0] {
-                            Some(LineIntersection::SinglePoint {
-                                intersection,
-                                is_proper: _,
-                            }) => {
-                                vec![
-                                    line.start_point().into(),
-                                    Vertex::intersection((*intersection).into()),
-                                ]
+                .map(|(i, s)| {
+                    let start = if i == 0 {
+                        if is_closed {
+                            match intersections[intersections.len() - 1] {
+                                Vertex::Intersection(p) => Vertex::Intersection(p),
+                                Vertex::Point(_) => Vertex::Point(s.start),
                             }
-                            _ => {
-                                vec![line.start_point().into(), line.end_point().into()]
-                            }
-                        }
-                    } else if i == n - 1 {
-                        // tail
-                        let prev = &its[i - 1];
-                        match prev {
-                            Some(_) => {
-                                vec![line.end_point().into()]
-                            }
-                            _ => {
-                                vec![line.start_point().into(), line.end_point().into()]
-                            }
+                        } else {
+                            Vertex::Point(s.start)
                         }
                     } else {
-                        // middle
-                        let prev = &its[i - 1];
-                        let cur = &its[i];
-                        let start = match prev {
-                            Some(LineIntersection::SinglePoint {
-                                intersection: _,
-                                is_proper: _,
-                            }) => None,
-                            _ => Some(line.start_point().into()),
-                        };
+                        let prev = intersections[i - 1].clone();
+                        match prev {
+                            Vertex::Intersection(p) => Vertex::Intersection(p),
+                            Vertex::Point(_) => Vertex::Point(s.start),
+                        }
+                    };
+                    let end = if i != slen - 1 || is_closed {
+                        intersections[i].clone()
+                    } else {
+                        Vertex::Point(s.end)
+                    };
 
-                        let end = match cur {
-                            Some(LineIntersection::SinglePoint {
-                                intersection,
-                                is_proper: _,
-                            }) => Vertex::intersection((*intersection).into()),
-                            _ => line.end_point().into(),
-                        };
-
-                        vec![start, Some(end)].into_iter().flatten().collect_vec()
-                    }
+                    s.to_vertex_segment(start, end)
                 })
                 .collect_vec();
 
             return match corner_type {
                 CurveOffsetCornerType::None => Ok(Self::polyline(&offset, false).into()),
-                // CurveOffsetCornerType::None => Ok(Self::polyline(&vertices.into_iter().map(|v| v.into()).collect_vec(), false).into()),
                 CurveOffsetCornerType::Sharp => {
-                    // scan to connect vertices
-                    let n = vertices.len();
-                    let mut cursor = 0;
-                    let mut scanned: Vec<Point2<T>> = vec![vertices[0].clone().into()];
-
                     let delta = distance.abs() * T::from_f64(2.0).unwrap();
-
-                    while cursor < n {
-                        if cursor + 3 >= n {
-                            let rest: Vec<Point2<T>> = vertices[cursor..]
-                                .iter()
-                                .map(|v| v.clone().into())
-                                .collect_vec();
-                            scanned.extend(rest);
-                            break;
+                    let spans = try_connect(&segments, |cursor| {
+                        let cur = &segments[cursor];
+                        if cursor == segments.len() - 1 && !is_closed {
+                            return Ok(None);
                         }
-
-                        let v1 = &vertices[cursor + 1];
-                        if let Vertex::Intersection(it) = v1 {
-                            scanned.push(it.clone());
-                            cursor += 1;
-                            continue;
-                        }
-
-                        // find the intersection of the line v0-v1 & v2-v3
-                        let v0 = &vertices[cursor];
-                        let v2 = &vertices[cursor + 2];
-                        let v3 = &vertices[cursor + 3];
-
-                        let d0 = (v1.inner() - v0.inner()).normalize() * delta;
-                        let l0 = to_line_helper(v0.inner(), &(v1.inner() + d0));
-                        let d1 = (v3.inner() - v2.inner()).normalize() * delta;
-                        let l1 = to_line_helper(&(v2.inner() - d1), v3.inner());
-
-                        let it = geo::algorithm::line_intersection::line_intersection(l0, l1);
-                        let it = it
-                            .and_then(|it| match it {
-                                LineIntersection::SinglePoint {
-                                    intersection: p,
-                                    is_proper: _,
-                                } => Some(p),
-                                _ => None,
-                            })
-                            .ok_or(anyhow::anyhow!("no intersection"))?;
-                        scanned.push(Point2::new(
-                            T::from_f64(it.x).unwrap(),
-                            T::from_f64(it.y).unwrap(),
-                        ));
-                        cursor += 2;
-                    }
-                    Ok(Self::polyline(&scanned, false).into())
+                        let next = &segments[(cursor + 1) % segments.len()];
+                        let v0 = cur.start.clone();
+                        let v1 = cur.end.clone();
+                        let v2 = next.start.clone();
+                        let v3 = next.end.clone();
+                        let it = find_corner_intersection([&v0, &v1, &v2, &v3], delta)?;
+                        Ok(Some(NurbsCurve2D::polyline(
+                            &[v1.into(), it, v2.into()],
+                            false,
+                        )))
+                    })?;
+                    Ok(CompoundCurve::new_unchecked(spans))
                 }
                 CurveOffsetCornerType::Round => {
-                    // scan to create rounded corners by arc
-                    let spans = try_scan_to_connect_vertices(&vertices, |cursor| {
-                        let v0 = &vertices[cursor];
-                        let v1 = &vertices[cursor + 1];
+                    let spans = try_connect(&segments, |cursor| {
+                        let cur = &segments[cursor];
+                        if cursor == segments.len() - 1 && !is_closed {
+                            return Ok(None);
+                        }
+                        let next = &segments[(cursor + 1) % segments.len()];
+
+                        let v0 = &cur.start;
+                        let v1 = &cur.end;
                         let t = (v1.inner() - v0.inner()).normalize();
                         let sign = distance.signum();
                         let n = Vector2::new(t.y, -t.x);
                         let d = n * distance;
                         let center = v1.inner() - d;
-                        let v2 = &vertices[cursor + 2];
+                        let v2 = &next.start;
 
                         let d0 = v1.inner() - center;
                         let d1 = v2.inner() - center;
@@ -285,41 +250,52 @@ where
                             T::zero(),
                             angle,
                         )?;
-                        Ok(arc)
+                        Ok(Some(arc))
                     })?;
-
                     Ok(CompoundCurve::new_unchecked(spans))
                 }
                 CurveOffsetCornerType::Smooth => {
-                    // scan to create smooth corners by arc
                     let frac_2_3 = T::from_f64(2.0 / 3.0).unwrap();
                     let d = distance.abs() * frac_2_3;
-                    let spans = try_scan_to_connect_vertices(&vertices, |cursor| {
-                        let v0 = &vertices[cursor];
-                        let v1 = &vertices[cursor + 1];
-                        let v2 = &vertices[cursor + 2];
-                        let v3 = &vertices[cursor + 3];
+                    let spans = try_connect(&segments, |cursor| {
+                        let cur = &segments[cursor];
+                        if cursor == segments.len() - 1 && !is_closed {
+                            return Ok(None);
+                        }
+                        let next = &segments[(cursor + 1) % segments.len()];
+
+                        let v0 = &cur.start;
+                        let v1 = &cur.end;
+                        let v2 = &next.start;
+                        let v3 = &next.end;
 
                         let d10 = (v1.inner() - v0.inner()).normalize() * d;
                         let d32 = (v3.inner() - v2.inner()).normalize() * d;
 
                         // create arc between v1 and v2
-                        let arc = NurbsCurve2D::bezier(&[
+                        let bezier = NurbsCurve2D::bezier(&[
                             v1.inner().clone(),
                             v1.inner() + d10,
                             v2.inner() - d32,
                             v2.inner().clone(),
                         ]);
-                        Ok(arc)
+                        Ok(Some(bezier))
                     })?;
-
                     Ok(CompoundCurve::new_unchecked(spans))
                 }
-                CurveOffsetCornerType::Chamfer => Self::try_interpolate(
-                    &vertices.into_iter().map(|v| v.into()).collect_vec(),
-                    self.degree(),
-                )
-                .map(|c| c.into()),
+                CurveOffsetCornerType::Chamfer => {
+                    let spans = try_connect(&segments, |cursor| {
+                        let cur = &segments[cursor];
+                        if cursor == segments.len() - 1 && !is_closed {
+                            return Ok(None);
+                        }
+                        let next = &segments[(cursor + 1) % segments.len()];
+                        let v1 = cur.end.clone();
+                        let v2 = next.start.clone();
+                        Ok(Some(NurbsCurve2D::polyline(&[v1.into(), v2.into()], false)))
+                    })?;
+                    Ok(CompoundCurve::new_unchecked(spans))
+                }
             };
         } else {
         };
@@ -328,52 +304,115 @@ where
     }
 }
 
-/// scan vertices to connect them by a given corner function
-fn try_scan_to_connect_vertices<T: FloatingPoint, F>(
-    vertices: &[Vertex<T>],
-    generate_corner_arc: F,
+#[derive(Debug, Clone)]
+struct Segment<T, P> {
+    start: P,
+    end: P,
+    line: geo::Line,
+    _marker: PhantomData<T>,
+}
+
+type PointSegment<T> = Segment<T, Point2<T>>;
+type VertexSegment<T> = Segment<T, Vertex<T>>;
+
+impl<T: FloatingPoint> PointSegment<T> {
+    fn new(start: Point2<T>, end: Point2<T>) -> Self {
+        let line = to_line_helper(&start, &end);
+        Self {
+            start,
+            end,
+            line,
+            _marker: PhantomData,
+        }
+    }
+
+    fn to_vertex_segment(self, start: Vertex<T>, end: Vertex<T>) -> VertexSegment<T> {
+        VertexSegment {
+            start,
+            end,
+            line: self.line,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<T: FloatingPoint, P> Segment<T, P> {
+    fn intersects(&self, other: &Segment<T, P>) -> Option<Point2<T>> {
+        let l0 = self.line;
+        let l1 = other.line;
+        let it = geo::algorithm::line_intersection::line_intersection(l0, l1);
+        it.and_then(|it| match it {
+            LineIntersection::SinglePoint {
+                intersection: p,
+                is_proper: _,
+            } => Some(Point2::new(
+                T::from_f64(p.x).unwrap(),
+                T::from_f64(p.y).unwrap(),
+            )),
+            _ => None,
+        })
+    }
+}
+
+/// try to connect segments by a given corner function
+fn try_connect<T: FloatingPoint, F>(
+    segments: &[VertexSegment<T>],
+    corner: F,
 ) -> anyhow::Result<Vec<NurbsCurve2D<T>>>
 where
-    F: Fn(usize) -> anyhow::Result<NurbsCurve2D<T>>,
+    F: Fn(usize) -> anyhow::Result<Option<NurbsCurve2D<T>>>,
 {
-    let mut spans = vec![];
-    let n = vertices.len();
-    let mut cursor = 0;
-    let mut scanned: Vec<Point2<T>> = vec![vertices[0].clone().into()];
+    let spans = segments
+        .iter()
+        .enumerate()
+        .map(|(i, s)| {
+            let polyline =
+                NurbsCurve2D::polyline(&[s.start.clone().into(), s.end.clone().into()], false);
+            match s.end {
+                Vertex::Point(_) => {
+                    let c = corner(i)?;
+                    match c {
+                        Some(c) => Ok(vec![polyline, c]),
+                        None => Ok(vec![polyline]),
+                    }
+                }
+                Vertex::Intersection(_) => Ok(vec![polyline]),
+            }
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    Ok(spans.into_iter().flatten().collect_vec())
+}
 
-    while cursor < n {
-        if cursor + 3 >= n {
-            let rest: Vec<Point2<T>> = vertices[cursor + 1..]
-                .iter()
-                .map(|v| v.clone().into())
-                .collect_vec();
-            scanned.extend(rest);
-            break;
-        }
+/// find the intersection of the line v0-v1 & v2-v3
+fn find_corner_intersection<T: FloatingPoint>(
+    vertices: [&Vertex<T>; 4],
+    delta: T,
+) -> anyhow::Result<Point2<T>> {
+    let v0 = vertices[0];
+    let v1 = vertices[1];
+    let v2 = vertices[2];
+    let v3 = vertices[3];
 
-        let v1 = &vertices[cursor + 1];
-        scanned.push(v1.inner().clone());
+    let d0 = (v1.inner() - v0.inner()).normalize() * delta;
+    let l0 = to_line_helper(v0.inner(), &(v1.inner() + d0));
+    let d1 = (v3.inner() - v2.inner()).normalize() * delta;
+    let l1 = to_line_helper(&(v2.inner() - d1), v3.inner());
 
-        if let Vertex::Intersection(_) = v1 {
-            cursor += 1;
-            continue;
-        }
+    let it = geo::algorithm::line_intersection::line_intersection(l0, l1);
+    let it = it
+        .and_then(|it| match it {
+            LineIntersection::SinglePoint {
+                intersection: p,
+                is_proper: _,
+            } => Some(p),
+            _ => None,
+        })
+        .ok_or(anyhow::anyhow!("no intersection"))?;
 
-        spans.push(NurbsCurve2D::polyline(&scanned, false));
-
-        let arc = generate_corner_arc(cursor)?;
-        spans.push(arc);
-
-        let v2 = &vertices[cursor + 2];
-        cursor += 2;
-        scanned = vec![v2.inner().clone()];
-    }
-
-    if !scanned.is_empty() {
-        spans.push(NurbsCurve2D::polyline(&scanned, false));
-    }
-
-    Ok(spans)
+    Ok(Point2::new(
+        T::from_f64(it.x).unwrap(),
+        T::from_f64(it.y).unwrap(),
+    ))
 }
 
 impl<'a, T> Offset<'a, T> for NurbsCurve3D<T>
