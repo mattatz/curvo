@@ -1,5 +1,5 @@
 use bevy::{
-    color::palettes::css::{BLUE, GREEN, LIGHT_GREEN, TOMATO, WHITE, YELLOW},
+    color::palettes::css::{BLUE, LIGHT_GREEN, WHITE, YELLOW},
     prelude::*,
     render::camera::ScalingMode,
 };
@@ -89,7 +89,8 @@ impl Plugin for AppPlugin {
 }
 
 fn setup(mut commands: Commands, settings: Res<Setting>) {
-    let points = vec![
+    // s-shape
+    let _points = [
         Point2::new(-1.0, -1.0),
         Point2::new(1.0, -1.0),
         Point2::new(1.0, 1.0),
@@ -99,7 +100,7 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
     ];
 
     // square
-    let points = vec![
+    let _points = [
         Point2::new(-1.0, -1.0),
         Point2::new(1.0, -1.0),
         Point2::new(1.0, 1.0),
@@ -118,19 +119,10 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
         Point2::new(-1.5, 1.),
         Point2::new(-0.5, 1.),
         Point2::new(-0.5, 2.),
-    ];
-
-    /*
-    let mut rng: rand::rngs::StdRng = rand::SeedableRng::from_os_rng();
-    let points = points
-        .into_iter()
-        .map(|p| {
-            let x = p.x + rng.random::<f64>() * 0.5;
-            let y = p.y + rng.random::<f64>() * 0.5;
-            Point2::new(x, y)
-        })
-        .collect_vec();
-    */
+    ]
+    .into_iter()
+    .rev()
+    .collect_vec();
 
     commands.spawn((ControlPoints(points.clone()),));
 
@@ -229,13 +221,8 @@ fn update_ui(
             ui.heading("degree");
             ui.group(|g| {
                 g.horizontal(|ui| {
-                    changed |= ui
-                        .add(
-                            egui::DragValue::new(&mut settings.degree)
-                                .speed(1e-1)
-                                .range(1..=3),
-                        )
-                        .changed();
+                    changed |= ui.selectable_value(&mut settings.degree, 1, "1").changed();
+                    changed |= ui.selectable_value(&mut settings.degree, 3, "3").changed();
                 });
             });
         });
@@ -246,6 +233,7 @@ fn update_ui(
         let mut profile = profile.single_mut().unwrap();
         let n = points.len();
         let is_closed = points[0] == points[n - 1];
+
         profile.0 = if is_closed {
             let points = points.iter().take(n - 1).cloned().collect_vec();
             NurbsCurve2D::try_periodic_interpolate(&points, settings.degree, KnotStyle::Centripetal)
@@ -255,7 +243,6 @@ fn update_ui(
         };
 
         let mut offset_curve = offset_curve.single_mut().unwrap();
-
         let option = CurveOffsetOption::default()
             .with_corner_type(settings.corner_type.clone())
             .with_distance(settings.distance)
@@ -289,18 +276,19 @@ fn gizmos_offset_curve(
         gizmos.sphere(p, 0.025, WHITE);
     });
 
-    let tol = 1e-6;
+    let tol = 1e-7 * 0.5;
 
     let profile = profile.single().unwrap();
-    let curve = profile.0.elevate_dimension();
-    let tess = curve
+    let tess = profile
+        .0
         .tessellate(Some(tol))
         .into_iter()
-        .map(|p| p.cast::<f32>().into())
+        .map(|p| p.coords.cast::<f32>().to_homogeneous().into())
         .collect_vec();
     gizmos.linestrip(tess, WHITE);
 
     let offset_curve = offset_curve.single().unwrap();
+
     offset_curve.0.iter().for_each(|c| {
         let tess = c
             .tessellate(Some(tol))
