@@ -14,10 +14,16 @@ use crate::region::{CompoundCurve, CompoundCurve2D};
 use crate::tessellation::tessellation_curve::tessellate_curve_adaptive;
 use crate::{curve::NurbsCurve, misc::FloatingPoint, offset::Offset};
 
+/// Offset option for NURBS curves
 #[derive(Debug, Clone, PartialEq)]
 pub struct CurveOffsetOption<T> {
+    /// Offset distance
     distance: T,
+    /// Normal tolerance for tessellation
     normal_tolerance: T,
+    /// Knot tolerance for reducing knots
+    knot_tolerance: T,
+    /// Corner type
     corner_type: CurveOffsetCornerType,
 }
 
@@ -26,6 +32,7 @@ impl<T: FloatingPoint> Default for CurveOffsetOption<T> {
         Self {
             distance: T::zero(),
             normal_tolerance: T::from_f64(1e-4).unwrap(),
+            knot_tolerance: T::from_f64(1e-4).unwrap(),
             corner_type: Default::default(),
         }
     }
@@ -39,6 +46,11 @@ impl<T> CurveOffsetOption<T> {
 
     pub fn with_normal_tolerance(mut self, tol: T) -> Self {
         self.normal_tolerance = tol;
+        self
+    }
+
+    pub fn with_knot_tolerance(mut self, tol: T) -> Self {
+        self.knot_tolerance = tol;
         self
     }
 
@@ -95,7 +107,8 @@ where
     fn offset(&'a self, option: Self::Option) -> Self::Output {
         let CurveOffsetOption {
             distance,
-            normal_tolerance: tol,
+            normal_tolerance: norm_tol,
+            knot_tolerance: knot_tol,
             corner_type,
         } = option;
 
@@ -361,7 +374,7 @@ where
 
             Ok(vec![CompoundCurve::new_unchecked_aligned(res)])
         } else {
-            let tess = tessellate_nurbs_curve(self, tol)
+            let tess = tessellate_nurbs_curve(self, norm_tol)
                 .into_iter()
                 .map(|(p, t)| {
                     let t = t.normalize();
@@ -369,7 +382,7 @@ where
                 })
                 .collect_vec();
             let mut res = Self::try_interpolate(&tess, self.degree())?;
-            res.try_reduce_knots(Some(tol))?;
+            res.try_reduce_knots(Some(knot_tol))?;
             Ok(vec![res.into()])
         }
     }
@@ -539,8 +552,8 @@ mod tests {
         let polyline = NurbsCurve2D::polyline(&points, false);
         let option = CurveOffsetOption {
             distance: 0.2,
-            normal_tolerance: 1e-4,
             corner_type: CurveOffsetCornerType::Sharp,
+            ..Default::default()
         };
         let res = polyline.offset(option).unwrap();
         assert_eq!(res.len(), 1);
