@@ -273,7 +273,7 @@ fn gizmos_offset_curve(
     control_points: Query<&ControlPoints>,
     profile: Query<&ProfileCurve>,
     offset_curve: Query<&OffsetCurve>,
-    offset_vertex: Query<&OffsetVertex>,
+    _offset_vertex: Query<&OffsetVertex>,
     mut gizmos: Gizmos,
 ) {
     let points = &control_points.single().unwrap().0;

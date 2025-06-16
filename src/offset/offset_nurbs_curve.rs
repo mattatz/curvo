@@ -8,7 +8,7 @@ use nalgebra::{
 };
 use num_traits::NumCast;
 
-use crate::curve::{NurbsCurve2D, NurbsCurve3D};
+use crate::curve::NurbsCurve2D;
 use crate::offset::CurveOffsetCornerType;
 use crate::region::{CompoundCurve, CompoundCurve2D};
 use crate::tessellation::tessellation_curve::tessellate_curve_adaptive;
@@ -397,7 +397,8 @@ impl<T: FloatingPoint> PointSegment<T> {
         }
     }
 
-    fn to_vertex_segment(self, start: Vertex<T>, end: Vertex<T>) -> VertexSegment<T> {
+    /// Convert a point segment to a vertex segment
+    fn to_vertex_segment(&self, start: Vertex<T>, end: Vertex<T>) -> VertexSegment<T> {
         VertexSegment {
             start,
             end,
@@ -486,35 +487,9 @@ fn find_corner_intersection<T: FloatingPoint>(
     ))
 }
 
-impl<'a, T> Offset<'a, T> for NurbsCurve3D<T>
-where
-    T: FloatingPoint,
-{
-    type Output = Self;
-    type Option = CurveOffsetOption<T>;
-
-    /// Offset the NURBS curve by a given distance with a given epsilon
-    fn offset(&'a self, option: Self::Option) -> Self::Output {
-        let CurveOffsetOption {
-            distance,
-            normal_tolerance: epsilon,
-            corner_type,
-        } = option;
-
-        let tess = tessellate_nurbs_curve(self, epsilon);
-        let offset = tess
-            .into_iter()
-            .map(|(p, tangent)| {
-                let normal = tangent;
-                p + normal * distance
-            })
-            .collect_vec();
-
-        todo!()
-    }
-}
-
-fn tessellate_nurbs_curve<T: FloatingPoint, D: DimName>(
+/// tessellate the NURBS curve & return the points and tangent vectors
+#[allow(clippy::type_complexity)]
+fn tessellate_nurbs_curve<T, D>(
     curve: &NurbsCurve<T, D>,
     normal_tolerance: T,
 ) -> Vec<(
@@ -522,6 +497,8 @@ fn tessellate_nurbs_curve<T: FloatingPoint, D: DimName>(
     OVector<T, DimNameDiff<D, U1>>,
 )>
 where
+    T: FloatingPoint,
+    D: DimName,
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
@@ -546,7 +523,10 @@ fn to_line_helper<T: FloatingPoint>(p0: &Point2<T>, p1: &Point2<T>) -> geo::Line
 mod tests {
     use nalgebra::Point2;
 
-    use crate::curve::NurbsCurve2D;
+    use crate::{
+        curve::NurbsCurve2D,
+        offset::{CurveOffsetCornerType, CurveOffsetOption, Offset},
+    };
 
     #[test]
     fn offset_nurbs_curve() {
@@ -557,8 +537,27 @@ mod tests {
             Point2::new(0.0, 1.0),
         ];
         let polyline = NurbsCurve2D::polyline(&points, false);
-        let knots = polyline.knots().to_vec();
-        let n = knots.len();
-        let knots = knots[1..n - 1].to_vec(); // remove the first and last knot
+        let option = CurveOffsetOption {
+            distance: 0.2,
+            normal_tolerance: 1e-4,
+            corner_type: CurveOffsetCornerType::Sharp,
+        };
+        let res = polyline.offset(option).unwrap();
+        assert_eq!(res.len(), 1);
+        let curve = &res[0];
+        let spans = curve.spans();
+        assert_eq!(spans.len(), 1);
+        let span = &spans[0];
+        let pts = span.dehomogenized_control_points();
+        assert_eq!(pts.len(), 4);
+        assert_eq!(
+            pts,
+            vec![
+                Point2::new(0.0, -0.2),
+                Point2::new(1.2, -0.2),
+                Point2::new(1.2, 1.2),
+                Point2::new(0.0, 1.2),
+            ]
+        );
     }
 }

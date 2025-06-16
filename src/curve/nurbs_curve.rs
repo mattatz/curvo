@@ -1880,7 +1880,7 @@ where
                 .collect();
 
             // Sort by multiplicity (descending) to prioritize removing high-multiplicity knots
-            candidates.sort_by(|a, b| b.multiplicity().cmp(&a.multiplicity()));
+            candidates.sort_by_key(|m| std::cmp::Reverse(m.multiplicity()));
 
             for mult_info in candidates {
                 let knot = *mult_info.knot();
