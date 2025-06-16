@@ -309,8 +309,16 @@ where
                         let v2 = &next.start;
                         let v3 = &next.end;
 
-                        let d10 = (v1.inner() - v0.inner()).normalize() * d;
-                        let d32 = (v3.inner() - v2.inner()).normalize() * d;
+                        let d10 = if v1.inner() == v0.inner() {
+                            Vector2::zeros()
+                        } else {
+                            (v1.inner() - v0.inner()).normalize() * d
+                        };
+                        let d32 = if v3.inner() == v2.inner() {
+                            Vector2::zeros()
+                        } else {
+                            (v3.inner() - v2.inner()).normalize() * d
+                        };
 
                         // create arc between v1 and v2
                         let bezier = NurbsCurve2D::bezier(&[

@@ -13,7 +13,6 @@ use bevy_points::{
     plugin::PointsPlugin,
 };
 use itertools::Itertools;
-use misc::add_curve;
 use nalgebra::Point2;
 
 use curvo::prelude::*;
@@ -25,7 +24,7 @@ use materials::*;
 use misc::*;
 use rand::Rng;
 
-#[derive(Resource)]
+#[derive(Resource, Debug)]
 struct Setting {
     pub corner_type: CurveOffsetCornerType,
     pub distance: f64,
@@ -35,11 +34,13 @@ struct Setting {
 impl Default for Setting {
     fn default() -> Self {
         Self {
+            // corner_type: CurveOffsetCornerType::Sharp,
             // corner_type: CurveOffsetCornerType::Round,
-            corner_type: CurveOffsetCornerType::Sharp,
-            distance: 0.2,
-            // distance: -0.2,
+            corner_type: CurveOffsetCornerType::Smooth,
+            // distance: 0.2,
+            distance: 2.0,
             degree: 1,
+            // distance: -0.2,
         }
     }
 }
@@ -102,6 +103,7 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
         Point2::new(1.0, 3.0),
     ];
 
+    /*
     let points = vec![
         Point2::new(-1.0, -1.0),
         Point2::new(1.0, -1.0),
@@ -109,6 +111,7 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
         Point2::new(-1.0, 1.0),
         Point2::new(-1.0, -1.0),
     ];
+    */
 
     /*
     let mut rng: rand::rngs::StdRng = rand::SeedableRng::from_os_rng();
@@ -150,7 +153,10 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
             ..OrthographicProjection::default_3d()
         }),
         Transform::from_translation(Vec3::new(0., 0., 3.)).looking_at(Vec3::ZERO, Vec3::Y),
-        PanOrbitCamera::default(),
+        PanOrbitCamera {
+            orbit_sensitivity: 0.0,
+            ..Default::default()
+        },
     ));
 }
 
@@ -242,6 +248,7 @@ fn update_ui(
         };
 
         let mut offset_curve = offset_curve.single_mut().unwrap();
+
         let option = CurveOffsetOption::default()
             .with_corner_type(settings.corner_type.clone())
             .with_distance(settings.distance)
@@ -251,6 +258,7 @@ fn update_ui(
             offset_curve.update(res);
         }
 
+        /*
         let option = CurveOffsetOption::default()
             .with_corner_type(CurveOffsetCornerType::None)
             .with_distance(settings.distance)
@@ -259,6 +267,7 @@ fn update_ui(
         if let Ok(res) = res {
             offset_vertex.single_mut().unwrap().0 = res;
         }
+        */
     }
 }
 
@@ -275,10 +284,12 @@ fn gizmos_offset_curve(
         gizmos.sphere(p, 0.025, WHITE);
     });
 
+    let tol = 1e-6;
+
     let profile = profile.single().unwrap();
     let curve = profile.0.elevate_dimension();
     let tess = curve
-        .tessellate(Some(1e-8))
+        .tessellate(Some(tol))
         .into_iter()
         .map(|p| p.cast::<f32>().into())
         .collect_vec();
@@ -286,19 +297,18 @@ fn gizmos_offset_curve(
 
     let offset_curve = offset_curve.single().unwrap();
     offset_curve.0.iter().for_each(|c| {
-        c.spans().iter().for_each(|span| {
-            let c = span.elevate_dimension();
+        c.spans().iter().enumerate().for_each(|(i, c)| {
             let tess = c
-                .tessellate(Some(1e-8))
+                .tessellate(Some(tol))
                 .into_iter()
-                .map(|p| p.cast::<f32>().into())
+                .map(|p| p.coords.cast::<f32>().to_homogeneous().into())
                 .collect_vec();
-            gizmos.linestrip(tess, WHITE);
+            gizmos.linestrip(tess, YELLOW);
 
             let pts = c.dehomogenized_control_points();
             pts.iter().for_each(|p| {
-                let p: Vec3 = p.cast::<f32>().into();
-                gizmos.sphere(p, 0.025, WHITE);
+                let p: Vec3 = p.coords.cast::<f32>().to_homogeneous().into();
+                gizmos.sphere(p, 0.025, YELLOW);
             });
         });
     });
