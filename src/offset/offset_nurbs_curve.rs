@@ -106,7 +106,7 @@ impl<'a, T> Offset<'a, T> for NurbsCurve2D<T>
 where
     T: FloatingPoint,
 {
-    type Output = anyhow::Result<CompoundCurve2D<T>>;
+    type Output = anyhow::Result<Vec<CompoundCurve2D<T>>>;
     type Option = CurveOffsetOption<T>;
 
     /// Offset the NURBS curve by a given distance with a given epsilon
@@ -117,21 +117,11 @@ where
             corner_type,
         } = option;
 
-        let tess = tessellate_nurbs_curve(self, tol);
-        let offset = tess
-            .into_iter()
-            .map(|(p, tangent)| {
-                let t = tangent.normalize();
-                let normal = Vector2::new(t.y, -t.x);
-                p + normal * distance
-            })
-            .collect_vec();
-
         let is_closed = self.is_closed();
 
         if self.degree() == 1 {
             let pts = self.dehomogenized_control_points();
-            let segments = pts
+            let p_segments = pts
                 .windows(2)
                 .map(|w| {
                     let p0 = &w[0];
@@ -146,12 +136,18 @@ where
                 })
                 .collect_vec();
 
+            if matches!(corner_type, CurveOffsetCornerType::None) {
+                return Ok(p_segments.into_iter().map(|s| {
+                    NurbsCurve2D::polyline(&[s.start.into(), s.end.into()], false).into()
+                }).collect_vec());
+            }
+
             let n = if is_closed {
-                segments.len() + 1
+                p_segments.len() + 1
             } else {
-                segments.len()
+                p_segments.len()
             };
-            let intersections = segments
+            let intersections = p_segments
                 .iter()
                 .cycle()
                 .take(n)
@@ -166,8 +162,8 @@ where
                 })
                 .collect_vec();
 
-            let slen = segments.len();
-            let segments = segments
+            let slen = p_segments.len();
+            let segments = p_segments
                 .into_iter()
                 .enumerate()
                 .map(|(i, s)| {
@@ -197,8 +193,10 @@ where
                 })
                 .collect_vec();
 
-            return match corner_type {
-                CurveOffsetCornerType::None => Ok(Self::polyline(&offset, false).into()),
+            let spans = match corner_type {
+                CurveOffsetCornerType::None => {
+                    unreachable!()
+                },
                 CurveOffsetCornerType::Sharp => {
                     let delta = distance.abs() * T::from_f64(2.0).unwrap();
                     let spans = try_connect(&segments, |cursor| {
@@ -217,7 +215,7 @@ where
                             false,
                         )))
                     })?;
-                    Ok(CompoundCurve::new_unchecked(spans))
+                    spans
                 }
                 CurveOffsetCornerType::Round => {
                     let spans = try_connect(&segments, |cursor| {
@@ -252,7 +250,7 @@ where
                         )?;
                         Ok(Some(arc))
                     })?;
-                    Ok(CompoundCurve::new_unchecked(spans))
+                    spans
                 }
                 CurveOffsetCornerType::Smooth => {
                     let frac_2_3 = T::from_f64(2.0 / 3.0).unwrap();
@@ -281,7 +279,7 @@ where
                         ]);
                         Ok(Some(bezier))
                     })?;
-                    Ok(CompoundCurve::new_unchecked(spans))
+                    spans
                 }
                 CurveOffsetCornerType::Chamfer => {
                     let spans = try_connect(&segments, |cursor| {
@@ -294,10 +292,50 @@ where
                         let v2 = next.start.clone();
                         Ok(Some(NurbsCurve2D::polyline(&[v1.into(), v2.into()], false)))
                     })?;
-                    Ok(CompoundCurve::new_unchecked(spans))
+                    spans
                 }
             };
+
+            if spans.iter().all(|c| c.degree() == 1) {
+                let pts = spans.into_iter().map(|c| c.dehomogenized_control_points()).flatten().collect_vec();
+                let pts = pts.windows(2).filter_map(|w| {
+                    let p0 = w[0];
+                    let p1 = w[1];
+                    if p0 != p1 {
+                        Some(p0)
+                    } else {
+                        None
+                    }
+                }).chain(vec![pts.last().unwrap().clone()]).collect_vec();
+
+                let thres = T::one() - T::from_f64(1e-6).unwrap();
+                let trimmed = pts.windows(3).filter_map(|w| {
+                    if w.len() == 3 {
+                        let p0 = w[0];
+                        let p1 = w[1];
+                        let p2 = w[2];
+                        let d10 = (p1 - p0).normalize();
+                        let d21 = (p2 - p1).normalize();
+                        let dot = d10.dot(&d21);
+                        if dot > thres {
+                            None
+                        } else {
+                            Some(p1.clone())
+                        }
+                    } else {
+                        w.last().cloned()
+                    }
+                }).collect_vec();
+
+                let h = pts.first().ok_or(anyhow::anyhow!("no head"))?;
+                let t = pts.last().ok_or(anyhow::anyhow!("no tail"))?;
+                let pts = vec![h.clone()].into_iter().chain(trimmed).chain(vec![t.clone()].into_iter()).collect_vec();
+                return Ok(vec![NurbsCurve2D::polyline(&pts, false).into()]);
+            } else {
+                return Ok(vec![CompoundCurve::new_unchecked(spans)]);
+            }
         } else {
+            let tess = tessellate_nurbs_curve(self, tol);
         };
 
         todo!()
@@ -455,24 +493,11 @@ where
     DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
-    if curve.degree() == 1 {
-        let pts = curve.dehomogenized_control_points();
-        pts.windows(2)
-            .map(|w| {
-                let p0 = &w[0];
-                let p1 = &w[1];
-                let tangent = p1 - p0;
-                [(p0.clone(), tangent.clone()), (p1.clone(), tangent)]
-            })
-            .flatten()
-            .collect()
-    } else {
-        let mut rng = rand::rng();
-        let (start, end) = curve.knots_domain();
-        tessellate_curve_adaptive(curve, start, end, normal_tolerance, &mut rng, &|t, p| {
-            (p, curve.tangent_at(t))
-        })
-    }
+    let mut rng = rand::rng();
+    let (start, end) = curve.knots_domain();
+    tessellate_curve_adaptive(curve, start, end, normal_tolerance, &mut rng, &|t, p| {
+        (p, curve.tangent_at(t))
+    })
 }
 
 /// Convert a line segment to a geo::Line
