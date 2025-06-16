@@ -2,7 +2,8 @@ pub mod offset_nurbs_curve;
 pub use offset_nurbs_curve::*;
 
 /// Corner type for offsetting NURBS curves
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum CurveOffsetCornerType {
     /// Just offset the curve segments
     None,
