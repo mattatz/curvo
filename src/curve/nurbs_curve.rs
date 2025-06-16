@@ -1818,6 +1818,91 @@ where
             knots: self.knots.cast(),
         }
     }
+
+    /// Try to reduce knots of the curve as much as possible
+    /// Returns the total number of knots removed
+    /// `tolerance` defines the acceptable deviation in the curve's shape.
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::Point3;
+    ///
+    /// // Create a curve with redundant knots
+    /// let points = vec![
+    ///     Point3::new(0., 0., 0.),
+    ///     Point3::new(1., 0., 0.),
+    ///     Point3::new(2., 0., 0.),
+    ///     Point3::new(3., 1., 0.),
+    ///     Point3::new(4., 2., 0.),
+    /// ];
+    /// let mut curve = NurbsCurve3D::polyline(&points, false);
+    ///
+    /// // Add some redundant knots
+    /// curve.try_add_knot(0.5).unwrap();
+    /// curve.try_add_knot(1.5).unwrap();
+    /// curve.try_add_knot(2.5).unwrap();
+    ///
+    /// let original_knot_count = curve.knots().len();
+    /// let original_control_point_count = curve.control_points().len();
+    ///
+    /// // Reduce knots
+    /// let removed_count = curve.try_reduce_knots(Some(1e-6)).unwrap();
+    ///
+    /// let final_knot_count = curve.knots().len();
+    /// let final_control_point_count = curve.control_points().len();
+    ///
+    /// // Verify that knots and control points were reduced
+    /// assert!(final_knot_count < original_knot_count);
+    /// assert!(final_control_point_count <= original_control_point_count);
+    /// assert!(removed_count > 0);
+    /// ```
+    pub fn try_reduce_knots(&mut self, tolerance: Option<T>) -> anyhow::Result<usize> {
+        let tolerance = tolerance.unwrap_or(T::from_f64(1e-6).unwrap());
+        let mut total_removed = 0;
+        let mut changed = true;
+
+        // Continue until no more knots can be removed
+        while changed {
+            changed = false;
+            let multiplicities = self.knots.multiplicity();
+
+            // Try to remove knots starting from those with highest multiplicity
+            // and avoid the first and last knots (domain boundaries)
+            let mut candidates: Vec<_> = multiplicities
+                .iter()
+                .filter(|m| {
+                    let knot = *m.knot();
+                    let first_knot = self.knots.first();
+                    let last_knot = self.knots.last();
+                    // Skip boundary knots and knots with multiplicity 0
+                    knot != first_knot && knot != last_knot && m.multiplicity() > 0
+                })
+                .collect();
+
+            // Sort by multiplicity (descending) to prioritize removing high-multiplicity knots
+            candidates.sort_by(|a, b| b.multiplicity().cmp(&a.multiplicity()));
+
+            for mult_info in candidates {
+                let knot = *mult_info.knot();
+
+                // Try to remove this knot as many times as possible
+                let mut local_removed = 0;
+                loop {
+                    match self.try_remove_knot(knot, Some(tolerance)) {
+                        Ok(removed) if removed > 0 => {
+                            local_removed += removed;
+                            changed = true;
+                        }
+                        _ => break, // Can't remove this knot anymore
+                    }
+                }
+
+                total_removed += local_removed;
+            }
+        }
+
+        Ok(total_removed)
+    }
 }
 
 /// Enable to transform a NURBS curve by a given DxD matrix

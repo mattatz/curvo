@@ -386,7 +386,8 @@ where
                     offset(&p, &t)
                 })
                 .collect_vec();
-            let res = Self::try_interpolate(&tess, self.degree())?;
+            let mut res = Self::try_interpolate(&tess, self.degree())?;
+            res.try_reduce_knots(Some(tol))?;
             return Ok(vec![res.into()]);
         };
     }
