@@ -119,6 +119,12 @@ where
 
         let is_closed = self.is_closed();
 
+        let offset = |point: &Point2<T>, t: &Vector2<T>| {
+            let normal = Vector2::new(t.y, -t.x);
+            let d = normal * distance;
+            point + d
+        };
+
         if self.degree() == 1 {
             let pts = self.dehomogenized_control_points();
             let p_segments = pts
@@ -128,18 +134,17 @@ where
                     let p1 = &w[1];
                     let tangent = p1 - p0;
                     let t = tangent.normalize();
-                    let normal = Vector2::new(t.y, -t.x);
-                    let d = normal * distance;
-                    let start = p0 + d;
-                    let end = p1 + d;
+                    let start = offset(p0, &t);
+                    let end = offset(p1, &t);
                     PointSegment::new(start, end)
                 })
                 .collect_vec();
 
             if matches!(corner_type, CurveOffsetCornerType::None) {
-                return Ok(p_segments.into_iter().map(|s| {
-                    NurbsCurve2D::polyline(&[s.start.into(), s.end.into()], false).into()
-                }).collect_vec());
+                return Ok(p_segments
+                    .into_iter()
+                    .map(|s| NurbsCurve2D::polyline(&[s.start.into(), s.end.into()], false).into())
+                    .collect_vec());
             }
 
             let n = if is_closed {
@@ -196,13 +201,15 @@ where
             let spans = match corner_type {
                 CurveOffsetCornerType::None => {
                     unreachable!()
-                },
+                }
                 CurveOffsetCornerType::Sharp => {
                     let delta = distance.abs() * T::from_f64(2.0).unwrap();
 
                     let n = segments.len();
-                    let pts = segments.iter().enumerate().map(|(i, s)| {
-                        match s.start {
+                    let pts = segments
+                        .iter()
+                        .enumerate()
+                        .map(|(i, s)| match s.start {
                             Vertex::Point(p) => {
                                 let prev = if i != 0 || is_closed {
                                     Some(&segments[(i + n - 1) % n])
@@ -215,15 +222,16 @@ where
                                         let v1 = prev.end.clone();
                                         let v2 = s.start.clone();
                                         let v3 = s.end.clone();
-                                        let it = find_corner_intersection([&v0, &v1, &v2, &v3], delta)?;
+                                        let it =
+                                            find_corner_intersection([&v0, &v1, &v2, &v3], delta)?;
                                         Ok(it)
-                                    },
-                                    _ => Ok(p)
+                                    }
+                                    _ => Ok(p),
                                 }
                             }
                             Vertex::Intersection(p) => Ok(p),
-                        }
-                    }).collect::<anyhow::Result<Vec<_>>>()?;
+                        })
+                        .collect::<anyhow::Result<Vec<_>>>()?;
 
                     let last = segments.last();
                     let last = if let Some(last) = last {
@@ -234,17 +242,17 @@ where
                                 } else {
                                     Some(*p)
                                 }
-                            },
-                            _ => {
-                                None
                             }
+                            _ => None,
                         }
                     } else {
                         None
                     };
 
                     let pts = if let Some(last) = last {
-                        pts.into_iter().chain(vec![last.clone()].into_iter()).collect_vec()
+                        pts.into_iter()
+                            .chain(vec![last.clone()].into_iter())
+                            .collect_vec()
                     } else {
                         pts
                     };
@@ -335,9 +343,11 @@ where
             let mut cursor = None;
 
             let connect = |i: usize, j: usize| {
-                let pts = spans[i..j].iter().flat_map(|c| {
-                    c.dehomogenized_control_points()
-                }).dedup().collect_vec();
+                let pts = spans[i..j]
+                    .iter()
+                    .flat_map(|c| c.dehomogenized_control_points())
+                    .dedup()
+                    .collect_vec();
                 NurbsCurve2D::polyline(&pts, false)
             };
 
@@ -369,10 +379,16 @@ where
 
             return Ok(vec![CompoundCurve::new_unchecked_aligned(res)]);
         } else {
-            let tess = tessellate_nurbs_curve(self, tol);
+            let tess = tessellate_nurbs_curve(self, tol)
+                .into_iter()
+                .map(|(p, t)| {
+                    let t = t.normalize();
+                    offset(&p, &t)
+                })
+                .collect_vec();
+            let res = Self::try_interpolate(&tess, self.degree())?;
+            return Ok(vec![res.into()]);
         };
-
-        todo!()
     }
 }
 

@@ -92,10 +92,7 @@ impl Plugin for AppPlugin {
     }
 }
 
-fn setup(
-    mut commands: Commands,
-    settings: Res<Setting>,
-) {
+fn setup(mut commands: Commands, settings: Res<Setting>) {
     let points = vec![
         Point2::new(-1.0, -1.0),
         Point2::new(1.0, -1.0),
@@ -105,7 +102,6 @@ fn setup(
         Point2::new(1.0, 3.0),
     ];
 
-    /*
     let points = vec![
         Point2::new(-1.0, -1.0),
         Point2::new(1.0, -1.0),
@@ -113,7 +109,6 @@ fn setup(
         Point2::new(-1.0, 1.0),
         Point2::new(-1.0, -1.0),
     ];
-    */
 
     /*
     let mut rng: rand::rngs::StdRng = rand::SeedableRng::from_os_rng();
@@ -160,7 +155,8 @@ fn setup(
 }
 
 fn update_ui(
-    mut contexts: EguiContexts, mut settings: ResMut<Setting>,
+    mut contexts: EguiContexts,
+    mut settings: ResMut<Setting>,
     control_points: Query<&ControlPoints>,
     mut profile: Query<&mut ProfileCurve>,
     mut offset_curve: Query<&mut OffsetCurve>,
@@ -177,69 +173,93 @@ fn update_ui(
             ui.heading("corner type");
             ui.group(|g| {
                 g.horizontal(|ui| {
-                    changed |= ui.selectable_value(
-                        &mut settings.corner_type,
-                        CurveOffsetCornerType::Sharp,
-                        "Sharp",
-                    ).changed();
-                    changed |= ui.selectable_value(
-                        &mut settings.corner_type,
-                        CurveOffsetCornerType::Round,
-                        "Round",
-                    ).changed();
-                    changed |= ui.selectable_value(
-                        &mut settings.corner_type,
-                        CurveOffsetCornerType::Smooth,
-                        "Smooth",
-                    ).changed();
-                    changed |= ui.selectable_value(
-                        &mut settings.corner_type,
-                        CurveOffsetCornerType::Chamfer,
-                        "Chamfer",
-                    ).changed();
+                    changed |= ui
+                        .selectable_value(
+                            &mut settings.corner_type,
+                            CurveOffsetCornerType::Sharp,
+                            "Sharp",
+                        )
+                        .changed();
+                    changed |= ui
+                        .selectable_value(
+                            &mut settings.corner_type,
+                            CurveOffsetCornerType::Round,
+                            "Round",
+                        )
+                        .changed();
+                    changed |= ui
+                        .selectable_value(
+                            &mut settings.corner_type,
+                            CurveOffsetCornerType::Smooth,
+                            "Smooth",
+                        )
+                        .changed();
+                    changed |= ui
+                        .selectable_value(
+                            &mut settings.corner_type,
+                            CurveOffsetCornerType::Chamfer,
+                            "Chamfer",
+                        )
+                        .changed();
                 });
             });
 
             ui.heading("distance");
             ui.group(|g| {
                 g.horizontal(|ui| {
-                    changed |= ui.add(egui::DragValue::new(&mut settings.distance).speed(1e-2)).changed();
+                    changed |= ui
+                        .add(egui::DragValue::new(&mut settings.distance).speed(1e-2))
+                        .changed();
                 });
             });
 
             ui.heading("degree");
             ui.group(|g| {
                 g.horizontal(|ui| {
-                    changed |= ui.add(egui::DragValue::new(&mut settings.degree).speed(1e-1).range(1..=3)).changed();
+                    changed |= ui
+                        .add(
+                            egui::DragValue::new(&mut settings.degree)
+                                .speed(1e-1)
+                                .range(1..=3),
+                        )
+                        .changed();
                 });
             });
         });
 
-        if changed {
-            let points = &control_points.single().unwrap().0;
+    if changed {
+        let points = &control_points.single().unwrap().0;
 
-            let mut profile = profile.single_mut().unwrap();
-            profile.0 = NurbsCurve2D::try_interpolate(points, settings.degree).unwrap();
+        let mut profile = profile.single_mut().unwrap();
+        let n = points.len();
+        let is_closed = points[0] == points[n - 1];
+        profile.0 = if is_closed {
+            let points = points.iter().take(n - 1).cloned().collect_vec();
+            NurbsCurve2D::try_periodic_interpolate(&points, settings.degree, KnotStyle::Centripetal)
+                .unwrap()
+        } else {
+            NurbsCurve2D::try_interpolate(points, settings.degree).unwrap()
+        };
 
-            let mut offset_curve = offset_curve.single_mut().unwrap();
-            let option = CurveOffsetOption::default()
-                .with_corner_type(settings.corner_type.clone())
-                .with_distance(settings.distance)
-                .with_normal_tolerance(1e-4);
-            let res = profile.0.offset(option);
-            if let Ok(res) = res {
-                offset_curve.update(res);
-            }
-
-            let option = CurveOffsetOption::default()
-                .with_corner_type(CurveOffsetCornerType::None)
-                .with_distance(settings.distance)
-                .with_normal_tolerance(1e-4);
-            let res = profile.0.offset(option);
-            if let Ok(res) = res {
-                offset_vertex.single_mut().unwrap().0 = res;
-            }
+        let mut offset_curve = offset_curve.single_mut().unwrap();
+        let option = CurveOffsetOption::default()
+            .with_corner_type(settings.corner_type.clone())
+            .with_distance(settings.distance)
+            .with_normal_tolerance(1e-4);
+        let res = profile.0.offset(option);
+        if let Ok(res) = res {
+            offset_curve.update(res);
         }
+
+        let option = CurveOffsetOption::default()
+            .with_corner_type(CurveOffsetCornerType::None)
+            .with_distance(settings.distance)
+            .with_normal_tolerance(1e-4);
+        let res = profile.0.offset(option);
+        if let Ok(res) = res {
+            offset_vertex.single_mut().unwrap().0 = res;
+        }
+    }
 }
 
 fn gizmos_offset_curve(
