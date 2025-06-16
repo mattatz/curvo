@@ -1,5 +1,5 @@
 use bevy::{
-    color::palettes::css::{BLUE, TOMATO, WHITE, YELLOW},
+    color::palettes::css::{BLUE, GREEN, LIGHT_GREEN, TOMATO, WHITE, YELLOW},
     prelude::*,
     render::camera::ScalingMode,
 };
@@ -98,7 +98,7 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
         Point2::new(1.0, 3.0),
     ];
 
-    /*
+    // square
     let points = vec![
         Point2::new(-1.0, -1.0),
         Point2::new(1.0, -1.0),
@@ -106,7 +106,19 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
         Point2::new(-1.0, 1.0),
         Point2::new(-1.0, -1.0),
     ];
-    */
+
+    // convex polygon
+    let points = vec![
+        Point2::new(-0.5, 2.),
+        Point2::new(0.5, 2.),
+        Point2::new(0.5, 1.),
+        Point2::new(1.5, 1.),
+        Point2::new(1.5, -1.),
+        Point2::new(-1.5, -1.),
+        Point2::new(-1.5, 1.),
+        Point2::new(-0.5, 1.),
+        Point2::new(-0.5, 2.),
+    ];
 
     /*
     let mut rng: rand::rngs::StdRng = rand::SeedableRng::from_os_rng();
@@ -296,9 +308,11 @@ fn gizmos_offset_curve(
             .map(|p| p.coords.cast::<f32>().to_homogeneous().into())
             .collect_vec();
         let n = tess.len();
+        let c0 = Oklaba::from(YELLOW);
+        let c1 = Oklaba::from(BLUE);
         let pts = tess.into_iter().enumerate().map(|(i, p)| {
             let t = (i as f32) / (n as f32);
-            let c = YELLOW * (1. - t) + BLUE * t;
+            let c = c0.mix(&c1, t);
             (p, c)
         });
         gizmos.linestrip_gradient(pts);
@@ -308,7 +322,7 @@ fn gizmos_offset_curve(
             .flat_map(|c| c.dehomogenized_control_points())
             .for_each(|p| {
                 let p: Vec3 = p.coords.cast::<f32>().to_homogeneous().into();
-                gizmos.sphere(p, 0.025, YELLOW);
+                gizmos.sphere(p, 0.035, LIGHT_GREEN);
             });
     });
 
