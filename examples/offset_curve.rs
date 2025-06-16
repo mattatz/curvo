@@ -1,5 +1,5 @@
 use bevy::{
-    color::palettes::css::{TOMATO, WHITE, YELLOW},
+    color::palettes::css::{BLUE, TOMATO, WHITE, YELLOW},
     prelude::*,
     render::camera::ScalingMode,
 };
@@ -295,7 +295,13 @@ fn gizmos_offset_curve(
             .into_iter()
             .map(|p| p.coords.cast::<f32>().to_homogeneous().into())
             .collect_vec();
-        gizmos.linestrip(tess, YELLOW);
+        let n = tess.len();
+        let pts = tess.into_iter().enumerate().map(|(i, p)| {
+            let t = (i as f32) / (n as f32);
+            let c = YELLOW * (1. - t) + BLUE * t;
+            (p, c)
+        });
+        gizmos.linestrip_gradient(pts);
 
         c.spans()
             .iter()
@@ -306,6 +312,7 @@ fn gizmos_offset_curve(
             });
     });
 
+    /*
     let offset_vertex = offset_vertex.single().unwrap();
     offset_vertex.0.iter().for_each(|c| {
         let tess = c
@@ -315,4 +322,5 @@ fn gizmos_offset_curve(
             .collect_vec();
         gizmos.linestrip(tess, TOMATO);
     });
+    */
 }

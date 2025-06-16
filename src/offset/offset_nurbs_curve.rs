@@ -356,7 +356,6 @@ where
             let n = spans.len();
             for i in 0..n {
                 if spans[i].degree() != 1 {
-                    res.push(spans[i].clone());
                     if let Some(cursor) = cursor {
                         let m = i.saturating_sub(cursor);
                         if m > 0 {
@@ -364,6 +363,7 @@ where
                             res.push(polyline);
                         }
                     }
+                    res.push(spans[i].clone());
                     cursor = None;
                 } else if cursor.is_none() {
                     cursor = Some(i);
