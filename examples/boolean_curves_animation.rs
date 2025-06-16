@@ -130,7 +130,7 @@ fn boolean(
     let trans = Translation2::new(delta.cos(), 0.) * Rotation2::new(delta);
     // let trans = Translation2::new(delta.cos(), 0.);
 
-    if let Ok(profile) = profile.get_single() {
+    if let Ok(profile) = profile.single() {
         let subject = &profile.0;
         let clip = profile.1.transformed(&trans.into());
         let tr = Transform::from_xyz(0., 5., 0.);

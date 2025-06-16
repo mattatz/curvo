@@ -1,5 +1,5 @@
 use bevy::{
-    color::palettes::css::{WHITE, YELLOW},
+    color::palettes::css::{TOMATO, WHITE, YELLOW},
     prelude::*,
     render::camera::ScalingMode,
 };
@@ -161,7 +161,7 @@ fn update_ui(
     control_points: Query<&ControlPoints>,
     mut profile: Query<&mut ProfileCurve>,
     mut offset_curve: Query<&mut OffsetCurve>,
-    offset_vertex: Query<&mut OffsetVertex>,
+    mut offset_vertex: Query<&mut OffsetVertex>,
 ) {
     let mut changed = false;
     egui::Window::new("offset curve")
@@ -253,7 +253,6 @@ fn update_ui(
             offset_curve.update(res);
         }
 
-        /*
         let option = CurveOffsetOption::default()
             .with_corner_type(CurveOffsetCornerType::None)
             .with_distance(settings.distance)
@@ -262,7 +261,6 @@ fn update_ui(
         if let Ok(res) = res {
             offset_vertex.single_mut().unwrap().0 = res;
         }
-        */
     }
 }
 
@@ -292,32 +290,29 @@ fn gizmos_offset_curve(
 
     let offset_curve = offset_curve.single().unwrap();
     offset_curve.0.iter().for_each(|c| {
-        c.spans().iter().enumerate().for_each(|(i, c)| {
-            let tess = c
-                .tessellate(Some(tol))
-                .into_iter()
-                .map(|p| p.coords.cast::<f32>().to_homogeneous().into())
-                .collect_vec();
-            gizmos.linestrip(tess, YELLOW);
+        let tess = c
+            .tessellate(Some(tol))
+            .into_iter()
+            .map(|p| p.coords.cast::<f32>().to_homogeneous().into())
+            .collect_vec();
+        gizmos.linestrip(tess, YELLOW);
 
-            let pts = c.dehomogenized_control_points();
-            pts.iter().for_each(|p| {
+        c.spans()
+            .iter()
+            .flat_map(|c| c.dehomogenized_control_points())
+            .for_each(|p| {
                 let p: Vec3 = p.coords.cast::<f32>().to_homogeneous().into();
                 gizmos.sphere(p, 0.025, YELLOW);
             });
-        });
     });
 
-    /*
     let offset_vertex = offset_vertex.single().unwrap();
-    offset_vertex.0.spans().iter().for_each(|span| {
-        let c = span.elevate_dimension();
+    offset_vertex.0.iter().for_each(|c| {
         let tess = c
-            .tessellate(None)
+            .tessellate(Some(tol))
             .into_iter()
-            .map(|p| p.cast::<f32>().into())
+            .map(|p| p.coords.cast::<f32>().to_homogeneous().into())
             .collect_vec();
-        gizmos.linestrip(tess, YELLOW);
+        gizmos.linestrip(tess, TOMATO);
     });
-    */
 }
