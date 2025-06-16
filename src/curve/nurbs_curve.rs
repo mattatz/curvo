@@ -6,7 +6,8 @@ use gauss_quad::GaussLegendre;
 use itertools::Itertools;
 use nalgebra::allocator::Allocator;
 use nalgebra::{
-    Const, DMatrix, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff, DimNameSub, OMatrix, OPoint, OVector, RealField, Rotation3, UnitVector3, Vector3, U1,
+    Const, DMatrix, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff, DimNameSub,
+    OMatrix, OPoint, OVector, RealField, Rotation3, UnitVector3, Vector3, U1,
 };
 use simba::scalar::SupersetOf;
 

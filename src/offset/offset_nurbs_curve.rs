@@ -250,9 +250,7 @@ where
                     };
 
                     let pts = if let Some(last) = last {
-                        pts.into_iter()
-                            .chain(vec![last])
-                            .collect_vec()
+                        pts.into_iter().chain(vec![last]).collect_vec()
                     } else {
                         pts
                     };
@@ -260,7 +258,6 @@ where
                     return Ok(vec![NurbsCurve2D::polyline(&pts, false).into()]);
                 }
                 CurveOffsetCornerType::Round => {
-                    
                     try_connect(&segments, |cursor| {
                         let cur = &segments[cursor];
                         if cursor == segments.len() - 1 && !is_closed {
@@ -297,7 +294,7 @@ where
                 CurveOffsetCornerType::Smooth => {
                     let frac_2_3 = T::from_f64(2.0 / 3.0).unwrap();
                     let d = distance.abs() * frac_2_3;
-                    
+
                     try_connect(&segments, |cursor| {
                         let cur = &segments[cursor];
                         if cursor == segments.len() - 1 && !is_closed {
@@ -331,19 +328,16 @@ where
                         Ok(Some(bezier))
                     })?
                 }
-                CurveOffsetCornerType::Chamfer => {
-                    
-                    try_connect(&segments, |cursor| {
-                        let cur = &segments[cursor];
-                        if cursor == segments.len() - 1 && !is_closed {
-                            return Ok(None);
-                        }
-                        let next = &segments[(cursor + 1) % segments.len()];
-                        let v1 = cur.end.clone();
-                        let v2 = next.start.clone();
-                        Ok(Some(NurbsCurve2D::polyline(&[v1.into(), v2.into()], false)))
-                    })?
-                }
+                CurveOffsetCornerType::Chamfer => try_connect(&segments, |cursor| {
+                    let cur = &segments[cursor];
+                    if cursor == segments.len() - 1 && !is_closed {
+                        return Ok(None);
+                    }
+                    let next = &segments[(cursor + 1) % segments.len()];
+                    let v1 = cur.end.clone();
+                    let v2 = next.start.clone();
+                    Ok(Some(NurbsCurve2D::polyline(&[v1.into(), v2.into()], false)))
+                })?,
             };
 
             // connect polylines
@@ -571,8 +565,6 @@ mod tests {
     use nalgebra::Point2;
 
     use crate::curve::NurbsCurve2D;
-
-    
 
     #[test]
     fn offset_nurbs_curve() {
