@@ -6,8 +6,7 @@ use gauss_quad::GaussLegendre;
 use itertools::Itertools;
 use nalgebra::allocator::Allocator;
 use nalgebra::{
-    Const, DMatrix, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff, DimNameSub,
-    DimNameSum, OMatrix, OPoint, OVector, RealField, Rotation3, UnitVector3, Vector3, U1,
+    Const, DMatrix, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff, DimNameSub, OMatrix, OPoint, OVector, RealField, Rotation3, UnitVector3, Vector3, U1,
 };
 use simba::scalar::SupersetOf;
 
@@ -2347,7 +2346,7 @@ where
             {
                 struct FieldVisitor;
 
-                impl<'de> Visitor<'de> for FieldVisitor {
+                impl Visitor<'_> for FieldVisitor {
                     type Value = Field;
 
                     fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

@@ -45,8 +45,7 @@ pub fn add_curve<'a, C: Into<CurveVariant<'a>>>(
         CurveVariant::CompoundCurve(c) => c
             .spans()
             .iter()
-            .map(|span| span.tessellate(tolerance))
-            .flatten()
+            .flat_map(|span| span.tessellate(tolerance))
             .collect(),
     };
 
@@ -74,7 +73,7 @@ pub fn add_curve<'a, C: Into<CurveVariant<'a>>>(
     commands.spawn((
         Mesh3d(meshes.add(line)),
         MeshMaterial3d(line_materials.add(LineMaterial {
-            color: color.unwrap_or(Color::WHITE.into()),
+            color: color.unwrap_or(Color::WHITE),
             ..Default::default()
         })),
     ));

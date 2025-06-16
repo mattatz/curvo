@@ -1,5 +1,5 @@
 use bevy::{
-    color::palettes::css::{TOMATO, WHITE, YELLOW},
+    color::palettes::css::{WHITE, YELLOW},
     prelude::*,
     render::camera::ScalingMode,
 };
@@ -7,11 +7,7 @@ use bevy_egui::{egui, EguiContextPass, EguiContexts, EguiPlugin};
 use bevy_infinite_grid::InfiniteGridPlugin;
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
-use bevy_points::{
-    material::{PointsMaterial, PointsShaderSettings},
-    mesh::PointsMesh,
-    plugin::PointsPlugin,
-};
+use bevy_points::plugin::PointsPlugin;
 use itertools::Itertools;
 use nalgebra::Point2;
 
@@ -22,7 +18,6 @@ mod misc;
 
 use materials::*;
 use misc::*;
-use rand::Rng;
 
 #[derive(Resource, Debug)]
 struct Setting {
@@ -35,10 +30,10 @@ impl Default for Setting {
     fn default() -> Self {
         Self {
             // corner_type: CurveOffsetCornerType::Sharp,
-            // corner_type: CurveOffsetCornerType::Round,
-            corner_type: CurveOffsetCornerType::Smooth,
-            // distance: 0.2,
-            distance: 2.0,
+            corner_type: CurveOffsetCornerType::Round,
+            // corner_type: CurveOffsetCornerType::Smooth,
+            distance: 0.2,
+            // distance: 2.0,
             degree: 1,
             // distance: -0.2,
         }
@@ -166,7 +161,7 @@ fn update_ui(
     control_points: Query<&ControlPoints>,
     mut profile: Query<&mut ProfileCurve>,
     mut offset_curve: Query<&mut OffsetCurve>,
-    mut offset_vertex: Query<&mut OffsetVertex>,
+    offset_vertex: Query<&mut OffsetVertex>,
 ) {
     let mut changed = false;
     egui::Window::new("offset curve")

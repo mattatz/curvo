@@ -1,7 +1,9 @@
 #![allow(unused_imports)]
 
 use approx::assert_relative_eq;
-use curvo::prelude::{CompoundCurve, FloatingPoint, NurbsCurve, NurbsCurve3D, NurbsSurface, NurbsSurface3D};
+use curvo::prelude::{
+    CompoundCurve, FloatingPoint, NurbsCurve, NurbsCurve3D, NurbsSurface, NurbsSurface3D,
+};
 use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, Point3, Vector3};
 
 #[test]
@@ -53,7 +55,8 @@ fn test_trimmed_surface_serialization() {
         None,
         vec![
             NurbsCurve2D::try_circle(&Point2::new(0.5, 0.5), &Vector2::x(), &Vector2::y(), 0.25)
-                .unwrap().into(),
+                .unwrap()
+                .into(),
         ],
     );
     let json = serde_json::to_string_pretty(&trimmed).unwrap();
@@ -91,8 +94,10 @@ where
 }
 
 #[allow(dead_code)]
-fn assert_compound_curve_eq<T: FloatingPoint, D: DimName>(a: &CompoundCurve<T, D>, b: &CompoundCurve<T, D>)
-where
+fn assert_compound_curve_eq<T: FloatingPoint, D: DimName>(
+    a: &CompoundCurve<T, D>,
+    b: &CompoundCurve<T, D>,
+) where
     DefaultAllocator: Allocator<D>,
 {
     a.spans().iter().zip(b.spans()).for_each(|(a, b)| {

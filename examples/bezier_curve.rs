@@ -9,7 +9,7 @@ use bevy::{
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use bevy_points::{mesh::PointsMesh, plugin::PointsPlugin, prelude::PointsMaterial};
-use nalgebra::{Point2, Vector2};
+use nalgebra::Point2;
 
 use curvo::prelude::*;
 

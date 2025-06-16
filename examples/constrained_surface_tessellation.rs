@@ -1,7 +1,7 @@
 use std::f64::consts::FRAC_PI_2;
 
 use bevy::{
-    color::palettes::css::{RED, TOMATO},
+    color::palettes::css::TOMATO,
     prelude::*,
     render::{
         camera::ScalingMode,
@@ -151,7 +151,7 @@ fn setup(
     commands.spawn((
         Mesh3d(meshes.add(mesh)),
         MeshMaterial3d(line_materials.add(LineMaterial {
-            color: Color::WHITE.into(),
+            color: Color::WHITE,
             ..Default::default()
         })),
     ));

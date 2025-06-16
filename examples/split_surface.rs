@@ -51,8 +51,8 @@ impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.insert_resource(Setting::default())
             .add_systems(Startup, setup)
-            .add_systems(EguiContextPass, (update_ui))
-            .add_systems(Update, (split_animation));
+            .add_systems(EguiContextPass, update_ui)
+            .add_systems(Update, split_animation);
     }
 }
 

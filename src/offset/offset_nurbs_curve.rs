@@ -4,7 +4,7 @@ use geo::LineIntersection;
 use itertools::Itertools;
 use nalgebra::allocator::Allocator;
 use nalgebra::{
-    DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, OVector, Point, Point2, Vector2, U1,
+    DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, OVector, Point2, Vector2, U1,
 };
 use num_traits::NumCast;
 
@@ -143,7 +143,7 @@ where
             if matches!(corner_type, CurveOffsetCornerType::None) {
                 return Ok(p_segments
                     .into_iter()
-                    .map(|s| NurbsCurve2D::polyline(&[s.start.into(), s.end.into()], false).into())
+                    .map(|s| NurbsCurve2D::polyline(&[s.start, s.end], false).into())
                     .collect_vec());
             }
 
@@ -159,7 +159,7 @@ where
                 .collect_vec()
                 .windows(2)
                 .map(|w| {
-                    if let Some(p) = w[0].intersects(&w[1]) {
+                    if let Some(p) = w[0].intersects(w[1]) {
                         Vertex::Intersection(p)
                     } else {
                         Vertex::Point(w[0].end)
@@ -238,7 +238,7 @@ where
                         match &last.end {
                             Vertex::Point(p) => {
                                 if is_closed {
-                                    Some(pts[0].clone())
+                                    Some(pts[0])
                                 } else {
                                     Some(*p)
                                 }
@@ -251,7 +251,7 @@ where
 
                     let pts = if let Some(last) = last {
                         pts.into_iter()
-                            .chain(vec![last.clone()].into_iter())
+                            .chain(vec![last])
                             .collect_vec()
                     } else {
                         pts
@@ -260,7 +260,8 @@ where
                     return Ok(vec![NurbsCurve2D::polyline(&pts, false).into()]);
                 }
                 CurveOffsetCornerType::Round => {
-                    let spans = try_connect(&segments, |cursor| {
+                    
+                    try_connect(&segments, |cursor| {
                         let cur = &segments[cursor];
                         if cursor == segments.len() - 1 && !is_closed {
                             return Ok(None);
@@ -291,13 +292,13 @@ where
                             angle,
                         )?;
                         Ok(Some(arc))
-                    })?;
-                    spans
+                    })?
                 }
                 CurveOffsetCornerType::Smooth => {
                     let frac_2_3 = T::from_f64(2.0 / 3.0).unwrap();
                     let d = distance.abs() * frac_2_3;
-                    let spans = try_connect(&segments, |cursor| {
+                    
+                    try_connect(&segments, |cursor| {
                         let cur = &segments[cursor];
                         if cursor == segments.len() - 1 && !is_closed {
                             return Ok(None);
@@ -322,17 +323,17 @@ where
 
                         // create arc between v1 and v2
                         let bezier = NurbsCurve2D::bezier(&[
-                            v1.inner().clone(),
+                            *v1.inner(),
                             v1.inner() + d10,
                             v2.inner() - d32,
-                            v2.inner().clone(),
+                            *v2.inner(),
                         ]);
                         Ok(Some(bezier))
-                    })?;
-                    spans
+                    })?
                 }
                 CurveOffsetCornerType::Chamfer => {
-                    let spans = try_connect(&segments, |cursor| {
+                    
+                    try_connect(&segments, |cursor| {
                         let cur = &segments[cursor];
                         if cursor == segments.len() - 1 && !is_closed {
                             return Ok(None);
@@ -341,8 +342,7 @@ where
                         let v1 = cur.end.clone();
                         let v2 = next.start.clone();
                         Ok(Some(NurbsCurve2D::polyline(&[v1.into(), v2.into()], false)))
-                    })?;
-                    spans
+                    })?
                 }
             };
 
@@ -371,10 +371,8 @@ where
                         }
                     }
                     cursor = None;
-                } else {
-                    if cursor.is_none() {
-                        cursor = Some(i);
-                    }
+                } else if cursor.is_none() {
+                    cursor = Some(i);
                 }
             }
 
@@ -385,7 +383,7 @@ where
                 }
             }
 
-            return Ok(vec![CompoundCurve::new_unchecked_aligned(res)]);
+            Ok(vec![CompoundCurve::new_unchecked_aligned(res)])
         } else {
             let tess = tessellate_nurbs_curve(self, tol)
                 .into_iter()
@@ -396,8 +394,8 @@ where
                 .collect_vec();
             let mut res = Self::try_interpolate(&tess, self.degree())?;
             res.try_reduce_knots(Some(tol))?;
-            return Ok(vec![res.into()]);
-        };
+            Ok(vec![res.into()])
+        }
     }
 }
 
@@ -574,7 +572,7 @@ mod tests {
 
     use crate::curve::NurbsCurve2D;
 
-    use super::*;
+    
 
     #[test]
     fn offset_nurbs_curve() {

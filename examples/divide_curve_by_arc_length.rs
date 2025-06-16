@@ -57,8 +57,8 @@ impl Plugin for AppPlugin {
                     .after(bevy_egui::input::write_egui_input_system)
                     .before(bevy_egui::begin_pass_system),
             )
-            .add_systems(EguiContextPass, (update_ui))
-            .add_systems(Update, (divide_by_arc_length));
+            .add_systems(EguiContextPass, update_ui)
+            .add_systems(Update, divide_by_arc_length);
     }
 }
 

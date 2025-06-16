@@ -35,13 +35,13 @@ where
 /// Tessellate the curve using an adaptive algorithm recursively
 /// if the curve between [start ~ end] is flat enough, it will return the two end points
 /// f is a function that maps the t and point to a new type P
-pub(crate) fn tessellate_curve_adaptive<'a, T: FloatingPoint, D, P, F>(
+pub(crate) fn tessellate_curve_adaptive<T: FloatingPoint, D, P, F>(
     curve: &NurbsCurve<T, D>,
     start: T,
     end: T,
     tol: T,
     rng: &mut ThreadRng,
-    f: &'a F,
+    f: &F,
 ) -> Vec<P>
 where
     D: DimName + DimNameSub<U1>,

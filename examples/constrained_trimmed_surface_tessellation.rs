@@ -1,7 +1,6 @@
-use std::f64::consts::{FRAC_PI_2, TAU};
+use std::f64::consts::TAU;
 
 use bevy::{
-    color::palettes::css::{RED, TOMATO},
     prelude::*,
     render::{
         camera::ScalingMode,
@@ -17,8 +16,7 @@ use bevy_points::{
 };
 use itertools::Itertools;
 use materials::*;
-use misc::{add_surface, add_surface_normals};
-use nalgebra::{Point2, Point3, Rotation3, Translation3, Vector2, Vector3};
+use nalgebra::{Point2, Point3, Vector2, Vector3};
 
 use curvo::prelude::*;
 mod materials;
@@ -141,7 +139,7 @@ fn setup(
     commands.spawn((
         Mesh3d(meshes.add(line_mesh)),
         MeshMaterial3d(line_materials.add(LineMaterial {
-            color: Color::WHITE.into(),
+            color: Color::WHITE,
             ..Default::default()
         })),
     ));

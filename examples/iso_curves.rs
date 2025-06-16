@@ -1,7 +1,7 @@
 use std::f64::consts::FRAC_PI_2;
 
 use bevy::{
-    color::palettes::css::{TOMATO, WHITE},
+    color::palettes::css::TOMATO,
     prelude::*,
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
