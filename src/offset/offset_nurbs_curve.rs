@@ -199,23 +199,57 @@ where
                 },
                 CurveOffsetCornerType::Sharp => {
                     let delta = distance.abs() * T::from_f64(2.0).unwrap();
-                    let spans = try_connect(&segments, |cursor| {
-                        let cur = &segments[cursor];
-                        if cursor == segments.len() - 1 && !is_closed {
-                            return Ok(None);
+
+                    let n = segments.len();
+                    let pts = segments.iter().enumerate().map(|(i, s)| {
+                        match s.start {
+                            Vertex::Point(p) => {
+                                let prev = if i != 0 || is_closed {
+                                    Some(&segments[(i + n - 1) % n])
+                                } else {
+                                    None
+                                };
+                                match prev {
+                                    Some(prev) => {
+                                        let v0 = prev.start.clone();
+                                        let v1 = prev.end.clone();
+                                        let v2 = s.start.clone();
+                                        let v3 = s.end.clone();
+                                        let it = find_corner_intersection([&v0, &v1, &v2, &v3], delta)?;
+                                        Ok(it)
+                                    },
+                                    _ => Ok(p)
+                                }
+                            }
+                            Vertex::Intersection(p) => Ok(p),
                         }
-                        let next = &segments[(cursor + 1) % segments.len()];
-                        let v0 = cur.start.clone();
-                        let v1 = cur.end.clone();
-                        let v2 = next.start.clone();
-                        let v3 = next.end.clone();
-                        let it = find_corner_intersection([&v0, &v1, &v2, &v3], delta)?;
-                        Ok(Some(NurbsCurve2D::polyline(
-                            &[v1.into(), it, v2.into()],
-                            false,
-                        )))
-                    })?;
-                    spans
+                    }).collect::<anyhow::Result<Vec<_>>>()?;
+
+                    let last = segments.last();
+                    let last = if let Some(last) = last {
+                        match &last.end {
+                            Vertex::Point(p) => {
+                                if is_closed {
+                                    Some(pts[0].clone())
+                                } else {
+                                    Some(*p)
+                                }
+                            },
+                            _ => {
+                                None
+                            }
+                        }
+                    } else {
+                        None
+                    };
+
+                    let pts = if let Some(last) = last {
+                        pts.into_iter().chain(vec![last.clone()].into_iter()).collect_vec()
+                    } else {
+                        pts
+                    };
+
+                    vec![NurbsCurve2D::polyline(&pts, false).into()]
                 }
                 CurveOffsetCornerType::Round => {
                     let spans = try_connect(&segments, |cursor| {
@@ -296,44 +330,7 @@ where
                 }
             };
 
-            if spans.iter().all(|c| c.degree() == 1) {
-                let pts = spans.into_iter().map(|c| c.dehomogenized_control_points()).flatten().collect_vec();
-                let pts = pts.windows(2).filter_map(|w| {
-                    let p0 = w[0];
-                    let p1 = w[1];
-                    if p0 != p1 {
-                        Some(p0)
-                    } else {
-                        None
-                    }
-                }).chain(vec![pts.last().unwrap().clone()]).collect_vec();
-
-                let thres = T::one() - T::from_f64(1e-6).unwrap();
-                let trimmed = pts.windows(3).filter_map(|w| {
-                    if w.len() == 3 {
-                        let p0 = w[0];
-                        let p1 = w[1];
-                        let p2 = w[2];
-                        let d10 = (p1 - p0).normalize();
-                        let d21 = (p2 - p1).normalize();
-                        let dot = d10.dot(&d21);
-                        if dot > thres {
-                            None
-                        } else {
-                            Some(p1.clone())
-                        }
-                    } else {
-                        w.last().cloned()
-                    }
-                }).collect_vec();
-
-                let h = pts.first().ok_or(anyhow::anyhow!("no head"))?;
-                let t = pts.last().ok_or(anyhow::anyhow!("no tail"))?;
-                let pts = vec![h.clone()].into_iter().chain(trimmed).chain(vec![t.clone()].into_iter()).collect_vec();
-                return Ok(vec![NurbsCurve2D::polyline(&pts, false).into()]);
-            } else {
-                return Ok(vec![CompoundCurve::new_unchecked(spans)]);
-            }
+            return Ok(vec![CompoundCurve::new_unchecked(spans)]);
         } else {
             let tess = tessellate_nurbs_curve(self, tol);
         };
