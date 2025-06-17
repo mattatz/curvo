@@ -28,8 +28,6 @@ where
     /// Offset the NURBS curve by a given option
     fn offset(&'a self, option: Self::Option) -> Self::Output {
         let distance = *option.distance();
-        let norm_tol = *option.normal_tolerance();
-        let knot_tol = *option.knot_tolerance();
         let corner_type = option.corner_type();
 
         let is_closed = self.is_closed();
@@ -256,6 +254,8 @@ where
 
             Ok(vec![CompoundCurve::new_unchecked_aligned(res)])
         } else {
+            let norm_tol = *option.normal_tolerance();
+            let knot_tol = *option.knot_tolerance();
             let tess = tessellate_nurbs_curve(self, norm_tol)
                 .into_iter()
                 .map(|(p, t)| {
