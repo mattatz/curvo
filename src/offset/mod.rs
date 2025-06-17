@@ -1,5 +1,8 @@
+pub mod curve_offset_option;
+pub mod offset_compound_curve;
 pub mod offset_nurbs_curve;
-pub use offset_nurbs_curve::*;
+mod vertex;
+pub use curve_offset_option::*;
 
 /// Corner type for offsetting NURBS curves
 #[derive(Debug, Clone, Copy, PartialEq)]

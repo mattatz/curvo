@@ -9,92 +9,12 @@ use nalgebra::{
 use num_traits::NumCast;
 
 use crate::curve::NurbsCurve2D;
+use crate::offset::curve_offset_option::CurveOffsetOption;
+use crate::offset::vertex::Vertex;
 use crate::offset::CurveOffsetCornerType;
 use crate::region::{CompoundCurve, CompoundCurve2D};
 use crate::tessellation::tessellation_curve::tessellate_curve_adaptive;
 use crate::{curve::NurbsCurve, misc::FloatingPoint, offset::Offset};
-
-/// Offset option for NURBS curves
-#[derive(Debug, Clone, PartialEq)]
-pub struct CurveOffsetOption<T> {
-    /// Offset distance
-    distance: T,
-    /// Normal tolerance for tessellation
-    normal_tolerance: T,
-    /// Knot tolerance for reducing knots
-    knot_tolerance: T,
-    /// Corner type
-    corner_type: CurveOffsetCornerType,
-}
-
-impl<T: FloatingPoint> Default for CurveOffsetOption<T> {
-    fn default() -> Self {
-        Self {
-            distance: T::zero(),
-            normal_tolerance: T::from_f64(1e-4).unwrap(),
-            knot_tolerance: T::from_f64(1e-4).unwrap(),
-            corner_type: Default::default(),
-        }
-    }
-}
-
-impl<T> CurveOffsetOption<T> {
-    pub fn with_distance(mut self, distance: T) -> Self {
-        self.distance = distance;
-        self
-    }
-
-    pub fn with_normal_tolerance(mut self, tol: T) -> Self {
-        self.normal_tolerance = tol;
-        self
-    }
-
-    pub fn with_knot_tolerance(mut self, tol: T) -> Self {
-        self.knot_tolerance = tol;
-        self
-    }
-
-    pub fn with_corner_type(mut self, ty: CurveOffsetCornerType) -> Self {
-        self.corner_type = ty;
-        self
-    }
-}
-
-/// vertex variant
-#[derive(Debug, Clone, PartialEq)]
-enum Vertex<T: FloatingPoint> {
-    Point(Point2<T>),
-    Intersection(Point2<T>),
-}
-
-impl<T: FloatingPoint, P: geo::CoordNum> From<geo::Point<P>> for Vertex<T> {
-    fn from(p: geo::Point<P>) -> Self {
-        let x = p.x().to_f64().unwrap();
-        let y = p.y().to_f64().unwrap();
-        Vertex::Point(Point2::new(
-            T::from_f64(x).unwrap(),
-            T::from_f64(y).unwrap(),
-        ))
-    }
-}
-
-impl<T: FloatingPoint> From<Vertex<T>> for Point2<T> {
-    fn from(v: Vertex<T>) -> Self {
-        match v {
-            Vertex::Point(p) => p,
-            Vertex::Intersection(p) => p,
-        }
-    }
-}
-
-impl<T: FloatingPoint> Vertex<T> {
-    pub fn inner(&self) -> &Point2<T> {
-        match self {
-            Vertex::Point(p) => p,
-            Vertex::Intersection(p) => p,
-        }
-    }
-}
 
 impl<'a, T> Offset<'a, T> for NurbsCurve2D<T>
 where
@@ -105,12 +25,10 @@ where
 
     /// Offset the NURBS curve by a given distance with a given epsilon
     fn offset(&'a self, option: Self::Option) -> Self::Output {
-        let CurveOffsetOption {
-            distance,
-            normal_tolerance: norm_tol,
-            knot_tolerance: knot_tol,
-            corner_type,
-        } = option;
+        let distance = *option.distance();
+        let norm_tol = *option.normal_tolerance();
+        let knot_tol = *option.knot_tolerance();
+        let corner_type = option.corner_type();
 
         let is_closed = self.is_closed();
 
@@ -551,11 +469,9 @@ mod tests {
             Point2::new(0.0, 1.0),
         ];
         let polyline = NurbsCurve2D::polyline(&points, false);
-        let option = CurveOffsetOption {
-            distance: 0.2,
-            corner_type: CurveOffsetCornerType::Sharp,
-            ..Default::default()
-        };
+        let option = CurveOffsetOption::default()
+            .with_distance(0.2)
+            .with_corner_type(CurveOffsetCornerType::Sharp);
         let res = polyline.offset(option).unwrap();
         assert_eq!(res.len(), 1);
         let curve = &res[0];
@@ -585,11 +501,9 @@ mod tests {
             Point2::new(0.0, 0.0),
         ];
         let polyline = NurbsCurve2D::polyline(&points, false);
-        let option = CurveOffsetOption {
-            distance: 0.2,
-            corner_type: CurveOffsetCornerType::Sharp,
-            ..Default::default()
-        };
+        let option = CurveOffsetOption::default()
+            .with_distance(0.2)
+            .with_corner_type(CurveOffsetCornerType::Sharp);
 
         // positive offset
         let res = polyline.offset(option.clone()).unwrap();
