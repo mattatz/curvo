@@ -26,7 +26,7 @@ where
             .map(|span| span.offset(option.clone()))
             .collect::<anyhow::Result<Vec<_>>>()?;
 
-        if matches!(option.corner_type(), CurveOffsetCornerType::Sharp) {
+        if matches!(option.corner_type(), CurveOffsetCornerType::None) {
             return Ok(offset.into_iter().flatten().collect());
         }
 
@@ -53,12 +53,11 @@ where
         };
 
         let corners = corners.into_iter().chain(vec![last_corner]).collect_vec();
-        println!("{:?}", corners);
 
         let n = corners.len();
         let curves = offset.into_iter().enumerate().map(|(i, o)| {
-            let prev_corner = &corners[(i + 1 + n) % n];
-            let next_corner = &corners[(i + 1) % n];
+            let prev_corner = &corners[(i + n - 1) % n];
+            let next_corner = &corners[i % n];
             match (prev_corner, next_corner) {
                 (Some(Corner::Intersection(prev)), Some(next)) => {
                     match next {
@@ -105,6 +104,7 @@ where
     }
 }
 
+#[derive(Debug)]
 enum Corner<T: FloatingPoint> {
     Intersection(Point2<T>),
     Curve(NurbsCurve2D<T>),
