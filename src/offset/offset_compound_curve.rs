@@ -19,6 +19,7 @@ where
     type Output = anyhow::Result<Vec<CompoundCurve2D<T>>>;
     type Option = CurveOffsetOption<T>;
 
+    /// Offset the CompoundCurve by a given option
     fn offset(&'a self, option: Self::Option) -> Self::Output {
         let offset = self
             .spans()
@@ -101,6 +102,7 @@ where
     }
 }
 
+/// Corner variant
 #[derive(Debug)]
 enum Corner<T: FloatingPoint> {
     Intersection(Point2<T>),
@@ -219,41 +221,5 @@ fn corner<T: FloatingPoint>(
     }
 }
 
-/// Get the parameter at the intersection of the two spans
-fn get_parameter_at_intersection<T: FloatingPoint>(polyline: &NurbsCurve2D<T>, t01: T) -> T {
-    let knots = polyline.knots();
-    let n = polyline.control_points().len();
-    let d = knots[n] - knots[n - 1];
-    knots[n - 1] + d * t01
-}
-
 #[cfg(test)]
-mod tests {
-    use nalgebra::Point2;
-
-    use crate::curve::NurbsCurve2D;
-
-    #[test]
-    fn test() {
-        let polyline = NurbsCurve2D::polyline(
-            &[
-                Point2::new(0., 0.),
-                Point2::new(1., 0.),
-                Point2::new(1., 1.),
-                Point2::new(0., 1.),
-            ],
-            false,
-        );
-
-        let knots = polyline.knots();
-        println!("{:?}", knots);
-        let pt1 = polyline.point_at(knots[1]);
-        let pt2 = polyline.point_at(knots[2]);
-        let pt3 = polyline.point_at(knots[3]);
-        let pt4 = polyline.point_at(knots[4]);
-        println!("{:?}", pt1);
-        println!("{:?}", pt2);
-        println!("{:?}", pt3);
-        println!("{:?}", pt4);
-    }
-}
+mod tests {}

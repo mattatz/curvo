@@ -25,7 +25,7 @@ where
     type Output = anyhow::Result<Vec<CompoundCurve2D<T>>>;
     type Option = CurveOffsetOption<T>;
 
-    /// Offset the NURBS curve by a given distance with a given epsilon
+    /// Offset the NURBS curve by a given option
     fn offset(&'a self, option: Self::Option) -> Self::Output {
         let distance = *option.distance();
         let norm_tol = *option.normal_tolerance();
