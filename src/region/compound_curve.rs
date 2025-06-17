@@ -114,6 +114,11 @@ where
         &mut self.spans
     }
 
+    /// Convert the compound curve into a vector of spans.
+    pub fn into_spans(self) -> Vec<NurbsCurve<T, D>> {
+        self.spans
+    }
+
     /// Get the domain of the compound curve
     pub fn knots_domain(&self) -> (T, T) {
         let knots = self.spans.iter().map(|span| span.knots_domain());
