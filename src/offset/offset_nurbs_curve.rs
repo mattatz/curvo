@@ -201,6 +201,7 @@ where
                     let delta = distance.abs() * T::from_f64(2.0).unwrap();
 
                     let n = segments.len();
+
                     let pts = segments
                         .iter()
                         .enumerate()
@@ -238,7 +239,7 @@ where
                                     Some(*p)
                                 }
                             }
-                            _ => None,
+                            Vertex::Intersection(opoint) => Some(*opoint),
                         }
                     } else {
                         None
