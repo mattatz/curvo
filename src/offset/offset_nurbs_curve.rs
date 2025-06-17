@@ -6,10 +6,10 @@ use nalgebra::allocator::Allocator;
 use nalgebra::{
     DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, OVector, Point2, Vector2, U1,
 };
-use num_traits::NumCast;
 
 use crate::curve::NurbsCurve2D;
 use crate::offset::curve_offset_option::CurveOffsetOption;
+use crate::offset::helper::to_line_helper;
 use crate::offset::vertex::Vertex;
 use crate::offset::CurveOffsetCornerType;
 use crate::region::{CompoundCurve, CompoundCurve2D};
@@ -440,15 +440,6 @@ where
     tessellate_curve_adaptive(curve, start, end, normal_tolerance, &mut rng, &|t, p| {
         (p, curve.tangent_at(t))
     })
-}
-
-/// Convert a line segment to a geo::Line
-fn to_line_helper<T: FloatingPoint>(p0: &Point2<T>, p1: &Point2<T>) -> geo::Line {
-    let x0 = <f64 as NumCast>::from(p0.x).unwrap();
-    let y0 = <f64 as NumCast>::from(p0.y).unwrap();
-    let x1 = <f64 as NumCast>::from(p1.x).unwrap();
-    let y1 = <f64 as NumCast>::from(p1.y).unwrap();
-    geo::Line::new(geo::coord! { x: x0, y: y0 }, geo::coord! { x: x1, y: y1 })
 }
 
 #[cfg(test)]
