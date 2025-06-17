@@ -191,8 +191,7 @@ fn corner<T: FloatingPoint>(
                     CurveOffsetCornerType::Sharp => {
                         let delta = option.distance().abs() * T::from_f64(2.0).unwrap();
                         let it = sharp_corner_intersection([s0[0], s0[1], s1[0], s1[1]], delta)?;
-                        let corner =
-                            NurbsCurve2D::polyline(&[s0[1].clone(), it, s1[0].clone()], false);
+                        let corner = NurbsCurve2D::polyline(&[*s0[1], it, *s1[0]], false);
                         Ok(Some(Corner::Curve(corner)))
                     }
                     CurveOffsetCornerType::Round => {

@@ -13,9 +13,11 @@ use nalgebra::Point2;
 
 use curvo::prelude::*;
 
+mod boolean;
 mod materials;
 mod misc;
 
+use boolean::*;
 use materials::*;
 use misc::*;
 
@@ -23,7 +25,6 @@ use misc::*;
 struct Setting {
     pub corner_type: CurveOffsetCornerType,
     pub distance: f64,
-    pub degree: usize,
 }
 
 impl Default for Setting {
@@ -33,9 +34,7 @@ impl Default for Setting {
             corner_type: CurveOffsetCornerType::Round,
             // corner_type: CurveOffsetCornerType::Smooth,
             // distance: 0.2,
-            distance: -0.2,
-            // distance: 2.0,
-            degree: 1,
+            distance: 0.2,
         }
     }
 }
@@ -109,7 +108,7 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
     .collect_vec();
 
     // convex polygon
-    let points = vec![
+    let points = [
         Point2::new(-0.5, 2.),
         Point2::new(0.5, 2.),
         Point2::new(0.5, 1.),
@@ -124,8 +123,13 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
         .windows(2)
         .map(|w| NurbsCurve2D::polyline(w, true))
         .collect_vec();
+    let _curve = CompoundCurve::try_new(spans).unwrap();
 
-    let curve = CompoundCurve::try_new(spans).unwrap();
+    let curve = match compound_rounded_t_shape() {
+        boolean::CurveVariant::Compound(c) => c.inverse(),
+        _ => todo!(),
+    };
+
     let option = CurveOffsetOption::default()
         .with_corner_type(settings.corner_type)
         .with_distance(settings.distance)
@@ -217,14 +221,6 @@ fn update_ui(
                         .changed();
                 });
             });
-
-            ui.heading("degree");
-            ui.group(|g| {
-                g.horizontal(|ui| {
-                    changed |= ui.selectable_value(&mut settings.degree, 1, "1").changed();
-                    changed |= ui.selectable_value(&mut settings.degree, 3, "3").changed();
-                });
-            });
         });
 
     if changed {
@@ -297,7 +293,7 @@ fn gizmos_offset_curve(
 
     let offset_vertex = offset_vertex.single().unwrap();
     offset_vertex.0.iter().for_each(|c| {
-        let tess: Vec<Vec3> = c
+        let _tess: Vec<Vec3> = c
             .tessellate(Some(tol))
             .into_iter()
             .map(|p| p.coords.cast::<f32>().to_homogeneous().into())
