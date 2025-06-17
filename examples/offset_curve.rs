@@ -33,9 +33,9 @@ impl Default for Setting {
             corner_type: CurveOffsetCornerType::Round,
             // corner_type: CurveOffsetCornerType::Smooth,
             distance: 0.2,
+            // distance: -0.2,
             // distance: 2.0,
             degree: 1,
-            // distance: -0.2,
         }
     }
 }
@@ -134,7 +134,7 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
 
     let curve = NurbsCurve2D::polyline(&points, true);
     let option = CurveOffsetOption::default()
-        .with_corner_type(CurveOffsetCornerType::Round)
+        .with_corner_type(settings.corner_type)
         .with_distance(settings.distance)
         .with_normal_tolerance(1e-4);
     let offset_curve = curve.offset(option.clone()).unwrap();
@@ -250,7 +250,7 @@ fn update_ui(
 
         let mut offset_curve = offset_curve.single_mut().unwrap();
         let option = CurveOffsetOption::default()
-            .with_corner_type(settings.corner_type.clone())
+            .with_corner_type(settings.corner_type)
             .with_distance(settings.distance)
             .with_normal_tolerance(1e-4);
         let res = profile.0.offset(option);

@@ -201,6 +201,7 @@ where
                     let delta = distance.abs() * T::from_f64(2.0).unwrap();
 
                     let n = segments.len();
+
                     let pts = segments
                         .iter()
                         .enumerate()
@@ -238,7 +239,7 @@ where
                                     Some(*p)
                                 }
                             }
-                            _ => None,
+                            Vertex::Intersection(opoint) => Some(*opoint),
                         }
                     } else {
                         None
@@ -570,6 +571,64 @@ mod tests {
                 Point2::new(1.2, -0.2),
                 Point2::new(1.2, 1.2),
                 Point2::new(0.0, 1.2),
+            ]
+        );
+    }
+
+    #[test]
+    fn offset_closed_rectangle() {
+        let points = vec![
+            Point2::new(0.0, 0.0),
+            Point2::new(1.0, 0.0),
+            Point2::new(1.0, 1.0),
+            Point2::new(0.0, 1.0),
+            Point2::new(0.0, 0.0),
+        ];
+        let polyline = NurbsCurve2D::polyline(&points, false);
+        let option = CurveOffsetOption {
+            distance: 0.2,
+            corner_type: CurveOffsetCornerType::Sharp,
+            ..Default::default()
+        };
+
+        // positive offset
+        let res = polyline.offset(option.clone()).unwrap();
+        assert_eq!(res.len(), 1);
+        let curve = &res[0];
+        let spans = curve.spans();
+        assert_eq!(spans.len(), 1);
+        let span = &spans[0];
+        let pts = span.dehomogenized_control_points();
+        assert_eq!(pts.len(), 5);
+        assert_eq!(
+            pts,
+            vec![
+                Point2::new(-0.2, -0.2),
+                Point2::new(1.2, -0.2),
+                Point2::new(1.2, 1.2),
+                Point2::new(-0.2, 1.2),
+                Point2::new(-0.2, -0.2),
+            ]
+        );
+
+        // negative offset
+        let option = option.clone().with_distance(-0.2);
+        let res = polyline.offset(option).unwrap();
+        assert_eq!(res.len(), 1);
+        let curve = &res[0];
+        let spans = curve.spans();
+        assert_eq!(spans.len(), 1);
+        let span = &spans[0];
+        let pts = span.dehomogenized_control_points();
+        assert_eq!(pts.len(), 5);
+        assert_eq!(
+            pts,
+            vec![
+                Point2::new(0.2, 0.2),
+                Point2::new(0.8, 0.2),
+                Point2::new(0.8, 0.8),
+                Point2::new(0.2, 0.8),
+                Point2::new(0.2, 0.2),
             ]
         );
     }
