@@ -94,17 +94,22 @@ impl Plugin for AppPlugin {
 fn setup(mut commands: Commands, settings: Res<Setting>) {
     // s-shape
     // square
-    let spans = [
+    let _spans = [
         Point2::new(-1.0, -1.0),
         Point2::new(1.0, -1.0),
         Point2::new(1.0, 1.0),
         Point2::new(-1.0, 1.0),
-    ].into_iter().cycle().take(5).collect_vec().windows(2).map(|w| {
-        NurbsCurve2D::polyline(&w, true)
-    }).collect_vec();
+    ]
+    .into_iter()
+    .cycle()
+    .take(5)
+    .collect_vec()
+    .windows(2)
+    .map(|w| NurbsCurve2D::polyline(w, true))
+    .collect_vec();
 
     // convex polygon
-    let _points = vec![
+    let points = vec![
         Point2::new(-0.5, 2.),
         Point2::new(0.5, 2.),
         Point2::new(0.5, 1.),
@@ -114,10 +119,11 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
         Point2::new(-1.5, 1.),
         Point2::new(-0.5, 1.),
         Point2::new(-0.5, 2.),
-    ]
-    .into_iter()
-    .rev()
-    .collect_vec();
+    ];
+    let spans = points
+        .windows(2)
+        .map(|w| NurbsCurve2D::polyline(w, true))
+        .collect_vec();
 
     let curve = CompoundCurve::try_new(spans).unwrap();
     let option = CurveOffsetOption::default()
@@ -157,7 +163,7 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
 fn update_ui(
     mut contexts: EguiContexts,
     mut settings: ResMut<Setting>,
-    mut profile: Query<&mut ProfileCurve>,
+    profile: Query<&mut ProfileCurve>,
     mut offset_curve: Query<&mut OffsetCurve>,
     mut offset_vertex: Query<&mut OffsetVertex>,
 ) {

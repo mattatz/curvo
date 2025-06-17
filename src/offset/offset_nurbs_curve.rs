@@ -9,7 +9,9 @@ use nalgebra::{
 
 use crate::curve::NurbsCurve2D;
 use crate::offset::curve_offset_option::CurveOffsetOption;
-use crate::offset::helper::to_line_helper;
+use crate::offset::helper::{
+    round_corner, sharp_corner_intersection, smooth_corner, to_line_helper,
+};
 use crate::offset::vertex::Vertex;
 use crate::offset::CurveOffsetCornerType;
 use crate::region::{CompoundCurve, CompoundCurve2D};
@@ -136,8 +138,10 @@ where
                                         let v1 = prev.end.clone();
                                         let v2 = s.start.clone();
                                         let v3 = s.end.clone();
-                                        let it =
-                                            find_corner_intersection([&v0, &v1, &v2, &v3], delta)?;
+                                        let it = sharp_corner_intersection(
+                                            [v0.inner(), v1.inner(), v2.inner(), v3.inner()],
+                                            delta,
+                                        )?;
                                         Ok(it)
                                     }
                                     _ => Ok(p),
@@ -171,77 +175,36 @@ where
 
                     return Ok(vec![NurbsCurve2D::polyline(&pts, false).into()]);
                 }
-                CurveOffsetCornerType::Round => {
-                    try_connect(&segments, |cursor| {
-                        let cur = &segments[cursor];
-                        if cursor == segments.len() - 1 && !is_closed {
-                            return Ok(None);
-                        }
-                        let next = &segments[(cursor + 1) % segments.len()];
+                CurveOffsetCornerType::Round => try_connect(&segments, |cursor| {
+                    let cur = &segments[cursor];
+                    if cursor == segments.len() - 1 && !is_closed {
+                        return Ok(None);
+                    }
+                    let next = &segments[(cursor + 1) % segments.len()];
 
-                        let v0 = &cur.start;
-                        let v1 = &cur.end;
-                        let t = (v1.inner() - v0.inner()).normalize();
-                        let sign = distance.signum();
-                        let n = Vector2::new(t.y, -t.x);
-                        let d = n * distance;
-                        let center = v1.inner() - d;
-                        let v2 = &next.start;
+                    let v0 = &cur.start;
+                    let v1 = &cur.end;
+                    let v2 = &next.start;
 
-                        let d0 = v1.inner() - center;
-                        let d1 = v2.inner() - center;
-                        let angle = d0.angle(&d1);
-                        let angle = angle.abs();
+                    let arc = round_corner(v0.inner(), v1.inner(), v2.inner(), distance)?;
+                    Ok(Some(arc))
+                })?,
+                CurveOffsetCornerType::Smooth => try_connect(&segments, |cursor| {
+                    let cur = &segments[cursor];
+                    if cursor == segments.len() - 1 && !is_closed {
+                        return Ok(None);
+                    }
+                    let next = &segments[(cursor + 1) % segments.len()];
 
-                        // create arc between v1 and v2
-                        let arc = Self::try_arc(
-                            &center,
-                            &(n * sign),
-                            &t,
-                            distance.abs(),
-                            T::zero(),
-                            angle,
-                        )?;
-                        Ok(Some(arc))
-                    })?
-                }
-                CurveOffsetCornerType::Smooth => {
-                    let frac_2_3 = T::from_f64(2.0 / 3.0).unwrap();
-                    let d = distance.abs() * frac_2_3;
+                    let v0 = &cur.start;
+                    let v1 = &cur.end;
+                    let v2 = &next.start;
+                    let v3 = &next.end;
+                    let bezier =
+                        smooth_corner(v0.inner(), v1.inner(), v2.inner(), v3.inner(), distance)?;
 
-                    try_connect(&segments, |cursor| {
-                        let cur = &segments[cursor];
-                        if cursor == segments.len() - 1 && !is_closed {
-                            return Ok(None);
-                        }
-                        let next = &segments[(cursor + 1) % segments.len()];
-
-                        let v0 = &cur.start;
-                        let v1 = &cur.end;
-                        let v2 = &next.start;
-                        let v3 = &next.end;
-
-                        let d10 = if v1.inner() == v0.inner() {
-                            Vector2::zeros()
-                        } else {
-                            (v1.inner() - v0.inner()).normalize() * d
-                        };
-                        let d32 = if v3.inner() == v2.inner() {
-                            Vector2::zeros()
-                        } else {
-                            (v3.inner() - v2.inner()).normalize() * d
-                        };
-
-                        // create arc between v1 and v2
-                        let bezier = NurbsCurve2D::bezier(&[
-                            *v1.inner(),
-                            v1.inner() + d10,
-                            v2.inner() - d32,
-                            *v2.inner(),
-                        ]);
-                        Ok(Some(bezier))
-                    })?
-                }
+                    Ok(Some(bezier))
+                })?,
                 CurveOffsetCornerType::Chamfer => try_connect(&segments, |cursor| {
                     let cur = &segments[cursor];
                     if cursor == segments.len() - 1 && !is_closed {
@@ -385,38 +348,6 @@ where
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
     Ok(spans.into_iter().flatten().collect_vec())
-}
-
-/// find the intersection of the line v0-v1 & v2-v3
-fn find_corner_intersection<T: FloatingPoint>(
-    vertices: [&Vertex<T>; 4],
-    delta: T,
-) -> anyhow::Result<Point2<T>> {
-    let v0 = vertices[0];
-    let v1 = vertices[1];
-    let v2 = vertices[2];
-    let v3 = vertices[3];
-
-    let d0 = (v1.inner() - v0.inner()).normalize() * delta;
-    let l0 = to_line_helper(v0.inner(), &(v1.inner() + d0));
-    let d1 = (v3.inner() - v2.inner()).normalize() * delta;
-    let l1 = to_line_helper(&(v2.inner() - d1), v3.inner());
-
-    let it = geo::algorithm::line_intersection::line_intersection(l0, l1);
-    let it = it
-        .and_then(|it| match it {
-            LineIntersection::SinglePoint {
-                intersection: p,
-                is_proper: _,
-            } => Some(p),
-            _ => None,
-        })
-        .ok_or(anyhow::anyhow!("no intersection"))?;
-
-    Ok(Point2::new(
-        T::from_f64(it.x).unwrap(),
-        T::from_f64(it.y).unwrap(),
-    ))
 }
 
 /// tessellate the NURBS curve & return the points and tangent vectors

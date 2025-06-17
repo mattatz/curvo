@@ -1,8 +1,8 @@
 pub mod curve_offset_option;
+mod helper;
 pub mod offset_compound_curve;
 pub mod offset_nurbs_curve;
 mod vertex;
-mod helper;
 pub use curve_offset_option::*;
 
 /// Corner type for offsetting NURBS curves

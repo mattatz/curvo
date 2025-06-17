@@ -1,14 +1,14 @@
-use geo::{
-    line_intersection, Coord, Euclidean, EuclideanLength, Length, LineIntersection, Vector2DOps,
-};
+use geo::LineIntersection;
 use itertools::Itertools;
 use nalgebra::Point2;
 
 use crate::{
     curve::NurbsCurve2D,
     misc::FloatingPoint,
-    offset::{helper::to_line_helper, CurveOffsetCornerType, CurveOffsetOption, Offset},
-    prelude::{Intersection, Intersects},
+    offset::{
+        helper::{round_corner, sharp_corner_intersection, smooth_corner, to_line_helper},
+        CurveOffsetCornerType, CurveOffsetOption, Offset,
+    },
     region::CompoundCurve2D,
 };
 
@@ -39,13 +39,13 @@ where
                 let w1 = &window[1];
                 find_corner(w0, w1, &option)
             })
-            .collect_vec();
+            .collect::<anyhow::Result<Vec<_>>>()?;
 
         let last_corner = if is_closed {
             let last = offset.last();
             let head = offset.first();
             match (last, head) {
-                (Some(last), Some(head)) => find_corner(last, head, &option),
+                (Some(last), Some(head)) => find_corner(last, head, &option)?,
                 _ => None,
             }
         } else {
@@ -85,22 +85,19 @@ where
                             trim_polyline(o[0].spans().first().unwrap(), None, Some(*next));
                         vec![trimmed]
                     }
-                    Corner::Curve(corner) => {
-                        o.into_iter()
-                            .flat_map(|c| c.into_spans())
-                            .chain(vec![corner.clone()])
-                            .collect_vec()
-                    }
+                    Corner::Curve(corner) => o
+                        .into_iter()
+                        .flat_map(|c| c.into_spans())
+                        .chain(vec![corner.clone()])
+                        .collect_vec(),
                 },
-                (_, None) => {
-                  o.into_iter().flat_map(|c| c.into_spans()).collect_vec()
-                },
+                (_, None) => o.into_iter().flat_map(|c| c.into_spans()).collect_vec(),
             }
         });
 
-        Ok(vec![
-          CompoundCurve2D::new_unchecked_aligned(curves.flatten().collect_vec())
-        ])
+        Ok(vec![CompoundCurve2D::new_unchecked_aligned(
+            curves.flatten().collect_vec(),
+        )])
     }
 }
 
@@ -119,11 +116,11 @@ fn trim_polyline<T: FloatingPoint>(
     let dehomogenized_control_points = polyline.dehomogenized_control_points();
     let start = match start {
         Some(p) => p,
-        None => dehomogenized_control_points[0].clone(),
+        None => dehomogenized_control_points[0],
     };
     let end = match end {
         Some(p) => p,
-        None => dehomogenized_control_points[dehomogenized_control_points.len() - 1].clone(),
+        None => dehomogenized_control_points[dehomogenized_control_points.len() - 1],
     };
     let pts = vec![start]
         .into_iter()
@@ -144,17 +141,17 @@ fn find_corner<T: FloatingPoint>(
     s0: &[CompoundCurve2D<T>],
     s1: &[CompoundCurve2D<T>],
     option: &CurveOffsetOption<T>,
-) -> Option<Corner<T>> {
+) -> anyhow::Result<Option<Corner<T>>> {
     match (s0.len(), s1.len()) {
         (1, 1) => {
             let last = s0[0].spans().last();
             let head = s1[0].spans().first();
             match (last, head) {
                 (Some(last), Some(head)) => corner(last, head, option),
-                _ => None,
+                _ => Ok(None),
             }
         }
-        _ => None,
+        _ => Ok(None),
     }
 }
 
@@ -163,7 +160,7 @@ fn corner<T: FloatingPoint>(
     c0: &NurbsCurve2D<T>,
     c1: &NurbsCurve2D<T>,
     option: &CurveOffsetOption<T>,
-) -> Option<Corner<T>> {
+) -> anyhow::Result<Option<Corner<T>>> {
     let last_degree = c0.degree();
     let head_degree = c1.degree();
     if last_degree == 1 && last_degree == head_degree {
@@ -173,38 +170,53 @@ fn corner<T: FloatingPoint>(
         let pt1 = c1.dehomogenized_control_points();
         let s0 = pt0[n0 - 2..].iter().collect_vec();
         let s1 = pt1[..2].iter().collect_vec();
-        let l0 = to_line_helper(&s0[0], &s0[1]);
-        let l1 = to_line_helper(&s1[0], &s1[1]);
+        let l0 = to_line_helper(s0[0], s0[1]);
+        let l1 = to_line_helper(s1[0], s1[1]);
         let it = geo::algorithm::line_intersection::line_intersection(l0, l1);
         match it {
             Some(LineIntersection::SinglePoint {
                 intersection,
                 is_proper: _,
             }) => {
-                /*
-                let get_parameter = |c: &NurbsCurve2D<T>, l: &geo::Line| {
-                    let d = intersection - l.start_point().into();
-                    let t = d.magnitude() / l.length::<Euclidean>();
-                    get_parameter_at_intersection(c, T::from_f64(t).unwrap())
-                };
-                let a = get_parameter(c0, &l0);
-                let b = get_parameter(c1, &l1);
-                */
-
                 let pt = Point2::new(
                     T::from_f64(intersection.x).unwrap(),
                     T::from_f64(intersection.y).unwrap(),
                 );
-                Some(Corner::Intersection(pt))
+                Ok(Some(Corner::Intersection(pt)))
             }
             _ => {
                 // create a corner curve
-                None
+                match option.corner_type() {
+                    CurveOffsetCornerType::None => unreachable!(),
+                    CurveOffsetCornerType::Sharp => {
+                        let delta = option.distance().abs() * T::from_f64(2.0).unwrap();
+                        let it = sharp_corner_intersection([s0[0], s0[1], s1[0], s1[1]], delta)?;
+                        let corner =
+                            NurbsCurve2D::polyline(&[s0[1].clone(), it, s1[0].clone()], false);
+                        Ok(Some(Corner::Curve(corner)))
+                    }
+                    CurveOffsetCornerType::Round => {
+                        let arc = round_corner(s0[0], s0[1], s1[0], *option.distance())?;
+                        Ok(Some(Corner::Curve(arc)))
+                    }
+                    CurveOffsetCornerType::Smooth => {
+                        let bezier = smooth_corner(s0[0], s0[1], s1[0], s1[1], *option.distance())?;
+                        Ok(Some(Corner::Curve(bezier)))
+                    }
+                    CurveOffsetCornerType::Chamfer => {
+                        let last = pt0.last().ok_or(anyhow::anyhow!("No last point"))?;
+                        let head = pt1.first().ok_or(anyhow::anyhow!("No head point"))?;
+                        Ok(Some(Corner::Curve(NurbsCurve2D::polyline(
+                            &[*last, *head],
+                            false,
+                        ))))
+                    }
+                }
             }
         }
     } else {
         // just connect the two spans by corner
-        None
+        Ok(None)
     }
 }
 
@@ -225,7 +237,7 @@ mod tests {
     #[test]
     fn test() {
         let polyline = NurbsCurve2D::polyline(
-            &vec![
+            &[
                 Point2::new(0., 0.),
                 Point2::new(1., 0.),
                 Point2::new(1., 1.),
