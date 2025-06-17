@@ -187,3 +187,8 @@ required-features = ["bevy"]
 name = "offset_curve"
 path = "examples/offset_curve.rs"
 required-features = ["bevy"]
+
+[[example]]
+name = "offset_compound_curve"
+path = "examples/offset_compound_curve.rs"
+required-features = ["bevy"]
