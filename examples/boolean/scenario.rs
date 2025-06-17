@@ -125,7 +125,7 @@ fn compound_circle() -> CurveVariant {
     .into()
 }
 
-fn compound_rounded_rectangle() -> CurveVariant {
+pub fn compound_rounded_rectangle() -> CurveVariant {
     let length = 2.0;
     let radius = 1.0;
     let dx = Vector2::x();
@@ -162,7 +162,7 @@ fn compound_rounded_rectangle() -> CurveVariant {
     .into()
 }
 
-fn compound_rounded_t_shape() -> CurveVariant {
+pub fn compound_rounded_t_shape() -> CurveVariant {
     let w_length = 1.5;
     let h_length = 3.0;
     let radius = 0.5;

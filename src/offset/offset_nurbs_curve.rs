@@ -6,95 +6,17 @@ use nalgebra::allocator::Allocator;
 use nalgebra::{
     DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, OVector, Point2, Vector2, U1,
 };
-use num_traits::NumCast;
 
 use crate::curve::NurbsCurve2D;
+use crate::offset::curve_offset_option::CurveOffsetOption;
+use crate::offset::helper::{
+    round_corner, sharp_corner_intersection, smooth_corner, to_line_helper,
+};
+use crate::offset::vertex::Vertex;
 use crate::offset::CurveOffsetCornerType;
 use crate::region::{CompoundCurve, CompoundCurve2D};
 use crate::tessellation::tessellation_curve::tessellate_curve_adaptive;
 use crate::{curve::NurbsCurve, misc::FloatingPoint, offset::Offset};
-
-/// Offset option for NURBS curves
-#[derive(Debug, Clone, PartialEq)]
-pub struct CurveOffsetOption<T> {
-    /// Offset distance
-    distance: T,
-    /// Normal tolerance for tessellation
-    normal_tolerance: T,
-    /// Knot tolerance for reducing knots
-    knot_tolerance: T,
-    /// Corner type
-    corner_type: CurveOffsetCornerType,
-}
-
-impl<T: FloatingPoint> Default for CurveOffsetOption<T> {
-    fn default() -> Self {
-        Self {
-            distance: T::zero(),
-            normal_tolerance: T::from_f64(1e-4).unwrap(),
-            knot_tolerance: T::from_f64(1e-4).unwrap(),
-            corner_type: Default::default(),
-        }
-    }
-}
-
-impl<T> CurveOffsetOption<T> {
-    pub fn with_distance(mut self, distance: T) -> Self {
-        self.distance = distance;
-        self
-    }
-
-    pub fn with_normal_tolerance(mut self, tol: T) -> Self {
-        self.normal_tolerance = tol;
-        self
-    }
-
-    pub fn with_knot_tolerance(mut self, tol: T) -> Self {
-        self.knot_tolerance = tol;
-        self
-    }
-
-    pub fn with_corner_type(mut self, ty: CurveOffsetCornerType) -> Self {
-        self.corner_type = ty;
-        self
-    }
-}
-
-/// vertex variant
-#[derive(Debug, Clone, PartialEq)]
-enum Vertex<T: FloatingPoint> {
-    Point(Point2<T>),
-    Intersection(Point2<T>),
-}
-
-impl<T: FloatingPoint, P: geo::CoordNum> From<geo::Point<P>> for Vertex<T> {
-    fn from(p: geo::Point<P>) -> Self {
-        let x = p.x().to_f64().unwrap();
-        let y = p.y().to_f64().unwrap();
-        Vertex::Point(Point2::new(
-            T::from_f64(x).unwrap(),
-            T::from_f64(y).unwrap(),
-        ))
-    }
-}
-
-impl<T: FloatingPoint> From<Vertex<T>> for Point2<T> {
-    fn from(v: Vertex<T>) -> Self {
-        match v {
-            Vertex::Point(p) => p,
-            Vertex::Intersection(p) => p,
-        }
-    }
-}
-
-impl<T: FloatingPoint> Vertex<T> {
-    pub fn inner(&self) -> &Point2<T> {
-        match self {
-            Vertex::Point(p) => p,
-            Vertex::Intersection(p) => p,
-        }
-    }
-}
 
 impl<'a, T> Offset<'a, T> for NurbsCurve2D<T>
 where
@@ -103,14 +25,10 @@ where
     type Output = anyhow::Result<Vec<CompoundCurve2D<T>>>;
     type Option = CurveOffsetOption<T>;
 
-    /// Offset the NURBS curve by a given distance with a given epsilon
+    /// Offset the NURBS curve by a given option
     fn offset(&'a self, option: Self::Option) -> Self::Output {
-        let CurveOffsetOption {
-            distance,
-            normal_tolerance: norm_tol,
-            knot_tolerance: knot_tol,
-            corner_type,
-        } = option;
+        let distance = *option.distance();
+        let corner_type = option.corner_type();
 
         let is_closed = self.is_closed();
 
@@ -218,8 +136,10 @@ where
                                         let v1 = prev.end.clone();
                                         let v2 = s.start.clone();
                                         let v3 = s.end.clone();
-                                        let it =
-                                            find_corner_intersection([&v0, &v1, &v2, &v3], delta)?;
+                                        let it = sharp_corner_intersection(
+                                            [v0.inner(), v1.inner(), v2.inner(), v3.inner()],
+                                            delta,
+                                        )?;
                                         Ok(it)
                                     }
                                     _ => Ok(p),
@@ -253,77 +173,36 @@ where
 
                     return Ok(vec![NurbsCurve2D::polyline(&pts, false).into()]);
                 }
-                CurveOffsetCornerType::Round => {
-                    try_connect(&segments, |cursor| {
-                        let cur = &segments[cursor];
-                        if cursor == segments.len() - 1 && !is_closed {
-                            return Ok(None);
-                        }
-                        let next = &segments[(cursor + 1) % segments.len()];
+                CurveOffsetCornerType::Round => try_connect(&segments, |cursor| {
+                    let cur = &segments[cursor];
+                    if cursor == segments.len() - 1 && !is_closed {
+                        return Ok(None);
+                    }
+                    let next = &segments[(cursor + 1) % segments.len()];
 
-                        let v0 = &cur.start;
-                        let v1 = &cur.end;
-                        let t = (v1.inner() - v0.inner()).normalize();
-                        let sign = distance.signum();
-                        let n = Vector2::new(t.y, -t.x);
-                        let d = n * distance;
-                        let center = v1.inner() - d;
-                        let v2 = &next.start;
+                    let v0 = &cur.start;
+                    let v1 = &cur.end;
+                    let v2 = &next.start;
 
-                        let d0 = v1.inner() - center;
-                        let d1 = v2.inner() - center;
-                        let angle = d0.angle(&d1);
-                        let angle = angle.abs();
+                    let arc = round_corner(v0.inner(), v1.inner(), v2.inner(), distance)?;
+                    Ok(Some(arc))
+                })?,
+                CurveOffsetCornerType::Smooth => try_connect(&segments, |cursor| {
+                    let cur = &segments[cursor];
+                    if cursor == segments.len() - 1 && !is_closed {
+                        return Ok(None);
+                    }
+                    let next = &segments[(cursor + 1) % segments.len()];
 
-                        // create arc between v1 and v2
-                        let arc = Self::try_arc(
-                            &center,
-                            &(n * sign),
-                            &t,
-                            distance.abs(),
-                            T::zero(),
-                            angle,
-                        )?;
-                        Ok(Some(arc))
-                    })?
-                }
-                CurveOffsetCornerType::Smooth => {
-                    let frac_2_3 = T::from_f64(2.0 / 3.0).unwrap();
-                    let d = distance.abs() * frac_2_3;
+                    let v0 = &cur.start;
+                    let v1 = &cur.end;
+                    let v2 = &next.start;
+                    let v3 = &next.end;
+                    let bezier =
+                        smooth_corner(v0.inner(), v1.inner(), v2.inner(), v3.inner(), distance)?;
 
-                    try_connect(&segments, |cursor| {
-                        let cur = &segments[cursor];
-                        if cursor == segments.len() - 1 && !is_closed {
-                            return Ok(None);
-                        }
-                        let next = &segments[(cursor + 1) % segments.len()];
-
-                        let v0 = &cur.start;
-                        let v1 = &cur.end;
-                        let v2 = &next.start;
-                        let v3 = &next.end;
-
-                        let d10 = if v1.inner() == v0.inner() {
-                            Vector2::zeros()
-                        } else {
-                            (v1.inner() - v0.inner()).normalize() * d
-                        };
-                        let d32 = if v3.inner() == v2.inner() {
-                            Vector2::zeros()
-                        } else {
-                            (v3.inner() - v2.inner()).normalize() * d
-                        };
-
-                        // create arc between v1 and v2
-                        let bezier = NurbsCurve2D::bezier(&[
-                            *v1.inner(),
-                            v1.inner() + d10,
-                            v2.inner() - d32,
-                            *v2.inner(),
-                        ]);
-                        Ok(Some(bezier))
-                    })?
-                }
+                    Ok(Some(bezier))
+                })?,
                 CurveOffsetCornerType::Chamfer => try_connect(&segments, |cursor| {
                     let cur = &segments[cursor];
                     if cursor == segments.len() - 1 && !is_closed {
@@ -375,6 +254,8 @@ where
 
             Ok(vec![CompoundCurve::new_unchecked_aligned(res)])
         } else {
+            let norm_tol = *option.normal_tolerance();
+            let knot_tol = *option.knot_tolerance();
             let tess = tessellate_nurbs_curve(self, norm_tol)
                 .into_iter()
                 .map(|(p, t)| {
@@ -469,38 +350,6 @@ where
     Ok(spans.into_iter().flatten().collect_vec())
 }
 
-/// find the intersection of the line v0-v1 & v2-v3
-fn find_corner_intersection<T: FloatingPoint>(
-    vertices: [&Vertex<T>; 4],
-    delta: T,
-) -> anyhow::Result<Point2<T>> {
-    let v0 = vertices[0];
-    let v1 = vertices[1];
-    let v2 = vertices[2];
-    let v3 = vertices[3];
-
-    let d0 = (v1.inner() - v0.inner()).normalize() * delta;
-    let l0 = to_line_helper(v0.inner(), &(v1.inner() + d0));
-    let d1 = (v3.inner() - v2.inner()).normalize() * delta;
-    let l1 = to_line_helper(&(v2.inner() - d1), v3.inner());
-
-    let it = geo::algorithm::line_intersection::line_intersection(l0, l1);
-    let it = it
-        .and_then(|it| match it {
-            LineIntersection::SinglePoint {
-                intersection: p,
-                is_proper: _,
-            } => Some(p),
-            _ => None,
-        })
-        .ok_or(anyhow::anyhow!("no intersection"))?;
-
-    Ok(Point2::new(
-        T::from_f64(it.x).unwrap(),
-        T::from_f64(it.y).unwrap(),
-    ))
-}
-
 /// tessellate the NURBS curve & return the points and tangent vectors
 #[allow(clippy::type_complexity)]
 fn tessellate_nurbs_curve<T, D>(
@@ -524,15 +373,6 @@ where
     })
 }
 
-/// Convert a line segment to a geo::Line
-fn to_line_helper<T: FloatingPoint>(p0: &Point2<T>, p1: &Point2<T>) -> geo::Line {
-    let x0 = <f64 as NumCast>::from(p0.x).unwrap();
-    let y0 = <f64 as NumCast>::from(p0.y).unwrap();
-    let x1 = <f64 as NumCast>::from(p1.x).unwrap();
-    let y1 = <f64 as NumCast>::from(p1.y).unwrap();
-    geo::Line::new(geo::coord! { x: x0, y: y0 }, geo::coord! { x: x1, y: y1 })
-}
-
 #[cfg(test)]
 mod tests {
     use nalgebra::Point2;
@@ -551,11 +391,9 @@ mod tests {
             Point2::new(0.0, 1.0),
         ];
         let polyline = NurbsCurve2D::polyline(&points, false);
-        let option = CurveOffsetOption {
-            distance: 0.2,
-            corner_type: CurveOffsetCornerType::Sharp,
-            ..Default::default()
-        };
+        let option = CurveOffsetOption::default()
+            .with_distance(0.2)
+            .with_corner_type(CurveOffsetCornerType::Sharp);
         let res = polyline.offset(option).unwrap();
         assert_eq!(res.len(), 1);
         let curve = &res[0];
@@ -585,11 +423,9 @@ mod tests {
             Point2::new(0.0, 0.0),
         ];
         let polyline = NurbsCurve2D::polyline(&points, false);
-        let option = CurveOffsetOption {
-            distance: 0.2,
-            corner_type: CurveOffsetCornerType::Sharp,
-            ..Default::default()
-        };
+        let option = CurveOffsetOption::default()
+            .with_distance(0.2)
+            .with_corner_type(CurveOffsetCornerType::Sharp);
 
         // positive offset
         let res = polyline.offset(option.clone()).unwrap();
