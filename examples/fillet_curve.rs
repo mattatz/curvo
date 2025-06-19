@@ -21,22 +21,12 @@ use misc::*;
 
 #[derive(Resource, Debug)]
 struct Setting {
-    pub corner_type: CurveOffsetCornerType,
-    pub distance: f64,
-    pub degree: usize,
+    pub radius: f64,
 }
 
 impl Default for Setting {
     fn default() -> Self {
-        Self {
-            // corner_type: CurveOffsetCornerType::Sharp,
-            corner_type: CurveOffsetCornerType::Round,
-            // corner_type: CurveOffsetCornerType::Smooth,
-            distance: 0.2,
-            // distance: -0.2,
-            // distance: 2.0,
-            degree: 1,
-        }
+        Self { radius: 0.2 }
     }
 }
 
@@ -47,14 +37,11 @@ struct ControlPoints(pub Vec<Point2<f64>>);
 struct ProfileCurve(pub NurbsCurve2D<f64>);
 
 #[derive(Component)]
-struct OffsetVertex(pub Vec<CompoundCurve2D<f64>>);
+struct FilletCurve(pub CompoundCurve2D<f64>);
 
-#[derive(Component)]
-struct OffsetCurve(pub Vec<CompoundCurve2D<f64>>);
-
-impl OffsetCurve {
-    pub fn update(&mut self, entities: Vec<CompoundCurve2D<f64>>) {
-        self.0 = entities;
+impl FilletCurve {
+    pub fn update(&mut self, curve: CompoundCurve2D<f64>) {
+        self.0 = curve;
     }
 }
 
@@ -133,18 +120,11 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
     commands.spawn((ControlPoints(points.clone()),));
 
     let curve = NurbsCurve2D::polyline(&points, true);
-    let option = CurveOffsetOption::default()
-        .with_corner_type(settings.corner_type)
-        .with_distance(settings.distance)
-        .with_normal_tolerance(1e-4);
-    let offset_curve = curve.offset(option.clone()).unwrap();
-    let offset_curve_vertex = curve
-        .offset(option.clone().with_corner_type(CurveOffsetCornerType::None))
-        .unwrap();
+    let option = FilletRadiusOption::new(settings.radius);
+    let offset_curve = curve.fillet(option.clone()).unwrap();
 
     commands.spawn((ProfileCurve(curve),));
-    commands.spawn((OffsetCurve(offset_curve),));
-    commands.spawn((OffsetVertex(offset_curve_vertex),));
+    commands.spawn((FilletCurve(offset_curve),));
 
     let scale = 5.;
     commands.spawn((
@@ -168,10 +148,8 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
 fn update_ui(
     mut contexts: EguiContexts,
     mut settings: ResMut<Setting>,
-    control_points: Query<&ControlPoints>,
-    mut profile: Query<&mut ProfileCurve>,
-    mut offset_curve: Query<&mut OffsetCurve>,
-    mut offset_vertex: Query<&mut OffsetVertex>,
+    profile: Query<&ProfileCurve>,
+    mut fillet_curve: Query<&mut FilletCurve>,
 ) {
     let mut changed = false;
     egui::Window::new("offset curve")
@@ -181,90 +159,24 @@ fn update_ui(
         .min_width(420.)
         .max_width(420.)
         .show(contexts.ctx_mut(), |ui| {
-            ui.heading("corner type");
+            ui.heading("radius");
             ui.group(|g| {
                 g.horizontal(|ui| {
                     changed |= ui
-                        .selectable_value(
-                            &mut settings.corner_type,
-                            CurveOffsetCornerType::Sharp,
-                            "Sharp",
-                        )
+                        .add(egui::DragValue::new(&mut settings.radius).speed(1e-2))
                         .changed();
-                    changed |= ui
-                        .selectable_value(
-                            &mut settings.corner_type,
-                            CurveOffsetCornerType::Round,
-                            "Round",
-                        )
-                        .changed();
-                    changed |= ui
-                        .selectable_value(
-                            &mut settings.corner_type,
-                            CurveOffsetCornerType::Smooth,
-                            "Smooth",
-                        )
-                        .changed();
-                    changed |= ui
-                        .selectable_value(
-                            &mut settings.corner_type,
-                            CurveOffsetCornerType::Chamfer,
-                            "Chamfer",
-                        )
-                        .changed();
-                });
-            });
-
-            ui.heading("distance");
-            ui.group(|g| {
-                g.horizontal(|ui| {
-                    changed |= ui
-                        .add(egui::DragValue::new(&mut settings.distance).speed(1e-2))
-                        .changed();
-                });
-            });
-
-            ui.heading("degree");
-            ui.group(|g| {
-                g.horizontal(|ui| {
-                    changed |= ui.selectable_value(&mut settings.degree, 1, "1").changed();
-                    changed |= ui.selectable_value(&mut settings.degree, 3, "3").changed();
                 });
             });
         });
 
     if changed {
-        let points = &control_points.single().unwrap().0;
+        let profile = profile.single().unwrap();
 
-        let mut profile = profile.single_mut().unwrap();
-        let n = points.len();
-        let is_closed = points[0] == points[n - 1];
-
-        profile.0 = if is_closed {
-            let points = points.iter().take(n - 1).cloned().collect_vec();
-            NurbsCurve2D::try_periodic_interpolate(&points, settings.degree, KnotStyle::Centripetal)
-                .unwrap()
-        } else {
-            NurbsCurve2D::try_interpolate(points, settings.degree).unwrap()
-        };
-
-        let mut offset_curve = offset_curve.single_mut().unwrap();
-        let option = CurveOffsetOption::default()
-            .with_corner_type(settings.corner_type)
-            .with_distance(settings.distance)
-            .with_normal_tolerance(1e-4);
-        let res = profile.0.offset(option);
+        let mut fillet_curve = fillet_curve.single_mut().unwrap();
+        let option = FilletRadiusOption::new(settings.radius);
+        let res = profile.0.fillet(option);
         if let Ok(res) = res {
-            offset_curve.update(res);
-        }
-
-        let option = CurveOffsetOption::default()
-            .with_corner_type(CurveOffsetCornerType::None)
-            .with_distance(settings.distance)
-            .with_normal_tolerance(1e-4);
-        let res = profile.0.offset(option);
-        if let Ok(res) = res {
-            offset_vertex.single_mut().unwrap().0 = res;
+            fillet_curve.update(res);
         }
     }
 }
@@ -272,8 +184,7 @@ fn update_ui(
 fn gizmos_offset_curve(
     control_points: Query<&ControlPoints>,
     profile: Query<&ProfileCurve>,
-    offset_curve: Query<&OffsetCurve>,
-    _offset_vertex: Query<&OffsetVertex>,
+    fillet_curve: Query<&FilletCurve>,
     mut gizmos: Gizmos,
 ) {
     let points = &control_points.single().unwrap().0;
@@ -293,9 +204,9 @@ fn gizmos_offset_curve(
         .collect_vec();
     gizmos.linestrip(tess, WHITE);
 
-    let offset_curve = offset_curve.single().unwrap();
+    let fillet_curve = fillet_curve.single().unwrap();
 
-    offset_curve.0.iter().for_each(|c| {
+    fillet_curve.0.spans().iter().for_each(|c| {
         let tess = c
             .tessellate(Some(tol))
             .into_iter()
@@ -311,24 +222,9 @@ fn gizmos_offset_curve(
         });
         gizmos.linestrip_gradient(pts);
 
-        c.spans()
-            .iter()
-            .flat_map(|c| c.dehomogenized_control_points())
-            .for_each(|p| {
-                let p: Vec3 = p.coords.cast::<f32>().to_homogeneous().into();
-                gizmos.sphere(p, 0.035, LIGHT_GREEN);
-            });
+        c.dehomogenized_control_points().iter().for_each(|p| {
+            let p: Vec3 = p.coords.cast::<f32>().to_homogeneous().into();
+            gizmos.sphere(p, 0.035, LIGHT_GREEN);
+        });
     });
-
-    /*
-    let offset_vertex = offset_vertex.single().unwrap();
-    offset_vertex.0.iter().for_each(|c| {
-        let tess = c
-            .tessellate(Some(tol))
-            .into_iter()
-            .map(|p| p.coords.cast::<f32>().to_homogeneous().into())
-            .collect_vec();
-        gizmos.linestrip(tess, TOMATO);
-    });
-    */
 }
