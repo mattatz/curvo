@@ -18,6 +18,7 @@ mod misc;
 
 use materials::*;
 use misc::*;
+use rand::Rng;
 
 #[derive(Resource, Debug)]
 struct Setting {
@@ -77,7 +78,7 @@ impl Plugin for AppPlugin {
                     .before(bevy_egui::begin_pass_system),
             )
             .add_systems(EguiContextPass, update_ui)
-            .add_systems(Update, gizmos_offset_curve);
+            .add_systems(Update, gizmos_curve);
     }
 }
 
@@ -93,12 +94,12 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
     ];
 
     // square
-    let _points = [
+    let points = vec![
         Point2::new(-1.0, -1.0),
         Point2::new(1.0, -1.0),
         Point2::new(1.0, 1.0),
         Point2::new(-1.0, 1.0),
-        Point2::new(-1.0, -1.0),
+        // Point2::new(-1.0, -1.0),
     ];
 
     // convex polygon
@@ -114,17 +115,26 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
         Point2::new(-0.5, 2.),
     ]
     .into_iter()
-    .rev()
     .collect_vec();
+
+    let mut rng: rand::rngs::StdRng = rand::SeedableRng::from_seed([0; 32]);
+    let points = points
+        .into_iter()
+        .map(|p| {
+            let dx = (rng.random::<f64>() - 0.5) * 1.;
+            let dy = (rng.random::<f64>() - 0.5) * 1.;
+            Point2::new(p.x + dx, p.y + dy)
+        })
+        .collect_vec();
 
     commands.spawn((ControlPoints(points.clone()),));
 
     let curve = NurbsCurve2D::polyline(&points, true);
     let option = FilletRadiusOption::new(settings.radius);
-    let offset_curve = curve.fillet(option.clone()).unwrap();
+    let fillet_curve = curve.fillet(option.clone()).unwrap();
 
     commands.spawn((ProfileCurve(curve),));
-    commands.spawn((FilletCurve(offset_curve),));
+    commands.spawn((FilletCurve(fillet_curve),));
 
     let scale = 5.;
     commands.spawn((
@@ -152,7 +162,7 @@ fn update_ui(
     mut fillet_curve: Query<&mut FilletCurve>,
 ) {
     let mut changed = false;
-    egui::Window::new("offset curve")
+    egui::Window::new("fillet curve")
         .collapsible(false)
         .drag_to_scroll(false)
         .default_width(420.)
@@ -181,7 +191,7 @@ fn update_ui(
     }
 }
 
-fn gizmos_offset_curve(
+fn gizmos_curve(
     control_points: Query<&ControlPoints>,
     profile: Query<&ProfileCurve>,
     fillet_curve: Query<&FilletCurve>,
@@ -190,19 +200,21 @@ fn gizmos_offset_curve(
     let points = &control_points.single().unwrap().0;
     points.iter().for_each(|p| {
         let p: Vec3 = p.coords.cast::<f32>().to_homogeneous().into();
-        gizmos.sphere(p, 0.025, WHITE);
+        // gizmos.sphere(p, 0.025, WHITE);
     });
 
     let tol = 1e-7 * 0.5;
 
     let profile = profile.single().unwrap();
+    /*
     let tess = profile
         .0
         .tessellate(Some(tol))
         .into_iter()
         .map(|p| p.coords.cast::<f32>().to_homogeneous().into())
         .collect_vec();
-    gizmos.linestrip(tess, WHITE);
+    gizmos.linestrip(tess, WHITE.with_alpha(0.25));
+    */
 
     let fillet_curve = fillet_curve.single().unwrap();
 
@@ -224,7 +236,7 @@ fn gizmos_offset_curve(
 
         c.dehomogenized_control_points().iter().for_each(|p| {
             let p: Vec3 = p.coords.cast::<f32>().to_homogeneous().into();
-            gizmos.sphere(p, 0.035, LIGHT_GREEN);
+            // gizmos.sphere(p, 0.015, LIGHT_GREEN);
         });
     });
 }
