@@ -27,7 +27,7 @@ impl<T: FloatingPoint> FilletRadiusOption<T> {
     }
 }
 
-/// Fillet the sharp corners of the curve with a given radius and parameter
+/// Only fillet the sharp corner at the specified parameter position with a given radius
 #[derive(Debug, Clone, Copy)]
 pub struct FilletRadiusParameterOption<T: FloatingPoint> {
     radius: T,
@@ -45,6 +45,16 @@ impl<T: FloatingPoint> FilletRadiusParameterOption<T> {
 
     pub fn parameter(&self) -> T {
         self.parameter
+    }
+
+    pub fn with_parameter(&mut self, parameter: T) -> &mut Self {
+        self.parameter = parameter;
+        self
+    }
+
+    pub fn with_radius(&mut self, radius: T) -> &mut Self {
+        self.radius = radius;
+        self
     }
 }
 
@@ -158,7 +168,22 @@ where
 {
     type Output = anyhow::Result<CompoundCurve<T, D>>;
 
-    /// Fillet the sharp corners of the curve with a given radius and parameter
+    /// Only fillet the sharp corner at the specified parameter position with a given radius
+    /// # Example
+    /// ```
+    /// use nalgebra::Point2;
+    /// use curvo::prelude::*;
+    ///
+    /// let square = vec![
+    ///     Point2::new(-1.0, -1.0),
+    ///     Point2::new(1.0, -1.0),
+    ///     Point2::new(1.0, 1.0),
+    ///     Point2::new(-1.0, 1.0),
+    ///     Point2::new(-1.0, -1.0),
+    /// ];
+    /// let curve = NurbsCurve2D::polyline(&square, false);
+    /// let fillet = curve.fillet(FilletRadiusParameterOption::new(0.2, 2.)).unwrap();
+    /// assert_eq!(fillet.spans().len(), 3);
     fn fillet(&self, option: FilletRadiusParameterOption<T>) -> Self::Output {
         let degree = self.degree();
         let radius = option.radius();
@@ -230,12 +255,13 @@ where
 }
 
 /// Fillet the sharp corners of the curve with a given radius
-fn fillet_curve<T: FloatingPoint, D: DimName>(
+fn fillet_curve<T: FloatingPoint, D>(
     segments: Vec<Segment<T, DimNameDiff<D, U1>>>,
     angle_fillet_length: Vec<Option<FilletLength<T>>>,
     is_closed: bool,
 ) -> anyhow::Result<CompoundCurve<T, D>>
 where
+    D: DimName,
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
@@ -374,7 +400,7 @@ where
 }
 
 /// Create a fillet arc curve
-fn create_fillet_arc<T: FloatingPoint, D: DimName>(
+fn create_fillet_arc<T: FloatingPoint, D>(
     start: &OPoint<T, DimNameDiff<D, U1>>,
     corner: &OPoint<T, DimNameDiff<D, U1>>,
     _end: &OPoint<T, DimNameDiff<D, U1>>,
@@ -384,6 +410,7 @@ fn create_fillet_arc<T: FloatingPoint, D: DimName>(
     radius: T,
 ) -> anyhow::Result<NurbsCurve<T, D>>
 where
+    D: DimName,
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
