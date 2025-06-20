@@ -151,7 +151,7 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
 
     let curve = NurbsCurve2D::polyline(&points, true);
     let option = FilletRadiusOption::new(settings.radius);
-    let fillet_curve = curve.fillet(option.clone()).unwrap();
+    let fillet_curve = curve.fillet(option).unwrap();
 
     commands.spawn((ProfileCurve(curve),));
     commands.spawn((FilletCurve(fillet_curve),));
@@ -169,7 +169,7 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
         true,
     );
     let option = FilletRadiusOption::new(settings.radius);
-    let fillet_curve = curve.fillet(option.clone()).unwrap();
+    let fillet_curve = curve.fillet(option).unwrap();
 
     commands.spawn((Profile3DCurve(curve),));
     commands.spawn((Fillet3DCurve(fillet_curve),));
