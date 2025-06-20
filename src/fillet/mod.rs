@@ -2,8 +2,6 @@ pub mod fillet_nurbs_curve;
 mod segment;
 pub use fillet_nurbs_curve::*;
 
-use segment::*;
-
 /// Trait for filleting a geometry
 /// O is the option type for the fillet
 pub trait Fillet<O> {

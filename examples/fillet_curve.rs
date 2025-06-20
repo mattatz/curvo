@@ -46,7 +46,7 @@ impl Default for Setting {
         Self {
             radius: 0.2,
             dimension: Dimension::default(),
-            use_parameter: true,
+            use_parameter: false,
             parameter: 0.0,
             control_points: true,
         }

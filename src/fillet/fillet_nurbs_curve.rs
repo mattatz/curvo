@@ -144,101 +144,7 @@ where
             })
             .collect_vec();
 
-        let l = angle_fillet_length.len();
-
-        let trimmed = segments
-            .into_iter()
-            .enumerate()
-            .map(|(i, current)| {
-                let prev_fillet = if i != 0 || is_closed {
-                    angle_fillet_length[(i + l - 1) % l]
-                } else {
-                    None
-                };
-
-                let next_fillet = if i != n - 1 || is_closed {
-                    angle_fillet_length[i % l]
-                } else {
-                    None
-                };
-
-                let start = match prev_fillet {
-                    Some((_, length, _)) => current.trim(length).0.end().clone(),
-                    None => current.start().clone(),
-                };
-
-                let end = match next_fillet {
-                    Some((_, length, _)) => {
-                        current.trim(current.length() - length).1.start().clone()
-                    }
-                    None => current.end().clone(),
-                };
-                (current, Segment::new(start, end))
-            })
-            .collect_vec();
-
-        let corners = trimmed
-            .iter()
-            .cycle()
-            .take(m)
-            .collect_vec()
-            .windows(2)
-            .zip(angle_fillet_length.iter())
-            .map(|(w, af)| {
-                let s0 = w[0];
-                let s1 = w[1];
-                let t0 = s0.1.tangent();
-                let t1 = s1.1.tangent();
-
-                match af {
-                    Some((angle, _, radius)) => {
-                        let corner = s0.0.end();
-                        let fillet_arc = create_fillet_arc(
-                            s0.1.end(),
-                            corner,
-                            s1.1.start(),
-                            t0,
-                            t1,
-                            T::pi() - *angle,
-                            *radius,
-                        )?;
-                        Ok(Some(fillet_arc))
-                    }
-                    None => Ok(None),
-                }
-            })
-            .collect::<anyhow::Result<Vec<_>>>()?;
-
-        let spans: Vec<Option<Span<T, D>>> = trimmed
-            .into_iter()
-            .map(|s| Some(Span::Segment(s.1)))
-            .interleave(corners.into_iter().map(|c| c.map(|c| Span::Fillet(c))))
-            .collect_vec();
-
-        let mut curves = vec![];
-        let mut polyline = vec![];
-        for s in spans {
-            match s {
-                Some(Span::Segment(s)) => {
-                    polyline.push(s.start().clone());
-                    polyline.push(s.end().clone());
-                }
-                Some(Span::Fillet(c)) => {
-                    polyline.dedup();
-                    curves.push(NurbsCurve::polyline(&polyline, false));
-                    curves.push(c);
-                    polyline.clear();
-                }
-                None => {}
-            }
-        }
-
-        if !polyline.is_empty() {
-            polyline.dedup();
-            curves.push(NurbsCurve::polyline(&polyline, false));
-        }
-
-        Ok(CompoundCurve::new_unchecked_aligned(curves))
+        fillet_curve(segments, angle_fillet_length, is_closed)
     }
 }
 
@@ -252,6 +158,7 @@ where
 {
     type Output = anyhow::Result<CompoundCurve<T, D>>;
 
+    /// Fillet the sharp corners of the curve with a given radius and parameter
     fn fillet(&self, option: FilletRadiusParameterOption<T>) -> Self::Output {
         let degree = self.degree();
         let radius = option.radius();
@@ -281,6 +188,7 @@ where
 
         let is_closed = self.is_closed();
         let n = segments.len();
+        let m = if is_closed { n + 1 } else { n };
 
         let index = self
             .knots()
@@ -296,25 +204,149 @@ where
             anyhow::bail!("Parameter too large, got {}", parameter);
         }
 
-        let prev_segment = &segments[index];
-        let next_segment = &segments[(index + 1) % n];
         let eps = T::from_f64(1e-6).unwrap();
-        let af = calculate_fillet_length(&[prev_segment, next_segment], radius, |length| {
-            let min = prev_segment.length().min(next_segment.length());
-            let l = min - eps;
-            length.min(l)
-        });
+        let angle_fillet_length = segments
+            .iter()
+            .cycle()
+            .take(m)
+            .collect_vec()
+            .windows(2)
+            .enumerate()
+            .map(|(i, w)| {
+                if i == index {
+                    calculate_fillet_length(&[w[0], w[1]], radius, |length| {
+                        let min = w[0].length().min(w[1].length());
+                        let l = min - eps;
+                        length.min(l)
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect_vec();
 
-        todo!()
+        fillet_curve(segments, angle_fillet_length, is_closed)
     }
 }
+
+/// Fillet the sharp corners of the curve with a given radius
+fn fillet_curve<T: FloatingPoint, D: DimName>(
+    segments: Vec<Segment<T, DimNameDiff<D, U1>>>,
+    angle_fillet_length: Vec<Option<FilletLength<T>>>,
+    is_closed: bool,
+) -> anyhow::Result<CompoundCurve<T, D>>
+where
+    D: DimNameSub<U1>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+    <D as DimNameSub<U1>>::Output: DimNameAdd<U1>,
+    DefaultAllocator: Allocator<<<D as DimNameSub<U1>>::Output as DimNameAdd<U1>>::Output>,
+{
+    let n = segments.len();
+    let m = if is_closed { n + 1 } else { n };
+    let l = angle_fillet_length.len();
+
+    let trimmed = segments
+        .into_iter()
+        .enumerate()
+        .map(|(i, current)| {
+            let prev_fillet = if i != 0 || is_closed {
+                angle_fillet_length[(i + l - 1) % l]
+            } else {
+                None
+            };
+
+            let next_fillet = if i != n - 1 || is_closed {
+                angle_fillet_length[i % l]
+            } else {
+                None
+            };
+
+            let start = match prev_fillet {
+                Some((_, length, _)) => current.trim(length).0.end().clone(),
+                None => current.start().clone(),
+            };
+
+            let end = match next_fillet {
+                Some((_, length, _)) => current.trim(current.length() - length).1.start().clone(),
+                None => current.end().clone(),
+            };
+            (current, Segment::new(start, end))
+        })
+        .collect_vec();
+
+    let corners = trimmed
+        .iter()
+        .cycle()
+        .take(m)
+        .collect_vec()
+        .windows(2)
+        .zip(angle_fillet_length.iter())
+        .map(|(w, af)| {
+            let s0 = w[0];
+            let s1 = w[1];
+            let t0 = s0.1.tangent();
+            let t1 = s1.1.tangent();
+
+            match af {
+                Some((angle, _, radius)) => {
+                    let corner = s0.0.end();
+                    let fillet_arc = create_fillet_arc(
+                        s0.1.end(),
+                        corner,
+                        s1.1.start(),
+                        t0,
+                        t1,
+                        T::pi() - *angle,
+                        *radius,
+                    )?;
+                    Ok(Some(fillet_arc))
+                }
+                None => Ok(None),
+            }
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+
+    let spans: Vec<Option<Span<T, D>>> = trimmed
+        .into_iter()
+        .map(|s| Some(Span::Segment(s.1)))
+        .interleave(corners.into_iter().map(|c| c.map(|c| Span::Fillet(c))))
+        .collect_vec();
+
+    let mut curves = vec![];
+    let mut polyline = vec![];
+    for s in spans {
+        match s {
+            Some(Span::Segment(s)) => {
+                polyline.push(s.start().clone());
+                polyline.push(s.end().clone());
+            }
+            Some(Span::Fillet(c)) => {
+                polyline.dedup();
+                curves.push(NurbsCurve::polyline(&polyline, false));
+                curves.push(c);
+                polyline.clear();
+            }
+            None => {}
+        }
+    }
+
+    if !polyline.is_empty() {
+        polyline.dedup();
+        curves.push(NurbsCurve::polyline(&polyline, false));
+    }
+
+    Ok(CompoundCurve::new_unchecked_aligned(curves))
+}
+
+type FilletLength<T> = (T, T, T);
 
 /// Calculate the fillet length for a given radius and segments
 fn calculate_fillet_length<T: FloatingPoint, D: DimName, F>(
     w: &[&Segment<T, D>; 2],
     radius: T,
     constrain: F,
-) -> Option<(T, T, T)>
+) -> Option<FilletLength<T>>
 where
     DefaultAllocator: Allocator<D>,
     F: Fn(T) -> T,
@@ -460,26 +492,5 @@ mod tests {
             let start = s1.point_at(s1.knots_domain().0);
             assert_relative_eq!(end, start, epsilon = 1e-6);
         });
-    }
-
-    #[test]
-    fn polyline_test() {
-        let points = vec![
-            Point2::new(-0.5, 2.),
-            Point2::new(0.5, 2.),
-            Point2::new(0.5, 1.),
-            Point2::new(1.5, 1.),
-        ];
-        let curve = NurbsCurve2D::polyline(&points, false);
-        let knots = curve.knots();
-        println!("{:?}", knots);
-        let i0 = knots.floor(0.5);
-        let i1 = knots.floor(1.);
-        let i2 = knots.floor(2.);
-        let i3 = knots.floor(3.);
-        println!("{:?}", i0);
-        println!("{:?}", i1);
-        println!("{:?}", i2);
-        println!("{:?}", i3);
     }
 }
