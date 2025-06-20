@@ -9,7 +9,7 @@ use bevy_infinite_grid::InfiniteGridPlugin;
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use bevy_points::plugin::PointsPlugin;
 use itertools::Itertools;
-use nalgebra::Point2;
+use nalgebra::{Point2, Point3};
 
 use curvo::prelude::*;
 
@@ -20,14 +20,32 @@ use materials::*;
 use misc::*;
 use rand::Rng;
 
+#[derive(Debug, PartialEq)]
+enum Dimension {
+    Two,
+    Three,
+}
+
+impl Default for Dimension {
+    fn default() -> Self {
+        Self::Two
+    }
+}
+
 #[derive(Resource, Debug)]
 struct Setting {
     pub radius: f64,
+    pub dimension: Dimension,
+    pub control_points: bool,
 }
 
 impl Default for Setting {
     fn default() -> Self {
-        Self { radius: 0.2 }
+        Self {
+            radius: 0.2,
+            dimension: Dimension::default(),
+            control_points: true,
+        }
     }
 }
 
@@ -38,13 +56,13 @@ struct ControlPoints(pub Vec<Point2<f64>>);
 struct ProfileCurve(pub NurbsCurve2D<f64>);
 
 #[derive(Component)]
+struct Profile3DCurve(pub NurbsCurve3D<f64>);
+
+#[derive(Component)]
 struct FilletCurve(pub CompoundCurve2D<f64>);
 
-impl FilletCurve {
-    pub fn update(&mut self, curve: CompoundCurve2D<f64>) {
-        self.0 = curve;
-    }
-}
+#[derive(Component)]
+struct Fillet3DCurve(pub CompoundCurve3D<f64>);
 
 fn main() {
     App::new()
@@ -115,14 +133,16 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
         Point2::new(-0.5, 2.),
     ]
     .into_iter()
+    .rev()
     .collect_vec();
 
     let mut rng: rand::rngs::StdRng = rand::SeedableRng::from_seed([0; 32]);
+    let delta = 0.5;
     let points = points
         .into_iter()
         .map(|p| {
-            let dx = (rng.random::<f64>() - 0.5) * 1.;
-            let dy = (rng.random::<f64>() - 0.5) * 1.;
+            let dx = (rng.random::<f64>() - 0.5) * delta;
+            let dy = (rng.random::<f64>() - 0.5) * delta;
             Point2::new(p.x + dx, p.y + dy)
         })
         .collect_vec();
@@ -135,6 +155,24 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
 
     commands.spawn((ProfileCurve(curve),));
     commands.spawn((FilletCurve(fillet_curve),));
+
+    let curve = NurbsCurve3D::polyline(
+        &points
+            .iter()
+            .map(|p| {
+                let p: Point3<f64> = p.coords.to_homogeneous().into();
+                let dz = (rng.random::<f64>() - 0.5) * delta;
+                Point3::new(p.x, p.y, p.z + dz)
+                // Point3::new(p.x, p.y, p.z)
+            })
+            .collect_vec(),
+        true,
+    );
+    let option = FilletRadiusOption::new(settings.radius);
+    let fillet_curve = curve.fillet(option.clone()).unwrap();
+
+    commands.spawn((Profile3DCurve(curve),));
+    commands.spawn((Fillet3DCurve(fillet_curve),));
 
     let scale = 5.;
     commands.spawn((
@@ -149,7 +187,7 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
         }),
         Transform::from_translation(Vec3::new(0., 0., 3.)).looking_at(Vec3::ZERO, Vec3::Y),
         PanOrbitCamera {
-            orbit_sensitivity: 0.0,
+            // orbit_sensitivity: 0.0,
             ..Default::default()
         },
     ));
@@ -159,7 +197,9 @@ fn update_ui(
     mut contexts: EguiContexts,
     mut settings: ResMut<Setting>,
     profile: Query<&ProfileCurve>,
+    profile_3d: Query<&Profile3DCurve>,
     mut fillet_curve: Query<&mut FilletCurve>,
+    mut fillet_curve_3d: Query<&mut Fillet3DCurve>,
 ) {
     let mut changed = false;
     egui::Window::new("fillet curve")
@@ -169,12 +209,31 @@ fn update_ui(
         .min_width(420.)
         .max_width(420.)
         .show(contexts.ctx_mut(), |ui| {
+            ui.heading("dimension");
+            ui.group(|g| {
+                g.horizontal(|ui| {
+                    ui.selectable_value(&mut settings.dimension, Dimension::Two, "2D");
+                    ui.selectable_value(&mut settings.dimension, Dimension::Three, "3D");
+                });
+            });
+
             ui.heading("radius");
             ui.group(|g| {
                 g.horizontal(|ui| {
                     changed |= ui
-                        .add(egui::DragValue::new(&mut settings.radius).speed(1e-2))
+                        .add(
+                            egui::DragValue::new(&mut settings.radius)
+                                .speed(1e-2)
+                                .range(0.0..=5.0),
+                        )
                         .changed();
+                });
+            });
+
+            ui.heading("control points");
+            ui.group(|g| {
+                g.horizontal(|ui| {
+                    ui.checkbox(&mut settings.control_points, "show");
                 });
             });
         });
@@ -186,7 +245,14 @@ fn update_ui(
         let option = FilletRadiusOption::new(settings.radius);
         let res = profile.0.fillet(option);
         if let Ok(res) = res {
-            fillet_curve.update(res);
+            fillet_curve.0 = res;
+        }
+
+        let profile_3d = profile_3d.single().unwrap();
+        let mut fillet_curve_3d = fillet_curve_3d.single_mut().unwrap();
+        let res = profile_3d.0.fillet(option);
+        if let Ok(res) = res {
+            fillet_curve_3d.0 = res;
         }
     }
 }
@@ -195,6 +261,8 @@ fn gizmos_curve(
     control_points: Query<&ControlPoints>,
     profile: Query<&ProfileCurve>,
     fillet_curve: Query<&FilletCurve>,
+    fillet_curve_3d: Query<&Fillet3DCurve>,
+    settings: Res<Setting>,
     mut gizmos: Gizmos,
 ) {
     let points = &control_points.single().unwrap().0;
@@ -206,7 +274,6 @@ fn gizmos_curve(
     let tol = 1e-7 * 0.5;
 
     let profile = profile.single().unwrap();
-    /*
     let tess = profile
         .0
         .tessellate(Some(tol))
@@ -214,29 +281,59 @@ fn gizmos_curve(
         .map(|p| p.coords.cast::<f32>().to_homogeneous().into())
         .collect_vec();
     gizmos.linestrip(tess, WHITE.with_alpha(0.25));
-    */
 
-    let fillet_curve = fillet_curve.single().unwrap();
+    match settings.dimension {
+        Dimension::Two => {
+            let fillet_curve = fillet_curve.single().unwrap();
+            fillet_curve.0.spans().iter().for_each(|c| {
+                let tess: Vec<Vec3> = c
+                    .tessellate(Some(tol))
+                    .into_iter()
+                    .map(|p| p.coords.cast::<f32>().to_homogeneous().into())
+                    .collect_vec();
+                let n = tess.len();
+                let c0 = Oklaba::from(YELLOW);
+                let c1 = Oklaba::from(BLUE);
+                let pts = tess.into_iter().enumerate().map(|(i, p)| {
+                    let t = (i as f32) / (n as f32);
+                    let c = c0.mix(&c1, t);
+                    (p, c)
+                });
+                gizmos.linestrip_gradient(pts);
 
-    fillet_curve.0.spans().iter().for_each(|c| {
-        let tess = c
-            .tessellate(Some(tol))
-            .into_iter()
-            .map(|p| p.coords.cast::<f32>().to_homogeneous().into())
-            .collect_vec();
-        let n = tess.len();
-        let c0 = Oklaba::from(YELLOW);
-        let c1 = Oklaba::from(BLUE);
-        let pts = tess.into_iter().enumerate().map(|(i, p)| {
-            let t = (i as f32) / (n as f32);
-            let c = c0.mix(&c1, t);
-            (p, c)
-        });
-        gizmos.linestrip_gradient(pts);
+                if settings.control_points {
+                    c.dehomogenized_control_points().iter().for_each(|p| {
+                        let p: Vec3 = p.coords.cast::<f32>().to_homogeneous().into();
+                        gizmos.sphere(p, 0.025, LIGHT_GREEN);
+                    });
+                }
+            });
+        }
+        Dimension::Three => {
+            let fillet_curve = fillet_curve_3d.single().unwrap();
+            fillet_curve.0.spans().iter().for_each(|c| {
+                let tess: Vec<Vec3> = c
+                    .tessellate(Some(tol))
+                    .into_iter()
+                    .map(|p| p.coords.cast::<f32>().into())
+                    .collect_vec();
+                let n = tess.len();
+                let c0 = Oklaba::from(YELLOW);
+                let c1 = Oklaba::from(BLUE);
+                let pts = tess.into_iter().enumerate().map(|(i, p)| {
+                    let t = (i as f32) / (n as f32);
+                    let c = c0.mix(&c1, t);
+                    (p, c)
+                });
+                gizmos.linestrip_gradient(pts);
 
-        c.dehomogenized_control_points().iter().for_each(|p| {
-            let p: Vec3 = p.coords.cast::<f32>().to_homogeneous().into();
-            // gizmos.sphere(p, 0.015, LIGHT_GREEN);
-        });
-    });
+                if settings.control_points {
+                    c.dehomogenized_control_points().iter().for_each(|p| {
+                        let p: Vec3 = p.coords.cast::<f32>().into();
+                        gizmos.sphere(p, 0.025, LIGHT_GREEN);
+                    });
+                }
+            });
+        }
+    }
 }
