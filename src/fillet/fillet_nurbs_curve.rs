@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use nalgebra::{
-    allocator::Allocator, Const, DefaultAllocator, DimName, DimNameAdd, DimNameDiff, DimNameSub,
-    OPoint, OVector, Point2, Vector2, U1,
+    allocator::Allocator, Const, DVector, DefaultAllocator, DimName, DimNameAdd, DimNameDiff,
+    DimNameSub, OPoint, OVector, Point2, Vector2, U1,
 };
 
 use crate::{curve::NurbsCurve, fillet::Fillet, misc::FloatingPoint, region::CompoundCurve};
@@ -170,12 +170,17 @@ where
                 let s1 = &w[1];
                 let t0 = s0.tangent();
                 let t1 = s1.tangent();
-                let cos_angle = t0.dot(&t1);
+                let cos_angle = t0.dot(&t1).clamp(-T::one(), T::one());
                 let angle = cos_angle.acos();
                 if angle < T::from_f64(1e-4).unwrap() {
                     return None;
                 }
-                let half_angle = angle / T::from_f64(2.0).unwrap();
+                let half_angle = angle * half;
+
+                // let sin_half = half_angle.sin();
+                // let cos_half = half_angle.cos();
+                // let fillet_length = radius * cos_half / sin_half;
+
                 let tan_half = half_angle.tan();
                 let fillet_length = radius * tan_half;
 
@@ -188,7 +193,7 @@ where
         let l = angle_fillet_length.len();
 
         let trimmed = segments
-            .iter()
+            .into_iter()
             .enumerate()
             .map(|(i, current)| {
                 let prev_fillet = if i != 0 || is_closed {
@@ -212,7 +217,7 @@ where
                     Some((_, length)) => current.trim(current.length() - length).1.start().clone(),
                     None => current.end().clone(),
                 };
-                Segment::new(start, end)
+                (current, Segment::new(start, end))
             })
             .collect_vec();
 
@@ -226,12 +231,21 @@ where
             .map(|(w, af)| {
                 let s0 = w[0];
                 let s1 = w[1];
-                let t0 = s0.tangent();
-                let t1 = s1.tangent();
+                let t0 = s0.1.tangent();
+                let t1 = s1.1.tangent();
 
                 match af {
-                    Some(_) => {
-                        let fillet_arc = create_fillet_arc(s0.end(), s1.start(), t0, t1, radius)?;
+                    Some((angle, _)) => {
+                        let corner = s0.0.end();
+                        let fillet_arc = create_fillet_arc(
+                            s0.1.end(),
+                            corner,
+                            s1.1.start(),
+                            t0,
+                            t1,
+                            T::pi() - *angle,
+                            radius,
+                        )?;
                         Ok(Some(fillet_arc))
                     }
                     None => Ok(None),
@@ -241,7 +255,7 @@ where
 
         let spans: Vec<Option<Span<T, D>>> = trimmed
             .into_iter()
-            .map(|s| Some(Span::Segment(s)))
+            .map(|s| Some(Span::Segment(s.1)))
             .interleave(corners.into_iter().map(|c| c.map(|c| Span::Fillet(c))))
             .collect_vec();
 
@@ -275,9 +289,11 @@ where
 /// Create a fillet arc curve
 fn create_fillet_arc<T: FloatingPoint, D: DimName>(
     start: &OPoint<T, DimNameDiff<D, U1>>,
+    corner: &OPoint<T, DimNameDiff<D, U1>>,
     end: &OPoint<T, DimNameDiff<D, U1>>,
     t0: &OVector<T, DimNameDiff<D, U1>>,
     t1: &OVector<T, DimNameDiff<D, U1>>,
+    angle: T,
     radius: T,
 ) -> anyhow::Result<NurbsCurve<T, D>>
 where
@@ -287,17 +303,29 @@ where
     <D as DimNameSub<U1>>::Output: DimNameAdd<U1>,
     DefaultAllocator: Allocator<<<D as DimNameSub<U1>>::Output as DimNameAdd<U1>>::Output>,
 {
-    let center = start + t1 * radius;
-    let x_axis = -t1;
-    let y_axis = t0;
-    let arc_angle = t0.angle(&t1);
+    let theta = angle / T::from_f64(2.0).unwrap();
+    let r = radius / theta.sin();
 
-    NurbsCurve::try_arc(
-        &center,
-        &x_axis,
-        &y_axis,
-        radius,
-        T::zero(),
-        arc_angle.abs(),
-    )
+    // let bisector = ((t1 + t0) / T::from_f64(2.0).unwrap() - t0).normalize();
+    let bisector = (t1 - t0).normalize();
+    let center = corner + bisector * r;
+
+    let x_axis = (start - &center).normalize();
+    let y_axis = if D::dim() > 3 {
+        let n = t0.cross(t1);
+        n
+    } else {
+        let x = x_axis.as_slice();
+        OVector::<T, DimNameDiff<D, U1>>::from_vec(vec![x[1], -x[0]])
+    };
+    let y_axis = if y_axis.dot(&t0) < T::zero() {
+        -y_axis
+    } else {
+        y_axis
+    };
+
+    // debug
+    // return Ok(NurbsCurve::polyline( &vec![start.clone(), center.clone(), end.clone()], false,));
+    // return NurbsCurve::try_circle(&center, &x_axis, &y_axis, radius);
+    NurbsCurve::try_arc(&center, &x_axis, &y_axis, radius, T::zero(), T::pi() - angle.abs())
 }
