@@ -4,7 +4,7 @@ use nalgebra::{
     OVector, Rotation3, Unit, Vector3, U1,
 };
 
-use crate::{curve::NurbsCurve, fillet::Fillet, misc::FloatingPoint, region::CompoundCurve};
+use crate::{curve::NurbsCurve, fillet::{segment::Segment, Fillet}, misc::FloatingPoint, region::CompoundCurve};
 
 /// Fillet the sharp corners of the curve with a given radius
 #[derive(Debug, Clone, Copy)]
@@ -56,60 +56,6 @@ impl<T: FloatingPoint> FilletDistanceOption<T> {
 
     pub fn distance(&self) -> T {
         self.distance
-    }
-}
-
-/// Segment of a curve
-#[derive(Debug, Clone)]
-struct Segment<T: FloatingPoint, D: DimName>
-where
-    DefaultAllocator: Allocator<D>,
-{
-    start: OPoint<T, D>,
-    end: OPoint<T, D>,
-    tangent: OVector<T, D>,
-    length: T,
-}
-
-impl<T: FloatingPoint, D: DimName> Segment<T, D>
-where
-    DefaultAllocator: Allocator<D>,
-{
-    fn new(start: OPoint<T, D>, end: OPoint<T, D>) -> Self {
-        let tangent = &end - &start;
-        let length = tangent.norm();
-        Self {
-            start,
-            end,
-            tangent: tangent.normalize(),
-            length,
-        }
-    }
-
-    fn start(&self) -> &OPoint<T, D> {
-        &self.start
-    }
-
-    fn end(&self) -> &OPoint<T, D> {
-        &self.end
-    }
-
-    fn tangent(&self) -> &OVector<T, D> {
-        &self.tangent
-    }
-
-    fn length(&self) -> T {
-        self.length
-    }
-
-    /// Trim the segment by a given length
-    fn trim(&self, length: T) -> (Self, Self) {
-        let t = self.tangent() * length;
-        let end = self.start() + &t;
-        (
-            Self::new(self.start().clone(), end.clone()),
-            Self::new(end, self.end().clone()),
-        )
     }
 }
 
