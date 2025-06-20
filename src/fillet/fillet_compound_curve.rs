@@ -29,10 +29,11 @@ where
             .map(|span| span.fillet(FilletRadiusOption::new(radius)))
             .collect::<anyhow::Result<Vec<_>>>()?;
 
+        let is_closed = self.is_closed(None);
+
+        /*
         // flatten the spans
         let spans = spans.into_iter().flat_map(|c| c.into_spans()).collect_vec();
-
-        let is_closed = self.is_closed(None);
         if is_closed {
             let last = spans
                 .last()
@@ -44,7 +45,9 @@ where
                 // create fillet arc
             }
         }
-
         Ok(CompoundCurve::new_unchecked_aligned(spans))
+        */
+
+        todo!()
     }
 }
