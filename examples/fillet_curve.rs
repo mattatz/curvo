@@ -112,7 +112,7 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
     ];
 
     // square
-    let points = vec![
+    let _points = vec![
         Point2::new(-1.0, -1.0),
         Point2::new(1.0, -1.0),
         Point2::new(1.0, 1.0),
@@ -137,7 +137,10 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
     .collect_vec();
 
     let mut rng: rand::rngs::StdRng = rand::SeedableRng::from_seed([0; 32]);
-    let delta = 0.5;
+    let delta = 1.0;
+
+    /*
+    // wobble the points for debugging
     let points = points
         .into_iter()
         .map(|p| {
@@ -146,6 +149,7 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
             Point2::new(p.x + dx, p.y + dy)
         })
         .collect_vec();
+    */
 
     commands.spawn((ControlPoints(points.clone()),));
 
@@ -267,23 +271,23 @@ fn gizmos_curve(
 ) {
     let points = &control_points.single().unwrap().0;
     points.iter().for_each(|p| {
-        let p: Vec3 = p.coords.cast::<f32>().to_homogeneous().into();
+        let _p: Vec3 = p.coords.cast::<f32>().to_homogeneous().into();
         // gizmos.sphere(p, 0.025, WHITE);
     });
 
     let tol = 1e-7 * 0.5;
 
-    let profile = profile.single().unwrap();
-    let tess = profile
-        .0
-        .tessellate(Some(tol))
-        .into_iter()
-        .map(|p| p.coords.cast::<f32>().to_homogeneous().into())
-        .collect_vec();
-    gizmos.linestrip(tess, WHITE.with_alpha(0.25));
-
     match settings.dimension {
         Dimension::Two => {
+            let profile = profile.single().unwrap();
+            let tess = profile
+                .0
+                .tessellate(Some(tol))
+                .into_iter()
+                .map(|p| p.coords.cast::<f32>().to_homogeneous().into())
+                .collect_vec();
+            gizmos.linestrip(tess, WHITE.with_alpha(0.25));
+
             let fillet_curve = fillet_curve.single().unwrap();
             fillet_curve.0.spans().iter().for_each(|c| {
                 let tess: Vec<Vec3> = c
