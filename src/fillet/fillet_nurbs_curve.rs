@@ -4,7 +4,12 @@ use nalgebra::{
     OVector, Rotation3, Unit, Vector3, U1,
 };
 
-use crate::{curve::NurbsCurve, fillet::{segment::Segment, Fillet}, misc::FloatingPoint, region::CompoundCurve};
+use crate::{
+    curve::NurbsCurve,
+    fillet::{segment::Segment, Fillet},
+    misc::FloatingPoint,
+    region::CompoundCurve,
+};
 
 /// Fillet the sharp corners of the curve with a given radius
 #[derive(Debug, Clone, Copy)]
@@ -121,10 +126,9 @@ where
         let n = segments.len();
         let m = if is_closed { n + 1 } else { n };
 
+        // calculate angle and fillet length for each segment
         let half = T::from_f64(0.5).unwrap();
         let eps = T::from_f64(1e-6).unwrap();
-
-        // calculate angle and fillet length for each segment
         let angle_fillet_length = segments
             .iter()
             .cycle()
@@ -132,26 +136,11 @@ where
             .collect_vec()
             .windows(2)
             .map(|w| {
-                let s0 = &w[0];
-                let s1 = &w[1];
-                let t0 = s0.tangent();
-                let t1 = s1.tangent();
-                let cos_angle = t0.dot(t1).clamp(-T::one(), T::one());
-                let angle = cos_angle.acos();
-                if angle < T::from_f64(1e-4).unwrap() {
-                    return None;
-                }
-                let half_angle = angle * half;
-
-                let tan_half = half_angle.tan();
-                let fillet_length = radius * tan_half;
-
-                let min = s0.length().min(s1.length());
-                let l = min * half - eps;
-
-                let actural_fillet_length = fillet_length.min(l);
-                let actural_radius = actural_fillet_length / tan_half;
-                Some((angle, actural_fillet_length, actural_radius))
+                calculate_fillet_length(&[w[0], w[1]], radius, |length| {
+                    let min = w[0].length().min(w[1].length());
+                    let l = min * half - eps;
+                    length.min(l)
+                })
             })
             .collect_vec();
 
@@ -251,6 +240,105 @@ where
 
         Ok(CompoundCurve::new_unchecked_aligned(curves))
     }
+}
+
+impl<T: FloatingPoint, D: DimName> Fillet<FilletRadiusParameterOption<T>> for NurbsCurve<T, D>
+where
+    D: DimNameSub<U1>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+    <D as DimNameSub<U1>>::Output: DimNameAdd<U1>,
+    DefaultAllocator: Allocator<<<D as DimNameSub<U1>>::Output as DimNameAdd<U1>>::Output>,
+{
+    type Output = anyhow::Result<CompoundCurve<T, D>>;
+
+    fn fillet(&self, option: FilletRadiusParameterOption<T>) -> Self::Output {
+        let degree = self.degree();
+        let radius = option.radius();
+        let parameter = option.parameter();
+        let domain = self.knots_domain();
+
+        anyhow::ensure!(
+            domain.0 <= parameter && parameter <= domain.1,
+            "Parameter must be in the domain of the curve, but got {}",
+            parameter
+        );
+
+        if degree >= 2 || radius <= T::zero() {
+            return Ok(self.clone().into());
+        }
+
+        let pts = self.dehomogenized_control_points();
+
+        let segments = pts
+            .windows(2)
+            .map(|w| {
+                let p0 = &w[0];
+                let p1 = &w[1];
+                Segment::new(p0.clone(), p1.clone())
+            })
+            .collect_vec();
+
+        let is_closed = self.is_closed();
+        let n = segments.len();
+
+        let index = self
+            .knots()
+            .floor(parameter)
+            .ok_or(anyhow::anyhow!(
+                "Parameter must be in the domain of the curve, but got {}",
+                parameter
+            ))?
+            .clamp(0, pts.len())
+            - 1;
+
+        if !is_closed && index >= n - 1 {
+            anyhow::bail!("Parameter too large, got {}", parameter);
+        }
+
+        let prev_segment = &segments[index];
+        let next_segment = &segments[(index + 1) % n];
+        let eps = T::from_f64(1e-6).unwrap();
+        let af = calculate_fillet_length(&[prev_segment, next_segment], radius, |length| {
+            let min = prev_segment.length().min(next_segment.length());
+            let l = min - eps;
+            length.min(l)
+        });
+
+        todo!()
+    }
+}
+
+/// Calculate the fillet length for a given radius and segments
+fn calculate_fillet_length<T: FloatingPoint, D: DimName, F>(
+    w: &[&Segment<T, D>; 2],
+    radius: T,
+    constrain: F,
+) -> Option<(T, T, T)>
+where
+    DefaultAllocator: Allocator<D>,
+    F: Fn(T) -> T,
+{
+    let half = T::from_f64(0.5).unwrap();
+
+    let s0 = &w[0];
+    let s1 = &w[1];
+    let t0 = s0.tangent();
+    let t1 = s1.tangent();
+    let cos_angle = t0.dot(t1).clamp(-T::one(), T::one());
+    let angle = cos_angle.acos();
+    if angle < T::from_f64(1e-4).unwrap() {
+        return None;
+    }
+    let half_angle = angle * half;
+
+    let tan_half = half_angle.tan();
+    let fillet_length = radius * tan_half;
+
+    let actual_fillet_length = constrain(fillet_length);
+
+    let actual_radius = actual_fillet_length / tan_half;
+    Some((angle, actual_fillet_length, actual_radius))
 }
 
 /// Create a fillet arc curve
@@ -372,5 +460,26 @@ mod tests {
             let start = s1.point_at(s1.knots_domain().0);
             assert_relative_eq!(end, start, epsilon = 1e-6);
         });
+    }
+
+    #[test]
+    fn polyline_test() {
+        let points = vec![
+            Point2::new(-0.5, 2.),
+            Point2::new(0.5, 2.),
+            Point2::new(0.5, 1.),
+            Point2::new(1.5, 1.),
+        ];
+        let curve = NurbsCurve2D::polyline(&points, false);
+        let knots = curve.knots();
+        println!("{:?}", knots);
+        let i0 = knots.floor(0.5);
+        let i1 = knots.floor(1.);
+        let i2 = knots.floor(2.);
+        let i3 = knots.floor(3.);
+        println!("{:?}", i0);
+        println!("{:?}", i1);
+        println!("{:?}", i2);
+        println!("{:?}", i3);
     }
 }

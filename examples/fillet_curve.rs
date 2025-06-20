@@ -36,6 +36,8 @@ impl Default for Dimension {
 struct Setting {
     pub radius: f64,
     pub dimension: Dimension,
+    pub use_parameter: bool,
+    pub parameter: f64,
     pub control_points: bool,
 }
 
@@ -44,6 +46,8 @@ impl Default for Setting {
         Self {
             radius: 0.2,
             dimension: Dimension::default(),
+            use_parameter: true,
+            parameter: 0.0,
             control_points: true,
         }
     }
@@ -153,12 +157,19 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
 
     commands.spawn((ControlPoints(points.clone()),));
 
-    let curve = NurbsCurve2D::polyline(&points, true);
-    let option = FilletRadiusOption::new(settings.radius);
-    let fillet_curve = curve.fillet(option).unwrap();
+    let curve = NurbsCurve2D::polyline(&points, false);
+
+    if settings.use_parameter {
+        let option = FilletRadiusParameterOption::new(settings.radius, settings.parameter);
+        let fillet_curve = curve.fillet(option).unwrap();
+        commands.spawn((FilletCurve(fillet_curve),));
+    } else {
+        let option = FilletRadiusOption::new(settings.radius);
+        let fillet_curve = curve.fillet(option).unwrap();
+        commands.spawn((FilletCurve(fillet_curve),));
+    }
 
     commands.spawn((ProfileCurve(curve),));
-    commands.spawn((FilletCurve(fillet_curve),));
 
     let curve = NurbsCurve3D::polyline(
         &points
@@ -170,13 +181,20 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
                 // Point3::new(p.x, p.y, p.z)
             })
             .collect_vec(),
-        true,
+        false,
     );
-    let option = FilletRadiusOption::new(settings.radius);
-    let fillet_curve = curve.fillet(option).unwrap();
+
+    if settings.use_parameter {
+        let option = FilletRadiusParameterOption::new(settings.radius, settings.parameter);
+        let fillet_curve = curve.fillet(option).unwrap();
+        commands.spawn((Fillet3DCurve(fillet_curve),));
+    } else {
+        let option = FilletRadiusOption::new(settings.radius);
+        let fillet_curve = curve.fillet(option).unwrap();
+        commands.spawn((Fillet3DCurve(fillet_curve),));
+    }
 
     commands.spawn((Profile3DCurve(curve),));
-    commands.spawn((Fillet3DCurve(fillet_curve),));
 
     let scale = 5.;
     commands.spawn((
@@ -205,7 +223,11 @@ fn update_ui(
     mut fillet_curve: Query<&mut FilletCurve>,
     mut fillet_curve_3d: Query<&mut Fillet3DCurve>,
 ) {
+    let profile = profile.single().unwrap();
+    let domain = profile.0.knots_domain();
+
     let mut changed = false;
+
     egui::Window::new("fillet curve")
         .collapsible(false)
         .drag_to_scroll(false)
@@ -234,6 +256,24 @@ fn update_ui(
                 });
             });
 
+            ui.heading("parameter");
+            ui.group(|g| {
+                g.horizontal(|ui| {
+                    changed |= ui
+                        .checkbox(&mut settings.use_parameter, "activate")
+                        .changed();
+                    if settings.use_parameter {
+                        changed |= ui
+                            .add(
+                                egui::DragValue::new(&mut settings.parameter)
+                                    .speed(1e-2)
+                                    .range(domain.0..=domain.1),
+                            )
+                            .changed();
+                    }
+                });
+            });
+
             ui.heading("control points");
             ui.group(|g| {
                 g.horizontal(|ui| {
@@ -243,20 +283,30 @@ fn update_ui(
         });
 
     if changed {
-        let profile = profile.single().unwrap();
-
         let mut fillet_curve = fillet_curve.single_mut().unwrap();
-        let option = FilletRadiusOption::new(settings.radius);
-        let res = profile.0.fillet(option);
-        if let Ok(res) = res {
-            fillet_curve.0 = res;
-        }
-
         let profile_3d = profile_3d.single().unwrap();
         let mut fillet_curve_3d = fillet_curve_3d.single_mut().unwrap();
-        let res = profile_3d.0.fillet(option);
-        if let Ok(res) = res {
-            fillet_curve_3d.0 = res;
+
+        if settings.use_parameter {
+            let option = FilletRadiusParameterOption::new(settings.radius, settings.parameter);
+            let res = profile.0.fillet(option);
+            if let Ok(res) = res {
+                fillet_curve.0 = res;
+            }
+            let res = profile_3d.0.fillet(option);
+            if let Ok(res) = res {
+                fillet_curve_3d.0 = res;
+            }
+        } else {
+            let option = FilletRadiusOption::new(settings.radius);
+            let res = profile.0.fillet(option);
+            if let Ok(res) = res {
+                fillet_curve.0 = res;
+            }
+            let res = profile_3d.0.fillet(option);
+            if let Ok(res) = res {
+                fillet_curve_3d.0 = res;
+            }
         }
     }
 }
