@@ -330,13 +330,16 @@ fn gizmos_curve(
     match settings.dimension {
         Dimension::Two => {
             let profile = profile.single().unwrap();
-            let tess = profile
-                .0
-                .tessellate(Some(tol))
-                .into_iter()
-                .map(|p| p.coords.cast::<f32>().to_homogeneous().into())
-                .collect_vec();
-            gizmos.linestrip(tess, WHITE.with_alpha(0.25));
+
+            if !settings.use_parameter {
+                let tess = profile
+                    .0
+                    .tessellate(Some(tol))
+                    .into_iter()
+                    .map(|p| p.coords.cast::<f32>().to_homogeneous().into())
+                    .collect_vec();
+                gizmos.linestrip(tess, WHITE.with_alpha(0.25));
+            }
 
             let fillet_curve = fillet_curve.single().unwrap();
             fillet_curve.0.spans().iter().for_each(|c| {
