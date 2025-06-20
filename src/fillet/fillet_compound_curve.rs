@@ -1,12 +1,10 @@
 use itertools::Itertools;
 use nalgebra::{
-    allocator::Allocator, DefaultAllocator, DimName, DimNameAdd, DimNameDiff, DimNameSub, OPoint,
-    OVector, Rotation3, Unit, Vector3, U1,
+    allocator::Allocator, DefaultAllocator, DimName, DimNameAdd, DimNameDiff, DimNameSub, U1,
 };
 
 use crate::{
-    curve::NurbsCurve,
-    fillet::{segment::Segment, Fillet, FilletRadiusOption, FilletRadiusParameterOption},
+    fillet::{Fillet, FilletRadiusOption},
     misc::FloatingPoint,
     region::CompoundCurve,
 };
@@ -31,8 +29,22 @@ where
             .map(|span| span.fillet(FilletRadiusOption::new(radius)))
             .collect::<anyhow::Result<Vec<_>>>()?;
 
-        let is_closed = self.is_closed(None);
+        // flatten the spans
+        let spans = spans.into_iter().flat_map(|c| c.into_spans()).collect_vec();
 
-        todo!()
+        let is_closed = self.is_closed(None);
+        if is_closed {
+            let last = spans
+                .last()
+                .ok_or(anyhow::anyhow!("Closed curve must have at least one span"))?;
+            let head = spans
+                .first()
+                .ok_or(anyhow::anyhow!("Closed curve must have at least one span"))?;
+            if last.degree() == 1 && last.degree() == head.degree() {
+                // create fillet arc
+            }
+        }
+
+        Ok(CompoundCurve::new_unchecked_aligned(spans))
     }
 }
