@@ -50,6 +50,8 @@ The supported features also include finding the closest point on NURBS curves, f
 
 <img src="https://github.com/user-attachments/assets/6b0583e4-01d4-447e-9347-c7b8bd0bc8af" width="360px" alt="Offset curve" />
 
+<img src="https://github.com/user-attachments/assets/4514e075-6e36-458e-867d-581d6bba62f7" width="360px" alt="Fillet curve" />
+
 ## Usage
 
 ```rust

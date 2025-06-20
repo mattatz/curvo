@@ -61,6 +61,7 @@ mod closest_parameter;
 mod contains;
 mod curve;
 mod dimension;
+mod fillet;
 mod intersects;
 mod knot;
 mod misc;
@@ -79,6 +80,7 @@ pub mod prelude {
     pub use crate::contains::*;
     pub use crate::curve::*;
     pub use crate::dimension::*;
+    pub use crate::fillet::*;
     pub use crate::intersects::*;
     pub use crate::knot::*;
     pub use crate::misc::*;

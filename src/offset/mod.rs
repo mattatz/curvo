@@ -27,6 +27,7 @@ impl Default for CurveOffsetCornerType {
     }
 }
 
+/// Trait for offsetting a geometry
 pub trait Offset<'a, T> {
     type Output;
     type Option;

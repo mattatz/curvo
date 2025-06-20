@@ -1,6 +1,6 @@
 [package]
 name = "curvo"
-version = "0.1.56"
+version = "0.1.57"
 authors = ["Masatatsu Nakamura <masatatsu.nakamura@gmail.com"]
 edition = "2021"
 keywords = ["nurbs", "modeling", "graphics", "3d"]
@@ -191,4 +191,9 @@ required-features = ["bevy"]
 [[example]]
 name = "offset_compound_curve"
 path = "examples/offset_compound_curve.rs"
+required-features = ["bevy"]
+
+[[example]]
+name = "fillet_curve"
+path = "examples/fillet_curve.rs"
 required-features = ["bevy"]
