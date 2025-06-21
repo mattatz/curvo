@@ -54,7 +54,7 @@ where
         );
 
         let degree = self.degree();
-        if degree >= 2 || radius <= T::zero() {
+        if degree >= 2 {
             return Ok(self.clone().into());
         }
 
@@ -130,7 +130,7 @@ where
             parameter
         );
 
-        if degree >= 2 || radius <= T::zero() {
+        if degree >= 2 {
             return Ok(self.clone().into());
         }
 
