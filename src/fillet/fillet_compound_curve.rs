@@ -32,6 +32,29 @@ where
     type Output = anyhow::Result<CompoundCurve<T, D>>;
 
     /// Fillet the sharp corners of the curve with a given radius
+    /// # Example
+    /// ```
+    /// use nalgebra::Point2;
+    /// use curvo::prelude::*;
+    ///
+    /// let points = [
+    ///     Point2::new(-1.0, -1.0),
+    ///     Point2::new(1.0, -1.0),
+    ///     Point2::new(1.0, 1.0),
+    ///     Point2::new(-1.0, 1.0),
+    ///     Point2::new(-1.0, -1.0),
+    /// ];
+    /// let spans = points.windows(2).map(|w| NurbsCurve2D::polyline(w, false)).collect();
+    /// let curve = CompoundCurve2D::try_new(spans).unwrap();
+    /// let fillet = curve.fillet(FilletRadiusOption::new(0.2)).unwrap();
+    /// assert_eq!(fillet.spans().len(), 8);
+    ///
+    /// let domain = fillet.knots_domain();
+    /// let pt = fillet.point_at(domain.0);
+    /// assert_eq!(pt, Point2::new(-0.8, -1.0));
+    /// let pt = fillet.point_at(domain.1);
+    /// assert_eq!(pt, Point2::new(-0.8, -1.0));
+    /// ```
     fn fillet(&self, option: FilletRadiusOption<T>) -> Self::Output {
         let radius = option.radius();
         anyhow::ensure!(
@@ -82,6 +105,23 @@ where
     type Output = anyhow::Result<CompoundCurve<T, D>>;
 
     /// Only fillet the sharp corner at the specified parameter position with a given radius
+    /// # Example
+    /// ```
+    /// use nalgebra::Point2;
+    /// use curvo::prelude::*;
+    ///
+    /// let points = [
+    ///     Point2::new(-1.0, -1.0),
+    ///     Point2::new(1.0, -1.0),
+    ///     Point2::new(1.0, 1.0),
+    ///     Point2::new(-1.0, 1.0),
+    ///     Point2::new(-1.0, -1.0),
+    /// ];
+    /// let spans = points.windows(2).map(|w| NurbsCurve2D::polyline(w, false)).collect();
+    /// let curve = CompoundCurve2D::try_new(spans).unwrap();
+    /// let fillet = curve.fillet(FilletRadiusParameterOption::new(0.2, 0.5)).unwrap();
+    /// assert_eq!(fillet.spans().len(), 3);
+    /// ```
     fn fillet(&self, option: FilletRadiusParameterOption<T>) -> Self::Output {
         let radius = option.radius();
         anyhow::ensure!(
