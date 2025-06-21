@@ -7,7 +7,9 @@ use crate::{
     curve::NurbsCurve,
     fillet::{
         helper::{
-            calculate_fillet_length, create_fillet_corner_between_trimmed_segments, decompose_into_segments, trim_segment_by_fillet_length, CompoundSegment, FilletLength, TrimmedSegment
+            calculate_fillet_length, create_fillet_corner_between_trimmed_segments,
+            decompose_into_segments, trim_segment_by_fillet_length, try_connect_compound_segments,
+            CompoundSegment, FilletLength, TrimmedSegment,
         },
         segment::Segment,
         Fillet, FilletRadiusOption,
@@ -151,28 +153,5 @@ where
         )
         .collect_vec();
 
-    let mut curves = vec![];
-    let mut polyline = vec![];
-    for s in spans {
-        match s {
-            Some(CompoundSegment::Segment(s)) => {
-                polyline.push(s.start().clone());
-                polyline.push(s.end().clone());
-            }
-            Some(CompoundSegment::Curve(c)) => {
-                polyline.dedup();
-                curves.push(NurbsCurve::polyline(&polyline, false));
-                curves.push(c);
-                polyline.clear();
-            }
-            None => {}
-        }
-    }
-
-    if !polyline.is_empty() {
-        polyline.dedup();
-        curves.push(NurbsCurve::polyline(&polyline, false));
-    }
-
-    Ok(CompoundCurve::new_unchecked_aligned(curves))
+    try_connect_compound_segments(spans)
 }
