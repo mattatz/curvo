@@ -6,7 +6,7 @@ use nalgebra::{
 use crate::{
     curve::NurbsCurve,
     fillet::{
-        helper::{calculate_fillet_length, create_fillet_arc, FilletLength},
+        helper::{calculate_fillet_length, create_fillet_arc, decompose_into_segments, FilletLength},
         segment::Segment,
         Fillet, FilletRadiusOption, FilletRadiusParameterOption,
     },
@@ -61,16 +61,7 @@ where
             return Ok(self.clone().into());
         }
 
-        let pts = self.dehomogenized_control_points();
-
-        let segments = pts
-            .windows(2)
-            .map(|w| {
-                let p0 = &w[0];
-                let p1 = &w[1];
-                Segment::new(p0.clone(), p1.clone())
-            })
-            .collect_vec();
+        let segments = decompose_into_segments(self);
 
         let is_closed = self.is_closed();
         let n = segments.len();
@@ -140,16 +131,7 @@ where
             return Ok(self.clone().into());
         }
 
-        let pts = self.dehomogenized_control_points();
-
-        let segments = pts
-            .windows(2)
-            .map(|w| {
-                let p0 = &w[0];
-                let p1 = &w[1];
-                Segment::new(p0.clone(), p1.clone())
-            })
-            .collect_vec();
+        let segments = decompose_into_segments(self);
 
         let is_closed = self.is_closed();
         let n = segments.len();
@@ -162,7 +144,7 @@ where
                 "Parameter must be in the domain of the curve, but got {}",
                 parameter
             ))?
-            .clamp(0, pts.len())
+            .clamp(0, segments.len() + 1)
             - 1;
 
         if !is_closed && index >= n - 1 {

@@ -7,6 +7,23 @@ use crate::{curve::NurbsCurve, fillet::segment::Segment, misc::FloatingPoint};
 
 pub type FilletLength<T> = (T, T, T);
 
+/// Decompose a curve into segments
+pub fn decompose_into_segments<T: FloatingPoint, D: DimName>(
+    curve: &NurbsCurve<T, D>,
+) -> Vec<Segment<T, DimNameDiff<D, U1>>>
+where
+    D: DimNameSub<U1>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+{
+    let pts = curve.dehomogenized_control_points();
+    pts.windows(2).map(|w| {
+        let p0 = &w[0];
+        let p1 = &w[1];
+        Segment::new(p0.clone(), p1.clone())
+    }).collect()
+}
+
 /// Calculate the fillet length for a given radius and segments
 pub fn calculate_fillet_length<T: FloatingPoint, D: DimName, F>(
     w: &[&Segment<T, D>; 2],
