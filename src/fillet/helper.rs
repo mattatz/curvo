@@ -3,7 +3,9 @@ use nalgebra::{
     OVector, Rotation3, Unit, Vector3, U1,
 };
 
-use crate::{curve::NurbsCurve, fillet::segment::Segment, misc::FloatingPoint};
+use crate::{
+    curve::NurbsCurve, fillet::segment::Segment, misc::FloatingPoint, region::CompoundCurve,
+};
 
 pub type FilletLength<T> = (T, T, T);
 
@@ -31,6 +33,12 @@ where
     pub fn trimmed(&self) -> &Segment<T, D> {
         &self.trimmed
     }
+}
+
+/// A span of a compound curve for fillet operation
+pub enum CompoundSegment<S, C> {
+    Segment(S),
+    Curve(C),
 }
 
 /// Decompose a curve into segments
@@ -196,6 +204,43 @@ where
         T::zero(),
         T::pi() - angle.abs(),
     )
+}
+
+/// Connect a list of compound segments into a compound curve
+pub fn try_connect_compound_segments<T: FloatingPoint, D: DimName>(
+    segments: Vec<Option<CompoundSegment<Segment<T, DimNameDiff<D, U1>>, NurbsCurve<T, D>>>>,
+) -> anyhow::Result<CompoundCurve<T, D>>
+where
+    D: DimNameSub<U1>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+    <D as DimNameSub<U1>>::Output: DimNameAdd<U1>,
+    DefaultAllocator: Allocator<<<D as DimNameSub<U1>>::Output as DimNameAdd<U1>>::Output>,
+{
+    let mut curves = vec![];
+    let mut polyline = vec![];
+    for s in segments {
+        match s {
+            Some(CompoundSegment::Segment(s)) => {
+                polyline.push(s.start().clone());
+                polyline.push(s.end().clone());
+            }
+            Some(CompoundSegment::Curve(c)) => {
+                polyline.dedup();
+                curves.push(NurbsCurve::polyline(&polyline, false));
+                curves.push(c);
+                polyline.clear();
+            }
+            None => {}
+        }
+    }
+
+    if !polyline.is_empty() {
+        polyline.dedup();
+        curves.push(NurbsCurve::polyline(&polyline, false));
+    }
+
+    Ok(CompoundCurve::new_unchecked_aligned(curves))
 }
 
 /// Convert a 2d dimension vector to 3D vector

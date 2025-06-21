@@ -9,7 +9,8 @@ use crate::{
         helper::{
             calculate_fillet_length, create_fillet_arc,
             create_fillet_corner_between_trimmed_segments, decompose_into_segments,
-            trim_segment_by_fillet_length, FilletLength, TrimmedSegment,
+            trim_segment_by_fillet_length, try_connect_compound_segments, CompoundSegment,
+            FilletLength, TrimmedSegment,
         },
         segment::Segment,
         Fillet, FilletRadiusOption, FilletRadiusParameterOption,
@@ -17,18 +18,6 @@ use crate::{
     misc::FloatingPoint,
     region::CompoundCurve,
 };
-
-/// Span of a fillet curve
-#[derive(Debug, Clone)]
-enum Span<T: FloatingPoint, D: DimName>
-where
-    DefaultAllocator: Allocator<D>,
-    D: DimNameSub<U1>,
-    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
-{
-    Segment(Segment<T, DimNameDiff<D, U1>>),
-    Fillet(NurbsCurve<T, D>),
-}
 
 impl<T: FloatingPoint, D: DimName> Fillet<FilletRadiusOption<T>> for NurbsCurve<T, D>
 where
@@ -227,36 +216,17 @@ where
         .map(|(w, af)| create_fillet_corner_between_trimmed_segments(&[w[0], w[1]], af))
         .collect::<anyhow::Result<Vec<_>>>()?;
 
-    let spans: Vec<Option<Span<T, D>>> = trimmed
+    let spans = trimmed
         .into_iter()
-        .map(|s| Some(Span::Segment(s.trimmed().clone())))
-        .interleave(corners.into_iter().map(|c| c.map(|c| Span::Fillet(c))))
+        .map(|s| Some(CompoundSegment::Segment(s.trimmed().clone())))
+        .interleave(
+            corners
+                .into_iter()
+                .map(|c| c.map(|c| CompoundSegment::Curve(c))),
+        )
         .collect_vec();
 
-    let mut curves = vec![];
-    let mut polyline = vec![];
-    for s in spans {
-        match s {
-            Some(Span::Segment(s)) => {
-                polyline.push(s.start().clone());
-                polyline.push(s.end().clone());
-            }
-            Some(Span::Fillet(c)) => {
-                polyline.dedup();
-                curves.push(NurbsCurve::polyline(&polyline, false));
-                curves.push(c);
-                polyline.clear();
-            }
-            None => {}
-        }
-    }
-
-    if !polyline.is_empty() {
-        polyline.dedup();
-        curves.push(NurbsCurve::polyline(&polyline, false));
-    }
-
-    Ok(CompoundCurve::new_unchecked_aligned(curves))
+    try_connect_compound_segments(spans)
 }
 
 #[cfg(test)]
