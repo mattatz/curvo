@@ -108,8 +108,8 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
 
     if settings.use_parameter {
         let option = FilletRadiusParameterOption::new(settings.radius, settings.parameter);
-        // let fillet_curve = curve.fillet(option).unwrap();
-        // commands.spawn((FilletCurve(fillet_curve),));
+        let fillet_curve = curve.fillet(option).unwrap();
+        commands.spawn((FilletCurve(fillet_curve),));
     } else {
         let option = FilletRadiusOption::new(settings.radius);
         let fillet_curve = curve.fillet(option).unwrap();
@@ -148,7 +148,7 @@ fn update_ui(
 
     let mut changed = false;
 
-    egui::Window::new("fillet curve")
+    egui::Window::new("fillet compound curve")
         .collapsible(false)
         .drag_to_scroll(false)
         .default_width(420.)
@@ -199,12 +199,10 @@ fn update_ui(
 
         if settings.use_parameter {
             let option = FilletRadiusParameterOption::new(settings.radius, settings.parameter);
-            /*
             let res = profile.0.fillet(option);
             if let Ok(res) = res {
                 fillet_curve.0 = res;
             }
-            */
         } else {
             let option = FilletRadiusOption::new(settings.radius);
             let res = profile.0.fillet(option);

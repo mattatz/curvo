@@ -12,7 +12,7 @@ use crate::{
             CompoundSegment, FilletLength, TrimmedSegment,
         },
         segment::Segment,
-        Fillet, FilletRadiusOption,
+        Fillet, FilletRadiusOption, FilletRadiusParameterOption,
     },
     misc::FloatingPoint,
     region::CompoundCurve,
@@ -77,6 +77,22 @@ where
             .collect_vec();
 
         fillet_compound_curve(segments, angle_fillet_length, is_closed)
+    }
+}
+
+impl<T: FloatingPoint, D: DimName> Fillet<FilletRadiusParameterOption<T>> for CompoundCurve<T, D>
+where
+    D: DimNameSub<U1>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+    <D as DimNameSub<U1>>::Output: DimNameAdd<U1>,
+    DefaultAllocator: Allocator<<<D as DimNameSub<U1>>::Output as DimNameAdd<U1>>::Output>,
+{
+    type Output = anyhow::Result<CompoundCurve<T, D>>;
+
+    /// Only fillet the sharp corner at the specified parameter position with a given radius
+    fn fillet(&self, option: FilletRadiusParameterOption<T>) -> Self::Output {
+        todo!()
     }
 }
 
