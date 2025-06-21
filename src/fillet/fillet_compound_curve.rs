@@ -35,21 +35,7 @@ where
     fn fillet(&self, option: FilletRadiusOption<T>) -> Self::Output {
         let radius = option.radius();
 
-        let segments = self
-            .spans()
-            .iter()
-            .flat_map(|c| {
-                if c.degree() > 1 {
-                    vec![CompoundSegment::Curve(c.clone())]
-                } else {
-                    let segments = decompose_into_segments(c);
-                    segments
-                        .into_iter()
-                        .map(|s| CompoundSegment::Segment(s))
-                        .collect_vec()
-                }
-            })
-            .collect_vec();
+        let segments = decompose_into_compound_segments(self);
 
         let is_closed = self.is_closed(None);
         let n = segments.len();
@@ -92,8 +78,49 @@ where
 
     /// Only fillet the sharp corner at the specified parameter position with a given radius
     fn fillet(&self, option: FilletRadiusParameterOption<T>) -> Self::Output {
+        let parameter = option.parameter();
+        let domain = self.knots_domain();
+
+        anyhow::ensure!(
+            domain.0 <= parameter && parameter <= domain.1,
+            "Parameter must be in the domain of the curve, but got {}",
+            parameter
+        );
+
+        let segments = decompose_into_compound_segments(self);
+
+        let is_closed = self.is_closed(None);
+        let n = segments.len();
+        let m = if is_closed { n + 1 } else { n };
+
         todo!()
     }
+}
+
+/// Decompose a compound curve into a list of segments and curves
+fn decompose_into_compound_segments<T: FloatingPoint, D: DimName>(
+    curve: &CompoundCurve<T, D>,
+) -> Vec<CompoundSegmentPreprocess<T, D>>
+where
+    D: DimNameSub<U1>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+{
+    curve
+        .spans()
+        .iter()
+        .flat_map(|c| {
+            if c.degree() > 1 {
+                vec![CompoundSegment::Curve(c.clone())]
+            } else {
+                let segments = decompose_into_segments(c);
+                segments
+                    .into_iter()
+                    .map(|s| CompoundSegment::Segment(s))
+                    .collect_vec()
+            }
+        })
+        .collect_vec()
 }
 
 /// Fillet the sharp corners of the curve with a given radius
