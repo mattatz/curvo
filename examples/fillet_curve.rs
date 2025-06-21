@@ -104,6 +104,7 @@ impl Plugin for AppPlugin {
     }
 }
 
+#[allow(clippy::useless_vec)]
 fn setup(mut commands: Commands, settings: Res<Setting>) {
     // s-shape
     let _points = [
@@ -266,7 +267,7 @@ fn update_ui(
                         changed |= ui
                             .add(
                                 egui::DragValue::new(&mut settings.parameter)
-                                    .speed(1e-2)
+                                    .speed(1e-1)
                                     .range(domain.0..=domain.1),
                             )
                             .changed();

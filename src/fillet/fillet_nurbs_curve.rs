@@ -47,8 +47,13 @@ where
     /// ```
     fn fillet(&self, option: FilletRadiusOption<T>) -> Self::Output {
         let radius = option.radius();
-        let degree = self.degree();
+        anyhow::ensure!(
+            radius > T::zero(),
+            "Radius must be positive, but got {}",
+            radius
+        );
 
+        let degree = self.degree();
         if degree >= 2 || radius <= T::zero() {
             return Ok(self.clone().into());
         }
@@ -108,8 +113,14 @@ where
     /// let fillet = curve.fillet(FilletRadiusParameterOption::new(0.2, 2.)).unwrap();
     /// assert_eq!(fillet.spans().len(), 3);
     fn fillet(&self, option: FilletRadiusParameterOption<T>) -> Self::Output {
-        let degree = self.degree();
         let radius = option.radius();
+        anyhow::ensure!(
+            radius > T::zero(),
+            "Radius must be positive, but got {}",
+            radius
+        );
+
+        let degree = self.degree();
         let parameter = option.parameter();
         let domain = self.knots_domain();
 

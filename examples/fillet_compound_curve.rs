@@ -9,7 +9,7 @@ use bevy_infinite_grid::InfiniteGridPlugin;
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use bevy_points::plugin::PointsPlugin;
 use itertools::Itertools;
-use nalgebra::{Point2, Point3};
+use nalgebra::Point2;
 
 use curvo::prelude::*;
 
@@ -20,7 +20,6 @@ mod misc;
 use boolean::*;
 use materials::*;
 use misc::*;
-use rand::Rng;
 
 #[derive(Resource, Debug)]
 struct Setting {
@@ -83,12 +82,14 @@ impl Plugin for AppPlugin {
     }
 }
 
+#[allow(clippy::useless_vec)]
 fn setup(mut commands: Commands, settings: Res<Setting>) {
     let curve = match compound_rounded_t_shape() {
         boolean::CurveVariant::Compound(c) => c.inverse(),
         _ => todo!(),
     };
 
+    // convex shape
     let points = [
         Point2::new(-0.5, 2.),
         Point2::new(0.5, 2.),
@@ -104,7 +105,7 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
         .windows(2)
         .map(|w| NurbsCurve2D::polyline(w, true))
         .collect_vec();
-    let curve = CompoundCurve::try_new(spans).unwrap();
+    let _curve = CompoundCurve::try_new(spans).unwrap();
 
     if settings.use_parameter {
         let option = FilletRadiusParameterOption::new(settings.radius, settings.parameter);
@@ -178,7 +179,7 @@ fn update_ui(
                         changed |= ui
                             .add(
                                 egui::DragValue::new(&mut settings.parameter)
-                                    .speed(1e-2)
+                                    .speed(1e-1)
                                     .range(domain.0..=domain.1),
                             )
                             .changed();

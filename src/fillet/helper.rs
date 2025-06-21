@@ -42,10 +42,11 @@ pub enum CompoundSegment<S, C> {
 }
 
 /// Decompose a curve into segments
-pub fn decompose_into_segments<T: FloatingPoint, D: DimName>(
+pub fn decompose_into_segments<T: FloatingPoint, D>(
     curve: &NurbsCurve<T, D>,
 ) -> Vec<Segment<T, DimNameDiff<D, U1>>>
 where
+    D: DimName,
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
@@ -93,12 +94,13 @@ where
 }
 
 /// Trim a segment by a given length
-pub fn trim_segment_by_fillet_length<T: FloatingPoint, D: DimName>(
+pub fn trim_segment_by_fillet_length<T: FloatingPoint, D>(
     segment: &Segment<T, D>,
     prev_fillet: Option<FilletLength<T>>,
     next_fillet: Option<FilletLength<T>>,
 ) -> Segment<T, D>
 where
+    D: DimName,
     DefaultAllocator: Allocator<D>,
 {
     let start = match prev_fillet {
@@ -114,7 +116,7 @@ where
 }
 
 /// Create a fillet corner curve
-pub fn create_fillet_corner_between_trimmed_segments<T: FloatingPoint, D: DimName>(
+pub fn create_fillet_corner_between_trimmed_segments<T: FloatingPoint, D>(
     segments: &[&TrimmedSegment<T, DimNameDiff<D, U1>>; 2],
     fillet_length: Option<FilletLength<T>>,
 ) -> anyhow::Result<Option<NurbsCurve<T, D>>>
@@ -207,10 +209,12 @@ where
 }
 
 /// Connect a list of compound segments into a compound curve
-pub fn try_connect_compound_segments<T: FloatingPoint, D: DimName>(
+#[allow(clippy::type_complexity)]
+pub fn try_connect_compound_segments<T: FloatingPoint, D>(
     segments: Vec<Option<CompoundSegment<Segment<T, DimNameDiff<D, U1>>, NurbsCurve<T, D>>>>,
 ) -> anyhow::Result<CompoundCurve<T, D>>
 where
+    D: DimName,
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,

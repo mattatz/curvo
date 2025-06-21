@@ -34,6 +34,11 @@ where
     /// Fillet the sharp corners of the curve with a given radius
     fn fillet(&self, option: FilletRadiusOption<T>) -> Self::Output {
         let radius = option.radius();
+        anyhow::ensure!(
+            radius > T::zero(),
+            "Radius must be positive, but got {}",
+            radius
+        );
 
         let segments = decompose_into_compound_segments(self);
 
@@ -78,8 +83,14 @@ where
 
     /// Only fillet the sharp corner at the specified parameter position with a given radius
     fn fillet(&self, option: FilletRadiusParameterOption<T>) -> Self::Output {
-        let parameter = option.parameter();
         let radius = option.radius();
+        anyhow::ensure!(
+            radius > T::zero(),
+            "Radius must be positive, but got {}",
+            radius
+        );
+
+        let parameter = option.parameter();
         let domain = self.knots_domain();
 
         anyhow::ensure!(
@@ -161,10 +172,11 @@ where
 }
 
 /// Decompose a compound curve into a list of segments and curves
-fn decompose_into_compound_segments<T: FloatingPoint, D: DimName>(
+fn decompose_into_compound_segments<T: FloatingPoint, D>(
     curve: &CompoundCurve<T, D>,
 ) -> Vec<CompoundSegmentPreprocess<T, D>>
 where
+    D: DimName,
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
