@@ -79,6 +79,7 @@ where
     /// Only fillet the sharp corner at the specified parameter position with a given radius
     fn fillet(&self, option: FilletRadiusParameterOption<T>) -> Self::Output {
         let parameter = option.parameter();
+        let radius = option.radius();
         let domain = self.knots_domain();
 
         anyhow::ensure!(
@@ -93,7 +94,71 @@ where
         let n = segments.len();
         let m = if is_closed { n + 1 } else { n };
 
-        todo!()
+        // convert span index to segment index
+        let mut segment_index = 0;
+        let mut found = false;
+
+        for span in self.spans().iter() {
+            if span.knots_domain().1 <= parameter {
+                segment_index += span.control_points().len() - 1;
+                continue;
+            }
+
+            let index = span.knots().floor(parameter);
+            if let Some(index) = index {
+                segment_index += index;
+                found = true;
+                break;
+            } else {
+                if span.degree() == 1 {
+                    segment_index += span.control_points().len();
+                } else {
+                    segment_index += 1;
+                }
+            }
+        }
+
+        anyhow::ensure!(
+            found,
+            "Parameter must be in the domain of the curve, but got {}",
+            parameter
+        );
+
+        segment_index = segment_index.saturating_sub(1);
+
+        if !is_closed && segment_index >= n - 1 {
+            anyhow::bail!("Parameter too large, got {}", parameter);
+        }
+
+        // calculate angle and fillet length for each segment
+        let half = T::from_f64(0.5).unwrap();
+        let eps = T::from_f64(1e-6).unwrap();
+        let angle_fillet_length = segments
+            .iter()
+            .cycle()
+            .take(m)
+            .collect_vec()
+            .windows(2)
+            .enumerate()
+            .map(|(i, w)| {
+                if i == segment_index {
+                    match (w[0], w[1]) {
+                        (CompoundSegment::Segment(s0), CompoundSegment::Segment(s1)) => {
+                            calculate_fillet_length(&[s0, s1], radius, |length| {
+                                let min = s0.length().min(s1.length());
+                                let l = min * half - eps;
+                                length.min(l)
+                            })
+                        }
+                        _ => None,
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect_vec();
+
+        fillet_compound_curve(segments, angle_fillet_length, is_closed)
     }
 }
 
