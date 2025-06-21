@@ -109,12 +109,10 @@ where
                 segment_index += index;
                 found = true;
                 break;
+            } else if span.degree() == 1 {
+                segment_index += span.control_points().len();
             } else {
-                if span.degree() == 1 {
-                    segment_index += span.control_points().len();
-                } else {
-                    segment_index += 1;
-                }
+                segment_index += 1;
             }
         }
 
@@ -181,7 +179,7 @@ where
                 let segments = decompose_into_segments(c);
                 segments
                     .into_iter()
-                    .map(|s| CompoundSegment::Segment(s))
+                    .map(CompoundSegment::Segment)
                     .collect_vec()
             }
         })
@@ -254,11 +252,7 @@ where
             CompoundSegment::Segment(s) => Some(CompoundSegment::Segment(s.trimmed().clone())),
             CompoundSegment::Curve(c) => Some(CompoundSegment::Curve(c)),
         })
-        .interleave(
-            corners
-                .into_iter()
-                .map(|c| c.map(|c| CompoundSegment::Curve(c))),
-        )
+        .interleave(corners.into_iter().map(|c| c.map(CompoundSegment::Curve)))
         .collect_vec();
 
     try_connect_compound_segments(spans)

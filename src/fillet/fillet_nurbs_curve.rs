@@ -7,10 +7,9 @@ use crate::{
     curve::NurbsCurve,
     fillet::{
         helper::{
-            calculate_fillet_length, create_fillet_arc,
-            create_fillet_corner_between_trimmed_segments, decompose_into_segments,
-            trim_segment_by_fillet_length, try_connect_compound_segments, CompoundSegment,
-            FilletLength, TrimmedSegment,
+            calculate_fillet_length, create_fillet_corner_between_trimmed_segments,
+            decompose_into_segments, trim_segment_by_fillet_length, try_connect_compound_segments,
+            CompoundSegment, FilletLength, TrimmedSegment,
         },
         segment::Segment,
         Fillet, FilletRadiusOption, FilletRadiusParameterOption,
@@ -219,11 +218,7 @@ where
     let spans = trimmed
         .into_iter()
         .map(|s| Some(CompoundSegment::Segment(s.trimmed().clone())))
-        .interleave(
-            corners
-                .into_iter()
-                .map(|c| c.map(|c| CompoundSegment::Curve(c))),
-        )
+        .interleave(corners.into_iter().map(|c| c.map(CompoundSegment::Curve)))
         .collect_vec();
 
     try_connect_compound_segments(spans)
