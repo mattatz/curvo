@@ -6,7 +6,11 @@ use nalgebra::{
 use crate::{
     curve::NurbsCurve,
     fillet::{
-        helper::{calculate_fillet_length, create_fillet_arc, decompose_into_segments, FilletLength},
+        helper::{
+            calculate_fillet_length, create_fillet_arc,
+            create_fillet_corner_between_trimmed_segments, decompose_into_segments,
+            trim_segment_by_fillet_length, FilletLength, TrimmedSegment,
+        },
         segment::Segment,
         Fillet, FilletRadiusOption, FilletRadiusParameterOption,
     },
@@ -203,23 +207,13 @@ where
             } else {
                 None
             };
-
             let next_fillet = if i != n - 1 || is_closed {
                 angle_fillet_length[i % l]
             } else {
                 None
             };
-
-            let start = match prev_fillet {
-                Some((_, length, _)) => current.trim(length).0.end().clone(),
-                None => current.start().clone(),
-            };
-
-            let end = match next_fillet {
-                Some((_, length, _)) => current.trim(current.length() - length).1.start().clone(),
-                None => current.end().clone(),
-            };
-            (current, Segment::new(start, end))
+            let trimmed = trim_segment_by_fillet_length(&current, prev_fillet, next_fillet);
+            TrimmedSegment::new(current, trimmed)
         })
         .collect_vec();
 
@@ -229,35 +223,13 @@ where
         .take(m)
         .collect_vec()
         .windows(2)
-        .zip(angle_fillet_length.iter())
-        .map(|(w, af)| {
-            let s0 = w[0];
-            let s1 = w[1];
-            let t0 = s0.1.tangent();
-            let t1 = s1.1.tangent();
-
-            match af {
-                Some((angle, _, radius)) => {
-                    let corner = s0.0.end();
-                    let fillet_arc = create_fillet_arc(
-                        s0.1.end(),
-                        corner,
-                        s1.1.start(),
-                        t0,
-                        t1,
-                        T::pi() - *angle,
-                        *radius,
-                    )?;
-                    Ok(Some(fillet_arc))
-                }
-                None => Ok(None),
-            }
-        })
+        .zip(angle_fillet_length.into_iter())
+        .map(|(w, af)| create_fillet_corner_between_trimmed_segments(&[w[0], w[1]], af))
         .collect::<anyhow::Result<Vec<_>>>()?;
 
     let spans: Vec<Option<Span<T, D>>> = trimmed
         .into_iter()
-        .map(|s| Some(Span::Segment(s.1)))
+        .map(|s| Some(Span::Segment(s.trimmed().clone())))
         .interleave(corners.into_iter().map(|c| c.map(|c| Span::Fillet(c))))
         .collect_vec();
 

@@ -7,6 +7,32 @@ use crate::{curve::NurbsCurve, fillet::segment::Segment, misc::FloatingPoint};
 
 pub type FilletLength<T> = (T, T, T);
 
+/// A trimmed segment with its origin segment
+pub struct TrimmedSegment<T: FloatingPoint, D: DimName>
+where
+    DefaultAllocator: Allocator<D>,
+{
+    origin: Segment<T, D>,
+    trimmed: Segment<T, D>,
+}
+
+impl<T: FloatingPoint, D: DimName> TrimmedSegment<T, D>
+where
+    DefaultAllocator: Allocator<D>,
+{
+    pub fn new(origin: Segment<T, D>, trimmed: Segment<T, D>) -> Self {
+        Self { origin, trimmed }
+    }
+
+    pub fn origin(&self) -> &Segment<T, D> {
+        &self.origin
+    }
+
+    pub fn trimmed(&self) -> &Segment<T, D> {
+        &self.trimmed
+    }
+}
+
 /// Decompose a curve into segments
 pub fn decompose_into_segments<T: FloatingPoint, D: DimName>(
     curve: &NurbsCurve<T, D>,
@@ -17,11 +43,13 @@ where
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     let pts = curve.dehomogenized_control_points();
-    pts.windows(2).map(|w| {
-        let p0 = &w[0];
-        let p1 = &w[1];
-        Segment::new(p0.clone(), p1.clone())
-    }).collect()
+    pts.windows(2)
+        .map(|w| {
+            let p0 = &w[0];
+            let p1 = &w[1];
+            Segment::new(p0.clone(), p1.clone())
+        })
+        .collect()
 }
 
 /// Calculate the fillet length for a given radius and segments
@@ -56,6 +84,61 @@ where
     Some((angle, actual_fillet_length, actual_radius))
 }
 
+/// Trim a segment by a given length
+pub fn trim_segment_by_fillet_length<T: FloatingPoint, D: DimName>(
+    segment: &Segment<T, D>,
+    prev_fillet: Option<FilletLength<T>>,
+    next_fillet: Option<FilletLength<T>>,
+) -> Segment<T, D>
+where
+    DefaultAllocator: Allocator<D>,
+{
+    let start = match prev_fillet {
+        Some((_, length, _)) => segment.trim(length).0.end().clone(),
+        None => segment.start().clone(),
+    };
+
+    let end = match next_fillet {
+        Some((_, length, _)) => segment.trim(segment.length() - length).1.start().clone(),
+        None => segment.end().clone(),
+    };
+    Segment::new(start, end)
+}
+
+/// Create a fillet corner curve
+pub fn create_fillet_corner_between_trimmed_segments<T: FloatingPoint, D: DimName>(
+    segments: &[&TrimmedSegment<T, DimNameDiff<D, U1>>; 2],
+    fillet_length: Option<FilletLength<T>>,
+) -> anyhow::Result<Option<NurbsCurve<T, D>>>
+where
+    D: DimName,
+    D: DimNameSub<U1>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+{
+    let s0 = &segments[0];
+    let s1 = &segments[1];
+    let t0 = s0.trimmed().tangent();
+    let t1 = s1.trimmed().tangent();
+
+    match fillet_length {
+        Some((angle, _, radius)) => {
+            let corner = s0.origin().end();
+            let fillet_arc = create_fillet_arc(
+                s0.trimmed().end(),
+                corner,
+                s1.trimmed().start(),
+                t0,
+                t1,
+                T::pi() - angle,
+                radius,
+            )?;
+            Ok(Some(fillet_arc))
+        }
+        None => Ok(None),
+    }
+}
+
 /// Create a fillet arc curve
 pub fn create_fillet_arc<T: FloatingPoint, D>(
     start: &OPoint<T, DimNameDiff<D, U1>>,
@@ -71,8 +154,8 @@ where
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
-    <D as DimNameSub<U1>>::Output: DimNameAdd<U1>,
-    DefaultAllocator: Allocator<<<D as DimNameSub<U1>>::Output as DimNameAdd<U1>>::Output>,
+    // <D as DimNameSub<U1>>::Output: DimNameAdd<U1>,
+    // DefaultAllocator: Allocator<<<D as DimNameSub<U1>>::Output as DimNameAdd<U1>>::Output>,
 {
     anyhow::ensure!(
         D::dim() - 1 <= 3,
