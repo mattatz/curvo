@@ -1,6 +1,6 @@
 [package]
 name = "curvo"
-version = "0.1.57"
+version = "0.1.58"
 authors = ["Masatatsu Nakamura <masatatsu.nakamura@gmail.com"]
 edition = "2021"
 keywords = ["nurbs", "modeling", "graphics", "3d"]
@@ -20,7 +20,7 @@ rand_distr = { version = "0.5.1", default-features = false, optional = true }
 robust = { version = "1.2.0" }
 easer = { version = "0.3.0", optional = true }
 simba = { version = "0.9.0", default-features = false }
-spade = { version = "2.13.1" }
+spade = { version = "2.14.0" }
 gauss-quad = "0.2.3"
 geo = { version = "0.29.3" }
 bevy = { version = "0.16.1", optional = true }
@@ -196,4 +196,9 @@ required-features = ["bevy"]
 [[example]]
 name = "fillet_curve"
 path = "examples/fillet_curve.rs"
+required-features = ["bevy"]
+
+[[example]]
+name = "fillet_compound_curve"
+path = "examples/fillet_compound_curve.rs"
 required-features = ["bevy"]
