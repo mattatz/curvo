@@ -107,12 +107,14 @@ where
     // insert boundary parameters to us & vs if constraints are provided
     let (us, vs) = if let Some(c) = constraints.as_ref() {
         let us = if let Some(iu) = c.u_parameters() {
-            merge_sorted_parameters(us, iu)
+            // merge_sorted_parameters(us, iu)
+            iu
         } else {
             us
         };
         let vs = if let Some(iv) = c.v_parameters() {
-            merge_sorted_parameters(vs, iv)
+            // merge_sorted_parameters(vs, iv)
+            iv
         } else {
             vs
         };
@@ -135,20 +137,44 @@ where
     let divs_u = us.len() - 1;
     let divs_v = vs.len() - 1;
 
+    let eps = T::from_f64(1e-8).unwrap();
+
     let pts = vs
         .iter()
         .enumerate()
         .map(|(iv, v)| {
             let u_min = iv == 0;
-            let u_max = iv == divs_v - 1;
+            let u_max = iv == divs_v;
             let u_constraint = (u_min && u_min_constraint) || (u_max && u_max_constraint);
 
             let row = us.iter().enumerate().map(|(iu, u)| {
-                let ds = s.rational_derivatives(*u, *v, 1);
-                let norm = ds[1][0].cross(&ds[0][1]).normalize();
                 let v_min = iu == 0;
-                let v_max = iu == divs_u - 1;
+                let v_max = iu == divs_u;
                 let v_constraint = (v_min && v_min_constraint) || (v_max && v_max_constraint);
+
+                let ds = s.rational_derivatives(*u, *v, 1);
+                let n = ds[1][0].cross(&ds[0][1]);
+                let l = n.norm();
+                let norm = if l.is_zero() || !l.is_finite() {
+                    let u_p = if v_min {
+                        *u + eps
+                    } else if v_max {
+                        *u - eps
+                    } else {
+                        *u
+                    };
+                    let v_p = if u_min {
+                        *v + eps
+                    } else if u_max {
+                        *v - eps
+                    } else {
+                        *v
+                    };
+                    s.normal_at(u_p, v_p).normalize()
+                } else {
+                    n / l
+                };
+
                 SurfacePoint::new(Vector2::new(*u, *v), ds[0][0].clone().into(), norm, false)
                     .with_constraints(u_constraint, v_constraint)
                     .with_boundary(u_min, u_max, v_min, v_max)
@@ -229,6 +255,7 @@ fn west(index: usize, iv: usize) -> Option<usize> {
     }
 }
 
+#[allow(dead_code)]
 /// Merge two sorted vectors
 fn merge_sorted_parameters<T: FloatingPoint>(p0: Vec<T>, p1: Vec<T>) -> Vec<T> {
     let mut c0 = 0;
@@ -256,4 +283,62 @@ fn merge_sorted_parameters<T: FloatingPoint>(p0: Vec<T>, p1: Vec<T>) -> Vec<T> {
     }
 
     res
+}
+
+#[cfg(test)]
+mod tests {
+    use std::f64::consts::FRAC_PI_2;
+
+    use nalgebra::{Point3, Rotation3, Translation3, Vector3};
+
+    use crate::{curve::NurbsCurve3D, misc::Transformable};
+
+    use super::*;
+
+    /// Test that the surface is tessellated correctly with constraints on the boundary
+    #[test]
+    fn surface_constrained_tessellation() {
+        let interpolation_target = vec![
+            Point3::new(-1.0, -1.0, 0.),
+            Point3::new(1.0, -1.0, 0.),
+            Point3::new(1.0, 1.0, 0.),
+            Point3::new(-1.0, 1.0, 0.),
+            Point3::new(-1.0, 2.0, 0.),
+            Point3::new(1.0, 2.5, 0.),
+        ];
+        let interpolated = NurbsCurve3D::<f64>::try_interpolate(&interpolation_target, 3).unwrap();
+
+        let rotation = Rotation3::from_axis_angle(&Vector3::z_axis(), FRAC_PI_2);
+        let translation = Translation3::new(0., 0., 1.5);
+        let m = translation * rotation;
+        let front = interpolated.transformed(&(translation.inverse()).into());
+        let back = interpolated.transformed(&m.into());
+
+        let (umin, umax) = front.knots_domain();
+
+        let surface = NurbsSurface::try_loft(&[front.clone(), back.clone()], Some(3)).unwrap();
+
+        let u_parameters = (0..=8)
+            .map(|i| umin + (umax - umin) * i as f64 / 8.)
+            .collect_vec();
+
+        let boundary = BoundaryConstraints::default()
+            .with_u_parameters_at_v_min(u_parameters.clone())
+            .with_u_parameters_at_v_max(u_parameters.clone());
+        let option = AdaptiveTessellationOptions {
+            norm_tolerance: 1e-3,
+            ..Default::default()
+        };
+        let tess = surface.constrained_tessellate(boundary, Some(option));
+        let vertices = tess.points().clone();
+
+        let front_points = u_parameters
+            .iter()
+            .map(|u| front.point_at(*u))
+            .collect_vec();
+        let back_points = u_parameters.iter().map(|u| back.point_at(*u)).collect_vec();
+
+        assert!(front_points.iter().all(|p| vertices.contains(p)));
+        assert!(back_points.iter().all(|p| vertices.contains(p)));
+    }
 }
