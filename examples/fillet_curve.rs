@@ -161,7 +161,7 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
     let curve = NurbsCurve2D::polyline(&points, false);
 
     if settings.use_parameter {
-        let option = FilletRadiusParameterOption::new(settings.radius, settings.parameter);
+        let option = FilletRadiusParameterOption::new(settings.radius, vec![settings.parameter]);
         let fillet_curve = curve.fillet(option).unwrap();
         commands.spawn((FilletCurve(fillet_curve),));
     } else {
@@ -186,7 +186,7 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
     );
 
     if settings.use_parameter {
-        let option = FilletRadiusParameterOption::new(settings.radius, settings.parameter);
+        let option = FilletRadiusParameterOption::new(settings.radius, vec![settings.parameter]);
         let fillet_curve = curve.fillet(option).unwrap();
         commands.spawn((Fillet3DCurve(fillet_curve),));
     } else {
@@ -289,18 +289,19 @@ fn update_ui(
         let mut fillet_curve_3d = fillet_curve_3d.single_mut().unwrap();
 
         if settings.use_parameter {
-            let option = FilletRadiusParameterOption::new(settings.radius, settings.parameter);
-            let res = profile.0.fillet(option);
+            let option =
+                FilletRadiusParameterOption::new(settings.radius, vec![settings.parameter]);
+            let res = profile.0.fillet(option.clone());
             if let Ok(res) = res {
                 fillet_curve.0 = res;
             }
-            let res = profile_3d.0.fillet(option);
+            let res = profile_3d.0.fillet(option.clone());
             if let Ok(res) = res {
                 fillet_curve_3d.0 = res;
             }
         } else {
             let option = FilletRadiusOption::new(settings.radius);
-            let res = profile.0.fillet(option);
+            let res = profile.0.fillet(option.clone());
             if let Ok(res) = res {
                 fillet_curve.0 = res;
             }

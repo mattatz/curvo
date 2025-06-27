@@ -110,7 +110,7 @@ where
     ///     Point2::new(-1.0, -1.0),
     /// ];
     /// let curve = NurbsCurve2D::polyline(&square, false);
-    /// let fillet = curve.fillet(FilletRadiusParameterOption::new(0.2, 2.)).unwrap();
+    /// let fillet = curve.fillet(FilletRadiusParameterOption::new(0.2, vec![2.])).unwrap();
     /// assert_eq!(fillet.spans().len(), 3);
     fn fillet(&self, option: FilletRadiusParameterOption<T>) -> Self::Output {
         let radius = option.radius();
@@ -121,14 +121,17 @@ where
         );
 
         let degree = self.degree();
-        let parameter = option.parameter();
+        let parameters = option.parameters();
         let domain = self.knots_domain();
 
-        anyhow::ensure!(
-            domain.0 <= parameter && parameter <= domain.1,
-            "Parameter must be in the domain of the curve, but got {}",
-            parameter
-        );
+        // Validate all parameters are within domain
+        for &parameter in parameters {
+            anyhow::ensure!(
+                domain.0 <= parameter && parameter <= domain.1,
+                "Parameter must be in the domain of the curve, but got {}",
+                parameter
+            );
+        }
 
         if degree >= 2 {
             return Ok(self.clone().into());
@@ -140,19 +143,26 @@ where
         let n = segments.len();
         let m = if is_closed { n + 1 } else { n };
 
-        let index = self
-            .knots()
-            .floor(parameter)
-            .ok_or(anyhow::anyhow!(
-                "Parameter must be in the domain of the curve, but got {}",
-                parameter
-            ))?
-            .clamp(0, segments.len() + 1)
-            - 1;
+        // Calculate indices for all parameters
+        let indices = parameters
+            .iter()
+            .map(|&parameter| {
+                let index = self
+                    .knots()
+                    .floor(parameter)
+                    .ok_or(anyhow::anyhow!(
+                        "Parameter must be in the domain of the curve, but got {}",
+                        parameter
+                    ))?
+                    .clamp(0, segments.len() + 1)
+                    - 1;
 
-        if !is_closed && index >= n - 1 {
-            anyhow::bail!("Parameter too large, got {}", parameter);
-        }
+                if !is_closed && index >= n - 1 {
+                    anyhow::bail!("Parameter too large, got {}", parameter);
+                }
+                Ok(index)
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
 
         let eps = T::from_f64(1e-6).unwrap();
         let angle_fillet_length = segments
@@ -163,7 +173,7 @@ where
             .windows(2)
             .enumerate()
             .map(|(i, w)| {
-                if i == index {
+                if indices.contains(&i) {
                     calculate_fillet_length(&[w[0], w[1]], radius, |length| {
                         let min = w[0].length().min(w[1].length());
                         let l = min - eps;

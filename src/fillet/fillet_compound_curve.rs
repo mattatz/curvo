@@ -119,7 +119,7 @@ where
     /// ];
     /// let spans = points.windows(2).map(|w| NurbsCurve2D::polyline(w, false)).collect();
     /// let curve = CompoundCurve2D::try_new(spans).unwrap();
-    /// let fillet = curve.fillet(FilletRadiusParameterOption::new(0.2, 0.5)).unwrap();
+    /// let fillet = curve.fillet(FilletRadiusParameterOption::new(0.2, vec![0.5])).unwrap();
     /// assert_eq!(fillet.spans().len(), 3);
     /// ```
     fn fillet(&self, option: FilletRadiusParameterOption<T>) -> Self::Output {
@@ -130,14 +130,17 @@ where
             radius
         );
 
-        let parameter = option.parameter();
+        let parameters = option.parameters();
         let domain = self.knots_domain();
 
-        anyhow::ensure!(
-            domain.0 <= parameter && parameter <= domain.1,
-            "Parameter must be in the domain of the curve, but got {}",
-            parameter
-        );
+        // Validate all parameters are within domain
+        for &parameter in parameters {
+            anyhow::ensure!(
+                domain.0 <= parameter && parameter <= domain.1,
+                "Parameter must be in the domain of the curve, but got {}",
+                parameter
+            );
+        }
 
         let segments = decompose_into_compound_segments(self);
 
@@ -145,39 +148,46 @@ where
         let n = segments.len();
         let m = if is_closed { n + 1 } else { n };
 
-        // convert span index to segment index
-        let mut segment_index = 0;
-        let mut found = false;
+        // Calculate segment indices for all parameters
+        let segment_indices = parameters
+            .iter()
+            .map(|&parameter| {
+                let mut segment_index = 0;
+                let mut found = false;
 
-        for span in self.spans().iter() {
-            if span.knots_domain().1 <= parameter {
-                segment_index += span.control_points().len() - 1;
-                continue;
-            }
+                for span in self.spans().iter() {
+                    if span.knots_domain().1 <= parameter {
+                        segment_index += span.control_points().len() - 1;
+                        continue;
+                    }
 
-            let index = span.knots().floor(parameter);
-            if let Some(index) = index {
-                segment_index += index;
-                found = true;
-                break;
-            } else if span.degree() == 1 {
-                segment_index += span.control_points().len();
-            } else {
-                segment_index += 1;
-            }
-        }
+                    let index = span.knots().floor(parameter);
+                    if let Some(index) = index {
+                        segment_index += index;
+                        found = true;
+                        break;
+                    } else if span.degree() == 1 {
+                        segment_index += span.control_points().len();
+                    } else {
+                        segment_index += 1;
+                    }
+                }
 
-        anyhow::ensure!(
-            found,
-            "Parameter must be in the domain of the curve, but got {}",
-            parameter
-        );
+                anyhow::ensure!(
+                    found,
+                    "Parameter must be in the domain of the curve, but got {}",
+                    parameter
+                );
 
-        segment_index = segment_index.saturating_sub(1);
+                segment_index = segment_index.saturating_sub(1);
 
-        if !is_closed && segment_index >= n - 1 {
-            anyhow::bail!("Parameter too large, got {}", parameter);
-        }
+                if !is_closed && segment_index >= n - 1 {
+                    anyhow::bail!("Parameter too large, got {}", parameter);
+                }
+
+                Ok(segment_index)
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
 
         // calculate angle and fillet length for each segment
         let half = T::from_f64(0.5).unwrap();
@@ -190,7 +200,7 @@ where
             .windows(2)
             .enumerate()
             .map(|(i, w)| {
-                if i == segment_index {
+                if segment_indices.contains(&i) {
                     match (w[0], w[1]) {
                         (CompoundSegment::Segment(s0), CompoundSegment::Segment(s1)) => {
                             calculate_fillet_length(&[s0, s1], radius, |length| {

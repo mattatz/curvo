@@ -108,7 +108,7 @@ fn setup(mut commands: Commands, settings: Res<Setting>) {
     let _curve = CompoundCurve::try_new(spans).unwrap();
 
     if settings.use_parameter {
-        let option = FilletRadiusParameterOption::new(settings.radius, settings.parameter);
+        let option = FilletRadiusParameterOption::new(settings.radius, vec![settings.parameter]);
         let fillet_curve = curve.fillet(option).unwrap();
         commands.spawn((FilletCurve(fillet_curve),));
     } else {
@@ -199,7 +199,8 @@ fn update_ui(
         let mut fillet_curve = fillet_curve.single_mut().unwrap();
 
         if settings.use_parameter {
-            let option = FilletRadiusParameterOption::new(settings.radius, settings.parameter);
+            let option =
+                FilletRadiusParameterOption::new(settings.radius, vec![settings.parameter]);
             let res = profile.0.fillet(option);
             if let Ok(res) = res {
                 fillet_curve.0 = res;

@@ -16,28 +16,40 @@ impl<T: FloatingPoint> FilletRadiusOption<T> {
     }
 }
 
-/// Only fillet the sharp corner at the specified parameter position with a given radius
-#[derive(Debug, Clone, Copy)]
+/// Only fillet the sharp corners at the specified parameter positions with a given radius
+#[derive(Debug, Clone)]
 pub struct FilletRadiusParameterOption<T: FloatingPoint> {
     radius: T,
-    parameter: T,
+    parameters: Vec<T>,
 }
 
 impl<T: FloatingPoint> FilletRadiusParameterOption<T> {
-    pub fn new(radius: T, parameter: T) -> Self {
-        Self { radius, parameter }
+    pub fn new(radius: T, parameters: Vec<T>) -> Self {
+        Self { radius, parameters }
+    }
+
+    pub fn from_single(radius: T, parameter: T) -> Self {
+        Self {
+            radius,
+            parameters: vec![parameter],
+        }
     }
 
     pub fn radius(&self) -> T {
         self.radius
     }
 
-    pub fn parameter(&self) -> T {
-        self.parameter
+    pub fn parameters(&self) -> &[T] {
+        &self.parameters
     }
 
-    pub fn with_parameter(&mut self, parameter: T) -> &mut Self {
-        self.parameter = parameter;
+    pub fn with_parameters(&mut self, parameters: Vec<T>) -> &mut Self {
+        self.parameters = parameters;
+        self
+    }
+
+    pub fn add_parameter(&mut self, parameter: T) -> &mut Self {
+        self.parameters.push(parameter);
         self
     }
 
