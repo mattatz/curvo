@@ -1,4 +1,4 @@
-use geo::{BoundingRect, Contains, LineIntersection};
+use geo::{BoundingRect, LineIntersection};
 use itertools::Itertools;
 use nalgebra::Point2;
 use num_traits::NumCast;
@@ -38,6 +38,7 @@ impl LineStringIntersection {
         self.line_index
     }
 
+    #[allow(unused)]
     pub fn is_proper(&self) -> bool {
         self.is_proper
     }
