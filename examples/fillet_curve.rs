@@ -301,7 +301,7 @@ fn update_ui(
             }
         } else {
             let option = FilletRadiusOption::new(settings.radius);
-            let res = profile.0.fillet(option.clone());
+            let res = profile.0.fillet(option);
             if let Ok(res) = res {
                 fillet_curve.0 = res;
             }

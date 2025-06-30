@@ -1,7 +1,6 @@
 use std::cmp::Ordering;
 
 use argmin::core::{ArgminFloat, Executor, State};
-use geo::BoundingRect;
 use itertools::Itertools;
 use nalgebra::{
     allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, Matrix2, OPoint,
@@ -99,21 +98,20 @@ where
 
             let find_parameter = |points: &Vec<Point2<T>>,
                                   knots: &KnotVector<T>,
-                                  pt: Point2<f64>,
+                                  point: Point2<f64>,
                                   index: usize|
              -> anyhow::Result<T> {
                 anyhow::ensure!(index + 1 < points.len(), "index out of bounds");
 
-                let next_index = index + 1;
                 let prev = points[index];
-                let next = points[next_index];
-                let knots = knots.as_slice();
+                let next = points[index + 1];
                 let k0 = knots[index + 1];
                 let k1 = knots[index + 2];
 
                 let d = (next - prev).norm();
-                let d2 = (next - pt.map(|x| T::from_f64(x).unwrap())).norm();
-                let t = d2 / d;
+                let d2 = (next - point.map(|x| T::from_f64(x).unwrap())).norm();
+                let t = T::one() - d2 / d;
+
                 Ok(k0 + t * (k1 - k0))
             };
 

@@ -55,18 +55,16 @@ pub fn find_line_string_intersection(
     l0.lines().enumerate().for_each(|(i0, l0)| {
         l1.lines().enumerate().for_each(|(i1, l1)| {
             let it = geo::algorithm::line_intersection::line_intersection(l0, l1);
-            match it {
-                Some(LineIntersection::SinglePoint {
-                    intersection,
-                    is_proper: _,
-                }) => {
-                    let p0 = Point2::new(intersection.x, intersection.y);
-                    res.push(LineStringIntersection {
-                        point: p0,
-                        line_index: (i0, i1),
-                    });
-                }
-                _ => {}
+            if let Some(LineIntersection::SinglePoint {
+                intersection,
+                is_proper: _,
+            }) = it
+            {
+                let p0 = Point2::new(intersection.x, intersection.y);
+                res.push(LineStringIntersection {
+                    point: p0,
+                    line_index: (i0, i1),
+                });
             }
         });
     });
