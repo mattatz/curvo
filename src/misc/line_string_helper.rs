@@ -1,4 +1,4 @@
-use geo::{BoundingRect, LineIntersection};
+use geo::{BoundingRect, Contains, LineIntersection};
 use itertools::Itertools;
 use nalgebra::Point2;
 use num_traits::NumCast;
@@ -23,8 +23,10 @@ pub fn to_line_string_helper<T: FloatingPoint>(points: &[Point2<T>]) -> geo::Lin
 /// Intersection of two line strings
 #[derive(Debug, Clone, PartialEq)]
 pub struct LineStringIntersection {
-    pub point: Point2<f64>,
-    pub line_index: (usize, usize),
+    point: Point2<f64>,
+    line_index: (usize, usize),
+    /// If the intersection is proper, it means that the intersection point is not on the endpoint of the line.
+    is_proper: bool,
 }
 
 impl LineStringIntersection {
@@ -34,6 +36,10 @@ impl LineStringIntersection {
 
     pub fn line_index(&self) -> (usize, usize) {
         self.line_index
+    }
+
+    pub fn is_proper(&self) -> bool {
+        self.is_proper
     }
 }
 
@@ -58,13 +64,14 @@ pub fn find_line_string_intersection(
             let it = geo::algorithm::line_intersection::line_intersection(l0, l1);
             if let Some(LineIntersection::SinglePoint {
                 intersection,
-                is_proper: _,
+                is_proper,
             }) = it
             {
-                let p0 = Point2::new(intersection.x, intersection.y);
+                let pt = Point2::new(intersection.x, intersection.y);
                 res.push(LineStringIntersection {
-                    point: p0,
+                    point: pt,
                     line_index: (i0, i1),
+                    is_proper,
                 });
             }
         });
