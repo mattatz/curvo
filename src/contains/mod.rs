@@ -1,17 +1,16 @@
-pub mod contains_compound_curve;
-pub mod contains_curve;
+pub mod compound_curve_contains_compound_curve;
+pub mod compound_curve_contains_curve;
+pub mod compound_curve_contains_point;
+pub mod curve_contains_compound_curve;
+pub mod curve_contains_curve;
+pub mod curve_contains_point;
 
-use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, OPoint};
+pub use curve_contains_point::*;
 
-use crate::misc::FloatingPoint;
-
-/// Trait for determining if a point is inside a curve.
-pub trait Contains<T: FloatingPoint, D: DimName>
-where
-    DefaultAllocator: Allocator<D>,
-{
+/// Trait for determining if a target is inside a geometry.
+pub trait Contains<T> {
     type Option;
-    fn contains(&self, point: &OPoint<T, D>, option: Self::Option) -> anyhow::Result<bool>;
+    fn contains(&self, target: &T, option: Self::Option) -> anyhow::Result<bool>;
 }
 
 #[cfg(test)]

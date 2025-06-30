@@ -4,7 +4,6 @@ pub mod compound_curve_intersection;
 pub mod curve_intersection_bfgs;
 pub mod curve_intersection_problem;
 pub mod curve_intersection_solver_options;
-mod helper;
 pub mod intersection_compound_curve;
 pub mod intersection_curve_curve;
 

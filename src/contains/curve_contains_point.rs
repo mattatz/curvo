@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 
 use argmin::core::ArgminFloat;
 use itertools::Itertools;
-use nalgebra::{Const, Point2, Vector2, U3};
+use nalgebra::{Const, OPoint, Point2, Vector2, U3};
 use num_traits::Float;
 
 use crate::{
@@ -15,7 +15,7 @@ use crate::{
 
 use super::Contains;
 
-impl<T: FloatingPoint + ArgminFloat> Contains<T, Const<2>> for NurbsCurve<T, Const<3>> {
+impl<T: FloatingPoint + ArgminFloat> Contains<OPoint<T, Const<2>>> for NurbsCurve<T, Const<3>> {
     type Option = Option<CurveIntersectionSolverOptions<T>>;
 
     /// Determine if a point is inside a closed curve by ray casting method.

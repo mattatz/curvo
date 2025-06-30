@@ -11,11 +11,8 @@ use num_traits::Float;
 use crate::{
     curve::NurbsCurve,
     knot::KnotVector,
-    misc::FloatingPoint,
-    prelude::{
-        curve_curve::helper::{find_line_string_intersection, to_line_string_helper},
-        BoundingBoxTraversal, CurveBoundingBoxTree, HasIntersection, Intersects,
-    },
+    misc::{find_line_string_intersection, to_line_string_helper, FloatingPoint},
+    prelude::{BoundingBoxTraversal, CurveBoundingBoxTree, HasIntersection, Intersects},
 };
 
 use super::{

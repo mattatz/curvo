@@ -94,12 +94,12 @@ pub fn clip<'a, T: FloatingPoint, S, C, O: Clone>(
 ) -> anyhow::Result<Clip<T>>
 where
     S: Clone
-        + Contains<T, U2, Option = O>
+        + Contains<C, Option = O>
         + EndPoints<T, U2>
         + Into<CompoundCurve<T, U3>>
         + TrimRange<T, U3>,
     C: Clone
-        + Contains<T, U2, Option = O>
+        + Contains<S, Option = O>
         + EndPoints<T, U2>
         + Into<CompoundCurve<T, U3>>
         + TrimRange<T, U3>,
@@ -138,8 +138,8 @@ where
         intersections.len()
     );
 
-    let clip_contains_subject = clip.contains(&subject.first_point(), option.clone())?;
-    let subject_contains_clip = subject.contains(&clip.first_point(), option.clone())?;
+    let clip_contains_subject = clip.contains(subject, option.clone())?;
+    let subject_contains_clip = subject.contains(clip, option.clone())?;
     // println!("clip contains subject: {}, subject contains clip: {}", clip_contains_subject, subject_contains_clip);
 
     let indexed = intersections.into_iter().enumerate().collect_vec();
