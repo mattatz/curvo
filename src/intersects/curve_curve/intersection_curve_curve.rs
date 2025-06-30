@@ -277,3 +277,27 @@ where
         })
         .collect_vec()
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::curve::NurbsCurve2D;
+
+    use super::*;
+
+    #[test]
+    fn test_polyline_x_polyline_intersection_on_edge() {
+        let p0 = NurbsCurve2D::<f64>::polyline(
+            &[
+                Point2::new(0., 0.),
+                Point2::new(1., 0.),
+                Point2::new(1., 1.),
+                Point2::new(0., 1.),
+            ],
+            false,
+        );
+        let p1 = NurbsCurve2D::<f64>::polyline(&[Point2::new(1., -1.), Point2::new(1., 2.)], false);
+
+        let intersections = p0.find_intersection(&p1, None).unwrap();
+        assert_eq!(intersections.len(), 2);
+    }
+}
