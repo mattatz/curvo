@@ -235,8 +235,6 @@ where
             });
     });
 
-    // println!("clip contains subject: {}, subject contains clip: {}", clip_contains_subject, subject_contains_clip);
-
     let mut a_flag = !clip_contains_subject;
     let mut b_flag = !subject_contains_clip;
 
@@ -394,10 +392,18 @@ where
             // filter out degenerated spans
             let spans = spans
                 .into_iter()
-                .filter(|span| {
-                    let mut pts = span.dehomogenized_control_points();
-                    pts.dedup();
-                    pts.len() >= 2
+                .filter_map(|span| {
+                    if span.degree() == 1 {
+                        let mut pts = span.dehomogenized_control_points();
+                        pts.dedup();
+                        if pts.len() >= 2 {
+                            Some(NurbsCurve2D::polyline(&pts, false))
+                        } else {
+                            None
+                        }
+                    } else {
+                        Some(span)
+                    }
                 })
                 .collect_vec();
             let region = Region::new(CompoundCurve::try_new(spans)?, vec![]);
