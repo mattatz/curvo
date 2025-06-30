@@ -390,6 +390,16 @@ where
             spans.iter().for_each(|span| {
                 info.add_span(span.clone());
             });
+
+            // filter out degenerated spans
+            let spans = spans
+                .into_iter()
+                .filter(|span| {
+                    let mut pts = span.dehomogenized_control_points();
+                    pts.dedup();
+                    pts.len() >= 2
+                })
+                .collect_vec();
             let region = Region::new(CompoundCurve::try_new(spans)?, vec![]);
             regions.push(region);
         }

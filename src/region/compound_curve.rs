@@ -69,6 +69,7 @@ where
         // Ensure the adjacent spans are connected in the forward direction.
         let mut curves = spans.clone();
         let mut connected = vec![curves.remove(0)];
+
         while !curves.is_empty() {
             let current = connected.len() - 1;
             let last = &connected[current];
@@ -98,7 +99,7 @@ where
                     }
                 }
                 None => {
-                    anyhow::bail!("No connection found");
+                    anyhow::bail!("No connection found to create a compound curve");
                 }
             }
         }
