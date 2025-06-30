@@ -3,7 +3,7 @@
 pub mod scenario;
 use curvo::prelude::{
     operation::BooleanOperation, Boolean, Clip, CompoundCurve, CurveIntersectionSolverOptions,
-    EndPoints, NurbsCurve, Region, Transformable,
+    EndPoints, Invertible, NurbsCurve, Region, Transformable,
 };
 use nalgebra::{Const, OMatrix, OPoint, U2, U3};
 pub use scenario::*;
@@ -83,6 +83,16 @@ impl<'a> Transformable<&'a OMatrix<f64, U3, U3>> for CurveVariant {
             CurveVariant::Curve(c) => c.transform(transform),
             CurveVariant::Compound(c) => c.transform(transform),
             CurveVariant::Region(r) => r.transform(transform),
+        }
+    }
+}
+
+impl Invertible for CurveVariant {
+    fn invert(&mut self) {
+        match self {
+            CurveVariant::Curve(c) => c.invert(),
+            CurveVariant::Compound(c) => c.invert(),
+            CurveVariant::Region(r) => r.invert(),
         }
     }
 }

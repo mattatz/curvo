@@ -1,8 +1,8 @@
 use argmin::core::ArgminFloat;
-use nalgebra::{Const, Point2};
+use nalgebra::{Const, OPoint, Point2};
 
 use crate::{
-    contains::contains_curve::x_ray_intersection,
+    contains::curve_contains_point::x_ray_intersection,
     misc::FloatingPoint,
     prelude::{BoundingBox, CurveIntersectionSolverOptions},
     region::CompoundCurve,
@@ -10,7 +10,7 @@ use crate::{
 
 use super::Contains;
 
-impl<T: FloatingPoint + ArgminFloat> Contains<T, Const<2>> for CompoundCurve<T, Const<3>> {
+impl<T: FloatingPoint + ArgminFloat> Contains<OPoint<T, Const<2>>> for CompoundCurve<T, Const<3>> {
     type Option = Option<CurveIntersectionSolverOptions<T>>;
 
     /// Determine if a point is inside a closed curve by ray casting method.

@@ -94,12 +94,12 @@ pub fn clip<'a, T: FloatingPoint, S, C, O: Clone>(
 ) -> anyhow::Result<Clip<T>>
 where
     S: Clone
-        + Contains<T, U2, Option = O>
+        + Contains<C, Option = O>
         + EndPoints<T, U2>
         + Into<CompoundCurve<T, U3>>
         + TrimRange<T, U3>,
     C: Clone
-        + Contains<T, U2, Option = O>
+        + Contains<S, Option = O>
         + EndPoints<T, U2>
         + Into<CompoundCurve<T, U3>>
         + TrimRange<T, U3>,
@@ -138,8 +138,8 @@ where
         intersections.len()
     );
 
-    let clip_contains_subject = clip.contains(&subject.first_point(), option.clone())?;
-    let subject_contains_clip = subject.contains(&clip.first_point(), option.clone())?;
+    let clip_contains_subject = clip.contains(subject, option.clone())?;
+    let subject_contains_clip = subject.contains(clip, option.clone())?;
     // println!("clip contains subject: {}, subject contains clip: {}", clip_contains_subject, subject_contains_clip);
 
     let indexed = intersections.into_iter().enumerate().collect_vec();
@@ -234,8 +234,6 @@ where
                 w[1].borrow_mut().set_prev(Rc::downgrade(w[0]));
             });
     });
-
-    // println!("clip contains subject: {}, subject contains clip: {}", clip_contains_subject, subject_contains_clip);
 
     let mut a_flag = !clip_contains_subject;
     let mut b_flag = !subject_contains_clip;
@@ -390,6 +388,24 @@ where
             spans.iter().for_each(|span| {
                 info.add_span(span.clone());
             });
+
+            // filter out degenerated spans
+            let spans = spans
+                .into_iter()
+                .filter_map(|span| {
+                    if span.degree() == 1 {
+                        let mut pts = span.dehomogenized_control_points();
+                        pts.dedup();
+                        if pts.len() >= 2 {
+                            Some(NurbsCurve2D::polyline(&pts, false))
+                        } else {
+                            None
+                        }
+                    } else {
+                        Some(span)
+                    }
+                })
+                .collect_vec();
             let region = Region::new(CompoundCurve::try_new(spans)?, vec![]);
             regions.push(region);
         }

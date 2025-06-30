@@ -4,13 +4,14 @@ use argmin::core::{ArgminFloat, Executor, State};
 use itertools::Itertools;
 use nalgebra::{
     allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, Matrix2, OPoint,
-    Vector2, U1,
+    Point2, Vector2, U1,
 };
 use num_traits::Float;
 
 use crate::{
     curve::NurbsCurve,
-    misc::FloatingPoint,
+    knot::KnotVector,
+    misc::{find_line_string_intersection, to_line_string_helper, FloatingPoint},
     prelude::{BoundingBoxTraversal, CurveBoundingBoxTree, HasIntersection, Intersects},
 };
 
@@ -76,6 +77,61 @@ where
         other: &'a NurbsCurve<T, D>,
         option: Self::Option,
     ) -> Self::Output {
+        if self.degree() == 1 && other.degree() == 1 && D::dim() == 3 {
+            // 2d polyline intersection
+            let p0 = self
+                .dehomogenized_control_points()
+                .iter()
+                .map(|p| Point2::from_slice(p.coords.as_slice()))
+                .collect_vec();
+            let p1 = other
+                .dehomogenized_control_points()
+                .iter()
+                .map(|p| Point2::from_slice(p.coords.as_slice()))
+                .collect_vec();
+            let l0 = to_line_string_helper(&p0);
+            let l1 = to_line_string_helper(&p1);
+            let intersections = find_line_string_intersection(&l0, &l1)?;
+
+            let find_parameter = |points: &Vec<Point2<T>>,
+                                  knots: &KnotVector<T>,
+                                  point: Point2<f64>,
+                                  index: usize|
+             -> anyhow::Result<T> {
+                anyhow::ensure!(index + 1 < points.len(), "index out of bounds");
+
+                let prev = points[index];
+                let next = points[index + 1];
+                let k0 = knots[index + 1];
+                let k1 = knots[index + 2];
+
+                let d = (next - prev).norm();
+                let d2 = (next - point.map(|x| T::from_f64(x).unwrap())).norm();
+                let t = T::one() - d2 / d;
+
+                Ok(k0 + t * (k1 - k0))
+            };
+
+            let its = intersections
+                .into_iter()
+                .map(|it| {
+                    let pt = it.point();
+                    let (i0, i1) = it.line_index();
+                    let t0 = find_parameter(&p0, self.knots(), pt, i0)?;
+                    let t1 = find_parameter(&p1, other.knots(), pt, i1)?;
+                    let pt = OPoint::<T, DimNameDiff<D, U1>>::from_slice(
+                        &pt.coords
+                            .as_slice()
+                            .iter()
+                            .map(|x| T::from_f64(*x).unwrap())
+                            .collect_vec(),
+                    );
+                    Ok(CurveCurveIntersection::new((pt.clone(), t0), (pt, t1)))
+                })
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            return Ok(group_and_extract_closest_intersections(its));
+        }
+
         let options = option.unwrap_or_default();
 
         let ta = CurveBoundingBoxTree::new(
@@ -154,7 +210,7 @@ where
                 }
             })
             .filter(|it| {
-                // filter out intersections that are too close
+                // filter out intersections that are too far away
                 let p0 = &it.a().0;
                 let p1 = &it.b().0;
                 let d = (p0 - p1).norm();
@@ -162,63 +218,86 @@ where
             })
             .collect_vec();
 
-        let sorted = intersections
-            .into_iter()
-            .sorted_by(|x, y| x.a().1.partial_cmp(&y.a().1).unwrap_or(Ordering::Equal))
-            .collect_vec();
-
-        // println!("sorted: {:?}", sorted.iter().map(|it| it.a()).collect_vec());
-
-        // group near parameter results & extract the closest one in each group
-        let parameter_minimum_distance = T::from_f64(1e-3).unwrap();
-        let groups = sorted
-            .into_iter()
-            .map(|pt| vec![pt])
-            .coalesce(|x, y| {
-                let x0 = &x[x.len() - 1];
-                let y0 = &y[y.len() - 1];
-                let da = Float::abs(x0.a().1 - y0.a().1);
-                let db = Float::abs(x0.b().1 - y0.b().1);
-                if da < parameter_minimum_distance || db < parameter_minimum_distance {
-                    // merge near parameter results
-                    let group = [x, y].concat();
-                    Ok(group)
-                } else {
-                    Err((x, y))
-                }
-            })
-            .collect::<Vec<Vec<CurveCurveIntersection<OPoint<T, DimNameDiff<D, U1>>, T>>>>()
-            .into_iter()
-            .collect_vec();
-
-        /*
-        println!("groups: {:?}", groups.len());
-        groups.iter().for_each(|group| {
-            println!("group: {:?}", group.iter().map(|v| &v.b().0).collect_vec());
-        });
-        */
-
-        let pts = groups
-            .into_iter()
-            .filter_map(|group| match group.len() {
-                1 => Some(group[0].clone()),
-                _ => {
-                    // find the closest intersection in the group
-                    group
-                        .iter()
-                        .map(|it| {
-                            let delta = &it.a().0 - &it.b().0;
-                            let norm = delta.norm_squared();
-                            (it, norm)
-                        })
-                        .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(Ordering::Equal))
-                        .map(|closest| closest.0.clone())
-                }
-            })
-            .collect_vec();
-
-        // println!("pts: {:?}", pts.len());
-
+        let pts = group_and_extract_closest_intersections(intersections);
         Ok(pts)
+    }
+}
+
+/// Group intersections by parameter and extract the closest intersection in each group
+fn group_and_extract_closest_intersections<T, D>(
+    intersections: Vec<CurveCurveIntersection<OPoint<T, D>, T>>,
+) -> Vec<CurveCurveIntersection<OPoint<T, D>, T>>
+where
+    T: FloatingPoint + ArgminFloat,
+    D: DimName,
+    DefaultAllocator: Allocator<D>,
+{
+    let sorted = intersections
+        .into_iter()
+        .sorted_by(|x, y| x.a().1.partial_cmp(&y.a().1).unwrap_or(Ordering::Equal))
+        .collect_vec();
+
+    let parameter_minimum_distance = T::from_f64(1e-3).unwrap();
+    let groups = sorted
+        .into_iter()
+        .map(|pt| vec![pt])
+        .coalesce(|x, y| {
+            let x0 = &x[x.len() - 1];
+            let y0 = &y[y.len() - 1];
+            let da = Float::abs(x0.a().1 - y0.a().1);
+            let db = Float::abs(x0.b().1 - y0.b().1);
+            if da < parameter_minimum_distance || db < parameter_minimum_distance {
+                // merge near parameter results
+                let group = [x, y].concat();
+                Ok(group)
+            } else {
+                Err((x, y))
+            }
+        })
+        .collect::<Vec<Vec<CurveCurveIntersection<OPoint<T, D>, T>>>>()
+        .into_iter()
+        .collect_vec();
+
+    groups
+        .into_iter()
+        .filter_map(|group| match group.len() {
+            1 => Some(group[0].clone()),
+            _ => {
+                // find the closest intersection in the group
+                group
+                    .iter()
+                    .map(|it| {
+                        let delta = &it.a().0 - &it.b().0;
+                        let norm = delta.norm_squared();
+                        (it, norm)
+                    })
+                    .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(Ordering::Equal))
+                    .map(|closest| closest.0.clone())
+            }
+        })
+        .collect_vec()
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::curve::NurbsCurve2D;
+
+    use super::*;
+
+    #[test]
+    fn test_polyline_x_polyline_intersection_on_edge() {
+        let p0 = NurbsCurve2D::<f64>::polyline(
+            &[
+                Point2::new(0., 0.),
+                Point2::new(1., 0.),
+                Point2::new(1., 1.),
+                Point2::new(0., 1.),
+            ],
+            false,
+        );
+        let p1 = NurbsCurve2D::<f64>::polyline(&[Point2::new(1., -1.), Point2::new(1., 2.)], false);
+
+        let intersections = p0.find_intersection(&p1, None).unwrap();
+        assert_eq!(intersections.len(), 2);
     }
 }
