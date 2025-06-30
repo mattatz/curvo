@@ -21,6 +21,7 @@ pub fn to_line_string_helper<T: FloatingPoint>(points: &[Point2<T>]) -> geo::Lin
 }
 
 /// Intersection of two line strings
+#[derive(Debug, Clone, PartialEq)]
 pub struct LineStringIntersection {
     pub point: Point2<f64>,
     pub line_index: (usize, usize),

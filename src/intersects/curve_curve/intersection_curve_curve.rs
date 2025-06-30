@@ -115,7 +115,7 @@ where
                 Ok(k0 + t * (k1 - k0))
             };
 
-            return intersections
+            let its = intersections
                 .into_iter()
                 .map(|it| {
                     let pt = it.point();
@@ -131,7 +131,8 @@ where
                     );
                     Ok(CurveCurveIntersection::new((pt.clone(), t0), (pt, t1)))
                 })
-                .collect::<anyhow::Result<Vec<_>>>();
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            return Ok(group_and_extract_closest_intersections(its));
         }
 
         let options = option.unwrap_or_default();
@@ -212,7 +213,7 @@ where
                 }
             })
             .filter(|it| {
-                // filter out intersections that are too close
+                // filter out intersections that are too far away
                 let p0 = &it.a().0;
                 let p1 = &it.b().0;
                 let d = (p0 - p1).norm();
@@ -220,63 +221,62 @@ where
             })
             .collect_vec();
 
-        let sorted = intersections
-            .into_iter()
-            .sorted_by(|x, y| x.a().1.partial_cmp(&y.a().1).unwrap_or(Ordering::Equal))
-            .collect_vec();
-
-        // println!("sorted: {:?}", sorted.iter().map(|it| it.a()).collect_vec());
-
-        // group near parameter results & extract the closest one in each group
-        let parameter_minimum_distance = T::from_f64(1e-3).unwrap();
-        let groups = sorted
-            .into_iter()
-            .map(|pt| vec![pt])
-            .coalesce(|x, y| {
-                let x0 = &x[x.len() - 1];
-                let y0 = &y[y.len() - 1];
-                let da = Float::abs(x0.a().1 - y0.a().1);
-                let db = Float::abs(x0.b().1 - y0.b().1);
-                if da < parameter_minimum_distance || db < parameter_minimum_distance {
-                    // merge near parameter results
-                    let group = [x, y].concat();
-                    Ok(group)
-                } else {
-                    Err((x, y))
-                }
-            })
-            .collect::<Vec<Vec<CurveCurveIntersection<OPoint<T, DimNameDiff<D, U1>>, T>>>>()
-            .into_iter()
-            .collect_vec();
-
-        /*
-        println!("groups: {:?}", groups.len());
-        groups.iter().for_each(|group| {
-            println!("group: {:?}", group.iter().map(|v| &v.b().0).collect_vec());
-        });
-        */
-
-        let pts = groups
-            .into_iter()
-            .filter_map(|group| match group.len() {
-                1 => Some(group[0].clone()),
-                _ => {
-                    // find the closest intersection in the group
-                    group
-                        .iter()
-                        .map(|it| {
-                            let delta = &it.a().0 - &it.b().0;
-                            let norm = delta.norm_squared();
-                            (it, norm)
-                        })
-                        .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(Ordering::Equal))
-                        .map(|closest| closest.0.clone())
-                }
-            })
-            .collect_vec();
-
-        // println!("pts: {:?}", pts.len());
-
+        let pts = group_and_extract_closest_intersections(intersections);
         Ok(pts)
     }
+}
+
+/// Group intersections by parameter and extract the closest intersection in each group
+fn group_and_extract_closest_intersections<T, D>(
+    intersections: Vec<CurveCurveIntersection<OPoint<T, D>, T>>,
+) -> Vec<CurveCurveIntersection<OPoint<T, D>, T>>
+where
+    T: FloatingPoint + ArgminFloat,
+    D: DimName,
+    DefaultAllocator: Allocator<D>,
+{
+    let sorted = intersections
+        .into_iter()
+        .sorted_by(|x, y| x.a().1.partial_cmp(&y.a().1).unwrap_or(Ordering::Equal))
+        .collect_vec();
+
+    let parameter_minimum_distance = T::from_f64(1e-3).unwrap();
+    let groups = sorted
+        .into_iter()
+        .map(|pt| vec![pt])
+        .coalesce(|x, y| {
+            let x0 = &x[x.len() - 1];
+            let y0 = &y[y.len() - 1];
+            let da = Float::abs(x0.a().1 - y0.a().1);
+            let db = Float::abs(x0.b().1 - y0.b().1);
+            if da < parameter_minimum_distance || db < parameter_minimum_distance {
+                // merge near parameter results
+                let group = [x, y].concat();
+                Ok(group)
+            } else {
+                Err((x, y))
+            }
+        })
+        .collect::<Vec<Vec<CurveCurveIntersection<OPoint<T, D>, T>>>>()
+        .into_iter()
+        .collect_vec();
+
+    groups
+        .into_iter()
+        .filter_map(|group| match group.len() {
+            1 => Some(group[0].clone()),
+            _ => {
+                // find the closest intersection in the group
+                group
+                    .iter()
+                    .map(|it| {
+                        let delta = &it.a().0 - &it.b().0;
+                        let norm = delta.norm_squared();
+                        (it, norm)
+                    })
+                    .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(Ordering::Equal))
+                    .map(|closest| closest.0.clone())
+            }
+        })
+        .collect_vec()
 }
