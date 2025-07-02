@@ -12,7 +12,7 @@ use crate::{
             CompoundSegment, FilletLength, TrimmedSegment,
         },
         segment::Segment,
-        Fillet, FilletRadiusOption, FilletRadiusParameterOption,
+        Fillet, FilletRadiusOption, FilletRadiusParameterOption, FilletRadiusParameterSetOption,
     },
     misc::FloatingPoint,
     region::CompoundCurve,
@@ -123,18 +123,36 @@ where
     /// assert_eq!(fillet.spans().len(), 3);
     /// ```
     fn fillet(&self, option: FilletRadiusParameterOption<T>) -> Self::Output {
-        let radius = option.radius();
+        let set = FilletRadiusParameterSetOption::from(option);
+        self.fillet(set)
+    }
+}
+
+impl<T: FloatingPoint, D: DimName> Fillet<FilletRadiusParameterSetOption<T>> for CompoundCurve<T, D>
+where
+    D: DimNameSub<U1>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+    <D as DimNameSub<U1>>::Output: DimNameAdd<U1>,
+    DefaultAllocator: Allocator<<<D as DimNameSub<U1>>::Output as DimNameAdd<U1>>::Output>,
+{
+    type Output = anyhow::Result<CompoundCurve<T, D>>;
+
+    fn fillet(&self, option: FilletRadiusParameterSetOption<T>) -> Self::Output {
+        let sets = option.radius_parameter_sets();
         anyhow::ensure!(
-            radius > T::zero(),
+            sets.iter().all(|s| s.radius() > T::zero()),
             "Radius must be positive, but got {}",
-            radius
+            sets.iter()
+                .map(|s| s.radius().to_f64().unwrap())
+                .fold(f64::MAX, |a, b| a.min(b))
         );
 
-        let parameters = option.parameters();
         let domain = self.knots_domain();
 
         // Validate all parameters are within domain
-        for &parameter in parameters {
+        for s in sets.iter() {
+            let parameter = s.parameter();
             anyhow::ensure!(
                 domain.0 <= parameter && parameter <= domain.1,
                 "Parameter must be in the domain of the curve, but got {}",
@@ -149,9 +167,10 @@ where
         let m = if is_closed { n + 1 } else { n };
 
         // Calculate segment indices for all parameters
-        let segment_indices = parameters
+        let segment_indices = sets
             .iter()
-            .map(|&parameter| {
+            .map(|s| {
+                let parameter = s.parameter();
                 let mut segment_index = 0;
                 let mut found = false;
 
@@ -185,7 +204,7 @@ where
                     anyhow::bail!("Parameter too large, got {}", parameter);
                 }
 
-                Ok(segment_index)
+                Ok((segment_index, s.radius()))
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
 
@@ -200,10 +219,11 @@ where
             .windows(2)
             .enumerate()
             .map(|(i, w)| {
-                if segment_indices.contains(&i) {
+                let index = segment_indices.iter().find(|(index, _)| *index == i);
+                if let Some((_, radius)) = index {
                     match (w[0], w[1]) {
                         (CompoundSegment::Segment(s0), CompoundSegment::Segment(s1)) => {
-                            calculate_fillet_length(&[s0, s1], radius, |length| {
+                            calculate_fillet_length(&[s0, s1], *radius, |length| {
                                 let min = s0.length().min(s1.length());
                                 let l = min * half - eps;
                                 length.min(l)
