@@ -12,7 +12,7 @@ use crate::{
             CompoundSegment, FilletLength, TrimmedSegment,
         },
         segment::Segment,
-        Fillet, FilletRadiusOption, FilletRadiusParameterOption,
+        Fillet, FilletRadiusOption, FilletRadiusParameterOption, FilletRadiusParameterSetOption,
     },
     misc::FloatingPoint,
     region::CompoundCurve,
@@ -113,19 +113,37 @@ where
     /// let fillet = curve.fillet(FilletRadiusParameterOption::new(0.2, vec![2.])).unwrap();
     /// assert_eq!(fillet.spans().len(), 3);
     fn fillet(&self, option: FilletRadiusParameterOption<T>) -> Self::Output {
-        let radius = option.radius();
+        let set = FilletRadiusParameterSetOption::from(option);
+        self.fillet(set)
+    }
+}
+
+impl<T: FloatingPoint, D: DimName> Fillet<FilletRadiusParameterSetOption<T>> for NurbsCurve<T, D>
+where
+    D: DimNameSub<U1>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+    <D as DimNameSub<U1>>::Output: DimNameAdd<U1>,
+    DefaultAllocator: Allocator<<<D as DimNameSub<U1>>::Output as DimNameAdd<U1>>::Output>,
+{
+    type Output = anyhow::Result<CompoundCurve<T, D>>;
+
+    fn fillet(&self, option: FilletRadiusParameterSetOption<T>) -> Self::Output {
+        let sets = option.radius_parameter_sets();
         anyhow::ensure!(
-            radius > T::zero(),
+            sets.iter().all(|s| s.radius() > T::zero()),
             "Radius must be positive, but got {}",
-            radius
+            sets.iter()
+                .map(|s| s.radius().to_f64().unwrap())
+                .fold(f64::MAX, |a, b| a.min(b))
         );
 
         let degree = self.degree();
-        let parameters = option.parameters();
         let domain = self.knots_domain();
 
         // Validate all parameters are within domain
-        for &parameter in parameters {
+        for s in sets.iter() {
+            let parameter = s.parameter();
             anyhow::ensure!(
                 domain.0 <= parameter && parameter <= domain.1,
                 "Parameter must be in the domain of the curve, but got {}",
@@ -144,9 +162,10 @@ where
         let m = if is_closed { n + 1 } else { n };
 
         // Calculate indices for all parameters
-        let indices = parameters
+        let indices = sets
             .iter()
-            .map(|&parameter| {
+            .map(|s| {
+                let parameter = s.parameter();
                 let index = self
                     .knots()
                     .floor(parameter)
@@ -160,7 +179,7 @@ where
                 if !is_closed && index >= n - 1 {
                     anyhow::bail!("Parameter too large, got {}", parameter);
                 }
-                Ok(index)
+                Ok((index, s.radius()))
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
 
@@ -173,8 +192,9 @@ where
             .windows(2)
             .enumerate()
             .map(|(i, w)| {
-                if indices.contains(&i) {
-                    calculate_fillet_length(&[w[0], w[1]], radius, |length| {
+                let index = indices.iter().find(|(index, _)| *index == i);
+                if let Some((_, radius)) = index {
+                    calculate_fillet_length(&[w[0], w[1]], *radius, |length| {
                         let min = w[0].length().min(w[1].length());
                         let l = min - eps;
                         length.min(l)
