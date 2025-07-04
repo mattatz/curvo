@@ -29,7 +29,13 @@ pub trait Boolean<T> {
         self.boolean(BooleanOperation::Difference, other, option)
     }
 
-    fn boolean(&self, operation: BooleanOperation, other: T, option: Self::Option) -> Self::Output;
+    fn boolean(&self, operation: BooleanOperation, other: T, option: Self::Option) -> Self::Output {
+        match operation {
+            BooleanOperation::Union => self.union(other, option),
+            BooleanOperation::Intersection => self.intersection(other, option),
+            BooleanOperation::Difference => self.difference(other, option),
+        }
+    }
 }
 
 #[cfg(test)]
