@@ -17,19 +17,19 @@ pub trait Boolean<T> {
     type Output;
     type Option;
 
-    fn union(&self, other: T, option: Self::Option) -> Self::Output {
-        self.boolean(BooleanOperation::Union, other, option)
-    }
+    fn union(&self, other: T, option: Self::Option) -> Self::Output;
 
-    fn intersection(&self, other: T, option: Self::Option) -> Self::Output {
-        self.boolean(BooleanOperation::Intersection, other, option)
-    }
+    fn intersection(&self, other: T, option: Self::Option) -> Self::Output;
 
-    fn difference(&self, other: T, option: Self::Option) -> Self::Output {
-        self.boolean(BooleanOperation::Difference, other, option)
-    }
+    fn difference(&self, other: T, option: Self::Option) -> Self::Output;
 
-    fn boolean(&self, operation: BooleanOperation, other: T, option: Self::Option) -> Self::Output;
+    fn boolean(&self, operation: BooleanOperation, other: T, option: Self::Option) -> Self::Output {
+        match operation {
+            BooleanOperation::Union => self.union(other, option),
+            BooleanOperation::Intersection => self.intersection(other, option),
+            BooleanOperation::Difference => self.difference(other, option),
+        }
+    }
 }
 
 #[cfg(test)]
