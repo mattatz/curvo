@@ -258,9 +258,9 @@ where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
-        let lengthes: anyhow::Result<Vec<T>> =
+        let lengths: anyhow::Result<Vec<T>> =
             self.spans.iter().map(|span| span.try_length()).collect();
-        let total = lengthes?.iter().fold(T::zero(), |a, b| a + *b);
+        let total = lengths?.iter().fold(T::zero(), |a, b| a + *b);
         Ok(total)
     }
 

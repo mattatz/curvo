@@ -178,10 +178,10 @@ where
     ) -> Vec<Vec<OPoint<T, DimNameDiff<D, U1>>>> {
         let (knot_spans_u, bases_u) = self
             .u_knots
-            .regulary_spaced_basis_functions(self.u_degree, divs_u);
+            .regularly_spaced_basis_functions(self.u_degree, divs_u);
         let (knot_spans_v, bases_v) = self
             .v_knots
-            .regulary_spaced_basis_functions(self.v_degree, divs_v);
+            .regularly_spaced_basis_functions(self.v_degree, divs_v);
         let mut pts = vec![];
 
         for i in 0..=divs_u {
@@ -1421,7 +1421,7 @@ fn sorted_set_union<T: RealField + Copy>(a: &[T], b: &[T]) -> Vec<T> {
         }
 
         if diff > T::zero() {
-            // add the smallar value
+            // add the smaller value
             merged.push(b[bi]);
             bi += 1;
             continue;
