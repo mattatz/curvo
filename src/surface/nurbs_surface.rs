@@ -26,7 +26,7 @@ use super::{FlipDirection, UVDirection};
 
 /// NURBS surface representation
 /// by generics, it can be used for 2D or 3D curves with f32 or f64 scalar types
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct NurbsSurface<T: FloatingPoint, D: DimName>
 where
     DefaultAllocator: Allocator<D>,

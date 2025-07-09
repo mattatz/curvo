@@ -14,7 +14,7 @@ use super::NurbsSurface3D;
 
 /// A trimmed NURBS surface.
 /// Base surface & a set of trimming curves in parameter space
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TrimmedSurface<T: FloatingPoint> {
     surface: NurbsSurface3D<T>,
     exterior: Option<CompoundCurve<T, U3>>,
