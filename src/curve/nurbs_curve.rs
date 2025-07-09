@@ -632,11 +632,11 @@ where
         anyhow::ensure!(length > T::zero(), "The length must be greater than zero");
 
         let segments = self.try_decompose_bezier_segments()?;
-        let lengthes = segments
+        let lengths = segments
             .iter()
             .map(|s| s.try_length())
             .collect::<anyhow::Result<Vec<_>>>()?;
-        let total = lengthes.iter().fold(T::zero(), |a, b| a + *b);
+        let total = lengths.iter().fold(T::zero(), |a, b| a + *b);
 
         anyhow::ensure!(
             total > length,
@@ -658,7 +658,7 @@ where
         let tolerance = T::from_f64(1e-3 * 2.5).unwrap();
 
         while i < segments.len() {
-            let current_length = lengthes[i];
+            let current_length = lengths[i];
             acc += current_length;
 
             while lc < acc + eps {
@@ -1206,11 +1206,11 @@ where
                 ph
             };
             if r > 0 {
-                let numer = ub - ua;
+                let number = ub - ua;
                 let mut alfs = vec![T::zero(); new_degree];
                 let mut k = new_degree;
                 while k > mul {
-                    alfs[k - mul - 1] = numer / (knots[a + k] - ua);
+                    alfs[k - mul - 1] = number / (knots[a + k] - ua);
                     k -= 1;
                 }
                 for j in 1..=(r as usize) {

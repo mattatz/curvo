@@ -1,0 +1,13 @@
+[files]
+extend-exclude = [".git"]
+
+[default]
+locale = "en"
+
+[default.extend-words]
+# allow list / custom corrections
+curvo = "curvo"
+easer = "easer"
+
+gam = "gam"
+daa = "daa"
