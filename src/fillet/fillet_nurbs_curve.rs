@@ -128,6 +128,25 @@ where
 {
     type Output = anyhow::Result<CompoundCurve<T, D>>;
 
+    /// Only fillet the sharp corner at the specified parameter position with a given radius
+    /// # Example
+    /// ```
+    /// use nalgebra::Point2;
+    /// use curvo::prelude::*;
+    ///
+    /// let square = vec![
+    ///     Point2::new(-1.0, -1.0),
+    ///     Point2::new(1.0, -1.0),
+    ///     Point2::new(1.0, 1.0),
+    ///     Point2::new(-1.0, 1.0),
+    ///     Point2::new(-1.0, -1.0),
+    /// ];
+    /// let curve = NurbsCurve2D::polyline(&square, false);
+    /// let fillet = curve.fillet(FilletRadiusParameterSetOption::new(vec![
+    ///     FilletRadiusParameterSet::new(2.0, 0.5),
+    /// ])).unwrap();
+    /// assert_eq!(fillet.spans().len(), 3);
+    /// ```
     fn fillet(&self, option: FilletRadiusParameterSetOption<T>) -> Self::Output {
         let sets = option.radius_parameter_sets();
         anyhow::ensure!(
