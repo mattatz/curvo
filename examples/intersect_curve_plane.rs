@@ -1,10 +1,8 @@
 use std::f32::consts::FRAC_PI_2;
 
 use bevy::{
-    color::palettes::{
-        css::{GREEN, LIME, TOMATO},
-        tailwind::{LIME_500, LIME_900},
-    },
+    color::palettes::css::{LIME, TOMATO},
+    pbr::wireframe::Wireframe,
     prelude::*,
     render::mesh::{PrimitiveTopology, VertexAttributeValues},
 };
@@ -12,7 +10,7 @@ use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin, InfiniteGridSet
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use bevy_points::{plugin::PointsPlugin, prelude::PointsMaterial};
-use nalgebra::{Point2, Point3, Rotation2, Rotation3, Translation2, Vector2, Vector3};
+use nalgebra::{Point3, Rotation3, Vector3};
 
 use curvo::prelude::*;
 
@@ -47,11 +45,15 @@ impl Plugin for AppPlugin {
 #[derive(Component)]
 struct Curve(pub NurbsCurve3D<f64>);
 
+#[derive(Component)]
+struct PlaneCollider;
+
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut line_materials: ResMut<Assets<LineMaterial>>,
     _points_materials: ResMut<Assets<PointsMaterial>>,
+    mut mesh_materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let points = vec![
         Point3::new(-1.0, -1.0, -1.0),
@@ -84,6 +86,24 @@ fn setup(
         .insert(Curve(curve.clone()))
         .insert(Name::new("curve"));
 
+    // add plane mesh
+    let pl = Plane3d::new(Dir3::Z.into(), Vec2::splat(2.));
+    commands.spawn((
+        Mesh3d(meshes.add(pl)),
+        MeshMaterial3d(mesh_materials.add(StandardMaterial {
+            base_color: LIME.with_alpha(0.1).into(),
+            unlit: true,
+            cull_mode: None,
+            double_sided: true,
+            alpha_mode: AlphaMode::Blend,
+            ..Default::default()
+        })),
+        Wireframe,
+        Transform::from_translation(Vec3::new(0., 0., 0.)),
+        PlaneCollider,
+        Name::new("plane"),
+    ));
+
     let center = Vec3::ZERO;
     commands.spawn((
         Transform::from_translation(center + Vec3::new(0., 0., 8.)).looking_at(center, Vec3::Y),
@@ -103,7 +123,11 @@ fn setup(
 #[allow(clippy::type_complexity)]
 fn update(
     time: Res<Time>,
-    mut set: ParamSet<(Query<(&Curve, &mut Transform), With<Curve>>,)>,
+    mut set: ParamSet<(
+        Query<(&Curve, &mut Transform), With<Curve>>,
+        Query<&mut Transform, With<PlaneCollider>>,
+        Query<&Transform, With<Camera>>,
+    )>,
     mut gizmos: Gizmos,
 ) {
     let speed = 1.0;
@@ -130,26 +154,21 @@ fn update(
     let normal = Vector3::z();
     let constant = elapsed.cos() as f64 * 1.25;
     let plane = Plane::new(normal, constant);
-    gizmos
-        .primitive_3d(
-            &Plane3d {
-                normal: Dir3::Z,
-                half_size: Vec2::splat(0.1),
-            },
-            Isometry3d::new(
-                Vec3A::from(Vec3::from((normal * -constant).cast::<f32>())),
-                Default::default(),
-            ),
-            LIME_900.with_alpha(0.2),
-        )
-        .cell_count(UVec2::new(100, 100))
-        .spacing(Vec2::new(0.1, 0.1));
+
+    {
+        let mut p1 = set.p1();
+        let mut plane_tr = p1.single_mut().unwrap();
+        plane_tr.translation = Vec3::new(0., 0., -constant as f32);
+    }
 
     let its = curve.find_intersection(&plane, None);
+    let p2 = set.p2();
+    let camera_transform = p2.single().unwrap();
     if let Ok(its) = its {
         its.iter().for_each(|it| {
             let p: Vec3 = it.a().0.coords.cast::<f32>().into();
-            gizmos.circle(p, 1e-2 * 5.0, Color::WHITE);
+            let tr = Isometry3d::new(p, camera_transform.rotation);
+            gizmos.circle(tr, 1e-2 * 5.0, Color::WHITE);
         });
     }
 }

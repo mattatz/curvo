@@ -1,54 +1,11 @@
-use argmin::{argmin_error_closure, core::*, float};
+use argmin::{argmin_error_closure, core::*};
 use nalgebra::{Matrix1, Vector1};
 
-use crate::misc::FloatingPoint;
-
-/// Customized quasi-Newton's method for finding the intersections between NURBS curves and planes
-/// Based on the CurveIntersectionBFGS implementation
-#[derive(Clone, Copy)]
-pub struct CurvePlaneIntersectionBFGS<F> {
-    /// Tolerance for the step size in the line search
-    step_size_tolerance: F,
-
-    /// Tolerance for the cost function to determine convergence
-    cost_tolerance: F,
-}
-
-impl<F> Default for CurvePlaneIntersectionBFGS<F>
-where
-    F: FloatingPoint,
-{
-    fn default() -> Self {
-        Self {
-            step_size_tolerance: float!(1e-8),
-            cost_tolerance: float!(1e-8),
-        }
-    }
-}
-
-impl<F> CurvePlaneIntersectionBFGS<F>
-where
-    F: FloatingPoint,
-{
-    /// Construct a new instance of [`CurvePlaneIntersectionBFGS`]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_step_size_tolerance(mut self, tolerance: F) -> Self {
-        self.step_size_tolerance = tolerance;
-        self
-    }
-
-    pub fn with_cost_tolerance(mut self, tolerance: F) -> Self {
-        self.cost_tolerance = tolerance;
-        self
-    }
-}
+use crate::{misc::FloatingPoint, prelude::CurveIntersectionBFGS};
 
 type CurvePlaneIterState<F> = IterState<Vector1<F>, Vector1<F>, (), Matrix1<F>, (), F>;
 
-impl<O, F> Solver<O, CurvePlaneIterState<F>> for CurvePlaneIntersectionBFGS<F>
+impl<O, F> Solver<O, CurvePlaneIterState<F>> for CurveIntersectionBFGS<F>
 where
     O: Gradient<Param = Vector1<F>, Gradient = Vector1<F>>
         + CostFunction<Param = Vector1<F>, Output = F>,
@@ -111,7 +68,7 @@ where
         let max_iters = state.get_max_iters();
         for _ in 0..max_iters {
             it += 1;
-            if t * norm < self.step_size_tolerance {
+            if t * norm < self.step_size_tolerance() {
                 break;
             }
 
@@ -176,7 +133,7 @@ where
         if let (Some(g), Some(h)) = (state.get_gradient(), state.get_hessian()) {
             let step = h * g;
             let norm = step.norm();
-            if norm < self.step_size_tolerance {
+            if norm < self.step_size_tolerance() {
                 return TerminationStatus::Terminated(TerminationReason::SolverExit(
                     "step size tolerance reached".into(),
                 ));
@@ -185,7 +142,7 @@ where
 
         if state.get_cost() != state.get_prev_cost()
             && nalgebra::ComplexField::abs(state.get_cost() - state.get_prev_cost())
-                < self.cost_tolerance
+                < self.cost_tolerance()
         {
             return TerminationStatus::Terminated(TerminationReason::SolverConverged);
         }

@@ -44,6 +44,14 @@ where
         self.cost_tolerance = tolerance;
         self
     }
+
+    pub fn step_size_tolerance(&self) -> F {
+        self.step_size_tolerance
+    }
+
+    pub fn cost_tolerance(&self) -> F {
+        self.cost_tolerance
+    }
 }
 
 type CurveCurveIterState<F> = IterState<Vector2<F>, Vector2<F>, (), Matrix2<F>, (), F>;

@@ -9,10 +9,13 @@ use crate::{
     curve::NurbsCurve,
     intersects::Intersection,
     misc::{FloatingPoint, Plane},
-    prelude::{CurveBoundingBoxTree, CurveIntersectionSolverOptions, HasIntersection, Intersects},
+    prelude::{
+        CurveBoundingBoxTree, CurveIntersectionBFGS, CurveIntersectionSolverOptions,
+        HasIntersection, Intersects,
+    },
 };
 
-use super::{CurvePlaneIntersectionBFGS, CurvePlaneIntersectionProblem};
+use super::CurvePlaneIntersectionProblem;
 
 pub type CurvePlaneIntersection<T> = Intersection<OPoint<T, Const<3>>, T, ()>;
 
@@ -53,7 +56,7 @@ where
                 );
 
                 // Set up solver
-                let solver = CurvePlaneIntersectionBFGS::<T>::new()
+                let solver = CurveIntersectionBFGS::<T>::new()
                     .with_step_size_tolerance(options.step_size_tolerance)
                     .with_cost_tolerance(options.cost_tolerance);
 
@@ -75,7 +78,7 @@ where
                             let distance = num_traits::Float::abs(plane.signed_distance(&point));
 
                             if distance < options.minimum_distance {
-                                Some(CurvePlaneIntersection::new((point.clone(), t), (point, ())))
+                                Some(CurvePlaneIntersection::new((point, t), (point, ())))
                             } else {
                                 None
                             }
@@ -94,9 +97,9 @@ where
 }
 
 /// Recursively collect all leaf nodes from a bounding box tree
-fn collect_leaf_nodes<'a, 'b, T: FloatingPoint>(
+fn collect_leaf_nodes<'a, T: FloatingPoint>(
     tree: CurveBoundingBoxTree<'a, T, Const<4>>,
-    plane: &'b Plane<T>,
+    plane: &Plane<T>,
 ) -> Vec<CurveBoundingBoxTree<'a, T, Const<4>>> {
     let bbox = tree.bounding_box();
     let corners = bbox.corners();
