@@ -1,4 +1,4 @@
-use nalgebra::Vector3;
+use nalgebra::{Point3, Vector3};
 
 use crate::misc::FloatingPoint;
 
@@ -20,5 +20,10 @@ impl<T: FloatingPoint> Plane<T> {
 
     pub fn constant(&self) -> T {
         self.constant
+    }
+
+    /// Calculate the signed distance from a point to the plane.
+    pub fn signed_distance(&self, point: &Point3<T>) -> T {
+        self.normal.dot(&point.coords) + self.constant
     }
 }
