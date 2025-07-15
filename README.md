@@ -52,6 +52,8 @@ The supported features also include finding the closest point on NURBS curves, f
 
 <img src="https://github.com/user-attachments/assets/4514e075-6e36-458e-867d-581d6bba62f7" width="360px" alt="Fillet curve" />
 
+<img src="https://github.com/user-attachments/assets/a6d9c611-3936-4559-8f44-18e5aaea194c" width="360px" alt="Curve plane intersection" />
+
 ## Usage
 
 ```rust

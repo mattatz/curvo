@@ -1,8 +1,7 @@
 use std::f32::consts::FRAC_PI_2;
 
 use bevy::{
-    color::palettes::css::{LIME, TOMATO},
-    pbr::wireframe::Wireframe,
+    color::palettes::css::{CORNFLOWER_BLUE, TOMATO},
     prelude::*,
     render::mesh::{PrimitiveTopology, VertexAttributeValues},
 };
@@ -91,14 +90,13 @@ fn setup(
     commands.spawn((
         Mesh3d(meshes.add(pl)),
         MeshMaterial3d(mesh_materials.add(StandardMaterial {
-            base_color: LIME.with_alpha(0.1).into(),
+            base_color: CORNFLOWER_BLUE.with_alpha(0.1).into(),
             unlit: true,
             cull_mode: None,
             double_sided: true,
             alpha_mode: AlphaMode::Blend,
             ..Default::default()
         })),
-        Wireframe,
         Transform::from_translation(Vec3::new(0., 0., 0.)),
         PlaneCollider,
         Name::new("plane"),
