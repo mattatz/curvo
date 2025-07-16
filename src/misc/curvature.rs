@@ -39,10 +39,10 @@ where
             //
             let n2 = deriv2.norm();
             if !n2.is_zero() {
-                Err(Self::new(OVector::zeros(), OVector::zeros()))
-            } else {
                 let u = deriv2 / n2;
                 Err(Self::new(u, OVector::zeros()))
+            } else {
+                Err(Self::new(OVector::zeros(), OVector::zeros()))
             }
         } else {
             let tangent = deriv1.clone() / n1;
