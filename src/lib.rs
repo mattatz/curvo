@@ -84,9 +84,9 @@ pub mod prelude {
     pub use crate::intersects::*;
     pub use crate::knot::*;
     pub use crate::misc::{
-        binomial::*, end_points::*, floating_point::*, frenet_frame::*, invertible::*, line::*,
-        orientation::*, polygon_boundary::*, ray::*, transformable::*, transpose::*,
-        trigonometry::*,
+        binomial::*, curvature::*, end_points::*, floating_point::*, frenet_frame::*,
+        invertible::*, line::*, orientation::*, plane::*, polygon_boundary::*, ray::*,
+        transformable::*, transpose::*, trigonometry::*,
     };
     pub use crate::offset::*;
     pub use crate::polygon_mesh::*;

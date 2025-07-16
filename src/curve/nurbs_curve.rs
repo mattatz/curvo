@@ -15,7 +15,7 @@ use crate::misc::binomial::Binomial;
 use crate::misc::frenet_frame::FrenetFrame;
 use crate::misc::transformable::Transformable;
 use crate::misc::trigonometry::segment_closest_point;
-use crate::misc::Ray;
+use crate::misc::{Curvature, Ray};
 use crate::prelude::{CurveLengthParameter, Invertible, KnotVector};
 use crate::{misc::FloatingPoint, CurveClosestParameterNewton, CurveClosestParameterProblem};
 
@@ -327,6 +327,31 @@ where
     {
         let deriv = self.rational_derivatives(u, 1);
         deriv[1].clone()
+    }
+
+    /// Compute curvature at a given parameter
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use std::f64::consts::FRAC_PI_2;
+    /// use nalgebra::{Point2, Vector2};
+    /// use approx::assert_relative_eq;
+    /// let curve = NurbsCurve2D::try_circle(&Point2::origin(), &Vector2::x(), &Vector2::y(), 1.0).unwrap();
+    /// let curvature = curve.curvature_at(0.).unwrap();
+    /// assert_relative_eq!(curvature.tangent_vector(), Vector2::y());
+    /// assert_relative_eq!(curvature.kappa(), 1.0);
+    /// assert_relative_eq!(curvature.curvature_vector(), -Vector2::x());
+    /// ```
+    pub fn curvature_at(&self, u: T) -> anyhow::Result<Curvature<T, DimNameDiff<D, U1>>>
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+    {
+        let deriv = self.rational_derivatives(u, 2);
+        let d1 = deriv[1].clone();
+        let d2 = deriv[2].clone();
+        Curvature::derivatives(d1, d2)
+            .map_err(|e| anyhow::anyhow!("Failed to compute curvature at parameter {}: {:?}", u, e))
     }
 
     /// Compute second order derivative at a given parameter.
