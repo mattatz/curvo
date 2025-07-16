@@ -1806,26 +1806,25 @@ where
         }
 
         let div = cloned.knots().len() / req_mult - 1;
-        let knot_length = req_mult * 2;
-        let segments = (0..div)
-            .map(|i| {
-                let start = i * req_mult;
-                let end = start + knot_length;
-                let knots = cloned.knots().as_slice()[start..end].to_vec();
-                let control_points = cloned.control_points[start..(start + req_mult)].to_vec();
-                Self {
-                    degree: cloned.degree,
-                    control_points,
-                    knots: KnotVector::new(knots),
-                }
-            })
-            .collect_vec();
-
-        if segments.len() <= 1 {
+        if div <= 1 {
             return Ok(vec![cloned]);
+        } else {
+            let knot_length = req_mult * 2;
+            let segments = (0..div)
+                .map(|i| {
+                    let start = i * req_mult;
+                    let end = start + knot_length;
+                    let knots = cloned.knots().as_slice()[start..end].to_vec();
+                    let control_points = cloned.control_points[start..(start + req_mult)].to_vec();
+                    Self {
+                        degree: cloned.degree,
+                        control_points,
+                        knots: KnotVector::new(knots),
+                    }
+                })
+                .collect_vec();
+            Ok(segments)
         }
-
-        Ok(segments)
     }
 
     /// Cast the curve to a curve with another floating point type
