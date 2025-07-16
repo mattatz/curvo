@@ -36,6 +36,8 @@ The supported features also include finding the closest point on NURBS curves, f
 
 <img src="https://github.com/mattatz/curvo/assets/1085910/754d2a96-0f6b-40f7-b6b1-106789d585b7" width="360px" alt="Smooth periodic points interpolation with knot styles" />
 
+<img src="https://github.com/user-attachments/assets/fea62a64-208e-4cee-812d-3b6aa8c8a8c5" width="360px" alt="Curvature of a NURBS curve" />
+
 <img src="https://github.com/mattatz/curvo/assets/1085910/87ebdb66-f0df-46cc-8cb4-01f597080ffb" width="360px" alt="Ellipse arc generation" />
 
 <img src="https://github.com/mattatz/curvo/assets/1085910/55f214ec-668a-4d18-8fa8-bfa5ca23b3a2" width="360px" alt="Iso-curves on a surface" />
@@ -44,6 +46,8 @@ The supported features also include finding the closest point on NURBS curves, f
 
 <img src="https://github.com/user-attachments/assets/6dc44288-1b21-4040-a49c-fc41d4ca3f45" width="360px" alt="Split a surface" />
 
+<img src="https://github.com/user-attachments/assets/a6d9c611-3936-4559-8f44-18e5aaea194c" width="360px" alt="Curve plane intersection" />
+
 <img src="https://github.com/user-attachments/assets/4117250d-582e-4bee-84b7-976f27739f9d" width="360px" alt="Surface & curve intersections" />
 
 <img src="https://github.com/user-attachments/assets/904c1a97-9f14-4bb6-9e41-6beebd62882f" width="360px" alt="Trimmed surface" />
@@ -51,8 +55,6 @@ The supported features also include finding the closest point on NURBS curves, f
 <img src="https://github.com/user-attachments/assets/6b0583e4-01d4-447e-9347-c7b8bd0bc8af" width="360px" alt="Offset curve" />
 
 <img src="https://github.com/user-attachments/assets/4514e075-6e36-458e-867d-581d6bba62f7" width="360px" alt="Fillet curve" />
-
-<img src="https://github.com/user-attachments/assets/a6d9c611-3936-4559-8f44-18e5aaea194c" width="360px" alt="Curve plane intersection" />
 
 ## Usage
 

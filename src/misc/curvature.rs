@@ -1,4 +1,5 @@
 use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, OVector};
+use simba::scalar::SupersetOf;
 
 use crate::misc::FloatingPoint;
 
@@ -65,5 +66,13 @@ where
     /// Returns the curvature magnitude
     pub fn kappa(&self) -> T {
         self.k.norm()
+    }
+
+    /// Casts the curvature to another floating point type.
+    pub fn cast<F: FloatingPoint + SupersetOf<T>>(&self) -> Curvature<F, D> {
+        Curvature {
+            t: self.t.clone().cast(),
+            k: self.k.clone().cast(),
+        }
     }
 }
