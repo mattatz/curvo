@@ -38,7 +38,7 @@ where
         let x0 = state.get_param().ok_or_else(argmin_error_closure!(
             NotInitialized,
             concat!(
-                "`CurvePlaneIntersectionBFGS` requires an initial parameter vector. ",
+                "`Newton` requires an initial parameter vector. ",
                 "Please provide an initial guess via `Executor`s `configure` method."
             )
         ))?;
