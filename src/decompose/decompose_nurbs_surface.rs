@@ -18,6 +18,8 @@ where
     type Output = Vec<Vec<NurbsSurface<T, D>>>;
 
     /// Decompose the surface into a set of Bezier patches of the same degree
+    /// Returns a vector of vectors of Bezier patches.
+    /// The outer vector is the u direction, the inner vector is the v direction.
     fn try_decompose(&self) -> anyhow::Result<Self::Output> {
         let mut refined = self.clone();
 
@@ -89,13 +91,13 @@ where
 
         // Extract each Bezier patch
         Ok((0..u_patches)
-            .map(|i| {
+            .map(|iu| {
                 (0..v_patches)
-                    .map(|j| {
+                    .map(|iv| {
                         // Calculate control point indices
-                        let u_start = i * refined.u_degree();
+                        let u_start = iu * refined.u_degree();
                         let u_end = u_start + refined.u_degree() + 1;
-                        let v_start = j * refined.v_degree();
+                        let v_start = iv * refined.v_degree();
                         let v_end = v_start + refined.v_degree() + 1;
 
                         let patch_control_points: Vec<Vec<OPoint<T, D>>> = refined.control_points()
