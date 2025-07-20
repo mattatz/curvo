@@ -129,6 +129,11 @@ path = "examples/decompose_curve_into_bezier_segments.rs"
 required-features = ["bevy"]
 
 [[example]]
+name = "decompose_surface_into_bezier_patches"
+path = "examples/decompose_surface_into_bezier_patches.rs"
+required-features = ["bevy"]
+
+[[example]]
 name = "divide_curve_by_arc_length"
 path = "examples/divide_curve_by_arc_length.rs"
 required-features = ["bevy"]
