@@ -70,17 +70,18 @@ fn setup(
     let surface = NurbsSurface3D::<f64>::new(degree, degree, u_knots, v_knots, control_points);
 
     let patches = surface.try_decompose().unwrap();
-    let n = patches.len();
+    let w = patches.len();
 
     for (ix, row) in patches.iter().enumerate() {
+        let h = row.len();
         for (iy, patch) in row.iter().enumerate() {
             let mesh = surface_2_mesh(patch, None);
             commands.spawn((
                 Mesh3d(meshes.add(mesh)),
                 MeshMaterial3d(mesh_materials.add(StandardMaterial {
                     base_color: Color::srgb(
-                        ix as f32 / (n + 1) as f32,
-                        iy as f32 / (n + 1) as f32,
+                        ix as f32 / (w - 1) as f32,
+                        iy as f32 / (h - 1) as f32,
                         0.,
                     ),
                     unlit: true,
