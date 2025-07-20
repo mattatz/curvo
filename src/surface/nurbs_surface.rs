@@ -51,18 +51,18 @@ where
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
-    pub fn new(
+    pub fn new<U: Into<KnotVector<T>>, V: Into<KnotVector<T>>>(
         u_degree: usize,
         v_degree: usize,
-        u_knots: Vec<T>,
-        v_knots: Vec<T>,
+        u_knots: U,
+        v_knots: V,
         control_points: Vec<Vec<OPoint<T, D>>>,
     ) -> Self {
         Self {
             u_degree,
             v_degree,
-            u_knots: KnotVector::new(u_knots),
-            v_knots: KnotVector::new(v_knots),
+            u_knots: u_knots.into(),
+            v_knots: v_knots.into(),
             control_points,
         }
     }
