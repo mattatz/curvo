@@ -1,7 +1,7 @@
 use std::f64::consts::PI;
 
 use bevy::prelude::*;
-use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
+use bevy_infinite_grid::InfiniteGridPlugin;
 
 use bevy_normal_material::plugin::NormalMaterialPlugin;
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
@@ -19,7 +19,13 @@ mod misc;
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                resolution: (640., 480.).into(),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }))
         .add_plugins(LineMaterialPlugin)
         .add_plugins(InfiniteGridPlugin)
         .add_plugins(PanOrbitCameraPlugin)
@@ -98,5 +104,4 @@ fn setup(
         Transform::from_translation(Vec3::new(0., 2.5, 10.)),
         PanOrbitCamera::default(),
     ));
-    commands.spawn(InfiniteGridBundle::default());
 }
