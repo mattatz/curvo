@@ -382,11 +382,7 @@ where
     }
 
     /// Evaluate the rational derivatives at a given parameter
-    pub(crate) fn rational_derivatives(
-        &self,
-        u: T,
-        derivs: usize,
-    ) -> Vec<OVector<T, DimNameDiff<D, U1>>>
+    pub fn rational_derivatives(&self, u: T, derivs: usize) -> Vec<OVector<T, DimNameDiff<D, U1>>>
     where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
