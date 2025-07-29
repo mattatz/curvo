@@ -2071,7 +2071,7 @@ checksum = "96a6ac251f4a2aca6b3f91340350eab87ae57c3f127ffeb585e92bd336717991"
 
 [[package]]
 name = "curvo"
-version = "0.1.64"
+version = "0.1.65"
 dependencies = [
  "anyhow",
  "approx",
