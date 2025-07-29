@@ -1,7 +1,7 @@
 use std::f64::consts::TAU;
 
 use bevy::{
-    color::palettes::css::{GREEN, RED, WHITE, YELLOW},
+    color::palettes::css::{RED, WHITE, YELLOW},
     prelude::*,
     render::mesh::{PrimitiveTopology, VertexAttributeValues},
 };
@@ -12,7 +12,7 @@ use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use bevy_points::plugin::PointsPlugin;
 use itertools::Itertools;
 use materials::*;
-use nalgebra::{Matrix4, Point3};
+use nalgebra::Point3;
 
 use curvo::prelude::*;
 use rand::Rng;

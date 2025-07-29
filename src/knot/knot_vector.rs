@@ -392,6 +392,12 @@ impl<T> FromIterator<T> for KnotVector<T> {
     }
 }
 
+impl<T> From<Vec<T>> for KnotVector<T> {
+    fn from(value: Vec<T>) -> Self {
+        Self(value)
+    }
+}
+
 impl<T: FloatingPoint> Invertible for KnotVector<T> {
     /// Reverses the knot vector
     /// # Example

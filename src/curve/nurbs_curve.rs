@@ -16,7 +16,7 @@ use crate::misc::frenet_frame::FrenetFrame;
 use crate::misc::transformable::Transformable;
 use crate::misc::trigonometry::segment_closest_point;
 use crate::misc::{Curvature, Ray};
-use crate::prelude::{CurveLengthParameter, Invertible, KnotVector};
+use crate::prelude::{CurveLengthParameter, Decompose, Invertible, KnotVector};
 use crate::{misc::FloatingPoint, CurveClosestParameterNewton, CurveClosestParameterProblem};
 
 use super::KnotStyle;
@@ -382,11 +382,7 @@ where
     }
 
     /// Evaluate the rational derivatives at a given parameter
-    pub(crate) fn rational_derivatives(
-        &self,
-        u: T,
-        derivs: usize,
-    ) -> Vec<OVector<T, DimNameDiff<D, U1>>>
+    pub fn rational_derivatives(&self, u: T, derivs: usize) -> Vec<OVector<T, DimNameDiff<D, U1>>>
     where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
@@ -539,7 +535,7 @@ where
         let start = mult.first().unwrap().multiplicity();
         let end = mult.last().unwrap().multiplicity();
 
-        let segments = self.try_decompose_bezier_segments()?;
+        let segments = self.try_decompose()?;
 
         // If the start/end parts of the knot vector are not duplicated,
         // the Bezier segments will not be generated correctly,
@@ -598,7 +594,7 @@ where
             return Ok(self.knots_domain().0);
         }
 
-        let segments = self.try_decompose_bezier_segments()?;
+        let segments = self.try_decompose()?;
         let gauss = GaussLegendre::new(16 + self.degree)?;
         let tolerance = tolerance.unwrap_or(T::from_f64(1e-4).unwrap());
 
@@ -656,7 +652,7 @@ where
     {
         anyhow::ensure!(length > T::zero(), "The length must be greater than zero");
 
-        let segments = self.try_decompose_bezier_segments()?;
+        let segments = self.try_decompose()?;
         let lengthes = segments
             .iter()
             .map(|s| s.try_length())
@@ -1786,46 +1782,6 @@ where
         }
 
         Ok(())
-    }
-
-    /// Decompose the curve into Bezier segments
-    pub fn try_decompose_bezier_segments(&self) -> anyhow::Result<Vec<Self>> {
-        let mut cloned = self.clone();
-        if !cloned.is_clamped() {
-            cloned.try_clamp()?;
-        }
-
-        let knot_mults = cloned.knots.multiplicity();
-        let req_mult = cloned.degree + 1;
-
-        for knot_mult in knot_mults.iter() {
-            if knot_mult.multiplicity() < req_mult {
-                let knots_insert = vec![*knot_mult.knot(); req_mult - knot_mult.multiplicity()];
-                cloned.try_refine_knot(knots_insert)?;
-            }
-        }
-
-        let div = cloned.knots().len() / req_mult - 1;
-        let knot_length = req_mult * 2;
-        let mut segments = vec![];
-
-        for i in 0..div {
-            let start = i * req_mult;
-            let end = start + knot_length;
-            let knots = cloned.knots().as_slice()[start..end].to_vec();
-            let control_points = cloned.control_points[start..(start + req_mult)].to_vec();
-            segments.push(Self {
-                degree: self.degree,
-                control_points,
-                knots: KnotVector::new(knots),
-            });
-        }
-
-        if segments.len() <= 1 {
-            return Ok(vec![cloned]);
-        }
-
-        Ok(segments)
     }
 
     /// Cast the curve to a curve with another floating point type

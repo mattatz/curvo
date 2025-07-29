@@ -60,6 +60,7 @@ mod bounding_box;
 mod closest_parameter;
 mod contains;
 mod curve;
+mod decompose;
 mod dimension;
 mod fillet;
 mod intersects;
@@ -79,6 +80,7 @@ pub mod prelude {
     pub use crate::bounding_box::*;
     pub use crate::contains::*;
     pub use crate::curve::*;
+    pub use crate::decompose::*;
     pub use crate::dimension::*;
     pub use crate::fillet::*;
     pub use crate::intersects::*;
