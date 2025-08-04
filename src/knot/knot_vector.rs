@@ -212,9 +212,7 @@ impl<T: RealField + Copy> KnotVector<T> {
                     } else {
                         if matches!(side, KnotSide::Below) && u == self[h] {
                             // left limit when u hits an internal knot
-                            if h > 0 {
-                                h -= 1;
-                            }
+                            h = h.saturating_sub(1);
                         }
                         if h < degree {
                             h = degree;
