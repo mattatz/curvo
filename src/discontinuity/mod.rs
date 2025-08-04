@@ -1,16 +1,19 @@
 use crate::misc::FloatingPoint;
 
+mod continuous;
 mod curve;
 
 /// The type of discontinuity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DiscontinuityType {
-    /// C0 discontinuity.
+    /// C0 (position)
     C0,
-    /// C1 (1st derivative) discontinuity.
+    /// C1 (1st derivative)
     C1,
-    /// C2 (2nd derivative) discontinuity.
+    /// C2 (2nd derivative)
     C2,
+    /// G2 (continuous unit tangent & curvature)
+    G2,
 }
 
 /// Search for a derivative, tangent, or curvature discontinuity.
@@ -48,7 +51,7 @@ where
     end: T,
 }
 
-impl<'a, G, T> Iterator for DiscontinuityIterator<'a, G, T>
+impl<G, T> Iterator for DiscontinuityIterator<'_, G, T>
 where
     G: Discontinuity<T>,
     T: FloatingPoint,

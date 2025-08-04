@@ -104,7 +104,7 @@ fn setup(
     let mut normals = vec![];
 
     let length = 0.15;
-    curvatures.iter().enumerate().for_each(|(_i, (p, c))| {
+    curvatures.iter().for_each(|(p, c)| {
         let p: Vec3 = (*p).into();
         let tv: Vec3 = c.tangent_vector().into();
         let cv: Vec3 = c.curvature_vector().into();

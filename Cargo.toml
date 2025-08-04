@@ -119,6 +119,11 @@ path = "examples/curvature.rs"
 required-features = ["bevy"]
 
 [[example]]
+name = "discontinuity"
+path = "examples/discontinuity.rs"
+required-features = ["bevy"]
+
+[[example]]
 name = "frenet_frame"
 path = "examples/frenet_frame.rs"
 required-features = ["bevy"]
