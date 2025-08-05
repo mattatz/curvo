@@ -6,8 +6,6 @@ mod curve;
 /// The type of discontinuity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DiscontinuityType {
-    /// C0 (position)
-    C0,
     /// C1 (1st derivative)
     C1,
     /// C2 (2nd derivative)
