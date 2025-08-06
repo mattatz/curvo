@@ -1,7 +1,5 @@
-use std::f64::consts::TAU;
-
 use bevy::{
-    color::palettes::css::{RED, WHITE, YELLOW},
+    color::palettes::css::{CORNFLOWER_BLUE, GOLD, WHITE},
     prelude::*,
     render::mesh::{PrimitiveTopology, VertexAttributeValues},
 };
@@ -9,13 +7,12 @@ use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 
 use bevy_normal_material::plugin::NormalMaterialPlugin;
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
-use bevy_points::plugin::PointsPlugin;
+use bevy_points::{mesh::PointsMesh, plugin::PointsPlugin, prelude::PointsMaterial};
 use itertools::Itertools;
 use materials::*;
 use nalgebra::Point3;
 
 use curvo::prelude::*;
-use rand::Rng;
 mod materials;
 
 fn main() {
@@ -47,29 +44,31 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut line_materials: ResMut<Assets<LineMaterial>>,
+    mut points_materials: ResMut<Assets<PointsMaterial>>,
 ) {
-    let mut rng = rand::rng();
-    let n = 12;
-    let min_radius = 1.5;
-    let max_radius = 2.0;
+    let pts = vec![
+        Point3::new(0.0, 0.0, 0.0),
+        Point3::new(0.3, 0.0, 0.0),
+        Point3::new(0.8, 0.8, 0.0),
+        Point3::new(1.2, 1.6, 0.0),
+        Point3::new(1.8, 1.6, 0.0),
+        Point3::new(2.2, 0.8, 0.0),
+        Point3::new(2.7, 0.1, 0.0),
+        Point3::new(3.0, 0.0, 0.0),
+    ]
+    .into_iter()
+    .map(|p| p.to_homogeneous().into())
+    .collect_vec();
 
-    let points: Vec<_> = (0..n)
-        .map(|i| {
-            let g = rng.random::<f64>();
-            let t = i as f64 / n as f64;
-            let r = t * TAU;
-            let rad = min_radius + g * (max_radius - min_radius);
-            let x = r.cos() * rad;
-            let y = r.sin() * rad;
-            Point3::new(x, y, 0.)
-        })
-        .collect();
-    let curve = NurbsCurve3D::try_periodic_interpolate(&points, 3, KnotStyle::Uniform).unwrap();
+    let knots = vec![0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 3.0, 3.0];
+    let curve = NurbsCurve3D::try_new(3, pts, knots).unwrap();
+
+    let bb = BoundingBox::from_iter(curve.dehomogenized_control_points());
 
     let mut mesh = Mesh::new(PrimitiveTopology::LineStrip, default());
     let vertices = curve
         .cast::<f32>()
-        .tessellate(Some(1e-6))
+        .tessellate(Some(1e-7))
         .iter()
         .map(|p| [p.x, p.y, p.z])
         .collect();
@@ -87,6 +86,39 @@ fn setup(
         ))
         .insert(Name::new("curve"));
 
+    let (t0, t1) = curve.knots_domain();
+    let discontinuities = curve
+        .discontinuity_iter(DiscontinuityType::G2, t0, t1)
+        .collect_vec();
+    println!("{:?}", discontinuities.len());
+
+    commands
+        .spawn((
+            Mesh3d(
+                meshes.add(PointsMesh {
+                    vertices: discontinuities
+                        .iter()
+                        .map(|t| {
+                            let p = curve.point_at(*t).cast::<f32>();
+                            [p.x, p.y, p.z].into()
+                        })
+                        .collect(),
+                    ..Default::default()
+                }),
+            ),
+            MeshMaterial3d(points_materials.add(PointsMaterial {
+                settings: bevy_points::material::PointsShaderSettings {
+                    color: CORNFLOWER_BLUE.into(),
+                    point_size: 0.05,
+                    opacity: 0.75,
+                },
+                circle: true,
+                ..Default::default()
+            })),
+            // Visibility::Hidden,
+        ))
+        .insert(Name::new("discontinuities"));
+
     let (start, end) = curve.knots_domain();
     let samples = 256;
     let span = (end - start) / ((samples - 1) as f64);
@@ -100,16 +132,12 @@ fn setup(
         })
         .collect_vec();
 
-    let mut tangents = vec![];
     let mut normals = vec![];
 
     let length = 0.15;
     curvatures.iter().for_each(|(p, c)| {
         let p: Vec3 = (*p).into();
-        let tv: Vec3 = c.tangent_vector().into();
         let cv: Vec3 = c.curvature_vector().into();
-        tangents.push(p);
-        tangents.push(p + tv * length);
         normals.push(p);
         normals.push(p + cv * length);
     });
@@ -130,7 +158,8 @@ fn setup(
                 )),
                 MeshMaterial3d(line_materials.add(LineMaterial {
                     color,
-                    ..Default::default()
+                    opacity: 0.5,
+                    alpha_mode: AlphaMode::Blend,
                 })),
             ))
             .insert(Name::new(name));
@@ -139,22 +168,18 @@ fn setup(
         &mut commands,
         &mut meshes,
         &mut line_materials,
-        &tangents,
-        RED.into(),
-        "t".to_string(),
-    );
-    add_arrows(
-        &mut commands,
-        &mut meshes,
-        &mut line_materials,
         &normals,
-        YELLOW.into(),
+        GOLD.into(),
         "n".to_string(),
     );
 
     commands.spawn((
         Transform::from_translation(Vec3::new(0., 0., 5.)),
-        PanOrbitCamera::default(),
+        PanOrbitCamera {
+            focus: bb.center().cast::<f32>().into(),
+            radius: Some(bb.size().cast::<f32>().norm()),
+            ..Default::default()
+        },
     ));
     commands.spawn(InfiniteGridBundle::default());
 }

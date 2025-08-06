@@ -38,6 +38,8 @@ The supported features also include finding the closest point on NURBS curves, f
 
 <img src="https://github.com/user-attachments/assets/fea62a64-208e-4cee-812d-3b6aa8c8a8c5" width="360px" alt="Curvature of a NURBS curve" />
 
+<img src="https://github.com/user-attachments/assets/11169def-0872-47f8-9712-775ebe065c6f" width="360px" alt="Discontinuity of a NURBS curve" />
+
 <img src="https://github.com/mattatz/curvo/assets/1085910/87ebdb66-f0df-46cc-8cb4-01f597080ffb" width="360px" alt="Ellipse arc generation" />
 
 <img src="https://github.com/mattatz/curvo/assets/1085910/55f214ec-668a-4d18-8fa8-bfa5ca23b3a2" width="360px" alt="Iso-curves on a surface" />
