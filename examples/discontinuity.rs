@@ -1,5 +1,5 @@
 use bevy::{
-    color::palettes::css::{CORNFLOWER_BLUE, GOLD, TOMATO, WHITE, YELLOW},
+    color::palettes::css::{CORNFLOWER_BLUE, GOLD, WHITE},
     prelude::*,
     render::mesh::{PrimitiveTopology, VertexAttributeValues},
 };
