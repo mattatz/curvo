@@ -1,9 +1,9 @@
 use bevy::{
-    color::palettes::css::{TOMATO, WHITE, YELLOW},
+    color::palettes::css::{CORNFLOWER_BLUE, GOLD, TOMATO, WHITE, YELLOW},
     prelude::*,
     render::mesh::{PrimitiveTopology, VertexAttributeValues},
 };
-use bevy_infinite_grid::InfiniteGridPlugin;
+use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 
 use bevy_normal_material::plugin::NormalMaterialPlugin;
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
@@ -48,26 +48,19 @@ fn setup(
 ) {
     let pts = vec![
         Point3::new(0.0, 0.0, 0.0),
-        Point3::new(1.0, 2.0, 0.0),
-        Point3::new(2.0, -2.0, 0.5),
-        Point3::new(3.0, 3.0, 1.0),
-        Point3::new(4.0, -3.0, 0.5),
-        Point3::new(5.0, 4.0, 0.0),
-        Point3::new(6.0, -4.0, -0.5),
-        Point3::new(7.0, 3.0, -1.0),
-        Point3::new(8.0, -2.0, -0.5),
-        Point3::new(9.0, 2.0, 0.0),
-        Point3::new(10.0, -1.0, 0.5),
-        Point3::new(11.0, 1.0, 0.0),
-        Point3::new(12.0, 0.0, 0.0),
+        Point3::new(0.3, 0.0, 0.0),
+        Point3::new(0.8, 0.8, 0.0),
+        Point3::new(1.2, 1.6, 0.0),
+        Point3::new(1.8, 1.6, 0.0),
+        Point3::new(2.2, 0.8, 0.0),
+        Point3::new(2.7, 0.1, 0.0),
+        Point3::new(3.0, 0.0, 0.0),
     ]
     .into_iter()
     .map(|p| p.to_homogeneous().into())
     .collect_vec();
 
-    let knots = vec![
-        0.0, 0.0, 0.0, 0.0, 0.1, 0.2, 0.2, 0.4, 0.4, 0.6, 0.6, 0.8, 0.8, 1.0, 1.0, 1.0, 1.0,
-    ];
+    let knots = vec![0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 3.0, 3.0];
     let curve = NurbsCurve3D::try_new(3, pts, knots).unwrap();
 
     let bb = BoundingBox::from_iter(curve.dehomogenized_control_points());
@@ -75,7 +68,7 @@ fn setup(
     let mut mesh = Mesh::new(PrimitiveTopology::LineStrip, default());
     let vertices = curve
         .cast::<f32>()
-        .tessellate(Some(1e-6))
+        .tessellate(Some(1e-7))
         .iter()
         .map(|p| [p.x, p.y, p.z])
         .collect();
@@ -115,8 +108,9 @@ fn setup(
             ),
             MeshMaterial3d(points_materials.add(PointsMaterial {
                 settings: bevy_points::material::PointsShaderSettings {
-                    color: TOMATO.into(),
-                    point_size: 0.2,
+                    color: CORNFLOWER_BLUE.into(),
+                    point_size: 0.05,
+                    opacity: 0.75,
                     ..Default::default()
                 },
                 circle: true,
@@ -125,31 +119,6 @@ fn setup(
             // Visibility::Hidden,
         ))
         .insert(Name::new("discontinuities"));
-
-    commands.spawn((
-        Mesh3d(
-            meshes.add(PointsMesh {
-                vertices: [t0, t1]
-                    .iter()
-                    .map(|t| {
-                        let p = curve.point_at(*t).cast::<f32>();
-                        [p.x, p.y, p.z].into()
-                    })
-                    .collect(),
-                ..Default::default()
-            }),
-        ),
-        MeshMaterial3d(points_materials.add(PointsMaterial {
-            settings: bevy_points::material::PointsShaderSettings {
-                color: YELLOW.into(),
-                point_size: 0.2,
-                ..Default::default()
-            },
-            circle: true,
-            ..Default::default()
-        })),
-        Visibility::Hidden,
-    ));
 
     let (start, end) = curve.knots_domain();
     let samples = 256;
@@ -190,7 +159,8 @@ fn setup(
                 )),
                 MeshMaterial3d(line_materials.add(LineMaterial {
                     color,
-                    ..Default::default()
+                    opacity: 0.5,
+                    alpha_mode: AlphaMode::Blend,
                 })),
             ))
             .insert(Name::new(name));
@@ -200,7 +170,7 @@ fn setup(
         &mut meshes,
         &mut line_materials,
         &normals,
-        YELLOW.into(),
+        GOLD.into(),
         "n".to_string(),
     );
 
@@ -212,5 +182,5 @@ fn setup(
             ..Default::default()
         },
     ));
-    // commands.spawn(InfiniteGridBundle::default());
+    commands.spawn(InfiniteGridBundle::default());
 }
