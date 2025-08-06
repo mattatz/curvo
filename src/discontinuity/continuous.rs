@@ -61,10 +61,10 @@ where
     let mut km_norm = km.norm();
     let mut kp_norm = kp.norm();
 
-    if !(km_norm > zero_curvature) {
+    if km_norm <= zero_curvature {
         km_norm = 0.0;
     }
-    if !(kp_norm > zero_curvature) {
+    if kp_norm <= zero_curvature {
         kp_norm = 0.0;
         if km_norm == 0.0 {
             return false;

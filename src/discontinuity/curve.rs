@@ -131,26 +131,25 @@ where
                     let cm = Curvature::derivatives(d1m.clone(), d2m.clone().unwrap()).unwrap();
                     let cp = Curvature::derivatives(d1p.clone(), d2p.clone().unwrap()).unwrap();
                     let d = cm.tangent_vector().dot(&cp.tangent_vector());
-                    if d.to_f64().unwrap() < cos_angle_tolerance {
-                        return Some(knots[ki]);
-                    } else if !is_g2_curvature_continuous(
-                        cm.curvature_vector().map(|x| x.to_f64().unwrap()),
-                        cp.curvature_vector().map(|x| x.to_f64().unwrap()),
-                        cos_angle_tolerance,
-                        curvature_tolerance,
-                    ) {
+                    if d.to_f64().unwrap() < cos_angle_tolerance
+                        || !is_g2_curvature_continuous(
+                            cm.curvature_vector().map(|x| x.to_f64().unwrap()),
+                            cp.curvature_vector().map(|x| x.to_f64().unwrap()),
+                            cos_angle_tolerance,
+                            curvature_tolerance,
+                        )
+                    {
                         return Some(knots[ki]);
                     }
                 } else {
                     // C1/C2: derivative difference
-                    if !is_tiny(&d1m, &d1p, d1m.amax() * T::default_epsilon().sqrt()) {
-                        return Some(knots[ki]);
-                    } else if b_ev2nd_der
-                        && !is_tiny(
-                            d2m.as_ref().unwrap(),
-                            d2p.as_ref().unwrap(),
-                            d2m.as_ref().unwrap().amax() * T::default_epsilon().sqrt(),
-                        )
+                    if !is_tiny(&d1m, &d1p, d1m.amax() * T::default_epsilon().sqrt())
+                        || (b_ev2nd_der
+                            && !is_tiny(
+                                d2m.as_ref().unwrap(),
+                                d2p.as_ref().unwrap(),
+                                d2m.as_ref().unwrap().amax() * T::default_epsilon().sqrt(),
+                            ))
                     {
                         return Some(knots[ki]);
                     }

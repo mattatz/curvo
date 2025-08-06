@@ -111,7 +111,6 @@ fn setup(
                     color: CORNFLOWER_BLUE.into(),
                     point_size: 0.05,
                     opacity: 0.75,
-                    ..Default::default()
                 },
                 circle: true,
                 ..Default::default()
