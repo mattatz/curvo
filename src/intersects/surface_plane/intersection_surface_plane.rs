@@ -2,7 +2,8 @@ use std::cmp::Ordering;
 
 use argmin::core::{ArgminFloat, Executor, State};
 use itertools::Itertools;
-use nalgebra::{Const, Matrix2, OPoint, Vector2};
+use nalgebra::{Const, Matrix2, OPoint, Point3, Vector2};
+use rstar::RTree;
 
 use crate::{
     bounding_box::BoundingBoxTree,
@@ -21,7 +22,7 @@ pub type SurfaceIntersectionSolverOptions<T> = CurveIntersectionSolverOptions<T>
 
 impl<'a, T> Intersects<'a, &'a Plane<T>> for NurbsSurface<T, Const<4>>
 where
-    T: FloatingPoint + ArgminFloat,
+    T: FloatingPoint + ArgminFloat + num_traits::Bounded,
 {
     type Output = anyhow::Result<Vec<NurbsCurve<T, Const<4>>>>;
     type Option = Option<SurfaceIntersectionSolverOptions<T>>;
@@ -36,8 +37,15 @@ where
 
         // Group nearby points and extract curves
         let options = option.unwrap_or_default();
-        let curves =
-            extract_intersection_curves(intersection_points, self, plane, options.minimum_distance);
+        let curves = extract_intersection_curves(
+            intersection_points
+                .into_iter()
+                .map(|p| p.into())
+                .collect_vec(),
+            self,
+            plane,
+            options.minimum_distance,
+        )?;
         Ok(curves)
     }
 }
@@ -114,63 +122,63 @@ pub fn find_surface_plane_intersection_points<T: FloatingPoint + ArgminFloat>(
     Ok(intersection_points)
 }
 
+#[derive(Debug, Clone, PartialEq)]
+struct PointNode<T: FloatingPoint> {
+    point: Point3<T>,
+    uv: (T, T),
+}
+
+impl<T: FloatingPoint> From<(Point3<T>, T, T)> for PointNode<T> {
+    fn from(value: (Point3<T>, T, T)) -> Self {
+        Self {
+            point: value.0,
+            uv: (value.1, value.2),
+        }
+    }
+}
+
+impl<T: FloatingPoint + num_traits::Bounded> rstar::RTreeObject for PointNode<T> {
+    type Envelope = rstar::AABB<[T; 2]>;
+
+    fn envelope(&self) -> Self::Envelope {
+        rstar::AABB::from_point([self.uv.0, self.uv.1])
+    }
+}
+
+impl<T: FloatingPoint + num_traits::Bounded> rstar::PointDistance for PointNode<T> {
+    fn distance_2(
+        &self,
+        other: &[T; 2],
+    ) -> <<Self::Envelope as rstar::Envelope>::Point as rstar::Point>::Scalar {
+        let du = self.uv.0 - other[0];
+        let dv = self.uv.1 - other[1];
+        du * du + dv * dv
+    }
+}
+
 /// Extract intersection curves from the collected points
 fn extract_intersection_curves<T>(
-    mut points: Vec<(OPoint<T, Const<3>>, T, T)>,
+    points: Vec<PointNode<T>>,
     _surface: &NurbsSurface<T, Const<4>>,
     _plane: &Plane<T>,
     min_distance: T,
-) -> Vec<NurbsCurve<T, Const<4>>>
+) -> anyhow::Result<Vec<NurbsCurve<T, Const<4>>>>
 where
-    T: FloatingPoint + ArgminFloat,
+    T: FloatingPoint + num_traits::Bounded,
 {
-    if points.is_empty() {
-        return vec![];
-    }
+    anyhow::ensure!(!points.is_empty(), "No intersection points found");
 
-    // Sort points by u parameter first, then v
-    points.sort_by(|a, b| match a.1.partial_cmp(&b.1) {
-        Some(Ordering::Equal) | None => a.2.partial_cmp(&b.2).unwrap_or(Ordering::Equal),
-        Some(ord) => ord,
-    });
+    let mut tree = RTree::bulk_load(points);
+    // tree.remove(t)
+
+    // take first
+    let first = tree.iter().next();
+    // tree.nearest_neighbor();
 
     // Group nearby points into curves
-    let mut curves = Vec::new();
-    let mut current_curve_points = vec![points[0].0.clone()];
-    let mut last_point = &points[0];
+    let mut curves = vec![];
 
-    for point in &points[1..] {
-        let dist = (point.0 - last_point.0).norm();
-        let param_dist = num_traits::Float::sqrt(
-            (point.1 - last_point.1) * (point.1 - last_point.1)
-                + (point.2 - last_point.2) * (point.2 - last_point.2),
-        );
-
-        if dist < min_distance * T::from_f64(10.0).unwrap()
-            && param_dist < min_distance * T::from_f64(10.0).unwrap()
-        {
-            current_curve_points.push(point.0.clone());
-            last_point = point;
-        } else {
-            // Start a new curve
-            if current_curve_points.len() >= 2 {
-                if let Ok(curve) = interpolate_points(&current_curve_points) {
-                    curves.push(curve);
-                }
-            }
-            current_curve_points = vec![point.0.clone()];
-            last_point = point;
-        }
-    }
-
-    // Handle the last curve
-    if current_curve_points.len() >= 2 {
-        if let Ok(curve) = interpolate_points(&current_curve_points) {
-            curves.push(curve);
-        }
-    }
-
-    curves
+    Ok(curves)
 }
 
 /// Interpolate a set of points to create a NURBS curve
