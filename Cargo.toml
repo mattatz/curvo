@@ -20,7 +20,7 @@ rand_distr = { version = "0.5.1", default-features = false, optional = true }
 robust = { version = "1.2.0" }
 easer = { version = "0.3.0", optional = true }
 simba = { version = "0.9.0", default-features = false }
-spade = { version = "2.14.0" }
+spade = { version = "2.15.0" }
 # gauss-quad = "0.2.3"
 gauss-quad = { git = "https://github.com/mattatz/gauss-quad.git", branch = "upgrade-nalgebra-rayon" }
 geo = { version = "0.30.0" }
@@ -162,6 +162,11 @@ required-features = ["bevy"]
 [[example]]
 name = "intersect_surface_curve"
 path = "examples/intersect_surface_curve.rs"
+required-features = ["bevy"]
+
+[[example]]
+name = "intersect_surface_plane"
+path = "examples/intersect_surface_plane.rs"
 required-features = ["bevy"]
 
 [[example]]
