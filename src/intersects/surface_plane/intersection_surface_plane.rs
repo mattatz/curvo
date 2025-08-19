@@ -1,12 +1,9 @@
-use std::cmp::Ordering;
-
 use argmin::core::{ArgminFloat, Executor, State};
 use itertools::Itertools;
 use nalgebra::{Const, Matrix2, OPoint, Point3, Vector2};
 use rstar::RTree;
 
 use crate::{
-    bounding_box::BoundingBoxTree,
     intersects::Intersection,
     misc::{FloatingPoint, Plane},
     prelude::{CurveIntersectionSolverOptions, Intersects, NurbsCurve, SurfaceBoundingBoxTree},
@@ -36,7 +33,6 @@ where
             find_surface_plane_intersection_points(self, plane, option.clone())?;
 
         // Group nearby points and extract curves
-        let options = option.unwrap_or_default();
         let curves = extract_intersection_curves(
             intersection_points
                 .into_iter()
@@ -44,7 +40,6 @@ where
                 .collect_vec(),
             self,
             plane,
-            options.minimum_distance,
         )?;
         Ok(curves)
     }
@@ -128,6 +123,12 @@ struct PointNode<T: FloatingPoint> {
     uv: (T, T),
 }
 
+impl<T: FloatingPoint> PointNode<T> {
+    pub fn query(&self) -> [T; 2] {
+        [self.uv.0, self.uv.1]
+    }
+}
+
 impl<T: FloatingPoint> From<(Point3<T>, T, T)> for PointNode<T> {
     fn from(value: (Point3<T>, T, T)) -> Self {
         Self {
@@ -159,24 +160,74 @@ impl<T: FloatingPoint + num_traits::Bounded> rstar::PointDistance for PointNode<
 /// Extract intersection curves from the collected points
 fn extract_intersection_curves<T>(
     points: Vec<PointNode<T>>,
-    _surface: &NurbsSurface<T, Const<4>>,
+    surface: &NurbsSurface<T, Const<4>>,
     _plane: &Plane<T>,
-    min_distance: T,
 ) -> anyhow::Result<Vec<NurbsCurve<T, Const<4>>>>
 where
     T: FloatingPoint + num_traits::Bounded,
 {
-    anyhow::ensure!(!points.is_empty(), "No intersection points found");
+    if points.is_empty() {
+        return Ok(vec![]);
+    }
 
+    // Build RTree for efficient spatial queries
     let mut tree = RTree::bulk_load(points);
-    // tree.remove(t)
+    let mut curves = Vec::new();
 
-    // take first
-    let first = tree.iter().next();
-    // tree.nearest_neighbor();
+    let (u_domain, v_domain) = surface.knots_domain();
+    let eps = T::from_f64(0.1).unwrap();
+    let u_threshold = (u_domain.1 - u_domain.0).abs() * eps;
+    let v_threshold = (v_domain.1 - v_domain.0).abs() * eps;
 
-    // Group nearby points into curves
-    let mut curves = vec![];
+    while tree.size() > 0 {
+        let traverse = |last_point: PointNode<T>,
+                        tree: &mut RTree<PointNode<T>>,
+                        connected: &mut Vec<PointNode<T>>,
+                        forward: bool| {
+            let mut last_point = last_point;
+            loop {
+                let nearest = tree.nearest_neighbor(&last_point.query()).cloned();
+                if let Some(nearest) = nearest {
+                    if (nearest.uv.0 - last_point.uv.0).abs() <= u_threshold
+                        && (nearest.uv.1 - last_point.uv.1).abs() <= v_threshold
+                    {
+                        if forward {
+                            connected.push(nearest.clone());
+                        } else {
+                            connected.insert(0, nearest.clone());
+                        }
+
+                        tree.remove(&nearest);
+                        last_point = nearest;
+                        continue;
+                    }
+                }
+
+                break;
+            }
+        };
+
+        // Start a new curve with an arbitrary point
+        let start_point = tree.iter().next().unwrap().clone();
+        let mut current_curve = vec![start_point.clone()];
+        tree.remove(&start_point);
+
+        // Grow the curve in both directions
+        traverse(start_point.clone(), &mut tree, &mut current_curve, true);
+        traverse(start_point, &mut tree, &mut current_curve, false);
+
+        // println!("current_curve: {:?}", current_curve.len());
+
+        // Create a NURBS curve if we have enough points
+        if current_curve.len() >= 2 {
+            let pts = current_curve
+                .into_iter()
+                .map(|node| node.point)
+                .collect_vec();
+            let curve = interpolate_points(&pts)?;
+            curves.push(curve);
+        }
+    }
 
     Ok(curves)
 }
@@ -234,5 +285,64 @@ mod tests {
         // For now, let's just check that the function runs without panicking
         // The actual curve extraction logic needs more refinement
         let _curves = intersections.unwrap();
+    }
+
+    #[test]
+    fn test_rtree_curve_extraction() {
+        use super::*;
+
+        // Create a set of test points that form a curve
+        let points = vec![
+            PointNode {
+                point: Point3::new(0.0, 0.0, 0.3),
+                uv: (0.1, 0.5),
+            },
+            PointNode {
+                point: Point3::new(0.1, 0.0, 0.3),
+                uv: (0.2, 0.5),
+            },
+            PointNode {
+                point: Point3::new(0.2, 0.0, 0.3),
+                uv: (0.3, 0.5),
+            },
+            PointNode {
+                point: Point3::new(0.3, 0.0, 0.3),
+                uv: (0.4, 0.5),
+            },
+            PointNode {
+                point: Point3::new(0.4, 0.0, 0.3),
+                uv: (0.5, 0.5),
+            },
+        ];
+
+        // Create a dummy surface and plane for the test
+        let control_points = vec![
+            vec![
+                Point3::new(0.0, 0.0, 0.0).to_homogeneous().into(),
+                Point3::new(1.0, 0.0, 0.0).to_homogeneous().into(),
+            ],
+            vec![
+                Point3::new(0.0, 1.0, 0.0).to_homogeneous().into(),
+                Point3::new(1.0, 1.0, 0.0).to_homogeneous().into(),
+            ],
+        ];
+        let surface = NurbsSurface3D::<f64>::new(
+            1,
+            1,
+            vec![0., 0., 1., 1.],
+            vec![0., 0., 1., 1.],
+            control_points,
+        );
+        let plane = Plane::new(Vector3::z(), 0.3);
+
+        // Test the curve extraction
+        let curves = extract_intersection_curves(points, &surface, &plane).unwrap();
+
+        // Should extract one curve
+        assert_eq!(curves.len(), 1);
+
+        // The curve should have the right degree
+        let curve = &curves[0];
+        assert!(curve.degree() <= 3);
     }
 }

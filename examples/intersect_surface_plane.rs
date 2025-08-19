@@ -151,6 +151,7 @@ fn setup(
                 circle: true,
                 ..Default::default()
             })),
+            // Visibility::Hidden
         ));
     }
 
@@ -159,7 +160,7 @@ fn setup(
         its.iter().for_each(|curve| {
             add_curve(
                 curve,
-                None,
+                Some(Color::WHITE),
                 None,
                 &mut commands,
                 &mut meshes,
