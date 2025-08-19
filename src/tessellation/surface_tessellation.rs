@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use nalgebra::{
     allocator::Allocator, Const, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint,
-    OVector, Vector2, U1,
+    OVector, Point3, Vector2, U1,
 };
 use simba::scalar::SupersetOf;
 
@@ -182,5 +182,32 @@ where
             faces: self.faces.clone(),
             uvs: self.uvs.iter().map(|uv| uv.cast()).collect(),
         }
+    }
+}
+
+impl<'a, T: FloatingPoint> TryFrom<&'a SurfaceTessellation<T, Const<4>>>
+    for parry3d_f64::shape::TriMesh
+{
+    type Error = anyhow::Error;
+
+    /// Convert a surface tessellation to a parry3d_f64::shape::TriMesh
+    fn try_from(tess: &'a SurfaceTessellation<T, Const<4>>) -> anyhow::Result<Self> {
+        let vertices = tess
+            .points
+            .iter()
+            .map(|p| {
+                Point3::new(
+                    p.x.to_f64().unwrap(),
+                    p.y.to_f64().unwrap(),
+                    p.z.to_f64().unwrap(),
+                )
+            })
+            .collect();
+        let indices = tess
+            .faces()
+            .iter()
+            .map(|f| [f[0] as u32, f[1] as u32, f[2] as u32])
+            .collect();
+        parry3d_f64::shape::TriMesh::new(vertices, indices).map_err(anyhow::Error::msg)
     }
 }

@@ -136,6 +136,33 @@ fn setup(
     }
     */
 
+    let tess = surface.tessellate(Some(AdaptiveTessellationOptions {
+        norm_tolerance: 1e-6,
+        ..Default::default()
+    }));
+    let its = tess.find_intersection(&plane, ());
+    println!("its: {:?}", its);
+    if let Ok(its) = its {
+        its.iter().for_each(|polyline| {
+            commands.spawn((
+                Mesh3d(meshes.add(PointsMesh::from_iter(
+                    polyline.iter().map(|it| Vec3::from(it.cast::<f32>())),
+                ))),
+                MeshMaterial3d(points_materials.add(PointsMaterial {
+                    settings: PointsShaderSettings {
+                        point_size: 0.025,
+                        color: WHITE.into(),
+                        ..Default::default()
+                    },
+                    circle: true,
+                    ..Default::default()
+                })),
+                // Visibility::Hidden
+            ));
+        });
+    }
+
+    /*
     let its = find_surface_plane_intersection_points(&surface, &plane, None);
     if let Ok(its) = its {
         commands.spawn((
@@ -154,7 +181,9 @@ fn setup(
             // Visibility::Hidden
         ));
     }
+    */
 
+    /*
     let its = surface.find_intersection(&plane, None);
     if let Ok(its) = its {
         its.iter().for_each(|curve| {
@@ -168,6 +197,7 @@ fn setup(
             );
         });
     }
+    */
 
     /*
     let ta = SurfaceBoundingBoxTree::new(&surface, UVDirection::U, None);
