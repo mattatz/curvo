@@ -2092,6 +2092,7 @@ dependencies = [
  "rand 0.9.2",
  "rand_distr 0.5.1",
  "robust",
+ "rstar",
  "serde",
  "serde_json",
  "simba",
