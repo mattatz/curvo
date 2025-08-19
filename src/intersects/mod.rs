@@ -9,6 +9,8 @@ pub use curve_curve::*;
 pub use curve_plane::*;
 pub use has_intersection::*;
 pub use intersection::*;
+pub use surface_curve::*;
+pub use surface_plane::*;
 
 /// Intersection between two objects trait
 pub trait Intersects<'a, T> {
