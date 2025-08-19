@@ -1,6 +1,7 @@
 use argmin::core::{ArgminFloat, Executor, State};
 use itertools::Itertools;
 use nalgebra::{Const, Matrix2, OPoint, Point3, Vector2};
+use ordered_float::OrderedFloat;
 use rstar::RTree;
 
 use crate::{
@@ -208,7 +209,17 @@ where
         };
 
         // Start a new curve with an arbitrary point
-        let start_point = tree.iter().next().unwrap().clone();
+        let start_point = tree
+            .iter()
+            .min_by_key(|pt| {
+                let (u, v) = pt.uv;
+                let du = (u_domain.1 - u).abs().min((u - u_domain.0).abs());
+                let dv = (v_domain.1 - v).abs().min((v - v_domain.0).abs());
+                let k = du.min(dv);
+                OrderedFloat::from(k.to_f64().unwrap())
+            })
+            .ok_or(anyhow::anyhow!("No start point found"))?
+            .clone();
         let mut current_curve = vec![start_point.clone()];
         tree.remove(&start_point);
 
