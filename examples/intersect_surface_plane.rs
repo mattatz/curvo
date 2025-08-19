@@ -12,7 +12,7 @@ use bevy_points::{
 };
 use itertools::Itertools;
 use misc::surface_2_mesh;
-use nalgebra::{Matrix4, Point3, Point4, Vector3};
+use nalgebra::{Point4, Vector3};
 
 use curvo::prelude::*;
 
@@ -21,6 +21,8 @@ mod misc;
 
 use materials::*;
 use rand::Rng;
+
+use crate::misc::add_curve;
 
 fn main() {
     App::new()
@@ -153,7 +155,18 @@ fn setup(
     }
 
     let its = surface.find_intersection(&plane, None);
-    println!("its: {:?}", its);
+    if let Ok(its) = its {
+        its.iter().for_each(|curve| {
+            add_curve(
+                curve,
+                None,
+                None,
+                &mut commands,
+                &mut meshes,
+                &mut line_materials,
+            );
+        });
+    }
 
     /*
     let ta = SurfaceBoundingBoxTree::new(&surface, UVDirection::U, None);
@@ -199,14 +212,6 @@ fn setup(
                     ))
                     .insert(Name::new("bounding box"));
             });
-    }
-    */
-
-    /*
-    let intersections = surface.find_intersection(&circle, None);
-    if let Ok(intersections) = intersections {
-        commands.spawn((
-        ));
     }
     */
 
