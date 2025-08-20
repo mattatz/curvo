@@ -2085,6 +2085,7 @@ dependencies = [
  "easer",
  "gauss-quad",
  "geo",
+ "hashbrown",
  "itertools 0.14.0",
  "log",
  "nalgebra",

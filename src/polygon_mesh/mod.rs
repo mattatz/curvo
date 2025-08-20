@@ -1,6 +1,6 @@
 use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, OPoint, U2, U3};
 
-use crate::misc::FloatingPoint;
+use crate::{misc::FloatingPoint, prelude::SurfaceTessellation3D};
 
 /// A struct representing a polygon mesh.
 #[derive(Clone, Debug)]
@@ -102,5 +102,12 @@ where
 {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         iter.fold(Self::new(vec![], vec![]), |a, b| a + b)
+    }
+}
+
+/// Convert a surface tessellation to a polygon mesh
+impl<T: FloatingPoint> From<SurfaceTessellation3D<T>> for PolygonMesh<T, U3> {
+    fn from(tess: SurfaceTessellation3D<T>) -> Self {
+        Self::new(tess.points().to_vec(), tess.faces().to_vec())
     }
 }

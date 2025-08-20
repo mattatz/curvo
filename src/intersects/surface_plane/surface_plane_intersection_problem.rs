@@ -42,14 +42,14 @@ impl<T: FloatingPoint> Gradient for SurfacePlaneIntersectionProblem<'_, T> {
         let p = &derivs[0][0];
         let du = &derivs[1][0];
         let dv = &derivs[0][1];
-        
+
         let p_point = OPoint::<T, Const<3>>::from_slice(p.as_slice());
         let distance = self.plane.signed_distance(&p_point);
         let normal = self.plane.normal();
-        
+
         let grad_u = T::from_f64(2.0).unwrap() * distance * normal.dot(du);
         let grad_v = T::from_f64(2.0).unwrap() * distance * normal.dot(dv);
-        
+
         Ok(Vector2::new(grad_u, grad_v))
     }
 }

@@ -83,7 +83,6 @@ fn setup(
 
     commands.spawn((
         Mesh3d(meshes.add(surface_2_mesh(&surface, None))),
-        // Mesh3d(meshes.add(surface_2_regular_mesh(&surface, 64, 64))),
         MeshMaterial3d(normal_materials.add(NormalMaterial {
             opacity: 0.35,
             cull_mode: None,
@@ -91,6 +90,7 @@ fn setup(
             ..Default::default()
         })),
         IntersectionSurface(surface.clone()),
+        // Visibility::Hidden,
     ));
 
     let plane = Plane::new(Vector3::y(), 0.0);
@@ -117,6 +117,7 @@ fn setup(
             cull_mode: None,
             ..Default::default()
         })),
+        // Visibility::Hidden,
     ));
 
     /*
@@ -137,13 +138,15 @@ fn setup(
     */
 
     let tess = surface.tessellate(Some(AdaptiveTessellationOptions {
-        // norm_tolerance: 1e-6,
-        max_depth: 1,
+        norm_tolerance: 1e-6,
+        // max_depth: 1,
         ..Default::default()
     }));
     let its = tess.find_intersection(&plane, ());
     if let Ok(its) = its {
+        println!("polylines: {}", its.polylines.len());
         its.polylines.iter().for_each(|polyline| {
+            /*
             commands.spawn((
                 Mesh3d(meshes.add(PointsMesh::from_iter(
                     polyline.iter().map(|it| Vec3::from(it.cast::<f32>())),
@@ -158,6 +161,42 @@ fn setup(
                     ..Default::default()
                 })),
                 // Visibility::Hidden
+            ));
+            */
+
+            let n = polyline.len() as f32;
+            println!("vertices: {:?}", polyline.len());
+            let line = Mesh::new(PrimitiveTopology::LineStrip, default())
+                .with_inserted_attribute(
+                    Mesh::ATTRIBUTE_POSITION,
+                    VertexAttributeValues::Float32x3(
+                        polyline
+                            .iter()
+                            .map(|it| it.cast::<f32>().into())
+                            .collect_vec(),
+                    ),
+                )
+                .with_inserted_attribute(
+                    Mesh::ATTRIBUTE_COLOR,
+                    VertexAttributeValues::Float32x4(
+                        polyline
+                            .iter()
+                            .enumerate()
+                            .map(|(i, _)| {
+                                let t = i as f32 / n;
+                                let hue = t * 360.;
+                                let c = Color::hsl(hue, 0.5, 0.5);
+                                c.to_srgba().to_f32_array()
+                            })
+                            .collect_vec(),
+                    ),
+                );
+            commands.spawn((
+                Mesh3d(meshes.add(line)),
+                MeshMaterial3d(line_materials.add(LineMaterial {
+                    color: Color::WHITE,
+                    ..Default::default()
+                })),
             ));
         });
     }

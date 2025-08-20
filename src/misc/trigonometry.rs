@@ -51,8 +51,8 @@ where
     if do2ptr < T::zero() {
         (u0, start.clone())
     } else if do2ptr > l {
-        return (u1, end.clone());
+        (u1, end.clone())
     } else {
-        return (u0 + (u1 - u0) * do2ptr / l, (r * do2ptr + o.coords).into());
+        (u0 + (u1 - u0) * do2ptr / l, (r * do2ptr + o.coords).into())
     }
 }
