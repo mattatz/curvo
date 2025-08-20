@@ -43,7 +43,7 @@ fn intersection_with_local_plane<T: FloatingPoint + SubsetOf<f64>>(
         .map(|p| p.cast::<f64>())
         .collect_vec();
     let indices = tess.faces();
-    let mut plane_positions = vec![Position::OnPlane; vertices.len()];
+    let mut plane_positions = vec![PlaneSide::OnPlane; vertices.len()];
 
     let plane = plane.cast::<f64>();
     let epsilon = epsilon.to_f64().unwrap();
@@ -54,21 +54,16 @@ fn intersection_with_local_plane<T: FloatingPoint + SubsetOf<f64>>(
         let dist_to_plane = plane.signed_distance(pt);
         if dist_to_plane < -epsilon {
             found_negative = true;
-            plane_positions[i] = Position::OnNegative;
+            plane_positions[i] = PlaneSide::OnNegative;
         } else if dist_to_plane > epsilon {
             found_positive = true;
-            plane_positions[i] = Position::OnPositive;
+            plane_positions[i] = PlaneSide::OnPositive;
         }
     }
 
     // Exit early if `self` isn’t crossed by the plane.
-    if !found_negative {
-        return Err(anyhow::anyhow!("No intersection found: no negative"));
-    }
-
-    if !found_positive {
-        return Err(anyhow::anyhow!("No intersection found: no positive"));
-    }
+    anyhow::ensure!(found_negative, "No intersection found: no negative");
+    anyhow::ensure!(found_positive, "No intersection found: no positive");
 
     // 2. Split the triangles.
     let mut index_adjacencies: Vec<Vec<usize>> = Vec::new(); // Adjacency list of indices
@@ -140,10 +135,10 @@ fn intersection_with_local_plane<T: FloatingPoint + SubsetOf<f64>>(
             let idx_b = idx[ib as usize];
 
             let fid = match (plane_positions[idx_a], plane_positions[idx_b]) {
-                (Position::OnNegative, Position::OnPositive)
-                | (Position::OnPositive, Position::OnNegative) => FeatureId::Edge(ia),
+                (PlaneSide::OnNegative, PlaneSide::OnPositive)
+                | (PlaneSide::OnPositive, PlaneSide::OnNegative) => FeatureId::Edge(ia),
                 // NOTE: the case (_, Position::OnPlane) will be dealt with in the next loop iteration.
-                (Position::OnPlane, _) => FeatureId::Vertex(ia),
+                (PlaneSide::OnPlane, _) => FeatureId::Vertex(ia),
                 _ => continue,
             };
 
@@ -475,22 +470,18 @@ pub fn extract_polylines_from_adjacencies(adjacencies: &[Vec<usize>]) -> Vec<Pol
 
 /// The position of a point relative to a plane.
 #[derive(Copy, Clone, Debug, PartialEq)]
-enum Position {
+enum PlaneSide {
     OnPlane,
     OnNegative,
     OnPositive,
 }
 
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Default)]
+#[derive(Copy, Clone, Debug, PartialEq, Default)]
 enum FeatureId {
     /// Shape-dependent identifier of a vertex.
-    Vertex(u32),
+    Vertex(usize),
     /// Shape-dependent identifier of an edge.
-    Edge(u32),
-    /// Shape-dependent identifier of a face.
-    Face(u32),
-    // XXX: remove this variant.
-    /// Unknown identifier.
+    Edge(usize),
     #[default]
     Unknown,
 }
