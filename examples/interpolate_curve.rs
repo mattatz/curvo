@@ -158,7 +158,7 @@ fn setup(
         ))
         .insert(Name::new("interpolation targets"));
 
-    let interpolated = NurbsCurve::try_interpolate(&interpolation_target, 3).unwrap();
+    let interpolated = NurbsCurve::interpolate(&interpolation_target, 3).unwrap();
 
     let vertices = add_curve(
         &interpolated,

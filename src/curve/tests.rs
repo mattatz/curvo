@@ -3,6 +3,7 @@ use nalgebra::{Point2, Rotation2, Translation2};
 use crate::{
     curve::NurbsCurve2D,
     misc::Transformable,
+    prelude::PeriodicInterpolation,
     prelude::{CurveIntersectionSolverOptions, Intersects},
 };
 
@@ -20,8 +21,8 @@ const OPTIONS: CurveIntersectionSolverOptions<f64> = CurveIntersectionSolverOpti
 fn problem_case() {
     let dx = 1.25;
     let dy = 1.5;
-    let subject = NurbsCurve2D::<f64>::try_periodic_interpolate(
-        &[
+    let subject = NurbsCurve2D::<f64>::interpolate_periodic(
+        &vec![
             Point2::new(-dx, -dy),
             Point2::new(0., -dy * 1.25),
             Point2::new(dx, -dy),
@@ -54,8 +55,8 @@ fn problem_case() {
 fn problem_case2() {
     let dx = 1.25;
     let dy = 1.5;
-    let subject = NurbsCurve2D::<f64>::try_periodic_interpolate(
-        &[
+    let subject = NurbsCurve2D::<f64>::interpolate_periodic(
+        &vec![
             Point2::new(-dx, -dy),
             Point2::new(0., -dy * 1.25),
             Point2::new(dx, -dy),

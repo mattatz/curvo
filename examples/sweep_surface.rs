@@ -83,7 +83,7 @@ fn setup(
             Point3::new(x, t * height, z)
         })
         .collect();
-    let rail = NurbsCurve3D::try_interpolate(&points, 3).unwrap();
+    let rail = NurbsCurve3D::interpolate(&points, 3).unwrap();
     add_curve(
         &rail,
         Some(WHITE.into()),

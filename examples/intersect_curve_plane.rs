@@ -62,7 +62,7 @@ fn setup(
         Point3::new(-1.0, 1.0, -1.0),
         Point3::new(1.0, 1.0, 1.0),
     ];
-    let curve = NurbsCurve3D::try_interpolate(&points, 3).unwrap();
+    let curve = NurbsCurve3D::interpolate(&points, 3).unwrap();
 
     let line_vertices = curve
         .tessellate(Some(1e-8))

@@ -291,7 +291,7 @@ mod tests {
 
     use nalgebra::{Point3, Rotation3, Translation3, Vector3};
 
-    use crate::{curve::NurbsCurve3D, misc::Transformable};
+    use crate::{curve::NurbsCurve3D, misc::Transformable, prelude::Interpolation};
 
     use super::*;
 
@@ -306,7 +306,7 @@ mod tests {
             Point3::new(-1.0, 2.0, 0.),
             Point3::new(1.0, 2.5, 0.),
         ];
-        let interpolated = NurbsCurve3D::<f64>::try_interpolate(&interpolation_target, 3).unwrap();
+        let interpolated = NurbsCurve3D::<f64>::interpolate(&interpolation_target, 3).unwrap();
 
         let rotation = Rotation3::from_axis_angle(&Vector3::z_axis(), FRAC_PI_2);
         let translation = Translation3::new(0., 0., 1.5);

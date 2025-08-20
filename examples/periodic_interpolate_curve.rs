@@ -128,7 +128,7 @@ fn setup(
     .into_iter()
     .for_each(|(knot, color)| {
         let curve =
-            NurbsCurve3D::try_periodic_interpolate(&interpolation_target, degree, knot).unwrap();
+            NurbsCurve3D::interpolate_periodic(&interpolation_target, degree, knot).unwrap();
         add_curve(
             &curve,
             Some(color.into()),

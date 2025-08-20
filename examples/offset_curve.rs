@@ -242,10 +242,10 @@ fn update_ui(
 
         profile.0 = if is_closed {
             let points = points.iter().take(n - 1).cloned().collect_vec();
-            NurbsCurve2D::try_periodic_interpolate(&points, settings.degree, KnotStyle::Centripetal)
+            NurbsCurve2D::interpolate_periodic(&points, settings.degree, KnotStyle::Centripetal)
                 .unwrap()
         } else {
-            NurbsCurve2D::try_interpolate(points, settings.degree).unwrap()
+            NurbsCurve2D::interpolate(points, settings.degree).unwrap()
         };
 
         let mut offset_curve = offset_curve.single_mut().unwrap();

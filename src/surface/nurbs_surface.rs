@@ -10,15 +10,15 @@ use nalgebra::{
 use simba::scalar::SupersetOf;
 
 use crate::{
-    curve::{
-        nurbs_curve::{dehomogenize, NurbsCurve, NurbsCurve3D},
-        try_interpolate_control_points,
-    },
+    curve::nurbs_curve::{dehomogenize, NurbsCurve, NurbsCurve3D},
     misc::{
         binomial::Binomial, transformable::Transformable, transpose_control_points, FloatingPoint,
         Invertible, Ray,
     },
-    prelude::{AdaptiveTessellationOptions, KnotVector, SurfaceTessellation, Tessellation},
+    prelude::{
+        try_interpolate_control_points, AdaptiveTessellationOptions, KnotVector,
+        SurfaceTessellation, Tessellation,
+    },
     SurfaceClosestParameterNewton, SurfaceClosestParameterProblem,
 };
 
@@ -662,7 +662,7 @@ where
     ///     Point3::new(-1.0, 2.0, 0.),
     ///     Point3::new(1.0, 2.5, 0.),
     /// ];
-    /// let interpolated = NurbsCurve3D::try_interpolate(&points, 3).unwrap();
+    /// let interpolated = NurbsCurve3D::interpolate(&points, 3).unwrap();
     /// // Offset the curve by translation of 2.0 in the z direction
     /// let offsetted = interpolated.transformed(&Translation3::new(0.0, 0.0, 2.0).into());
     ///
@@ -1099,7 +1099,7 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
     ///     Point3::new(1.0, 1.0, 0.),
     ///     Point3::new(-1.0, 1.0, 0.),
     /// ];
-    /// let profile = NurbsCurve3D::try_interpolate(&points, 3).unwrap();
+    /// let profile = NurbsCurve3D::interpolate(&points, 3).unwrap();
     ///
     /// let points: Vec<Point3<f64>> = vec![
     ///     Point3::new(1.0, 0., 0.),
@@ -1107,7 +1107,7 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
     ///     Point3::new(-1.0, 0., 2.),
     ///     Point3::new(0.0, 1., 3.),
     /// ];
-    /// let rail= NurbsCurve3D::try_interpolate(&points, 3).unwrap();
+    /// let rail= NurbsCurve3D::interpolate(&points, 3).unwrap();
     ///
     /// // Sweep the profile curve along the rail curve to create a NURBS surface
     /// let swept = NurbsSurface::try_sweep(&profile, &rail, Some(3));
@@ -1151,7 +1151,7 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
     ///     Point3::new(1.0, 1.0, 0.),
     ///     Point3::new(-1.0, 1.0, 0.),
     /// ];
-    /// let profile = NurbsCurve3D::try_interpolate(&points, 3).unwrap();
+    /// let profile = NurbsCurve3D::interpolate(&points, 3).unwrap();
     ///
     /// // Revolve the profile curve around the z-axis by PI radians to create a NURBS surface
     /// let reolved = NurbsSurface::try_revolve(&profile, &Point3::origin(), &Vector3::z_axis(), std::f64::consts::PI);

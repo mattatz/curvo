@@ -26,8 +26,8 @@ impl<'a, T: FloatingPoint + SubsetOf<f64>> Intersects<'a, &'a Plane<T>> for Poly
     /// Find the intersection points between a polygon mesh and a plane
     fn find_intersection(&'a self, other: &'a Plane<T>, _option: Self::Option) -> Self::Output {
         let eps = 1e-10;
-        let it = intersection_with_local_plane(self, other, T::from_f64(eps).unwrap());
-        it
+
+        intersection_with_local_plane(self, other, T::from_f64(eps).unwrap())
     }
 }
 
@@ -131,8 +131,8 @@ fn intersection_with_local_plane<T: FloatingPoint + SubsetOf<f64>>(
         // First, find where the plane intersects the triangle.
         for ia in 0..3 {
             let ib = (ia + 1) % 3;
-            let idx_a = idx[ia as usize];
-            let idx_b = idx[ib as usize];
+            let idx_a = idx[ia];
+            let idx_b = idx[ib];
 
             let fid = match (plane_positions[idx_a], plane_positions[idx_b]) {
                 (PlaneSide::OnNegative, PlaneSide::OnPositive)
@@ -186,8 +186,8 @@ fn intersection_with_local_plane<T: FloatingPoint + SubsetOf<f64>>(
                 // We don’t have to split the triangle, but we need to add
                 // the edge to the polyline indices
 
-                let id1 = idx[iv1 as usize];
-                let id2 = idx[iv2 as usize];
+                let id1 = idx[iv1];
+                let id2 = idx[iv2];
 
                 let out_id1 = *existing_vertices_found.entry(id1).or_insert_with(|| {
                     let v1 = vertices[id1];
@@ -206,9 +206,9 @@ fn intersection_with_local_plane<T: FloatingPoint + SubsetOf<f64>>(
                 let ia = ie;
                 let ib = (ie + 1) % 3;
                 let ic = (ie + 2) % 3;
-                let idx_a = idx[ia as usize];
-                let idx_b = idx[ib as usize];
-                let idx_c = idx[ic as usize];
+                let idx_a = idx[ia];
+                let idx_b = idx[ib];
+                let idx_c = idx[ic];
                 assert_eq!(iv, ic);
 
                 let intersection_idx =
@@ -231,9 +231,9 @@ fn intersection_with_local_plane<T: FloatingPoint + SubsetOf<f64>>(
                 let ia = e2; // The first point of the second edge is the vertex shared by both edges.
                 let ib = (e2 + 1) % 3;
                 let ic = (e2 + 2) % 3;
-                let idx_a = idx[ia as usize];
-                let idx_b = idx[ib as usize];
-                let idx_c = idx[ic as usize];
+                let idx_a = idx[ia];
+                let idx_b = idx[ib];
+                let idx_c = idx[ic];
 
                 let intersection1 =
                     intersect_edge(idx_c, idx_a, &mut hash_to_index, &mut new_vertices);

@@ -60,7 +60,7 @@ fn setup(
             Point3::new(x, y, z)
         })
         .collect();
-    let curve = NurbsCurve3D::try_interpolate(&points, 3).unwrap();
+    let curve = NurbsCurve3D::interpolate(&points, 3).unwrap();
 
     let vertices = curve
         .cast::<f32>()

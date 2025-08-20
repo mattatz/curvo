@@ -1,6 +1,6 @@
-use argmin::core::{ArgminFloat, Executor, State};
+use argmin::core::{ArgminFloat, State};
 use itertools::Itertools;
-use nalgebra::{Const, Matrix2, OPoint, Point2, Vector2};
+use nalgebra::{Const, OPoint, Point2};
 use simba::scalar::SubsetOf;
 
 use crate::{
@@ -8,13 +8,11 @@ use crate::{
     intersects::Intersection,
     misc::{FloatingPoint, Plane},
     prelude::{
-        interpolate_nurbs, AdaptiveTessellationOptions, CurveIntersectionSolverOptions, Intersects,
-        NurbsCurve, SurfaceBoundingBoxTree, Tessellation,
+        AdaptiveTessellationOptions, CurveIntersectionSolverOptions, Interpolation, Intersects,
+        NurbsCurve, Tessellation,
     },
-    surface::{NurbsSurface, UVDirection},
+    surface::NurbsSurface,
 };
-
-use super::{SurfacePlaneIntersectionBFGS, SurfacePlaneIntersectionProblem};
 
 pub type SurfacePlaneIntersection<T> = Vec<Intersection<OPoint<T, Const<3>>, T, ()>>;
 
@@ -33,7 +31,7 @@ where
     /// * `options` - Hyperparameters for the intersection solver
     fn find_intersection(&'a self, plane: &'a Plane<T>, option: Self::Option) -> Self::Output {
         let tess = self.tessellate(Some(AdaptiveTessellationOptions {
-            // norm_tolerance: T::from_f64(1e-1).unwrap(),
+            norm_tolerance: T::from_f64(1e-2).unwrap(),
             // max_depth: 1,
             ..Default::default()
         }));
@@ -55,7 +53,7 @@ where
                 let first = iter.next().ok_or(anyhow::anyhow!("No first point"))?;
                 let uv = self.find_closest_parameter(first, None)?;
                 let parameters = iter.try_fold(vec![uv], |mut acc, pt| {
-                    let uv = self.find_closest_parameter(pt, Some(acc.last().unwrap().clone()))?;
+                    let uv = self.find_closest_parameter(pt, Some(*acc.last().unwrap()))?;
                     // let uv = self.find_closest_parameter(pt, None)?;
                     acc.push(uv);
                     anyhow::Ok(acc)
@@ -76,8 +74,9 @@ where
         let curves = projected
             .iter()
             .map(|parameters| {
-                let degree = (parameters.len() - 1).min(3);
-                let parameter_curve = NurbsCurve2D::try_interpolate(
+                // let degree = (parameters.len() - 1).min(3);
+                let degree = (parameters.len() - 1).min(2);
+                let parameter_curve = NurbsCurve2D::interpolate(
                     &parameters
                         .iter()
                         .map(|uv| Point2::new(uv.0, uv.1))
@@ -113,7 +112,7 @@ where
         let debug = projected
             .iter()
             .map(|params| {
-                println!("polyline: {:?}", params);
+                // println!("polyline: {:?}", params);
                 NurbsCurve3D::polyline(
                     &params
                         .iter()
@@ -125,16 +124,6 @@ where
             .collect_vec();
         Ok(curves.into_iter().chain(debug).collect_vec())
     }
-}
-
-/// Interpolate a set of points to create a NURBS curve
-fn interpolate_points<T>(points: &[OPoint<T, Const<3>>]) -> anyhow::Result<NurbsCurve<T, Const<4>>>
-where
-    T: FloatingPoint,
-{
-    // Use curve interpolation to create a smooth curve through the points
-    let degree = (points.len() - 1).min(3); // Use cubic curves when possible
-    NurbsCurve::try_interpolate(points, degree)
 }
 
 #[cfg(test)]

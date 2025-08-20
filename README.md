@@ -78,7 +78,7 @@ fn main() {
 
   // Create a NURBS curve that interpolates the given points with degree 3
   // You can also specify the precision of the curve by generic type (f32 or f64)
-  let interpolated = NurbsCurve3D::<f64>::try_interpolate(&points, 3).unwrap();
+  let interpolated = NurbsCurve3D::<f64>::interpolate(&points, 3).unwrap();
 
   // NURBS curve & surface can be transformed by nalgebra's matrix
   let rotation = Rotation3::from_axis_angle(&Vector3::z_axis(), FRAC_PI_2);

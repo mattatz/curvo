@@ -17,7 +17,7 @@ pub fn circle_rectangle_case() -> CurveVariants {
 pub fn periodic_interpolation_case() -> CurveVariants {
     let dx = 2.25;
     let dy = 0.5;
-    let subject = NurbsCurve2D::<f64>::try_periodic_interpolate(
+    let subject = NurbsCurve2D::<f64>::interpolate_periodic(
         &[
             Point2::new(-dx, -dy),
             Point2::new(0., -dy * 0.5),
@@ -36,7 +36,7 @@ pub fn periodic_interpolation_case() -> CurveVariants {
 pub fn island_case() -> CurveVariants {
     let dx = 1.25;
     let dy = 1.5;
-    let subject = NurbsCurve2D::<f64>::try_periodic_interpolate(
+    let subject = NurbsCurve2D::<f64>::interpolate_periodic(
         &[
             Point2::new(-dx, -dy),
             Point2::new(0., -dy * 1.25),
