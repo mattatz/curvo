@@ -49,6 +49,9 @@ impl<T: FloatingPoint> Segment<T> {
         }
 
         let t = d_a / denom;
+        if (dir_norm * t).abs() <= epsilon {
+            return (SplitResult::Parallel, None);
+        }
 
         let intersection = self.a + dir * t;
         let s1 = Segment::new(self.a, intersection);
