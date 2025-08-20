@@ -120,7 +120,7 @@ mod tests {
         let dx = 2.25;
         let dy = 0.5;
         let subject = NurbsCurve2D::<f64>::interpolate_periodic(
-            &[
+            &vec![
                 Point2::new(-dx, -dy),
                 Point2::new(0., -dy * 0.5),
                 Point2::new(dx, -dy),

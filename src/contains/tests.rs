@@ -76,7 +76,7 @@ fn test_problem_case() {
     let dy = 0.5;
 
     let subject = NurbsCurve2D::<f64>::interpolate_periodic(
-        &[
+        &vec![
             Point2::new(-dx, -dy),
             Point2::new(0., -dy * 0.5),
             Point2::new(dx, -dy),
@@ -103,7 +103,7 @@ fn test_problem_case_2() {
     let dy = 0.5;
 
     let subject = NurbsCurve2D::<f64>::interpolate_periodic(
-        &[
+        &vec![
             Point2::new(-dx, -dy),
             Point2::new(0., -dy * 0.5),
             Point2::new(dx, -dy),
@@ -131,7 +131,7 @@ fn test_problem_case_3() {
     let dy = 0.5;
 
     let subject = NurbsCurve2D::<f64>::interpolate_periodic(
-        &[
+        &vec![
             Point2::new(-dx, -dy),
             Point2::new(0., -dy * 0.5),
             Point2::new(dx, -dy),
