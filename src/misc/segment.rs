@@ -17,6 +17,8 @@ pub enum SplitResult<T> {
     Negative,
     /// The shape being split is fully contained in the positive half-space of the plane.
     Positive,
+    /// The segment is parallel to the plane.
+    Parallel,
 }
 
 impl<T: FloatingPoint> Segment<T> {
@@ -31,29 +33,30 @@ impl<T: FloatingPoint> Segment<T> {
         epsilon: T,
     ) -> (SplitResult<Self>, Option<(Point3<T>, T)>) {
         let dir = self.b - self.a;
-        let a = plane.constant() - plane.normal().dot(&self.a.coords);
-        let b = plane.normal().dot(&dir);
-        let bcoord = a / b;
         let dir_norm = dir.norm();
 
-        if b.relative_eq(&T::zero(), T::default_epsilon(), T::default_max_relative())
-            || bcoord * dir_norm <= epsilon
-            || bcoord * dir_norm >= dir_norm - epsilon
-        {
-            if a >= T::zero() {
-                (SplitResult::Negative, None)
-            } else {
-                (SplitResult::Positive, None)
-            }
+        let d_a = plane.signed_distance(&self.a);
+        let d_b = plane.signed_distance(&self.b);
+        if d_a > T::zero() && d_b > T::zero() {
+            return (SplitResult::Positive, None);
+        } else if d_a < T::zero() && d_b < T::zero() {
+            return (SplitResult::Negative, None);
+        }
+
+        let denom = d_a - d_b;
+        if denom.relative_eq(&T::zero(), T::default_epsilon(), T::default_max_relative()) {
+            return (SplitResult::Parallel, None);
+        }
+
+        let t = d_a / denom;
+
+        let intersection = self.a + dir * t;
+        let s1 = Segment::new(self.a, intersection);
+        let s2 = Segment::new(intersection, self.b);
+        if d_a >= T::zero() {
+            (SplitResult::Pair(s1, s2), Some((intersection, t)))
         } else {
-            let intersection = self.a + dir * bcoord;
-            let s1 = Segment::new(self.a, intersection);
-            let s2 = Segment::new(intersection, self.b);
-            if a >= T::zero() {
-                (SplitResult::Pair(s1, s2), Some((intersection, bcoord)))
-            } else {
-                (SplitResult::Pair(s2, s1), Some((intersection, bcoord)))
-            }
+            (SplitResult::Pair(s2, s1), Some((intersection, t)))
         }
     }
 }

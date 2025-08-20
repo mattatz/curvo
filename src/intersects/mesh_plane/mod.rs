@@ -165,6 +165,11 @@ fn intersection_with_local_plane<T: FloatingPoint + SubsetOf<f64>>(
                         if let Some((intersection, _)) = segment.split(&plane, epsilon).1 {
                             push_new_vertex(intersection, hash_to_index, new_vertices)
                         } else {
+                            /*
+                            let dist = plane.signed_distance(&vertices[idx_a]);
+                            let dist2 = plane.signed_distance(&vertices[idx_b]);
+                            println!("dist: {:?}, dist2: {:?}", dist, dist2);
+                            */
                             unreachable!()
                         }
                     })
