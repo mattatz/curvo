@@ -13,8 +13,13 @@ use crate::{
     prelude::{Intersects, SurfaceTessellation3D},
 };
 
+#[derive(Debug, Clone)]
+pub struct MeshPlaneIntersection<T: FloatingPoint> {
+    pub polylines: Vec<Vec<Point3<T>>>,
+}
+
 impl<'a, T: FloatingPoint> Intersects<'a, &'a Plane<T>> for SurfaceTessellation3D<T> {
-    type Output = anyhow::Result<Vec<Vec<Point3<T>>>>;
+    type Output = anyhow::Result<MeshPlaneIntersection<T>>;
     type Option = ();
 
     /// Find the intersection points between a surface tessellation and a plane
@@ -22,60 +27,6 @@ impl<'a, T: FloatingPoint> Intersects<'a, &'a Plane<T>> for SurfaceTessellation3
         let eps = 1e-10;
         let it = intersection_with_local_plane(&self, &other, T::from_f64(eps).unwrap());
         return it;
-
-        let tri_mesh = parry3d_f64::shape::TriMesh::try_from(self)?;
-        let normal = other.normal();
-        let axis = UnitVector::new_normalize(Vector3::new(
-            normal.x.to_f64().unwrap(),
-            normal.y.to_f64().unwrap(),
-            normal.z.to_f64().unwrap(),
-        ));
-        let constant = other.constant().to_f64().unwrap();
-        println!(
-            "tri_mesh: {:?} {:?}",
-            tri_mesh.vertices().len(),
-            tri_mesh.indices().len()
-        );
-        let it = tri_mesh.intersection_with_local_plane(&axis, constant, eps);
-        match it {
-            parry3d_f64::query::IntersectResult::Intersect(polyline) => {
-                let ccs = polyline.extract_connected_components();
-                Ok(ccs
-                    .into_iter()
-                    .map(|cc| {
-                        let verts = cc.vertices();
-                        let indices = cc.indices();
-                        let n = indices.len();
-                        println!("n: {}", n);
-                        let verts = indices
-                            .iter()
-                            .map(|index| verts[index[0] as usize])
-                            .collect_vec();
-                        if n > 0 && indices[0][0] == indices[n - 1][1] {
-                            // closed polyline
-                            let mut verts = verts.clone();
-                            verts.push(verts[0]);
-                            verts
-                        } else {
-                            verts
-                        }
-                    })
-                    .map(|verts| {
-                        verts
-                            .into_iter()
-                            .map(|v| {
-                                Point3::new(
-                                    T::from_f64(v.x).unwrap(),
-                                    T::from_f64(v.y).unwrap(),
-                                    T::from_f64(v.z).unwrap(),
-                                )
-                            })
-                            .collect_vec()
-                    })
-                    .collect())
-            }
-            _ => Err(anyhow::anyhow!("No intersection found")),
-        }
     }
 }
 
@@ -83,7 +34,7 @@ fn intersection_with_local_plane<T: FloatingPoint>(
     tess: &SurfaceTessellation3D<T>,
     plane: &Plane<T>,
     epsilon: T,
-) -> anyhow::Result<Vec<Vec<Point3<T>>>> {
+) -> anyhow::Result<MeshPlaneIntersection<T>> {
     // 1. Partition the vertices.
     let vertices = tess
         .points()
@@ -284,13 +235,21 @@ fn intersection_with_local_plane<T: FloatingPoint>(
     }
 
     println!("index_adjacencies: {:?}", index_adjacencies.len());
+    index_adjacencies.iter().for_each(|adj| {
+        println!("adj: {:?}", adj.len());
+    });
 
     // todo!()
-    Ok(vec![new_vertices.into_iter().map(|v| {
-        Point3::new(
-            T::from_f64(v.x).unwrap(),
-            T::from_f64(v.y).unwrap(),
-            T::from_f64(v.z).unwrap(),
-        )
-    }).collect_vec()])
+    Ok(MeshPlaneIntersection {
+        polylines: vec![new_vertices
+            .into_iter()
+            .map(|v| {
+                Point3::new(
+                    T::from_f64(v.x).unwrap(),
+                    T::from_f64(v.y).unwrap(),
+                    T::from_f64(v.z).unwrap(),
+                )
+            })
+            .collect_vec()],
+    })
 }

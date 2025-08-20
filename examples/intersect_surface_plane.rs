@@ -137,13 +137,13 @@ fn setup(
     */
 
     let tess = surface.tessellate(Some(AdaptiveTessellationOptions {
-        norm_tolerance: 1e-6,
+        // norm_tolerance: 1e-6,
+        max_depth: 1,
         ..Default::default()
     }));
     let its = tess.find_intersection(&plane, ());
-    println!("its: {:?}", its);
     if let Ok(its) = its {
-        its.iter().for_each(|polyline| {
+        its.polylines.iter().for_each(|polyline| {
             commands.spawn((
                 Mesh3d(meshes.add(PointsMesh::from_iter(
                     polyline.iter().map(|it| Vec3::from(it.cast::<f32>())),
