@@ -43,7 +43,7 @@ fn intersection_with_local_plane<T: FloatingPoint + SubsetOf<f64>>(
         .map(|p| p.cast::<f64>())
         .collect_vec();
     let indices = tess.faces();
-    let mut plane_positions = vec![PlaneSide::OnPlane; vertices.len()];
+    let mut plane_positions = vec![PlaneSide::On; vertices.len()];
 
     let plane = plane.cast::<f64>();
     let epsilon = epsilon.to_f64().unwrap();
@@ -54,10 +54,10 @@ fn intersection_with_local_plane<T: FloatingPoint + SubsetOf<f64>>(
         let dist_to_plane = plane.signed_distance(pt);
         if dist_to_plane < -epsilon {
             found_negative = true;
-            plane_positions[i] = PlaneSide::OnNegative;
+            plane_positions[i] = PlaneSide::Negative;
         } else if dist_to_plane > epsilon {
             found_positive = true;
-            plane_positions[i] = PlaneSide::OnPositive;
+            plane_positions[i] = PlaneSide::Positive;
         }
     }
 
@@ -135,10 +135,10 @@ fn intersection_with_local_plane<T: FloatingPoint + SubsetOf<f64>>(
             let idx_b = idx[ib];
 
             let fid = match (plane_positions[idx_a], plane_positions[idx_b]) {
-                (PlaneSide::OnNegative, PlaneSide::OnPositive)
-                | (PlaneSide::OnPositive, PlaneSide::OnNegative) => FeatureId::Edge(ia),
+                (PlaneSide::Negative, PlaneSide::Positive)
+                | (PlaneSide::Positive, PlaneSide::Negative) => FeatureId::Edge(ia),
                 // NOTE: the case (_, Position::OnPlane) will be dealt with in the next loop iteration.
-                (PlaneSide::OnPlane, _) => FeatureId::Vertex(ia),
+                (PlaneSide::On, _) => FeatureId::Vertex(ia),
                 _ => continue,
             };
 
@@ -471,9 +471,9 @@ pub fn extract_polylines_from_adjacencies(adjacencies: &[Vec<usize>]) -> Vec<Pol
 /// The position of a point relative to a plane.
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum PlaneSide {
-    OnPlane,
-    OnNegative,
-    OnPositive,
+    On,
+    Negative,
+    Positive,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Default)]

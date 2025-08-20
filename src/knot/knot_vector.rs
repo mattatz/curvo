@@ -61,11 +61,11 @@ impl<T: RealField + Copy> KnotVector<T> {
         &self.0
     }
 
-    pub fn iter(&self) -> std::slice::Iter<T> {
+    pub fn iter(&'_ self) -> std::slice::Iter<'_, T> {
         self.0.iter()
     }
 
-    pub fn iter_mut(&mut self) -> std::slice::IterMut<T> {
+    pub fn iter_mut(&'_ mut self) -> std::slice::IterMut<'_, T> {
         self.0.iter_mut()
     }
 

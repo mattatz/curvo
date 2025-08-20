@@ -1,4 +1,4 @@
-use argmin::core::{ArgminFloat, State};
+use argmin::core::ArgminFloat;
 use itertools::Itertools;
 use nalgebra::{Const, OPoint, Point2};
 use simba::scalar::SubsetOf;
@@ -29,7 +29,7 @@ where
     /// Find the intersection curves between a surface and a plane
     /// * `plane` - The plane to intersect with
     /// * `options` - Hyperparameters for the intersection solver
-    fn find_intersection(&'a self, plane: &'a Plane<T>, option: Self::Option) -> Self::Output {
+    fn find_intersection(&'a self, plane: &'a Plane<T>, _option: Self::Option) -> Self::Output {
         let tess = self.tessellate(Some(AdaptiveTessellationOptions {
             norm_tolerance: T::from_f64(1e-2).unwrap(),
             // max_depth: 1,
