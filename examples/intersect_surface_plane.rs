@@ -45,7 +45,8 @@ struct AppPlugin;
 
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
-        app.add_systems(Startup, setup).add_systems(Update, update);
+        app.add_systems(Startup, setup);
+        // add_systems(Update, update);
     }
 }
 
@@ -141,7 +142,7 @@ fn setup(
 
     /*
     let tess = surface.tessellate(Some(AdaptiveTessellationOptions {
-        norm_tolerance: 1e-6,
+        norm_tolerance: 1e-2,
         // max_depth: 1,
         ..Default::default()
     }));
@@ -182,9 +183,59 @@ fn setup(
                     ..Default::default()
                 })),
             ));
+
+            let mut iter = polyline.iter();
+            let first = iter.next().unwrap();
+            let uv = surface.find_closest_parameter(first, None).unwrap();
+            let parameters = iter
+                .try_fold(vec![uv], |mut acc, pt| {
+                    let uv =
+                        surface.find_closest_parameter(pt, Some(acc.last().unwrap().clone()))?;
+                    // let uv = self.find_closest_parameter(pt, None)?;
+                    acc.push(uv);
+                    anyhow::Ok(acc)
+                })
+                .unwrap();
+
+            let points = parameters
+                .iter()
+                .map(|uv| surface.point_at(uv.0, uv.1))
+                .collect_vec();
+
+            polyline.iter().zip(points.iter()).for_each(|(pt, pt2)| {
+                let line = Mesh::new(PrimitiveTopology::LineStrip, default())
+                    .with_inserted_attribute(
+                        Mesh::ATTRIBUTE_POSITION,
+                        VertexAttributeValues::Float32x3(vec![
+                            pt.cast::<f32>().into(),
+                            pt2.cast::<f32>().into(),
+                        ]),
+                    );
+                commands.spawn((
+                    Mesh3d(meshes.add(line)),
+                    MeshMaterial3d(line_materials.add(LineMaterial {
+                        color: Color::WHITE,
+                        ..Default::default()
+                    })),
+                ));
+            });
         });
     }
     */
+
+    let its = surface.find_intersection(&plane, None);
+    if let Ok(its) = its {
+        its.iter().for_each(|curve| {
+            add_curve(
+                curve,
+                Some(Color::WHITE),
+                None,
+                &mut commands,
+                &mut meshes,
+                &mut line_materials,
+            );
+        });
+    }
 
     /*
     let its = find_surface_plane_intersection_points(&surface, &plane, None);
