@@ -31,7 +31,8 @@ where
     /// * `options` - Hyperparameters for the intersection solver
     fn find_intersection(&'a self, plane: &'a Plane<T>, _option: Self::Option) -> Self::Output {
         let tess = self.tessellate(Some(AdaptiveTessellationOptions {
-            norm_tolerance: T::from_f64(1e-2).unwrap(),
+            // norm_tolerance: T::from_f64(0.005).unwrap(),
+            // min_depth: 1,
             // max_depth: 1,
             ..Default::default()
         }));
@@ -58,15 +59,6 @@ where
                     acc.push(uv);
                     anyhow::Ok(acc)
                 })?;
-
-                /*
-                let points = parameters
-                    .iter()
-                    .map(|uv| self.point_at(uv.0, uv.1))
-                    .collect_vec();
-
-                anyhow::Ok(points)
-                */
                 anyhow::Ok(parameters)
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
@@ -74,8 +66,8 @@ where
         let curves = projected
             .iter()
             .map(|parameters| {
-                // let degree = (parameters.len() - 1).min(3);
                 let degree = (parameters.len() - 1).min(2);
+                // let degree = (parameters.len() - 1).min(3);
                 let parameter_curve = NurbsCurve2D::interpolate(
                     &parameters
                         .iter()
@@ -95,19 +87,10 @@ where
                     parameter_curve.knots().to_vec(),
                 )
             })
-            /*
-            .map(|polyline| {
-                interpolate_nurbs(
-                    &polyline.into_iter().map(|p| p.cast::<f64>()).collect_vec(),
-                    3,
-                )
-                .map(|c| c.cast::<T>())
-            })
-            */
             // .map(|polyline| Ok(NurbsCurve3D::polyline(&polyline, false)))
             .collect::<anyhow::Result<Vec<_>>>()?;
 
-        // Ok(curves)
+        // return Ok(curves);
 
         let debug = projected
             .iter()
