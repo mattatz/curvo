@@ -46,7 +46,7 @@ struct AppPlugin;
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.add_systems(Startup, setup);
-        // add_systems(Update, update);
+        // .add_systems(Update, update);
     }
 }
 
@@ -97,7 +97,7 @@ fn setup(
         // Visibility::Hidden,
     ));
 
-    let plane = Plane::new(Vector3::y(), 0.0);
+    let plane = Plane::new(Vector3::y(), -0.2);
     let dir = plane.normal().cast::<f32>();
     let size = 8.;
     // ground plane
@@ -113,7 +113,7 @@ fn setup(
                 .subdivisions(2),
             ),
         ),
-        Transform::from_translation((dir * (plane.constant() as f32)).into()),
+        Transform::from_translation((dir * (-plane.constant() as f32)).into()),
         MeshMaterial3d(standard_materials.add(StandardMaterial {
             base_color: Color::from(CORNFLOWER_BLUE).with_alpha(0.25),
             unlit: true,
@@ -122,7 +122,7 @@ fn setup(
             ..Default::default()
         })),
         IntersectionPlane(plane.clone()),
-        Visibility::Hidden,
+        // Visibility::Hidden,
     ));
 
     /*
