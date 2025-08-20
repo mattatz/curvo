@@ -1,13 +1,17 @@
 use argmin::core::{ArgminFloat, Executor, State};
 use itertools::Itertools;
-use nalgebra::{Const, Matrix2, OPoint, Vector2};
+use nalgebra::{Const, Matrix2, OPoint, Point2, Vector2};
 use simba::scalar::SubsetOf;
 
 use crate::{
-    curve::NurbsCurve3D, intersects::Intersection, misc::{FloatingPoint, Plane}, prelude::{
-        CurveIntersectionSolverOptions, Intersects, NurbsCurve, SurfaceBoundingBoxTree,
-        Tessellation,
-    }, surface::{NurbsSurface, UVDirection}
+    curve::{NurbsCurve2D, NurbsCurve3D},
+    intersects::Intersection,
+    misc::{FloatingPoint, Plane},
+    prelude::{
+        interpolate_nurbs, AdaptiveTessellationOptions, CurveIntersectionSolverOptions, Intersects,
+        NurbsCurve, SurfaceBoundingBoxTree, Tessellation,
+    },
+    surface::{NurbsSurface, UVDirection},
 };
 
 use super::{SurfacePlaneIntersectionBFGS, SurfacePlaneIntersectionProblem};
@@ -28,7 +32,11 @@ where
     /// * `plane` - The plane to intersect with
     /// * `options` - Hyperparameters for the intersection solver
     fn find_intersection(&'a self, plane: &'a Plane<T>, option: Self::Option) -> Self::Output {
-        let tess = self.tessellate(None);
+        let tess = self.tessellate(Some(AdaptiveTessellationOptions {
+            // norm_tolerance: T::from_f64(1e-1).unwrap(),
+            // max_depth: 1,
+            ..Default::default()
+        }));
         let its = tess.find_intersection(plane, ())?;
 
         /*
@@ -53,21 +61,69 @@ where
                     anyhow::Ok(acc)
                 })?;
 
+                /*
                 let points = parameters
                     .iter()
                     .map(|uv| self.point_at(uv.0, uv.1))
                     .collect_vec();
 
                 anyhow::Ok(points)
+                */
+                anyhow::Ok(parameters)
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
 
         let curves = projected
-            .into_iter()
-            // .map(|polyline| interpolate_points(&polyline))
-            .map(|polyline| Ok(NurbsCurve3D::polyline(&polyline, false)))
+            .iter()
+            .map(|parameters| {
+                let degree = (parameters.len() - 1).min(3);
+                let parameter_curve = NurbsCurve2D::try_interpolate(
+                    &parameters
+                        .iter()
+                        .map(|uv| Point2::new(uv.0, uv.1))
+                        .collect_vec(),
+                    degree,
+                )?;
+
+                let pts = parameter_curve.dehomogenized_control_points();
+                let pts = pts
+                    .iter()
+                    .map(|uv| self.point_at(uv.x, uv.y).to_homogeneous().into())
+                    .collect_vec();
+                NurbsCurve3D::try_new(
+                    parameter_curve.degree(),
+                    pts,
+                    parameter_curve.knots().to_vec(),
+                )
+            })
+            /*
+            .map(|polyline| {
+                interpolate_nurbs(
+                    &polyline.into_iter().map(|p| p.cast::<f64>()).collect_vec(),
+                    3,
+                )
+                .map(|c| c.cast::<T>())
+            })
+            */
+            // .map(|polyline| Ok(NurbsCurve3D::polyline(&polyline, false)))
             .collect::<anyhow::Result<Vec<_>>>()?;
-        Ok(curves)
+
+        // Ok(curves)
+
+        let debug = projected
+            .iter()
+            .map(|params| {
+                println!("polyline: {:?}", params);
+                NurbsCurve3D::polyline(
+                    &params
+                        .iter()
+                        .map(|uv| self.point_at(uv.0, uv.1))
+                        .collect_vec(),
+                    false,
+                )
+            })
+            .collect_vec();
+        Ok(curves.into_iter().chain(debug).collect_vec())
     }
 }
 

@@ -2253,6 +2253,7 @@ fn try_solve_interpolation<T: FloatingPoint>(
     let dim = points[0].len();
 
     let lu = m_a.lu();
+    // let lu = m_a.full_piv_lu();
     let mut m_x = DMatrix::<T>::identity(n, dim);
     let rows = m_x.nrows();
     for i in 0..dim {

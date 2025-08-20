@@ -22,7 +22,7 @@ mod misc;
 use materials::*;
 use rand::Rng;
 
-use crate::misc::add_curve;
+use crate::misc::{add_curve, add_regular_curve};
 
 fn main() {
     App::new()
@@ -94,6 +94,7 @@ fn setup(
         })),
         Transform::default(),
         IntersectionSurface(surface.clone()),
+        // Visibility::Hidden,
     ));
 
     let plane = Plane::new(Vector3::y(), 0.0);
@@ -121,6 +122,7 @@ fn setup(
             ..Default::default()
         })),
         IntersectionPlane(plane.clone()),
+        Visibility::Hidden,
     ));
 
     /*
@@ -140,6 +142,7 @@ fn setup(
     }
     */
 
+    /*
     let tess = surface.tessellate(Some(AdaptiveTessellationOptions {
         // norm_tolerance: 1e-2,
         // max_depth: 1,
@@ -231,13 +234,58 @@ fn setup(
             );
         });
     }
+    */
 
     let its = surface.find_intersection(&plane, None);
     if let Ok(its) = its {
         its.iter().for_each(|curve| {
+            let degree = curve.degree();
+            match degree {
+                1 => {
+                    let pts = curve.dehomogenized_control_points();
+                    let n = pts.len() as f32;
+                    commands.spawn((
+                        Mesh3d(
+                            meshes.add(PointsMesh {
+                                vertices: pts
+                                    .iter()
+                                    .map(|it| Vec3::from(it.cast::<f32>()))
+                                    .collect(),
+                                colors: Some(
+                                    pts.iter()
+                                        .enumerate()
+                                        .map(|(i, _)| {
+                                            let t = i as f32 / n;
+                                            let hue = t * 360.;
+                                            let c = Color::hsl(hue, 0.5, 0.5);
+                                            c
+                                        })
+                                        .collect_vec(),
+                                ),
+                            }),
+                        ),
+                        MeshMaterial3d(points_materials.add(PointsMaterial {
+                            settings: PointsShaderSettings {
+                                point_size: 0.025,
+                                color: WHITE.into(),
+                                ..Default::default()
+                            },
+                            circle: true,
+                            ..Default::default()
+                        })),
+                        // Visibility::Hidden
+                    ));
+                }
+                _ => {}
+            };
+
             add_curve(
                 curve,
-                Some(Color::WHITE),
+                if degree <= 1 {
+                    Some(TOMATO.into())
+                } else {
+                    Some(Color::WHITE)
+                },
                 None,
                 &mut commands,
                 &mut meshes,
