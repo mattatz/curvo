@@ -3,11 +3,15 @@ use itertools::Itertools;
 use nalgebra::{Const, Matrix2, OPoint, Point3, Vector2};
 use ordered_float::OrderedFloat;
 use rstar::RTree;
+use simba::scalar::SubsetOf;
 
 use crate::{
     intersects::Intersection,
     misc::{FloatingPoint, Plane},
-    prelude::{CurveIntersectionSolverOptions, Intersects, NurbsCurve, SurfaceBoundingBoxTree},
+    prelude::{
+        CurveIntersectionSolverOptions, Intersects, NurbsCurve, SurfaceBoundingBoxTree,
+        Tessellation,
+    },
     surface::{NurbsSurface, UVDirection},
 };
 
@@ -20,7 +24,7 @@ pub type SurfaceIntersectionSolverOptions<T> = CurveIntersectionSolverOptions<T>
 
 impl<'a, T> Intersects<'a, &'a Plane<T>> for NurbsSurface<T, Const<4>>
 where
-    T: FloatingPoint + ArgminFloat + num_traits::Bounded,
+    T: FloatingPoint + ArgminFloat + num_traits::Bounded + SubsetOf<f64>,
 {
     type Output = anyhow::Result<Vec<NurbsCurve<T, Const<4>>>>;
     type Option = Option<SurfaceIntersectionSolverOptions<T>>;
@@ -29,19 +33,34 @@ where
     /// * `plane` - The plane to intersect with
     /// * `options` - Hyperparameters for the intersection solver
     fn find_intersection(&'a self, plane: &'a Plane<T>, option: Self::Option) -> Self::Output {
-        // Collect intersection points from all leaf nodes
-        let intersection_points =
-            find_surface_plane_intersection_points(self, plane, option.clone())?;
+        let tess = self.tessellate(None);
+        let its = tess.find_intersection(plane, ())?;
+        let polylines = its
+            .polylines
+            .iter()
+            .map(|polyline| {
+                // use hint to find the closest point
+                let mut iter = polyline.iter();
+                let first = iter.next().ok_or(anyhow::anyhow!("No first point"))?;
+                let uv = self.find_closest_parameter(first, None)?;
+                let parameters = iter.try_fold(vec![uv], |mut acc, pt| {
+                    let uv = self.find_closest_parameter(pt, Some(acc.last().unwrap().clone()))?;
+                    acc.push(uv);
+                    anyhow::Ok(acc)
+                })?;
 
-        // Group nearby points and extract curves
-        let curves = extract_intersection_curves(
-            intersection_points
-                .into_iter()
-                .map(|p| p.into())
-                .collect_vec(),
-            self,
-            plane,
-        )?;
+                let points = parameters
+                    .iter()
+                    .map(|uv| self.point_at(uv.0, uv.1))
+                    .collect_vec();
+                anyhow::Ok(points)
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
+
+        let curves = polylines
+            .into_iter()
+            .map(|polyline| interpolate_points(&polyline))
+            .collect::<anyhow::Result<Vec<_>>>()?;
         Ok(curves)
     }
 }

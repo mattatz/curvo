@@ -198,7 +198,7 @@ fn setup(
         .insert(Name::new("points"));
 
     pts.iter().for_each(|pt| {
-        if let Ok(closest) = surface.find_closest_point(pt) {
+        if let Ok(closest) = surface.find_closest_point(pt, None) {
             let line_vertices = [pt, &closest]
                 .iter()
                 .map(|p| p.cast::<f32>().into())
@@ -251,7 +251,7 @@ fn find_closest_point(time: Res<Time>, surfaces: Query<&TargetSurface>, mut gizm
 
     surfaces.iter().for_each(|s| {
         pts.iter().for_each(|pt| {
-            if let Ok(closest) = s.0.find_closest_point(pt) {
+            if let Ok(closest) = s.0.find_closest_point(pt, None) {
                 gizmos.line(pt.cast::<f32>().into(), closest.cast::<f32>().into(), WHITE);
             }
         });

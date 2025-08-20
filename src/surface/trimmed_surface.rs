@@ -172,7 +172,7 @@ fn try_map_curve_closest_point<T: FloatingPoint + ArgminFloat>(
                 .iter()
                 .zip(weights.into_iter())
                 .map(|(p, w)| {
-                    let uv = surface.find_closest_parameter(p)?;
+                    let uv = surface.find_closest_parameter(p, None)?;
                     Ok(Point3::new(uv.0 * w, uv.1 * w, w))
                 })
                 .collect::<anyhow::Result<Vec<_>>>()?;

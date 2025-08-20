@@ -12,7 +12,7 @@ use bevy_points::{
 };
 use itertools::Itertools;
 use misc::surface_2_mesh;
-use nalgebra::{Point4, Vector3};
+use nalgebra::{Matrix4, Point4, Vector3};
 
 use curvo::prelude::*;
 
@@ -45,13 +45,15 @@ struct AppPlugin;
 
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
-        app.add_systems(Startup, setup);
-        //.add_systems(Update, update);
+        app.add_systems(Startup, setup).add_systems(Update, update);
     }
 }
 
 #[derive(Component)]
 struct IntersectionSurface(pub NurbsSurface3D<f64>);
+
+#[derive(Component)]
+struct IntersectionPlane(pub Plane<f64>);
 
 fn setup(
     mut commands: Commands,
@@ -89,8 +91,8 @@ fn setup(
             alpha_mode: AlphaMode::Blend,
             ..Default::default()
         })),
+        Transform::default(),
         IntersectionSurface(surface.clone()),
-        // Visibility::Hidden,
     ));
 
     let plane = Plane::new(Vector3::y(), 0.0);
@@ -117,7 +119,7 @@ fn setup(
             cull_mode: None,
             ..Default::default()
         })),
-        // Visibility::Hidden,
+        IntersectionPlane(plane.clone()),
     ));
 
     /*
@@ -137,6 +139,7 @@ fn setup(
     }
     */
 
+    /*
     let tess = surface.tessellate(Some(AdaptiveTessellationOptions {
         norm_tolerance: 1e-6,
         // max_depth: 1,
@@ -146,26 +149,7 @@ fn setup(
     if let Ok(its) = its {
         println!("polylines: {}", its.polylines.len());
         its.polylines.iter().for_each(|polyline| {
-            /*
-            commands.spawn((
-                Mesh3d(meshes.add(PointsMesh::from_iter(
-                    polyline.iter().map(|it| Vec3::from(it.cast::<f32>())),
-                ))),
-                MeshMaterial3d(points_materials.add(PointsMaterial {
-                    settings: PointsShaderSettings {
-                        point_size: 0.025,
-                        color: WHITE.into(),
-                        ..Default::default()
-                    },
-                    circle: true,
-                    ..Default::default()
-                })),
-                // Visibility::Hidden
-            ));
-            */
-
             let n = polyline.len() as f32;
-            println!("vertices: {:?}", polyline.len());
             let line = Mesh::new(PrimitiveTopology::LineStrip, default())
                 .with_inserted_attribute(
                     Mesh::ATTRIBUTE_POSITION,
@@ -200,6 +184,7 @@ fn setup(
             ));
         });
     }
+    */
 
     /*
     let its = find_surface_plane_intersection_points(&surface, &plane, None);
@@ -238,53 +223,6 @@ fn setup(
     }
     */
 
-    /*
-    let ta = SurfaceBoundingBoxTree::new(&surface, UVDirection::U, None);
-    let tb = CurveBoundingBoxTree::new(&circle, None);
-    let traversed = BoundingBoxTraversal::try_traverse(ta, tb);
-    if let Ok(traversed) = traversed {
-        let n = traversed.pairs_iter().count();
-        traversed
-            .pairs_iter()
-            .enumerate()
-            .for_each(|(idx, (a, b))| {
-                let t = (idx as f32) / (n as f32);
-                let hue = t * 360. * 1e2 % 360.;
-                let color = Color::hsl(hue, 0.5, 0.5);
-                let b0 = a.bounding_box();
-                let b1 = b.bounding_box();
-                let vertices = b0
-                    .lines()
-                    .iter()
-                    .chain(b1.lines().iter())
-                    .flat_map(|(a, b)| {
-                        [a, b]
-                            .iter()
-                            .map(|p| p.cast::<f32>())
-                            .map(|p| [p.x, p.y, 0.])
-                            .collect::<Vec<_>>()
-                    })
-                    .collect();
-                let line = Mesh::new(PrimitiveTopology::LineList, default())
-                    .with_inserted_attribute(
-                        Mesh::ATTRIBUTE_POSITION,
-                        VertexAttributeValues::Float32x3(vertices),
-                    );
-                commands
-                    .spawn((
-                        Mesh3d(meshes.add(line)),
-                        MeshMaterial3d(line_materials.add(LineMaterial {
-                            // color: Color::WHITE,
-                            color,
-                            opacity: 0.5,
-                            alpha_mode: AlphaMode::Blend,
-                        })),
-                    ))
-                    .insert(Name::new("bounding box"));
-            });
-    }
-    */
-
     let center = Vec3::ZERO;
     commands.spawn((
         Transform::from_translation(center + Vec3::new(3., 3., 3.)).looking_at(center, Vec3::Y),
@@ -298,4 +236,56 @@ fn setup(
         },
         ..Default::default()
     });
+}
+
+#[allow(clippy::type_complexity)]
+fn update(
+    time: Res<Time>,
+    mut surface: Query<
+        (&IntersectionSurface, &mut Transform),
+        (With<IntersectionSurface>, Without<IntersectionPlane>),
+    >,
+    plane: Query<&IntersectionPlane, (With<IntersectionPlane>, Without<IntersectionSurface>)>,
+    mut gizmos: Gizmos,
+) {
+    let speed = 1.0;
+    // let elapsed = time.elapsed_secs() * speed;
+    let delta = time.delta_secs() * speed;
+
+    surface.iter_mut().for_each(|(_, mut tr1)| {
+        tr1.rotate_local_z(-delta);
+    });
+
+    let s = surface.single();
+    let p = plane.single();
+    if let (Ok(s), Ok(p)) = (s, p) {
+        let m = Matrix4::from(s.1.compute_matrix()).cast::<f64>();
+        let surface = s.0 .0.clone().transformed(&m);
+        // let tess = surface.tessellate(Some(AdaptiveTessellationOptions {norm_tolerance: 1e-2, ..Default::default() }));
+        // let its = tess.find_intersection(&p.0, ());
+        let its = surface.find_intersection(&p.0, None);
+        if let Ok(its) = its {
+            /*
+            its.polylines.iter().for_each(|polyline| {
+                gizmos.linestrip(
+                    polyline
+                        .iter()
+                        .map(|it| it.cast::<f32>().into())
+                        .collect_vec(),
+                    Color::WHITE,
+                );
+            });
+            */
+            its.iter().for_each(|curve| {
+                let polyline = curve.tessellate(None);
+                gizmos.linestrip(
+                    polyline
+                        .iter()
+                        .map(|it| it.cast::<f32>().into())
+                        .collect_vec(),
+                    Color::WHITE,
+                );
+            });
+        }
+    }
 }

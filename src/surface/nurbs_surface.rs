@@ -915,7 +915,7 @@ where
     ///         // println!("u: {}, v: {}", u, v);
     ///         let pt = sphere.point_at(u, v);
     ///         let pt2 = pt * 5.;
-    ///         let closest = sphere.find_closest_point(&pt2).unwrap();
+    ///         let closest = sphere.find_closest_point(&pt2, None).unwrap();
     ///         assert_relative_eq!(pt, closest, epsilon = 1e-4);
     ///     });
     /// });
@@ -923,13 +923,14 @@ where
     pub fn find_closest_point(
         &self,
         point: &OPoint<T, DimNameDiff<D, U1>>,
+        hint: Option<(T, T)>,
     ) -> anyhow::Result<OPoint<T, DimNameDiff<D, U1>>>
     where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
         T: ArgminFloat,
     {
-        self.find_closest_parameter(point)
+        self.find_closest_parameter(point, hint)
             .map(|(u, v)| self.point_at(u, v))
     }
 
@@ -937,40 +938,34 @@ where
     pub fn find_closest_parameter(
         &self,
         point: &OPoint<T, DimNameDiff<D, U1>>,
+        hint: Option<(T, T)>,
     ) -> anyhow::Result<(T, T)>
     where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
         T: ArgminFloat,
     {
-        let mut uv = Vector2::new(self.u_knots_domain().0, self.v_knots_domain().0);
-        let mut min_dist = T::infinity();
-
-        /*
-        let tess = self.regular_tessellate(10, 10);
-        tess.points().iter().enumerate().for_each(|(i, pt)| {
-            let d = point - pt;
-            let d = d.norm_squared();
-            if d < min_dist {
-                min_dist = d;
-                uv = tess.uvs()[i];
+        let uv = match hint {
+            Some(uv) => Vector2::new(uv.0, uv.1),
+            None => {
+                let mut uv = Vector2::new(self.u_knots_domain().0, self.v_knots_domain().0);
+                let mut min_dist = T::infinity();
+                let tess = self.tessellate(Some(AdaptiveTessellationOptions {
+                    min_divs_u: (self.control_points().len() - 1) * 2,
+                    min_divs_v: (self.control_points()[0].len() - 1) * 2,
+                    ..Default::default()
+                }));
+                tess.points().iter().enumerate().for_each(|(i, pt)| {
+                    let d = point - pt;
+                    let d = d.norm_squared();
+                    if d < min_dist {
+                        min_dist = d;
+                        uv = tess.uvs()[i];
+                    }
+                });
+                uv
             }
-        });
-        */
-
-        let tess = self.tessellate(Some(AdaptiveTessellationOptions {
-            min_divs_u: (self.control_points().len() - 1) * 2,
-            min_divs_v: (self.control_points()[0].len() - 1) * 2,
-            ..Default::default()
-        }));
-        tess.points().iter().enumerate().for_each(|(i, pt)| {
-            let d = point - pt;
-            let d = d.norm_squared();
-            if d < min_dist {
-                min_dist = d;
-                uv = tess.uvs()[i];
-            }
-        });
+        };
         // println!("Initial guess: {:?}", uv);
 
         let pts = self.dehomogenized_control_points();
