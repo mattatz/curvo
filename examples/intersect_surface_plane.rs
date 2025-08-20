@@ -140,9 +140,8 @@ fn setup(
     }
     */
 
-    /*
     let tess = surface.tessellate(Some(AdaptiveTessellationOptions {
-        norm_tolerance: 1e-2,
+        // norm_tolerance: 1e-2,
         // max_depth: 1,
         ..Default::default()
     }));
@@ -197,12 +196,12 @@ fn setup(
                 })
                 .unwrap();
 
-            let points = parameters
+            let projected = parameters
                 .iter()
                 .map(|uv| surface.point_at(uv.0, uv.1))
                 .collect_vec();
 
-            polyline.iter().zip(points.iter()).for_each(|(pt, pt2)| {
+            polyline.iter().zip(projected.iter()).for_each(|(pt, pt2)| {
                 let line = Mesh::new(PrimitiveTopology::LineStrip, default())
                     .with_inserted_attribute(
                         Mesh::ATTRIBUTE_POSITION,
@@ -219,9 +218,19 @@ fn setup(
                     })),
                 ));
             });
+
+            let degree = (projected.len() - 1).min(3);
+            let curve = NurbsCurve3D::try_interpolate(&projected, degree).unwrap();
+            add_curve(
+                &curve,
+                Some(TOMATO.into()),
+                None,
+                &mut commands,
+                &mut meshes,
+                &mut line_materials,
+            );
         });
     }
-    */
 
     let its = surface.find_intersection(&plane, None);
     if let Ok(its) = its {
