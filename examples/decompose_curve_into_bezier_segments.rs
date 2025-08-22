@@ -82,7 +82,7 @@ fn setup(
         ))
         .insert(Name::new("curve"));
 
-    let segments = curve.try_decompose_bezier_segments().unwrap();
+    let segments = curve.try_decompose().unwrap();
     let n = segments.len();
     segments.iter().enumerate().for_each(|(i, segment)| {
         let segment = segment.cast::<f32>();

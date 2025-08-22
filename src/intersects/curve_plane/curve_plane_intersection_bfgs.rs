@@ -1,78 +1,27 @@
-use argmin::{argmin_error_closure, core::*, float};
-use nalgebra::{Matrix2, Vector2};
+use argmin::{argmin_error_closure, core::*};
+use nalgebra::{Matrix1, Vector1};
 
-use crate::misc::FloatingPoint;
+use crate::{misc::FloatingPoint, prelude::CurveIntersectionBFGS};
 
-/// Customized quasi-Newton's method for finding the intersections between NURBS curves
-/// Original source: https://argmin-rs.github.io/argmin/argmin/solver/newton/struct.Newton.html
-#[derive(Clone, Copy)]
-pub struct CurveIntersectionBFGS<F> {
-    /// Tolerance for the step size in the line search
-    step_size_tolerance: F,
+type CurvePlaneIterState<F> = IterState<Vector1<F>, Vector1<F>, (), Matrix1<F>, (), F>;
 
-    /// Tolerance for the cost function to determine convergence
-    cost_tolerance: F,
-}
-
-impl<F> Default for CurveIntersectionBFGS<F>
+impl<O, F> Solver<O, CurvePlaneIterState<F>> for CurveIntersectionBFGS<F>
 where
-    F: FloatingPoint,
-{
-    fn default() -> Self {
-        Self {
-            step_size_tolerance: float!(1e-8),
-            cost_tolerance: float!(1e-8),
-        }
-    }
-}
-
-impl<F> CurveIntersectionBFGS<F>
-where
-    F: FloatingPoint,
-{
-    /// Construct a new instance of [`Newton`]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_step_size_tolerance(mut self, tolerance: F) -> Self {
-        self.step_size_tolerance = tolerance;
-        self
-    }
-
-    pub fn with_cost_tolerance(mut self, tolerance: F) -> Self {
-        self.cost_tolerance = tolerance;
-        self
-    }
-
-    pub fn step_size_tolerance(&self) -> F {
-        self.step_size_tolerance
-    }
-
-    pub fn cost_tolerance(&self) -> F {
-        self.cost_tolerance
-    }
-}
-
-type CurveCurveIterState<F> = IterState<Vector2<F>, Vector2<F>, (), Matrix2<F>, (), F>;
-
-impl<O, F> Solver<O, CurveCurveIterState<F>> for CurveIntersectionBFGS<F>
-where
-    O: Gradient<Param = Vector2<F>, Gradient = Vector2<F>>
-        + CostFunction<Param = Vector2<F>, Output = F>,
+    O: Gradient<Param = Vector1<F>, Gradient = Vector1<F>>
+        + CostFunction<Param = Vector1<F>, Output = F>,
     F: FloatingPoint + ArgminFloat,
 {
-    const NAME: &'static str = "Curve intersection newton method with line search";
+    const NAME: &'static str = "Curve plane intersection newton method with line search";
 
     fn init(
         &mut self,
         problem: &mut Problem<O>,
-        state: CurveCurveIterState<F>,
-    ) -> Result<(CurveCurveIterState<F>, Option<KV>), Error> {
+        state: CurvePlaneIterState<F>,
+    ) -> Result<(CurvePlaneIterState<F>, Option<KV>), Error> {
         let x0 = state.get_param().ok_or_else(argmin_error_closure!(
             NotInitialized,
             concat!(
-                "`Newton` requires an initial parameter vector. ",
+                "`CurvePlaneIntersectionBFGS` requires an initial parameter vector. ",
                 "Please provide an initial guess via `Executor`s `configure` method."
             )
         ))?;
@@ -84,8 +33,8 @@ where
     fn next_iter(
         &mut self,
         problem: &mut Problem<O>,
-        state: CurveCurveIterState<F>,
-    ) -> Result<(CurveCurveIterState<F>, Option<KV>), Error> {
+        state: CurvePlaneIterState<F>,
+    ) -> Result<(CurvePlaneIterState<F>, Option<KV>), Error> {
         let x0 = state.get_param().ok_or_else(argmin_error_closure!(
             NotInitialized,
             concat!(
@@ -101,14 +50,12 @@ where
             None => problem.gradient(x0)?,
         };
 
-        let h0 = state.get_hessian().cloned().unwrap_or(Matrix2::identity());
-        // println!("cost: {:?}, hessian: {:?}", &f0, &h0);
+        let h0 = state.get_hessian().cloned().unwrap_or(Matrix1::identity());
 
         // line search
         let step = -h0 * g0;
 
         let norm = step.norm();
-        // println!("norm: {}", norm);
 
         let mut t = F::one();
         let df0 = g0.dot(&step);
@@ -121,7 +68,7 @@ where
         let max_iters = state.get_max_iters();
         for _ in 0..max_iters {
             it += 1;
-            if t * norm < self.step_size_tolerance {
+            if t * norm < self.step_size_tolerance() {
                 break;
             }
 
@@ -137,8 +84,6 @@ where
                 break;
             }
         }
-
-        // println!("{}: {}, {}", state.iter, x1, f1);
 
         let f1 = f1.unwrap_or(f0);
 
@@ -163,7 +108,7 @@ where
         ))
     }
 
-    fn terminate(&mut self, state: &CurveCurveIterState<F>) -> TerminationStatus {
+    fn terminate(&mut self, state: &CurvePlaneIterState<F>) -> TerminationStatus {
         if state.iter > state.max_iters {
             return TerminationStatus::Terminated(TerminationReason::MaxItersReached);
         }
@@ -188,7 +133,7 @@ where
         if let (Some(g), Some(h)) = (state.get_gradient(), state.get_hessian()) {
             let step = h * g;
             let norm = step.norm();
-            if norm < self.step_size_tolerance {
+            if norm < self.step_size_tolerance() {
                 return TerminationStatus::Terminated(TerminationReason::SolverExit(
                     "step size tolerance reached".into(),
                 ));
@@ -197,7 +142,7 @@ where
 
         if state.get_cost() != state.get_prev_cost()
             && nalgebra::ComplexField::abs(state.get_cost() - state.get_prev_cost())
-                < self.cost_tolerance
+                < self.cost_tolerance()
         {
             return TerminationStatus::Terminated(TerminationReason::SolverConverged);
         }

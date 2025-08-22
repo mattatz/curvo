@@ -3,7 +3,10 @@ use std::ops::Index;
 use nalgebra::{convert, RealField};
 use simba::scalar::SupersetOf;
 
-use crate::prelude::{FloatingPoint, Invertible, KnotMultiplicity};
+use crate::{
+    knot::KnotSide,
+    prelude::{FloatingPoint, Invertible, KnotMultiplicity},
+};
 
 /// Knot vector representation
 #[derive(Clone, Debug, PartialEq)]
@@ -165,8 +168,82 @@ impl<T: RealField + Copy> KnotVector<T> {
         }
 
         // binary search
+        self.binary_search(degree, n + 1, u)
+    }
+
+    /// Find the knot span index with a hint
+    /// # Example
+    /// ```
+    /// use curvo::prelude::{KnotVector, KnotSide};
+    /// let knots = KnotVector::new(vec![0., 0., 0., 1., 2., 3., 3., 3., 4., 5., 5., 5.]);
+    /// let degree = 2;
+    /// let n = knots.len() - degree - 1;
+    /// let t = 3.0;
+    /// let idx = knots.find_knot_span_index_with_hint(n, degree, t, KnotSide::Below, None);
+    /// assert_eq!(idx, 4);
+    ///
+    /// let idx = knots.find_knot_span_index_with_hint(n, degree, t, KnotSide::Above, None);
+    /// assert_eq!(idx, 8);
+    ///
+    /// let idx = knots.find_knot_span_index_with_hint(n, degree, t, KnotSide::None, None);
+    /// assert_eq!(idx, 7);
+    /// ```
+    pub fn find_knot_span_index_with_hint(
+        &self,
+        n: usize,
+        degree: usize,
+        u: T,
+        side: KnotSide,
+        hint: Option<usize>,
+    ) -> usize {
         let mut low = degree;
         let mut high = n + 1;
+
+        if let Some(h0) = hint {
+            if h0 > degree && h0 < n + 1 {
+                let mut h = h0;
+                // move to the first index of a possible multiple-knot block
+                while h > degree && self[h - 1] == self[h] {
+                    h -= 1;
+                }
+                if h > degree {
+                    if u < self[h] {
+                        high = h;
+                    } else {
+                        if matches!(side, KnotSide::Below) && u == self[h] {
+                            // left limit when u hits an internal knot
+                            h = h.saturating_sub(1);
+                        }
+                        if h < degree {
+                            h = degree;
+                        }
+                        low = h;
+                    }
+                }
+            }
+        }
+
+        let mut idx = self.binary_search(low, high, u);
+        match side {
+            KnotSide::Below => {
+                while idx > 0 && u == self[idx] {
+                    idx -= 1;
+                }
+            }
+            KnotSide::Above => {
+                while idx < n && u == self[idx] {
+                    idx += 1;
+                }
+            }
+            _ => {}
+        }
+        idx
+    }
+
+    /// Find the knot span index with a binary search
+    fn binary_search(&self, start: usize, end: usize, u: T) -> usize {
+        let mut low = start;
+        let mut high = end;
         let mut mid = ((low + high) as f64 / 2.).floor() as usize;
         while u < self[mid] || self[mid + 1] <= u {
             if u < self[mid] {
@@ -180,7 +257,6 @@ impl<T: RealField + Copy> KnotVector<T> {
             }
             mid = next;
         }
-
         mid
     }
 
@@ -392,6 +468,12 @@ impl<T> FromIterator<T> for KnotVector<T> {
     }
 }
 
+impl<T> From<Vec<T>> for KnotVector<T> {
+    fn from(value: Vec<T>) -> Self {
+        Self(value)
+    }
+}
+
 impl<T: FloatingPoint> Invertible for KnotVector<T> {
     /// Reverses the knot vector
     /// # Example
@@ -426,6 +508,6 @@ mod tests {
     fn knot() {
         let knot = KnotVector::new(vec![0., 0., 0., 1., 2., 3., 3., 3.]);
         let index = knot.find_knot_span_index(6, 2, 2.5);
-        dbg!(index);
+        assert_eq!(index, 4);
     }
 }

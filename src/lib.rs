@@ -60,7 +60,9 @@ mod bounding_box;
 mod closest_parameter;
 mod contains;
 mod curve;
+mod decompose;
 mod dimension;
+mod discontinuity;
 mod fillet;
 mod intersects;
 mod knot;
@@ -79,14 +81,16 @@ pub mod prelude {
     pub use crate::bounding_box::*;
     pub use crate::contains::*;
     pub use crate::curve::*;
+    pub use crate::decompose::*;
     pub use crate::dimension::*;
+    pub use crate::discontinuity::*;
     pub use crate::fillet::*;
     pub use crate::intersects::*;
     pub use crate::knot::*;
     pub use crate::misc::{
-        binomial::*, end_points::*, floating_point::*, frenet_frame::*, invertible::*, line::*,
-        orientation::*, polygon_boundary::*, ray::*, transformable::*, transpose::*,
-        trigonometry::*,
+        binomial::*, curvature::*, end_points::*, floating_point::*, frenet_frame::*,
+        invertible::*, line::*, orientation::*, plane::*, polygon_boundary::*, ray::*,
+        transformable::*, transpose::*, trigonometry::*,
     };
     pub use crate::offset::*;
     pub use crate::polygon_mesh::*;
