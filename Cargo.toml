@@ -45,8 +45,8 @@ approx = { version = "0.5", default-features = false }
 serde_json = "1.0"
 
 [features]
-# default = []
-default = ["bevy", "serde"] # for debugging example
+default = []
+# default = ["bevy", "serde"] # for debugging example
 bevy = [
   "dep:easer",
   "dep:rand_distr",
@@ -229,4 +229,9 @@ required-features = ["bevy"]
 [[example]]
 name = "fillet_compound_curve"
 path = "examples/fillet_compound_curve.rs"
+required-features = ["bevy"]
+
+[[example]]
+name = "marching"
+path = "examples/marching.rs"
 required-features = ["bevy"]

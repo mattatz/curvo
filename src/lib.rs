@@ -67,6 +67,7 @@ mod fillet;
 mod interpolation;
 mod intersects;
 mod knot;
+mod marching;
 mod misc;
 mod offset;
 mod polygon_mesh;
@@ -89,6 +90,7 @@ pub mod prelude {
     pub use crate::interpolation::*;
     pub use crate::intersects::*;
     pub use crate::knot::*;
+    pub use crate::marching::*;
     pub use crate::misc::{
         binomial::*, curvature::*, end_points::*, floating_point::*, frenet_frame::*,
         invertible::*, line::*, orientation::*, plane::*, polygon_boundary::*, ray::*,
