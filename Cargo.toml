@@ -1,6 +1,6 @@
 [package]
 name = "curvo"
-version = "0.1.64"
+version = "0.1.65"
 authors = ["Masatatsu Nakamura <masatatsu.nakamura@gmail.com"]
 edition = "2021"
 keywords = ["nurbs", "modeling", "graphics", "3d"]
@@ -114,6 +114,16 @@ path = "examples/trimmed_surface.rs"
 required-features = ["bevy"]
 
 [[example]]
+name = "curvature"
+path = "examples/curvature.rs"
+required-features = ["bevy"]
+
+[[example]]
+name = "discontinuity"
+path = "examples/discontinuity.rs"
+required-features = ["bevy"]
+
+[[example]]
 name = "frenet_frame"
 path = "examples/frenet_frame.rs"
 required-features = ["bevy"]
@@ -121,6 +131,11 @@ required-features = ["bevy"]
 [[example]]
 name = "decompose_curve_into_bezier_segments"
 path = "examples/decompose_curve_into_bezier_segments.rs"
+required-features = ["bevy"]
+
+[[example]]
+name = "decompose_surface_into_bezier_patches"
+path = "examples/decompose_surface_into_bezier_patches.rs"
 required-features = ["bevy"]
 
 [[example]]
@@ -136,6 +151,11 @@ required-features = ["bevy"]
 [[example]]
 name = "intersect_curves"
 path = "examples/intersect_curves.rs"
+required-features = ["bevy"]
+
+[[example]]
+name = "intersect_curve_plane"
+path = "examples/intersect_curve_plane.rs"
 required-features = ["bevy"]
 
 [[example]]
