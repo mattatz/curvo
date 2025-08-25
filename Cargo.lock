@@ -2566,7 +2566,8 @@ dependencies = [
 [[package]]
 name = "gauss-quad"
 version = "0.2.4"
-source = "git+https://github.com/mattatz/gauss-quad.git?branch=upgrade-nalgebra-rayon#216e8212aa9f41422032851179058a3cad65372a"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bcc0df122fbe0e18a274358b3212f1a7271df8c280ba030af6ec90364d469e69"
 dependencies = [
  "nalgebra",
 ]
