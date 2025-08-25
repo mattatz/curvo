@@ -21,7 +21,7 @@ jobs:
       - name: Checkout sources
         uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@1.86.0
+      - uses: dtolnay/rust-toolchain@1.89.0
         with:
           components: "rustfmt, clippy"
 
