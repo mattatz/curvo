@@ -256,18 +256,36 @@ fn trimmed_surface_adaptive_tessellate<T: FloatingPoint + SpadeNum>(
         })
         .collect_vec();
 
+    // filter out isolated vertices
+    let mut remap: HashMap<usize, usize> = HashMap::new();
+    let mut vertices = vec![];
+    let vs = t.vertices().collect_vec();
+    let remapped_faces = faces
+        .iter()
+        .filter_map(|face| {
+            face.iter()
+                .map(|v| {
+                    *remap.entry(*v).or_insert_with(|| {
+                        let i = vertices.len();
+                        vertices.push((*vs[*v].as_ref()).clone());
+                        i
+                    })
+                })
+                .collect_array::<3>()
+        })
+        .collect_vec();
+
     let mut points = vec![];
     let mut normals = vec![];
     let mut uvs = vec![];
-    t.vertices().for_each(|v| {
-        let v = v.as_ref();
+    vertices.iter().for_each(|v| {
         points.push(v.point);
         normals.push(v.normal);
         uvs.push(v.uv);
     });
 
     Ok(SurfaceTessellation {
-        faces,
+        faces: remapped_faces,
         points,
         normals,
         uvs,
