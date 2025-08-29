@@ -125,10 +125,13 @@ fn setup(
         // Visibility::Hidden,
     ));
 
-    let its = find_surface_plane_intersection_points(&surface, &plane, None);
-    if let Ok(its) = its {
-        let (point, uv) = its.first().unwrap();
+    // let its = find_surface_plane_intersection_points(&surface, &plane, None);
+    let its = find_surface_plane_intersection_leaf_nodes(&surface, &plane, 64);
+    if let Ok(nodes) = its {
+        // let (point, uv) = its.first().unwrap();
+        nodes.iter().for_each(|node| {});
 
+        /*
         let res = march_one_branch(&surface, &plane, *uv, MarchConfig::default());
         let parameters = res.uv;
         println!("parameters: {:?}", parameters.len());
@@ -152,7 +155,7 @@ fn setup(
                 circle: true,
                 ..Default::default()
             })),
-            Visibility::Hidden
+            Visibility::Hidden,
         ));
 
         let line = Mesh::new(PrimitiveTopology::LineStrip, default()).with_inserted_attribute(
@@ -193,10 +196,16 @@ fn setup(
         );
 
         commands.spawn((
-            Mesh3d(meshes.add(PointsMesh {
-                vertices: c.dehomogenized_control_points().iter().map(|p| Vec3::from(p.cast::<f32>())).collect(),
-                ..Default::default()
-            })),
+            Mesh3d(
+                meshes.add(PointsMesh {
+                    vertices: c
+                        .dehomogenized_control_points()
+                        .iter()
+                        .map(|p| Vec3::from(p.cast::<f32>()))
+                        .collect(),
+                    ..Default::default()
+                }),
+            ),
             MeshMaterial3d(points_materials.add(PointsMaterial {
                 settings: PointsShaderSettings {
                     point_size: 0.05,
@@ -208,6 +217,7 @@ fn setup(
             })),
             // Visibility::Hidden
         ));
+        */
     }
 
     let center = Vec3::ZERO;
