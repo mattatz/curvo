@@ -267,7 +267,7 @@ fn trimmed_surface_adaptive_tessellate<T: FloatingPoint + SpadeNum>(
                 .map(|v| {
                     *remap.entry(*v).or_insert_with(|| {
                         let i = vertices.len();
-                        vertices.push((*vs[*v].as_ref()).clone());
+                        vertices.push(*vs[*v].as_ref());
                         i
                     })
                 })
