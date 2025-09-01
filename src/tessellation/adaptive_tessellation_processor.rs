@@ -57,11 +57,10 @@ where
         current_depth: usize,
         direction: UVDirection,
     ) {
-        let id0 = self.nodes.len();
-        let id1 = id0 + 1;
+        let next_node_id_0 = self.nodes.len();
+        let next_node_id_1 = next_node_id_0 + 1;
 
         let node = self.nodes.get_mut(id).unwrap();
-
         let dividable = node.should_divide(self.surface, options, current_depth);
 
         node.direction = match dividable {
@@ -86,27 +85,27 @@ where
                     ];
                     let top = [west, east, node.corners[2].clone(), node.corners[3].clone()];
 
-                    node.assign_children([id0, id1]);
+                    node.assign_children([next_node_id_0, next_node_id_1]);
 
                     //assign neighbors to bottom node
                     let bottom_neighbors = [
                         *node.neighbors.at(NeighborDirection::South),
                         *node.neighbors.at(NeighborDirection::East),
-                        Some(id1),
+                        Some(next_node_id_1),
                         *node.neighbors.at(NeighborDirection::West),
                     ];
 
                     //assign neighbors to top node
                     let top_neighbors = [
-                        Some(id0),
+                        Some(next_node_id_0),
                         *node.neighbors.at(NeighborDirection::East),
                         *node.neighbors.at(NeighborDirection::North),
                         *node.neighbors.at(NeighborDirection::West),
                     ];
 
                     (
-                        AdaptiveTessellationNode::new(id0, bottom, bottom_neighbors),
-                        AdaptiveTessellationNode::new(id1, top, top_neighbors),
+                        AdaptiveTessellationNode::new(next_node_id_0, bottom, bottom_neighbors),
+                        AdaptiveTessellationNode::new(next_node_id_1, top, top_neighbors),
                     )
                 }
                 UVDirection::V => {
@@ -126,11 +125,11 @@ where
                         north,
                     ];
 
-                    node.assign_children([id0, id1]);
+                    node.assign_children([next_node_id_0, next_node_id_1]);
 
                     let left_neighbors = [
                         *node.neighbors.at(NeighborDirection::South),
-                        Some(id1),
+                        Some(next_node_id_1),
                         *node.neighbors.at(NeighborDirection::North),
                         *node.neighbors.at(NeighborDirection::West),
                     ];
@@ -138,12 +137,12 @@ where
                         *node.neighbors.at(NeighborDirection::South),
                         *node.neighbors.at(NeighborDirection::East),
                         *node.neighbors.at(NeighborDirection::North),
-                        Some(id0),
+                        Some(next_node_id_0),
                     ];
 
                     (
-                        AdaptiveTessellationNode::new(id0, left, left_neighbors),
-                        AdaptiveTessellationNode::new(id1, right, right_neighbors),
+                        AdaptiveTessellationNode::new(next_node_id_0, left, left_neighbors),
+                        AdaptiveTessellationNode::new(next_node_id_1, right, right_neighbors),
                     )
                 }
             }
@@ -152,9 +151,9 @@ where
         self.nodes.push(c0);
         self.nodes.push(c1);
 
-        //divide all children recursively
-        for child in [id0, id1] {
-            self.iterate(child, options, current_depth + 1, direction.opposite());
+        // divide all children recursively
+        for next_id in [next_node_id_0, next_node_id_1] {
+            self.iterate(next_id, options, current_depth + 1, direction.opposite());
         }
     }
 }
