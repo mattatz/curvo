@@ -47,7 +47,7 @@
 //!     ).unwrap();
 //!
 //!     // Tessellate the surface in adaptive manner about curvature for efficient rendering
-//!     let option = AdaptiveTessellationOptions {
+//!     let option = AdaptiveTessellationOptions::<_> {
 //!         norm_tolerance: 1e-4,
 //!         ..Default::default()
 //!     };
@@ -98,10 +98,11 @@ pub mod prelude {
     pub use crate::split::*;
     pub use crate::surface::*;
     pub use crate::tessellation::{
+        adaptive_tessellation_node::AdaptiveTessellationNode,
         adaptive_tessellation_option::AdaptiveTessellationOptions,
         boundary_constraints::BoundaryConstraints, surface_tessellation::*,
         trimmed_surface_constraints::TrimmedSurfaceConstraints, ConstrainedTessellation,
-        Tessellation, DividableDirection,
+        DefaultDivider, DividableDirection, Tessellation,
     };
     pub use crate::trim::*;
 }

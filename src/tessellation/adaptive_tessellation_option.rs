@@ -1,18 +1,12 @@
 use std::marker::PhantomData;
 
-use nalgebra::{DimName, RealField};
+use nalgebra::{RealField, U4};
 
-use crate::tessellation::{
-    adaptive_tessellation_node::AdaptiveTessellationNode, DefaultDivider, DividableDirection
-};
+use crate::tessellation::DefaultDivider;
 
 /// Options for adaptive tessellation of a surface
 #[derive(Clone, Debug, PartialEq)]
-pub struct AdaptiveTessellationOptions<
-    T: RealField,
-    D: DimName,
-    F: Fn(&AdaptiveTessellationNode<T, D>) -> Option<DividableDirection> = DefaultDivider<T, D>,
-> {
+pub struct AdaptiveTessellationOptions<T = f64, D = U4, F = DefaultDivider<T, D>> {
     /// Tolerance for the normal vector: if the L2 norm of the normal vectors is below this value, the edge is considered flat
     pub norm_tolerance: T,
     /// Minimum number of divisions in u direction
@@ -28,12 +22,7 @@ pub struct AdaptiveTessellationOptions<
     pub _marker: PhantomData<D>,
 }
 
-impl<
-        T: RealField,
-        D: DimName,
-        F: Fn(&AdaptiveTessellationNode<T, D>) -> Option<DividableDirection>,
-    > Default for AdaptiveTessellationOptions<T, D, F>
-{
+impl<T: RealField, D, F> Default for AdaptiveTessellationOptions<T, D, F> {
     fn default() -> Self {
         Self {
             norm_tolerance: T::from_f64(2.5e-2).unwrap(),
@@ -41,7 +30,7 @@ impl<
             min_divs_v: 1,
             min_depth: 0,
             max_depth: 8,
-            divider: None::<F>,
+            divider: None,
             _marker: PhantomData,
         }
     }

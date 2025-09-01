@@ -13,27 +13,23 @@ pub mod trimmed_surface;
 pub mod trimmed_surface_constraints;
 
 pub use adaptive_tessellation_node::DividableDirection;
+use nalgebra::U4;
 pub use surface_point::*;
 
 use crate::tessellation::adaptive_tessellation_node::AdaptiveTessellationNode;
 
-pub type DefaultDivider<T, D> = fn(&AdaptiveTessellationNode<T, D>) -> Option<DividableDirection>;
+pub type DefaultDivider<T = f64, D = U4> =
+    fn(&AdaptiveTessellationNode<T, D>) -> Option<DividableDirection>;
 
 /// A trait for tessellating a shape
-pub trait Tessellation {
-    type Option;
+pub trait Tessellation<Opt> {
     type Output;
-    fn tessellate(&self, options: Self::Option) -> Self::Output;
+    fn tessellate(&self, options: Opt) -> Self::Output;
 }
 
 /// A trait for tessellating a shape with constraints
-pub trait ConstrainedTessellation {
+pub trait ConstrainedTessellation<Opt> {
     type Constraint;
-    type Option;
     type Output;
-    fn constrained_tessellate(
-        &self,
-        constraints: Self::Constraint,
-        options: Self::Option,
-    ) -> Self::Output;
+    fn constrained_tessellate(&self, constraints: Self::Constraint, options: Opt) -> Self::Output;
 }

@@ -49,7 +49,7 @@ fn setup(
          line_materials: &mut ResMut<'_, Assets<LineMaterial>>,
          _normal_materials: &mut ResMut<'_, Assets<NormalMaterial>>,
          points_materials: &mut ResMut<'_, Assets<PointsMaterial>>| {
-            let option = AdaptiveTessellationOptions {
+            let option = AdaptiveTessellationOptions::<_> {
                 norm_tolerance: 1e-2,
                 ..Default::default()
             };
@@ -101,7 +101,7 @@ fn setup(
 
     let lofted = NurbsSurface::try_loft(&[front, back], Some(3)).unwrap();
 
-    add_surface(
+    add_surface::<DefaultDivider>(
         &lofted,
         &mut commands,
         &mut meshes,

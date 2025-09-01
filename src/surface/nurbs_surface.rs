@@ -958,7 +958,11 @@ where
         });
         */
 
-        let tess = self.tessellate(Some(AdaptiveTessellationOptions {
+        let tess = self.tessellate(Some(AdaptiveTessellationOptions::<
+            T,
+            D,
+            crate::tessellation::DefaultDivider<T, D>,
+        > {
             min_divs_u: (self.control_points().len() - 1) * 2,
             min_divs_v: (self.control_points()[0].len() - 1) * 2,
             ..Default::default()

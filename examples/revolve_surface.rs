@@ -81,7 +81,7 @@ fn setup(
     let revolved =
         NurbsSurface::try_revolve(&profile, &Point3::origin(), &Vector3::y(), TAU / 4.0 * 3.0)
             .unwrap();
-    add_surface(
+    add_surface::<DefaultDivider>(
         &revolved,
         &mut commands,
         &mut meshes,

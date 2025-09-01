@@ -6,8 +6,8 @@ use bevy::{
 use bevy_egui::EguiContexts;
 use bevy_normal_material::prelude::NormalMaterial;
 use curvo::prelude::{
-    AdaptiveTessellationOptions, CompoundCurve3D, NurbsCurve3D, NurbsSurface3D,
-    SurfaceTessellation3D, Tessellation,
+    AdaptiveTessellationNode, AdaptiveTessellationOptions, CompoundCurve3D, DefaultDivider,
+    DividableDirection, NurbsCurve3D, NurbsSurface3D, SurfaceTessellation3D, Tessellation,
 };
 use nalgebra::U4;
 
@@ -138,14 +138,16 @@ pub fn surface_2_regular_mesh(surface: &NurbsSurface3D<f64>, divs_u: usize, divs
         .with_inserted_indices(Indices::U32(indices))
 }
 
-#[allow(unused)]
-pub fn add_surface(
+#[allow(unused, invalid_type_param_default)]
+pub fn add_surface<F>(
     surface: &NurbsSurface3D<f64>,
     commands: &mut Commands<'_, '_>,
     meshes: &mut ResMut<'_, Assets<Mesh>>,
     normal_materials: &mut ResMut<'_, Assets<NormalMaterial>>,
-    option: Option<AdaptiveTessellationOptions<f64, U4>>,
-) {
+    option: Option<AdaptiveTessellationOptions<f64, U4, F>>,
+) where
+    F: Fn(&AdaptiveTessellationNode<f64, U4>) -> Option<DividableDirection> + Copy,
+{
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, default());
 
     let option = option.unwrap_or_default();

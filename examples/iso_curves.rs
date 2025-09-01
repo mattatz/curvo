@@ -68,15 +68,6 @@ fn setup(
     let back = interpolated.transformed(&m.into());
 
     let lofted = NurbsSurface::try_loft(&[front, back], Some(3)).unwrap();
-    /*
-    add_surface(
-        &lofted,
-        &mut commands,
-        &mut meshes,
-        &mut normal_materials,
-        None,
-    );
-    */
 
     let direction = UVDirection::V;
     let (min, max) = match direction {

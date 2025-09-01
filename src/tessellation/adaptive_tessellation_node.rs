@@ -283,7 +283,7 @@ where
 }
 
 /// Enum to represent the direction in which a node can be divided
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum DividableDirection {
     Both,
     U,
@@ -291,7 +291,7 @@ pub enum DividableDirection {
 }
 
 /// Enum to represent the direction of a neighbor
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum NeighborDirection {
     South = 0,
     East = 1,
