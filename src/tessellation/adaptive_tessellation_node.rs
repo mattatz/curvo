@@ -193,19 +193,11 @@ where
     }
 
     /// Check if the node should be divided
+    /// if the norm of the adjacent normals is greater than the normal_tolerance, the node should be divided
     pub fn should_divide(
         &mut self,
-        options: &AdaptiveTessellationOptions<T>,
-        current_depth: usize,
+        normal_tolerance: T,
     ) -> Option<DividableDirection> {
-        if current_depth < options.min_depth {
-            return Some(DividableDirection::Both);
-        }
-
-        if current_depth >= options.max_depth {
-            return None;
-        }
-
         if self.has_bad_normals() {
             self.fix_normals();
             //don't divide any further when encountering a degenerate normal
@@ -215,15 +207,15 @@ where
         // println!("{}, {}", surface.v_degree() >= 2, surface.u_degree() >= 2);
 
         let v_direction = (self.corners[0].normal() - self.corners[1].normal()).norm_squared()
-            > options.norm_tolerance
+            > normal_tolerance
             || (self.corners[2].normal() - self.corners[3].normal()).norm_squared()
-                > options.norm_tolerance;
+                > normal_tolerance;
         let v_direction = v_direction && self.corners.iter().all(|c| !c.is_u_constrained());
 
         let u_direction = (self.corners[1].normal() - self.corners[2].normal()).norm_squared()
-            > options.norm_tolerance
+            > normal_tolerance
             || (self.corners[3].normal() - self.corners[0].normal()).norm_squared()
-                > options.norm_tolerance;
+                > normal_tolerance;
         let u_direction = u_direction && self.corners.iter().all(|c| !c.is_v_constrained());
 
         match (u_direction, v_direction) {

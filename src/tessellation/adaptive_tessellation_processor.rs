@@ -61,7 +61,13 @@ where
         let next_node_id_1 = next_node_id_0 + 1;
 
         let node = self.nodes.get_mut(id).unwrap();
-        let dividable = node.should_divide(options, current_depth);
+        let dividable = if current_depth < options.min_depth {
+            Some(DividableDirection::Both)
+        } else if current_depth >= options.max_depth {
+            None
+        } else {
+            node.should_divide(options.norm_tolerance)
+        };
 
         node.direction = match dividable {
             Some(DividableDirection::Both) => direction,
