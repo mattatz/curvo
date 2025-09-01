@@ -195,7 +195,6 @@ where
     /// Check if the node should be divided
     pub fn should_divide(
         &mut self,
-        _surface: &NurbsSurface<T, D>,
         options: &AdaptiveTessellationOptions<T>,
         current_depth: usize,
     ) -> Option<DividableDirection> {

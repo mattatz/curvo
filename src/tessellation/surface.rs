@@ -24,8 +24,8 @@ where
     /// if adaptive_options is None, the surface will be tessellated at control points
     /// or else it will be tessellated adaptively based on the options
     /// this `adaptive` means that the surface will be tessellated based on the curvature of the surface
-    fn tessellate(&self, adaptive_options: Self::Option) -> Self::Output {
-        surface_adaptive_tessellate(self, None, adaptive_options)
+    fn tessellate(&self, options: Self::Option) -> Self::Output {
+        surface_adaptive_tessellate(self, None, options)
     }
 }
 

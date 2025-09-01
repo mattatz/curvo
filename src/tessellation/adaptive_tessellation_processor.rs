@@ -61,7 +61,7 @@ where
         let next_node_id_1 = next_node_id_0 + 1;
 
         let node = self.nodes.get_mut(id).unwrap();
-        let dividable = node.should_divide(self.surface, options, current_depth);
+        let dividable = node.should_divide(options, current_depth);
 
         node.direction = match dividable {
             Some(DividableDirection::Both) => direction,
