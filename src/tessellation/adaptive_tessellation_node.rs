@@ -10,7 +10,7 @@ use crate::{
     surface::UVDirection,
 };
 
-use super::SurfacePoint;
+use super::{cardinal_direction::CardinalDirection, SurfacePoint};
 
 /// Node for adaptive tessellation of a surface
 #[derive(Clone, Debug)]
@@ -23,8 +23,8 @@ where
     id: usize,
     children: Option<[usize; 2]>,
     pub(crate) corners: [SurfacePoint<T, DimNameDiff<D, U1>>; 4], // [left-bottom, right-bottom, right-top, left-top] order
-    pub(crate) neighbors: [Option<usize>; 4], // [south, east, north, west] order (east & west are u direction, north & south are v direction)
-    mid_points: [Option<SurfacePoint<T, DimNameDiff<D, U1>>>; 4], // [south, east, north, west] order
+    pub(crate) neighbors: CardinalDirection<usize>,
+    pub(crate) mid_points: CardinalDirection<SurfacePoint<T, DimNameDiff<D, U1>>>,
     pub(crate) direction: UVDirection,
     uv_center: Vector2<T>,
 }
@@ -35,18 +35,18 @@ where
     DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
-    pub fn new(
+    pub fn new<N: Into<CardinalDirection<usize>>>(
         id: usize,
         corners: [SurfacePoint<T, DimNameDiff<D, U1>>; 4],
-        neighbors: [Option<usize>; 4],
+        neighbors: N,
     ) -> Self {
         let uv_center = (corners[0].uv + corners[2].uv) * T::from_f64(0.5).unwrap();
         Self {
             id,
             corners,
-            neighbors,
+            neighbors: neighbors.into(),
             children: None,
-            mid_points: [None, None, None, None],
+            mid_points: CardinalDirection::default(),
             direction: UVDirection::V,
             uv_center,
         }
@@ -125,11 +125,11 @@ where
             None => base_arr,
             Some(neighbor) => {
                 let orig = &self.corners;
-                //get opposite edges uvs
+                // get opposite edges uvs
                 let corners = nodes[neighbor].get_edge_corners(nodes, (edge_index + 2) % 4);
                 let e = T::default_epsilon();
 
-                //clip the range of uvs to match self one
+                // clip the range of uvs to match self one
                 let idx = edge_index % 2;
                 let corner = corners
                     .into_iter()
@@ -147,8 +147,7 @@ where
         surface: &NurbsSurface<T, D>,
         direction: NeighborDirection,
     ) -> SurfacePoint<T, DimNameDiff<D, U1>> {
-        let index = direction as usize;
-        match self.mid_points[index] {
+        match self.mid_points.at(direction) {
             Some(ref p) => p.clone(),
             None => {
                 let uv = match direction {
@@ -162,6 +161,7 @@ where
                     NeighborDirection::West => Vector2::new(self.corners[0].uv.x, self.uv_center.y),
                 };
                 let pt = evaluate_surface(surface, uv);
+                let index: usize = direction.into();
                 self.mid_points[index] = Some(pt.clone());
                 pt
             }
@@ -173,15 +173,16 @@ where
         self.corners.iter().any(|c| c.is_normal_degenerated())
     }
 
+    /// Fix the degenerated normals
     fn fix_normals(&mut self) {
         let l = self.corners.len();
 
         for i in 0..l {
             if self.corners[i].is_normal_degenerated() {
-                //get neighbors
+                // get neighbors
                 let v1 = &self.corners[(i + 1) % l];
                 let v2 = &self.corners[(i + 3) % l];
-                //correct the normal
+                // correct the normal
                 self.corners[i].normal = if v1.is_normal_degenerated() {
                     v2.normal.clone()
                 } else {
@@ -294,4 +295,21 @@ pub enum NeighborDirection {
     East = 1,
     North = 2,
     West = 3,
+}
+
+impl NeighborDirection {
+    pub fn opposite(self) -> Self {
+        match self {
+            Self::South => Self::North,
+            Self::East => Self::West,
+            Self::North => Self::South,
+            Self::West => Self::East,
+        }
+    }
+}
+
+impl From<NeighborDirection> for usize {
+    fn from(val: NeighborDirection) -> Self {
+        val as usize
+    }
 }

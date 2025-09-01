@@ -90,18 +90,18 @@ where
 
                     //assign neighbors to bottom node
                     let bottom_neighbors = [
-                        node.neighbors[0],
-                        node.neighbors[1],
+                        *node.neighbors.at(NeighborDirection::South),
+                        *node.neighbors.at(NeighborDirection::East),
                         Some(id1),
-                        node.neighbors[3],
+                        *node.neighbors.at(NeighborDirection::West),
                     ];
 
                     //assign neighbors to top node
                     let top_neighbors = [
                         Some(id0),
-                        node.neighbors[1],
-                        node.neighbors[2],
-                        node.neighbors[3],
+                        *node.neighbors.at(NeighborDirection::East),
+                        *node.neighbors.at(NeighborDirection::North),
+                        *node.neighbors.at(NeighborDirection::West),
                     ];
 
                     (
@@ -129,15 +129,15 @@ where
                     node.assign_children([id0, id1]);
 
                     let left_neighbors = [
-                        node.neighbors[0],
+                        *node.neighbors.at(NeighborDirection::South),
                         Some(id1),
-                        node.neighbors[2],
-                        node.neighbors[3],
+                        *node.neighbors.at(NeighborDirection::North),
+                        *node.neighbors.at(NeighborDirection::West),
                     ];
                     let right_neighbors = [
-                        node.neighbors[0],
-                        node.neighbors[1],
-                        node.neighbors[2],
+                        *node.neighbors.at(NeighborDirection::South),
+                        *node.neighbors.at(NeighborDirection::East),
+                        *node.neighbors.at(NeighborDirection::North),
                         Some(id0),
                     ];
 
