@@ -4,8 +4,8 @@ use super::adaptive_tessellation_option::AdaptiveTessellationOptions;
 use super::surface_tessellation::SurfaceTessellation;
 use super::{ConstrainedTessellation, Tessellation};
 use itertools::Itertools;
-use nalgebra::Vector2;
 use nalgebra::{ComplexField, Point2, Point3, Vector3};
+use nalgebra::{Vector2, U4};
 use spade::{ConstrainedDelaunayTriangulation, HasPosition, SpadeNum, Triangulation};
 
 use crate::curve::NurbsCurve2D;
@@ -14,6 +14,7 @@ use crate::misc::PolygonBoundary;
 use crate::prelude::{Contains, SurfaceTessellation3D, TrimmedSurfaceConstraints};
 use crate::region::CompoundCurve2D;
 use crate::surface::{NurbsSurface3D, TrimmedSurface};
+use crate::tessellation::DefaultDivider;
 
 #[derive(Debug, Clone, Copy)]
 struct Vertex<T: FloatingPoint> {
@@ -43,7 +44,7 @@ impl<T: FloatingPoint + SpadeNum> HasPosition for Vertex<T> {
 type Tri<T> = ConstrainedDelaunayTriangulation<Vertex<T>>;
 
 impl<T: FloatingPoint + SpadeNum> Tessellation for TrimmedSurface<T> {
-    type Option = Option<AdaptiveTessellationOptions<T>>;
+    type Option = Option<AdaptiveTessellationOptions<T, U4, DefaultDivider<T, U4>>>;
     type Output = anyhow::Result<SurfaceTessellation3D<T>>;
 
     /// Tessellate a trimmed surface using an adaptive algorithm
@@ -53,7 +54,7 @@ impl<T: FloatingPoint + SpadeNum> Tessellation for TrimmedSurface<T> {
 }
 
 impl<T: FloatingPoint + SpadeNum> ConstrainedTessellation for TrimmedSurface<T> {
-    type Option = Option<AdaptiveTessellationOptions<T>>;
+    type Option = Option<AdaptiveTessellationOptions<T, U4, DefaultDivider<T, U4>>>;
     type Constraint = TrimmedSurfaceConstraints<T>;
     type Output = anyhow::Result<SurfaceTessellation3D<T>>;
 
@@ -71,7 +72,7 @@ impl<T: FloatingPoint + SpadeNum> ConstrainedTessellation for TrimmedSurface<T> 
 fn trimmed_surface_adaptive_tessellate<T: FloatingPoint + SpadeNum>(
     s: &TrimmedSurface<T>,
     constraints: Option<TrimmedSurfaceConstraints<T>>,
-    options: Option<AdaptiveTessellationOptions<T>>,
+    options: Option<AdaptiveTessellationOptions<T, U4, DefaultDivider<T, U4>>>,
 ) -> anyhow::Result<SurfaceTessellation3D<T>> {
     let o = options.as_ref();
 

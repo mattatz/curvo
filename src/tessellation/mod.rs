@@ -12,7 +12,12 @@ pub mod tessellation_region;
 pub mod trimmed_surface;
 pub mod trimmed_surface_constraints;
 
+pub use adaptive_tessellation_node::DividableDirection;
 pub use surface_point::*;
+
+use crate::tessellation::adaptive_tessellation_node::AdaptiveTessellationNode;
+
+pub type DefaultDivider<T, D> = fn(&AdaptiveTessellationNode<T, D>) -> Option<DividableDirection>;
 
 /// A trait for tessellating a shape
 pub trait Tessellation {

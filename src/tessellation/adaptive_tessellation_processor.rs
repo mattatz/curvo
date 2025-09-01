@@ -40,7 +40,10 @@ where
         self.nodes
     }
 
-    pub fn divide(&mut self, id: usize, options: &AdaptiveTessellationOptions<T>) {
+    pub fn divide<F>(&mut self, id: usize, options: &AdaptiveTessellationOptions<T, D, F>)
+    where
+        F: Fn(&AdaptiveTessellationNode<T, D>) -> Option<DividableDirection> + Copy,
+    {
         let direction = if self.surface.u_degree() > 1 {
             UVDirection::U
         } else {
@@ -50,26 +53,30 @@ where
     }
 
     /// iterate over the nodes and divide them if necessary
-    fn iterate(
+    fn iterate<F>(
         &mut self,
         id: usize,
-        options: &AdaptiveTessellationOptions<T>,
+        options: &AdaptiveTessellationOptions<T, D, F>,
         current_depth: usize,
         direction: UVDirection,
-    ) {
+    ) where
+        F: Fn(&AdaptiveTessellationNode<T, D>) -> Option<DividableDirection> + Copy,
+    {
         let next_node_id_0 = self.nodes.len();
         let next_node_id_1 = next_node_id_0 + 1;
 
         let node = self.nodes.get_mut(id).unwrap();
-        let dividable = if current_depth < options.min_depth {
+        let dividable_direction = if current_depth < options.min_depth {
             Some(DividableDirection::Both)
         } else if current_depth >= options.max_depth {
             None
         } else {
             node.should_divide(options.norm_tolerance)
+                .or(options.divider.and_then(|f| f(node)))
         };
 
-        node.direction = match dividable {
+        // set the divided direction of the node
+        node.direction = match dividable_direction {
             Some(DividableDirection::Both) => direction,
             Some(DividableDirection::U) => UVDirection::U,
             Some(DividableDirection::V) => UVDirection::V,

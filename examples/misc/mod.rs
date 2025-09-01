@@ -9,6 +9,7 @@ use curvo::prelude::{
     AdaptiveTessellationOptions, CompoundCurve3D, NurbsCurve3D, NurbsSurface3D,
     SurfaceTessellation3D, Tessellation,
 };
+use nalgebra::U4;
 
 use crate::LineMaterial;
 
@@ -82,7 +83,7 @@ pub fn add_curve<'a, C: Into<CurveVariant<'a>>>(
 #[allow(unused)]
 pub fn surface_2_mesh(
     surface: &NurbsSurface3D<f64>,
-    option: Option<AdaptiveTessellationOptions<f64>>,
+    option: Option<AdaptiveTessellationOptions<f64, U4>>,
 ) -> Mesh {
     let option = option.unwrap_or_default();
     let tess = surface.tessellate(Some(option));
@@ -143,7 +144,7 @@ pub fn add_surface(
     commands: &mut Commands<'_, '_>,
     meshes: &mut ResMut<'_, Assets<Mesh>>,
     normal_materials: &mut ResMut<'_, Assets<NormalMaterial>>,
-    option: Option<AdaptiveTessellationOptions<f64>>,
+    option: Option<AdaptiveTessellationOptions<f64, U4>>,
 ) {
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, default());
 
