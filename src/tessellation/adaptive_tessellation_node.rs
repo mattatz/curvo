@@ -56,8 +56,14 @@ where
         self.id
     }
 
+    /// check if the node is a leaf
     pub fn is_leaf(&self) -> bool {
         self.children.is_none()
+    }
+
+    /// get the corners of the node
+    pub fn corners(&self) -> &[SurfacePoint<T, DimNameDiff<D, U1>>; 4] {
+        &self.corners
     }
 
     pub fn assign_children(&mut self, children: [usize; 2]) {
