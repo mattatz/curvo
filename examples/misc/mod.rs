@@ -138,7 +138,7 @@ pub fn surface_2_regular_mesh(surface: &NurbsSurface3D<f64>, divs_u: usize, divs
         .with_inserted_indices(Indices::U32(indices))
 }
 
-#[allow(unused, invalid_type_param_default)]
+#[allow(unused)]
 pub fn add_surface<F>(
     surface: &NurbsSurface3D<f64>,
     commands: &mut Commands<'_, '_>,
