@@ -123,7 +123,7 @@ fn split_animation(
     let first = first.single().unwrap();
     let mesh = surface_2_mesh(
         &s0,
-        Some(AdaptiveTessellationOptions {
+        Some(AdaptiveTessellationOptions::<_> {
             max_depth: 4,
             ..Default::default()
         }),

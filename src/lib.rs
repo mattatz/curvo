@@ -47,10 +47,7 @@
 //!     ).unwrap();
 //!
 //!     // Tessellate the surface in adaptive manner about curvature for efficient rendering
-//!     let option = AdaptiveTessellationOptions {
-//!         norm_tolerance: 1e-4,
-//!         ..Default::default()
-//!     };
+//!     let option = AdaptiveTessellationOptions::<_>::default().with_norm_tolerance(1e-4);
 //!     let tessellation = lofted.tessellate(Some(option));
 //! }
 //! ```
@@ -98,10 +95,11 @@ pub mod prelude {
     pub use crate::split::*;
     pub use crate::surface::*;
     pub use crate::tessellation::{
+        adaptive_tessellation_node::AdaptiveTessellationNode,
         adaptive_tessellation_option::AdaptiveTessellationOptions,
         boundary_constraints::BoundaryConstraints, surface_tessellation::*,
-        trimmed_surface_constraints::TrimmedSurfaceConstraints, ConstrainedTessellation,
-        Tessellation,
+        tangent_space::TangentSpace, trimmed_surface_constraints::TrimmedSurfaceConstraints,
+        ConstrainedTessellation, DefaultDivider, DividableDirection, Tessellation,
     };
     pub use crate::trim::*;
 }

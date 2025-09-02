@@ -68,7 +68,7 @@ fn setup(
     let back = interpolated.transformed(&m.into());
     let lofted = NurbsSurface::try_loft(&[front, back], Some(3)).unwrap();
 
-    let option = AdaptiveTessellationOptions {
+    let option = AdaptiveTessellationOptions::<_> {
         norm_tolerance: 1e-2,
         ..Default::default()
     };

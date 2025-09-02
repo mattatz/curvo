@@ -4,11 +4,7 @@ use nalgebra::{
     U1,
 };
 
-use crate::{
-    misc::FloatingPoint,
-    prelude::{AdaptiveTessellationOptions, NurbsSurface},
-    surface::UVDirection,
-};
+use crate::{misc::FloatingPoint, prelude::NurbsSurface, surface::UVDirection};
 
 use super::{cardinal_direction::CardinalDirection, SurfacePoint};
 
@@ -20,11 +16,17 @@ where
     DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
+    /// id of the node
     id: usize,
+    /// children of the node
     children: Option<[usize; 2]>,
+    /// corners of the node
     pub(crate) corners: [SurfacePoint<T, DimNameDiff<D, U1>>; 4], // [left-bottom, right-bottom, right-top, left-top] order
+    /// neighbors of the node
     pub(crate) neighbors: CardinalDirection<usize>,
+    /// mid points of the node
     pub(crate) mid_points: CardinalDirection<SurfacePoint<T, DimNameDiff<D, U1>>>,
+    /// divided direction of the node
     pub(crate) direction: UVDirection,
     uv_center: Vector2<T>,
 }
@@ -62,6 +64,7 @@ where
     }
 
     /// get the corners of the node
+    /// [left-bottom, right-bottom, right-top, left-top] order
     pub fn corners(&self) -> &[SurfacePoint<T, DimNameDiff<D, U1>>; 4] {
         &self.corners
     }
@@ -75,6 +78,12 @@ where
         evaluate_surface(surface, self.uv_center)
     }
 
+    /// Get the uv center of the node
+    pub fn uv_center(&self) -> Vector2<T> {
+        self.uv_center
+    }
+
+    /// Get the corners of the edge of the node based on the divided direction
     fn get_edge_corners(
         &self,
         nodes: &Vec<Self>,
@@ -114,7 +123,7 @@ where
                 },
             },
             None => {
-                //if its a leaf, there are no children to obtain uvs from
+                // if its a leaf, there are no children to obtain uvs from
                 vec![self.corners[edge_index].clone()]
             }
         }
@@ -200,10 +209,7 @@ where
 
     /// Check if the node should be divided
     /// if the norm of the adjacent normals is greater than the normal_tolerance, the node should be divided
-    pub fn should_divide(
-        &mut self,
-        normal_tolerance: T,
-    ) -> Option<DividableDirection> {
+    pub fn should_divide(&mut self, normal_tolerance: T) -> Option<DividableDirection> {
         if self.has_bad_normals() {
             self.fix_normals();
             //don't divide any further when encountering a degenerate normal
@@ -278,7 +284,7 @@ where
 }
 
 /// Enum to represent the direction in which a node can be divided
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum DividableDirection {
     Both,
     U,
@@ -286,7 +292,7 @@ pub enum DividableDirection {
 }
 
 /// Enum to represent the direction of a neighbor
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum NeighborDirection {
     South = 0,
     East = 1,

@@ -154,18 +154,58 @@ where
         }
     }
 
+    /// Get the points
     pub fn points(&self) -> &Vec<OPoint<T, DimNameDiff<D, U1>>> {
         &self.points
     }
 
+    /// Get the normals
     pub fn normals(&self) -> &Vec<OVector<T, DimNameDiff<D, U1>>> {
         &self.normals
     }
 
+    /// Get the uvs
     pub fn uvs(&self) -> &Vec<Vector2<T>> {
         &self.uvs
     }
 
+    /// Zip the points, normals, and uvs together
+    #[allow(clippy::type_complexity)]
+    pub fn zipped_iter(
+        &self,
+    ) -> impl Iterator<
+        Item = (
+            &OPoint<T, DimNameDiff<D, U1>>,
+            &OVector<T, DimNameDiff<D, U1>>,
+            &Vector2<T>,
+        ),
+    > {
+        self.points
+            .iter()
+            .zip(self.normals.iter())
+            .zip(self.uvs.iter())
+            .map(|((p, n), uv)| (p, n, uv))
+    }
+
+    /// Zip the points, normals, and uvs together mutably
+    #[allow(clippy::type_complexity)]
+    pub fn zipped_iter_mut(
+        &mut self,
+    ) -> impl Iterator<
+        Item = (
+            &mut OPoint<T, DimNameDiff<D, U1>>,
+            &mut OVector<T, DimNameDiff<D, U1>>,
+            &mut Vector2<T>,
+        ),
+    > {
+        self.points
+            .iter_mut()
+            .zip(self.normals.iter_mut())
+            .zip(self.uvs.iter_mut())
+            .map(|((p, n), uv)| (p, n, uv))
+    }
+
+    /// Get the faces
     pub fn faces(&self) -> &Vec<[usize; 3]> {
         &self.faces
     }

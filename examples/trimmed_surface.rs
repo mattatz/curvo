@@ -57,7 +57,7 @@ fn setup(
                                normal_materials: &mut ResMut<'_, Assets<NormalMaterial>>,
                                surface: &TrimmedSurface<f64>,
                                transform: Transform| {
-        let option = AdaptiveTessellationOptions {
+        let option = AdaptiveTessellationOptions::<_> {
             norm_tolerance: 1e-2,
             ..Default::default()
         };
@@ -96,7 +96,7 @@ fn setup(
                        normal_materials: &mut ResMut<'_, Assets<NormalMaterial>>,
                        surface: &NurbsSurface3D<f64>,
                        transform: Transform| {
-        let option = AdaptiveTessellationOptions {
+        let option = AdaptiveTessellationOptions::<_> {
             norm_tolerance: 1e-2,
             ..Default::default()
         };

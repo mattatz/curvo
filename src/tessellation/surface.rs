@@ -9,34 +9,37 @@ use nalgebra::{
     allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, Vector2, U1,
 };
 
+use crate::tessellation::DividableDirection;
 use crate::{misc::FloatingPoint, surface::NurbsSurface};
 
-impl<T: FloatingPoint, D: DimName> Tessellation for NurbsSurface<T, D>
+impl<T: FloatingPoint, D: DimName, F> Tessellation<Option<AdaptiveTessellationOptions<T, D, F>>>
+    for NurbsSurface<T, D>
 where
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+    F: Fn(&AdaptiveTessellationNode<T, D>) -> Option<DividableDirection> + Copy,
 {
-    type Option = Option<AdaptiveTessellationOptions<T>>;
     type Output = SurfaceTessellation<T, D>;
 
     /// Tessellate the surface into a meshable form
     /// if adaptive_options is None, the surface will be tessellated at control points
     /// or else it will be tessellated adaptively based on the options
     /// this `adaptive` means that the surface will be tessellated based on the curvature of the surface
-    fn tessellate(&self, options: Self::Option) -> Self::Output {
+    fn tessellate(&self, options: Option<AdaptiveTessellationOptions<T, D, F>>) -> Self::Output {
         surface_adaptive_tessellate(self, None, options)
     }
 }
 
-impl<T: FloatingPoint, D: DimName> ConstrainedTessellation for NurbsSurface<T, D>
+impl<T: FloatingPoint, D: DimName, F>
+    ConstrainedTessellation<Option<AdaptiveTessellationOptions<T, D, F>>> for NurbsSurface<T, D>
 where
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+    F: Fn(&AdaptiveTessellationNode<T, D>) -> Option<DividableDirection> + Copy,
 {
     type Constraint = BoundaryConstraints<T>;
-    type Option = Option<AdaptiveTessellationOptions<T>>;
     type Output = SurfaceTessellation<T, D>;
 
     /// Tessellate the surface into a meshable form with constraints on the boundary
@@ -44,26 +47,27 @@ where
     fn constrained_tessellate(
         &self,
         constraints: Self::Constraint,
-        adaptive_options: Self::Option,
+        options: Option<AdaptiveTessellationOptions<T, D, F>>,
     ) -> Self::Output {
-        surface_adaptive_tessellate(self, Some(constraints), adaptive_options)
+        surface_adaptive_tessellate(self, Some(constraints), options)
     }
 }
 
 /// Tessellate the surface adaptively
-fn surface_adaptive_tessellate<T: FloatingPoint, D>(
+fn surface_adaptive_tessellate<T: FloatingPoint, D, F>(
     s: &NurbsSurface<T, D>,
     constraints: Option<BoundaryConstraints<T>>,
-    adaptive_options: Option<AdaptiveTessellationOptions<T>>,
+    options: Option<AdaptiveTessellationOptions<T, D, F>>,
 ) -> SurfaceTessellation<T, D>
 where
     D: DimName,
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+    F: Fn(&AdaptiveTessellationNode<T, D>) -> Option<DividableDirection> + Copy,
 {
-    let is_adaptive = adaptive_options.is_some();
-    let options = adaptive_options.unwrap_or_default();
+    let is_adaptive = options.is_some();
+    let options = options.unwrap_or_default();
 
     // if constraints are provided, we only need to tessellate the surface at the control points
     // otherwise, we need to tessellate the surface at twice the number of control points
@@ -325,10 +329,7 @@ mod tests {
         let boundary = BoundaryConstraints::default()
             .with_u_parameters_at_v_min(u_parameters.clone())
             .with_u_parameters_at_v_max(u_parameters.clone());
-        let option = AdaptiveTessellationOptions {
-            norm_tolerance: 1e-3,
-            ..Default::default()
-        };
+        let option = AdaptiveTessellationOptions::<f64>::default().with_norm_tolerance(1e-3);
         let tess = surface.constrained_tessellate(boundary, Some(option));
         let vertices = tess.points().clone();
 

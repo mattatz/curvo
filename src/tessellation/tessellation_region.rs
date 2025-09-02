@@ -17,8 +17,7 @@ use super::Tessellation;
 
 type Tri<T> = ConstrainedDelaunayTriangulation<SP2<T>>;
 
-impl<T: FloatingPoint + SpadeNum> Tessellation for Region<T> {
-    type Option = Option<T>;
+impl<T: FloatingPoint + SpadeNum> Tessellation<Option<T>> for Region<T> {
     type Output = anyhow::Result<PolygonMesh<T, Const<2>>>;
 
     fn tessellate(&self, tolerance: Option<T>) -> Self::Output {
