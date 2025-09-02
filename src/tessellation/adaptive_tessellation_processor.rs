@@ -71,8 +71,11 @@ where
         } else if current_depth >= options.max_depth {
             None
         } else {
-            node.should_divide(options.norm_tolerance)
-                .or(options.divider.and_then(|f| f(node)))
+            options
+                .divider
+                .and_then(|f| f(node))
+                .or(node.should_divide(options.norm_tolerance))
+            // node.should_divide(options.norm_tolerance).or(options.divider.and_then(|f| f(node)))
         };
 
         // set the divided direction of the node

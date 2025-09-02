@@ -6,6 +6,7 @@ mod cardinal_direction;
 pub mod surface;
 pub mod surface_point;
 pub mod surface_tessellation;
+pub mod tangent_space;
 pub mod tessellation_compound_curve;
 pub mod tessellation_curve;
 pub mod tessellation_region;
@@ -15,6 +16,7 @@ pub mod trimmed_surface_constraints;
 pub use adaptive_tessellation_node::DividableDirection;
 use nalgebra::U4;
 pub use surface_point::*;
+pub use tangent_space::*;
 
 use crate::tessellation::adaptive_tessellation_node::AdaptiveTessellationNode;
 

@@ -64,6 +64,7 @@ where
     }
 
     /// get the corners of the node
+    /// [left-bottom, right-bottom, right-top, left-top] order
     pub fn corners(&self) -> &[SurfacePoint<T, DimNameDiff<D, U1>>; 4] {
         &self.corners
     }
