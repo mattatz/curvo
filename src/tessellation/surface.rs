@@ -329,10 +329,7 @@ mod tests {
         let boundary = BoundaryConstraints::default()
             .with_u_parameters_at_v_min(u_parameters.clone())
             .with_u_parameters_at_v_max(u_parameters.clone());
-        let option = AdaptiveTessellationOptions::<f64> {
-            norm_tolerance: 1e-3,
-            ..Default::default()
-        };
+        let option = AdaptiveTessellationOptions::<f64>::default().with_norm_tolerance(1e-3);
         let tess = surface.constrained_tessellate(boundary, Some(option));
         let vertices = tess.points().clone();
 

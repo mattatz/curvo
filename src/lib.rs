@@ -47,10 +47,7 @@
 //!     ).unwrap();
 //!
 //!     // Tessellate the surface in adaptive manner about curvature for efficient rendering
-//!     let option = AdaptiveTessellationOptions::<_> {
-//!         norm_tolerance: 1e-4,
-//!         ..Default::default()
-//!     };
+//!     let option = AdaptiveTessellationOptions::<_>::default().with_norm_tolerance(1e-4);
 //!     let tessellation = lofted.tessellate(Some(option));
 //! }
 //! ```

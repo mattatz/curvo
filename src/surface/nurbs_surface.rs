@@ -962,11 +962,7 @@ where
             T,
             D,
             crate::tessellation::DefaultDivider<T, D>,
-        > {
-            min_divs_u: (self.control_points().len() - 1) * 2,
-            min_divs_v: (self.control_points()[0].len() - 1) * 2,
-            ..Default::default()
-        }));
+        >::default().with_min_divs_u((self.control_points().len() - 1) * 2).with_min_divs_v((self.control_points()[0].len() - 1) * 2)));
         tess.points().iter().enumerate().for_each(|(i, pt)| {
             let d = point - pt;
             let d = d.norm_squared();
