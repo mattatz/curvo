@@ -113,7 +113,7 @@ impl<T: FloatingPoint> SurfaceTessellation3D<T> {
         // Normalize and orthogonalize the tangents
         tangents
             .into_iter()
-            .zip(bitangents.into_iter())
+            .zip(bitangents)
             .zip(self.normals.iter())
             .map(|((t, b), n)| {
                 // Gram-Schmidt orthogonalization

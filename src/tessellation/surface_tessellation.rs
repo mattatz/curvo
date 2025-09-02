@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use nalgebra::{
     allocator::Allocator, Const, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint,
-    OVector, Vector2, Vector3, U1,
+    OVector, Vector2, U1,
 };
 use simba::scalar::SupersetOf;
 
@@ -170,6 +170,7 @@ where
     }
 
     /// Zip the points, normals, and uvs together
+    #[allow(clippy::type_complexity)]
     pub fn zipped_iter(
         &self,
     ) -> impl Iterator<
@@ -187,6 +188,7 @@ where
     }
 
     /// Zip the points, normals, and uvs together mutably
+    #[allow(clippy::type_complexity)]
     pub fn zipped_iter_mut(
         &mut self,
     ) -> impl Iterator<
@@ -222,4 +224,3 @@ where
         }
     }
 }
-

@@ -16,7 +16,6 @@ pub mod trimmed_surface_constraints;
 pub use adaptive_tessellation_node::DividableDirection;
 use nalgebra::U4;
 pub use surface_point::*;
-pub use tangent_space::*;
 
 use crate::tessellation::adaptive_tessellation_node::AdaptiveTessellationNode;
 

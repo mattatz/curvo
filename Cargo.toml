@@ -224,6 +224,6 @@ path = "examples/fillet_compound_curve.rs"
 required-features = ["bevy"]
 
 [[example]]
-name = "customize_tessellation"
-path = "examples/customize_tessellation.rs"
+name = "customized_tessellation"
+path = "examples/customized_tessellation.rs"
 required-features = ["bevy"]

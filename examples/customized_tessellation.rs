@@ -1,6 +1,9 @@
 use std::f64::consts::FRAC_PI_2;
 
-use bevy::{prelude::*, render::mesh::{PrimitiveTopology, VertexAttributeValues}};
+use bevy::{
+    prelude::*,
+    render::mesh::{PrimitiveTopology, VertexAttributeValues},
+};
 use bevy_egui::{egui, EguiContextPass, EguiContexts, EguiPlugin};
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 
@@ -53,8 +56,9 @@ fn setup(
     let field = |uv: Vector2<f64>| {
         let center = Vector2::new(0.5, 0.5);
         let radius = 0.2;
+        let thickness = 0.1;
         let distance = (uv - center).norm();
-        if distance <= radius {
+        if (radius - distance).abs() <= thickness {
             Some(DividableDirection::Both)
         } else {
             None
@@ -62,29 +66,56 @@ fn setup(
     };
 
     let surface = NurbsSurface::plane(Point3::new(0., 0., 0.), Vector3::x() * 2., Vector3::y());
-    let options: AdaptiveTessellationOptions<f64, U4> = AdaptiveTessellationOptions {
+    let options: AdaptiveTessellationOptions<f64, U4, _> = AdaptiveTessellationOptions {
+        min_depth: 3,
         max_depth: 12,
-        divider: Some(|node| {
+        divider: Some(|node: &AdaptiveTessellationNode<f64, U4>| {
+            let corners = node.corners().iter().map(|c| field(*c.uv())).collect_vec();
             let uv = node.uv_center();
-            field(uv)
+            let center = field(uv);
             // Some(DividableDirection::Both)
+            if corners[0] != corners[1]
+                || corners[2] != corners[3]
+                || corners[0] != corners[2]
+                || corners[1] != corners[3]
+                || center != corners[0]
+                || center != corners[1]
+                || center != corners[2]
+                || center != corners[3]
+            {
+                Some(DividableDirection::Both)
+            } else {
+                None
+            }
         }),
         ..Default::default()
     };
-    add_surface(&surface, &mut commands, &mut meshes, &mut normal_materials, Some(options.clone()));
+    add_surface(
+        &surface,
+        &mut commands,
+        &mut meshes,
+        &mut normal_materials,
+        Some(options.clone()),
+    );
 
     let tess = surface.tessellate(Some(options));
-    let vertices: Vec<[f32; 3]> = tess.points().iter().map(|pt| pt.cast::<f32>().into()).collect_vec();
+    let vertices: Vec<[f32; 3]> = tess
+        .points()
+        .iter()
+        .map(|pt| pt.cast::<f32>().into())
+        .collect_vec();
     let line = Mesh::new(PrimitiveTopology::LineList, default()).with_inserted_attribute(
         Mesh::ATTRIBUTE_POSITION,
-        VertexAttributeValues::Float32x3(tess.faces().iter().map(|f| {
-            let pt = f.iter().map(|i| vertices[*i]).collect_vec();
-            [
-                pt[0], pt[1],
-                pt[1], pt[2],
-                pt[2], pt[0],
-            ]
-        }).flatten().collect_vec()),
+        VertexAttributeValues::Float32x3(
+            tess.faces()
+                .iter()
+                .map(|f| {
+                    let pt = f.iter().map(|i| vertices[*i]).collect_vec();
+                    [pt[0], pt[1], pt[1], pt[2], pt[2], pt[0]]
+                })
+                .flatten()
+                .collect_vec(),
+        ),
     );
     commands.spawn((
         Mesh3d(meshes.add(line)),
