@@ -42,8 +42,8 @@ approx = { version = "0.5", default-features = false }
 serde_json = "1.0.143"
 
 [features]
-# default = []
-default = ["bevy", "serde"] # for debugging example
+default = []
+# default = ["bevy", "serde"] # for debugging example
 bevy = [
   "dep:easer",
   "dep:rand_distr",
