@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 
+use super::adaptive_tessellation_node::AdaptiveTessellationNode;
 use super::adaptive_tessellation_option::AdaptiveTessellationOptions;
 use super::surface_tessellation::SurfaceTessellation;
-use super::{ConstrainedTessellation, Tessellation};
+use super::{ConstrainedTessellation, DividableDirection, Tessellation};
 use itertools::Itertools;
-use nalgebra::Vector2;
 use nalgebra::{ComplexField, Point2, Point3, Vector3};
+use nalgebra::{Vector2, U4};
 use spade::{ConstrainedDelaunayTriangulation, HasPosition, SpadeNum, Triangulation};
 
 use crate::curve::NurbsCurve2D;
@@ -42,18 +43,24 @@ impl<T: FloatingPoint + SpadeNum> HasPosition for Vertex<T> {
 
 type Tri<T> = ConstrainedDelaunayTriangulation<Vertex<T>>;
 
-impl<T: FloatingPoint + SpadeNum> Tessellation for TrimmedSurface<T> {
-    type Option = Option<AdaptiveTessellationOptions<T>>;
+impl<T: FloatingPoint + SpadeNum, F> Tessellation<Option<AdaptiveTessellationOptions<T, U4, F>>>
+    for TrimmedSurface<T>
+where
+    F: Fn(&AdaptiveTessellationNode<T, U4>) -> Option<DividableDirection> + Copy,
+{
     type Output = anyhow::Result<SurfaceTessellation3D<T>>;
 
     /// Tessellate a trimmed surface using an adaptive algorithm
-    fn tessellate(&self, options: Self::Option) -> Self::Output {
+    fn tessellate(&self, options: Option<AdaptiveTessellationOptions<T, U4, F>>) -> Self::Output {
         trimmed_surface_adaptive_tessellate(self, None, options)
     }
 }
 
-impl<T: FloatingPoint + SpadeNum> ConstrainedTessellation for TrimmedSurface<T> {
-    type Option = Option<AdaptiveTessellationOptions<T>>;
+impl<T: FloatingPoint + SpadeNum, F>
+    ConstrainedTessellation<Option<AdaptiveTessellationOptions<T, U4, F>>> for TrimmedSurface<T>
+where
+    F: Fn(&AdaptiveTessellationNode<T, U4>) -> Option<DividableDirection> + Copy,
+{
     type Constraint = TrimmedSurfaceConstraints<T>;
     type Output = anyhow::Result<SurfaceTessellation3D<T>>;
 
@@ -61,18 +68,21 @@ impl<T: FloatingPoint + SpadeNum> ConstrainedTessellation for TrimmedSurface<T> 
     fn constrained_tessellate(
         &self,
         constraints: Self::Constraint,
-        adaptive_options: Self::Option,
+        adaptive_options: Option<AdaptiveTessellationOptions<T, U4, F>>,
     ) -> Self::Output {
         trimmed_surface_adaptive_tessellate(self, Some(constraints), adaptive_options)
     }
 }
 
 /// Tessellate a trimmed surface using an adaptive algorithm with or without constraints
-fn trimmed_surface_adaptive_tessellate<T: FloatingPoint + SpadeNum>(
+fn trimmed_surface_adaptive_tessellate<T: FloatingPoint + SpadeNum, F>(
     s: &TrimmedSurface<T>,
     constraints: Option<TrimmedSurfaceConstraints<T>>,
-    options: Option<AdaptiveTessellationOptions<T>>,
-) -> anyhow::Result<SurfaceTessellation3D<T>> {
+    options: Option<AdaptiveTessellationOptions<T, U4, F>>,
+) -> anyhow::Result<SurfaceTessellation3D<T>>
+where
+    F: Fn(&AdaptiveTessellationNode<T, U4>) -> Option<DividableDirection> + Copy,
+{
     let o = options.as_ref();
 
     let curve_tessellation_option = o

@@ -10,17 +10,16 @@ use crate::{
 
 use super::Tessellation;
 
-impl<T: FloatingPoint, D: DimName> Tessellation for NurbsCurve<T, D>
+impl<T: FloatingPoint, D: DimName> Tessellation<Option<T>> for NurbsCurve<T, D>
 where
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
-    type Option = Option<T>;
     type Output = Vec<OPoint<T, DimNameDiff<D, U1>>>;
     /// Tessellate the curve using an adaptive algorithm
     /// this `adaptive` means that the curve will be tessellated based on the curvature of the curve
-    fn tessellate(&self, tolerance: Self::Option) -> Self::Output {
+    fn tessellate(&self, tolerance: Option<T>) -> Self::Output {
         if self.degree() == 1 {
             return self.dehomogenized_control_points();
         }

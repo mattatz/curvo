@@ -1,6 +1,6 @@
 [package]
 name = "curvo"
-version = "0.1.68"
+version = "0.1.69"
 authors = ["Masatatsu Nakamura <masatatsu.nakamura@gmail.com"]
 edition = "2021"
 keywords = ["nurbs", "modeling", "graphics", "3d"]
@@ -221,4 +221,9 @@ required-features = ["bevy"]
 [[example]]
 name = "fillet_compound_curve"
 path = "examples/fillet_compound_curve.rs"
+required-features = ["bevy"]
+
+[[example]]
+name = "customized_tessellation"
+path = "examples/customized_tessellation.rs"
 required-features = ["bevy"]

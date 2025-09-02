@@ -6,9 +6,10 @@ use bevy::{
 use bevy_egui::EguiContexts;
 use bevy_normal_material::prelude::NormalMaterial;
 use curvo::prelude::{
-    AdaptiveTessellationOptions, CompoundCurve3D, NurbsCurve3D, NurbsSurface3D,
-    SurfaceTessellation3D, Tessellation,
+    AdaptiveTessellationNode, AdaptiveTessellationOptions, CompoundCurve3D, DefaultDivider,
+    DividableDirection, NurbsCurve3D, NurbsSurface3D, SurfaceTessellation3D, Tessellation,
 };
+use nalgebra::U4;
 
 use crate::LineMaterial;
 
@@ -82,7 +83,7 @@ pub fn add_curve<'a, C: Into<CurveVariant<'a>>>(
 #[allow(unused)]
 pub fn surface_2_mesh(
     surface: &NurbsSurface3D<f64>,
-    option: Option<AdaptiveTessellationOptions<f64>>,
+    option: Option<AdaptiveTessellationOptions<f64, U4>>,
 ) -> Mesh {
     let option = option.unwrap_or_default();
     let tess = surface.tessellate(Some(option));
@@ -138,13 +139,15 @@ pub fn surface_2_regular_mesh(surface: &NurbsSurface3D<f64>, divs_u: usize, divs
 }
 
 #[allow(unused)]
-pub fn add_surface(
+pub fn add_surface<F>(
     surface: &NurbsSurface3D<f64>,
     commands: &mut Commands<'_, '_>,
     meshes: &mut ResMut<'_, Assets<Mesh>>,
     normal_materials: &mut ResMut<'_, Assets<NormalMaterial>>,
-    option: Option<AdaptiveTessellationOptions<f64>>,
-) {
+    option: Option<AdaptiveTessellationOptions<f64, U4, F>>,
+) where
+    F: Fn(&AdaptiveTessellationNode<f64, U4>) -> Option<DividableDirection> + Copy,
+{
     let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, default());
 
     let option = option.unwrap_or_default();

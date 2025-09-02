@@ -94,7 +94,7 @@ fn setup(
     );
 
     let swept = NurbsSurface::try_sweep(&profile, &rail, Some(3)).unwrap();
-    add_surface(
+    add_surface::<DefaultDivider>(
         &swept,
         &mut commands,
         &mut meshes,
