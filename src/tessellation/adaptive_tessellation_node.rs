@@ -134,7 +134,7 @@ where
     pub fn get_all_corners(
         &self,
         nodes: &Vec<Self>,
-        edge_index: usize,
+        edge_index: usize, // [left-bottom, right-bottom, right-top, left-top] order
     ) -> Vec<SurfacePoint<T, DimNameDiff<D, U1>>> {
         let base_arr = vec![self.corners[edge_index].clone()];
 
@@ -144,13 +144,15 @@ where
                 let orig = &self.corners;
                 // get opposite edges uvs
                 let corners = nodes[neighbor].get_edge_corners(nodes, (edge_index + 2) % 4);
-                let e = T::default_epsilon();
 
                 // clip the range of uvs to match self one
-                let idx = edge_index % 2;
+                let idx = edge_index % 2; // left-bottom, right-top to x, right-bottom, left-top to y
+                let e = T::default_epsilon();
+                let lower = orig[0].uv[idx] + e;
+                let upper = orig[2].uv[idx] - e;
                 let corner = corners
                     .into_iter()
-                    .filter(|c| c.uv[idx] > orig[0].uv[idx] + e && c.uv[idx] < orig[2].uv[idx] - e)
+                    .filter(|c| lower <= c.uv[idx] && c.uv[idx] <= upper)
                     .rev()
                     .collect_vec();
                 [base_arr, corner].concat()
