@@ -258,8 +258,8 @@ fn east(index: usize, iu: usize, divs_u: usize) -> Option<usize> {
     }
 }
 
-fn west(index: usize, iv: usize) -> Option<usize> {
-    if iv == 0 {
+fn west(index: usize, iu: usize) -> Option<usize> {
+    if iu == 0 {
         None
     } else {
         Some(index - 1)
