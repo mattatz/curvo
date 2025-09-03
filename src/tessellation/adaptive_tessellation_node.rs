@@ -21,7 +21,8 @@ where
     /// children of the node
     children: Option<[usize; 2]>,
     /// corners of the node
-    pub(crate) corners: [SurfacePoint<T, DimNameDiff<D, U1>>; 4], // [left-bottom, right-bottom, right-top, left-top] order
+    /// left-bottom, right-bottom, right-top, left-top order
+    pub(crate) corners: [SurfacePoint<T, DimNameDiff<D, U1>>; 4],
     /// neighbors of the node
     pub(crate) neighbors: CardinalDirection<usize>,
     /// mid points of the node

@@ -37,6 +37,8 @@ impl<T> IndexMut<usize> for CardinalDirection<T> {
 }
 
 impl<T> From<[Option<T>; 4]> for CardinalDirection<T> {
+    /// Convert an array to a cardinal direction
+    /// Array must be in [south, east, north, west] order (counter-clockwise)
     fn from(array: [Option<T>; 4]) -> Self {
         Self(array)
     }

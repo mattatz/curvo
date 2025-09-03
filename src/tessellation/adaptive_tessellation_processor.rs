@@ -93,27 +93,34 @@ where
                 UVDirection::U => {
                     let east = node.evaluate_mid_point(self.surface, NeighborDirection::East);
                     let west = node.evaluate_mid_point(self.surface, NeighborDirection::West);
+
+                    // counter-clockwise order [south, east, north, west]
                     let bottom = [
-                        node.corners[0].clone(),
-                        node.corners[1].clone(),
+                        node.corners[0].clone(), // left-bottom
+                        node.corners[1].clone(), // right-bottom
                         east.clone(),
                         west.clone(),
                     ];
-                    let top = [west, east, node.corners[2].clone(), node.corners[3].clone()];
+                    let top = [
+                        west,
+                        east,
+                        node.corners[2].clone(), // right-top
+                        node.corners[3].clone(), // left-top
+                    ];
 
                     node.assign_children([next_node_id_0, next_node_id_1]);
 
-                    //assign neighbors to bottom node
+                    // assign neighbors to bottom node
                     let bottom_neighbors = [
                         *node.neighbors.at(NeighborDirection::South),
                         *node.neighbors.at(NeighborDirection::East),
-                        Some(next_node_id_1),
+                        Some(next_node_id_1), // top as north neighbor
                         *node.neighbors.at(NeighborDirection::West),
                     ];
 
-                    //assign neighbors to top node
+                    // assign neighbors to top node
                     let top_neighbors = [
-                        Some(next_node_id_0),
+                        Some(next_node_id_0), // bottom as south neighbor
                         *node.neighbors.at(NeighborDirection::East),
                         *node.neighbors.at(NeighborDirection::North),
                         *node.neighbors.at(NeighborDirection::West),
@@ -129,15 +136,15 @@ where
                     let north = node.evaluate_mid_point(self.surface, NeighborDirection::North);
 
                     let left = [
-                        node.corners[0].clone(),
+                        node.corners[0].clone(), // left-bottom
                         south.clone(),
                         north.clone(),
-                        node.corners[3].clone(),
+                        node.corners[3].clone(), // left-top
                     ];
                     let right = [
                         south,
-                        node.corners[1].clone(),
-                        node.corners[2].clone(),
+                        node.corners[1].clone(), // right-bottom
+                        node.corners[2].clone(), // right-top
                         north,
                     ];
 
@@ -145,7 +152,7 @@ where
 
                     let left_neighbors = [
                         *node.neighbors.at(NeighborDirection::South),
-                        Some(next_node_id_1),
+                        Some(next_node_id_1), // right as east neighbor
                         *node.neighbors.at(NeighborDirection::North),
                         *node.neighbors.at(NeighborDirection::West),
                     ];
@@ -153,7 +160,7 @@ where
                         *node.neighbors.at(NeighborDirection::South),
                         *node.neighbors.at(NeighborDirection::East),
                         *node.neighbors.at(NeighborDirection::North),
-                        Some(next_node_id_0),
+                        Some(next_node_id_0), // left as west neighbor
                     ];
 
                     (
