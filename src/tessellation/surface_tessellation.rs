@@ -37,7 +37,6 @@ pub type SurfaceTessellation2D<T> = SurfaceTessellation<T, Const<3>>;
 pub type SurfaceTessellation3D<T> = SurfaceTessellation<T, Const<4>>;
 
 type HashKey = (OrderedFloat<f64>, OrderedFloat<f64>);
-// type HashKey = String;
 
 impl<T: FloatingPoint, D: DimName> SurfaceTessellation<T, D>
 where
