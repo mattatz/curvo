@@ -49,10 +49,7 @@ fn setup(
          line_materials: &mut ResMut<'_, Assets<LineMaterial>>,
          _normal_materials: &mut ResMut<'_, Assets<NormalMaterial>>,
          points_materials: &mut ResMut<'_, Assets<PointsMaterial>>| {
-            let option = AdaptiveTessellationOptions::<_> {
-                norm_tolerance: 1e-2,
-                ..Default::default()
-            };
+            let option = AdaptiveTessellationOptions::<_>::default().with_norm_tolerance(1e-2);
             let tess = surf.tessellate(Some(option));
             let tess = tess.cast::<f32>();
             // let tess = surf.regular_tessellate(32, 32);

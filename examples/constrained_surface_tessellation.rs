@@ -98,9 +98,7 @@ fn setup(
     ));
 
     // let tess = surface.tessellate(Some(Default::default()));
-    let option = AdaptiveTessellationOptions::<_> {
-        ..Default::default()
-    };
+    let option = AdaptiveTessellationOptions::<_>::default();
     let tess = surface.constrained_tessellate(boundary, Some(option));
     let tess = tess.cast::<f32>();
 

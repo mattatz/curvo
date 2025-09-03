@@ -66,10 +66,7 @@ fn setup(
          _points_materials: &mut ResMut<'_, Assets<PointsMaterial>>| {
             let mut mesh = Mesh::new(PrimitiveTopology::TriangleList, default());
 
-            let option = AdaptiveTessellationOptions::<_> {
-                norm_tolerance: 1e-2,
-                ..Default::default()
-            };
+            let option = AdaptiveTessellationOptions::<_>::default().with_norm_tolerance(1e-2);
             let tess = surf.tessellate(Some(option));
             let tess = tess.cast::<f32>();
 

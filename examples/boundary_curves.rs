@@ -68,10 +68,7 @@ fn setup(
     let back = interpolated.transformed(&m.into());
     let lofted = NurbsSurface::try_loft(&[front, back], Some(3)).unwrap();
 
-    let option = AdaptiveTessellationOptions::<_> {
-        norm_tolerance: 1e-2,
-        ..Default::default()
-    };
+    let option = AdaptiveTessellationOptions::<_>::default().with_norm_tolerance(1e-2);
     let tess = lofted.tessellate(Some(option));
     let tess = tess.cast::<f32>();
     let vertices = tess.points().iter().map(|pt| (*pt).into()).collect();

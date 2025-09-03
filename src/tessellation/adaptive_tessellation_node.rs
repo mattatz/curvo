@@ -21,7 +21,8 @@ where
     /// children of the node
     children: Option<[usize; 2]>,
     /// corners of the node
-    pub(crate) corners: [SurfacePoint<T, DimNameDiff<D, U1>>; 4], // [left-bottom, right-bottom, right-top, left-top] order
+    /// left-bottom, right-bottom, right-top, left-top order
+    pub(crate) corners: [SurfacePoint<T, DimNameDiff<D, U1>>; 4],
     /// neighbors of the node
     pub(crate) neighbors: CardinalDirection<usize>,
     /// mid points of the node
@@ -63,10 +64,19 @@ where
         self.children.is_none()
     }
 
+    /// get the division direction of the node
+    pub fn division(&self) -> UVDirection {
+        self.direction
+    }
+
     /// get the corners of the node
     /// [left-bottom, right-bottom, right-top, left-top] order
     pub fn corners(&self) -> &[SurfacePoint<T, DimNameDiff<D, U1>>; 4] {
         &self.corners
+    }
+
+    pub fn neighbors(&self) -> &CardinalDirection<usize> {
+        &self.neighbors
     }
 
     pub fn assign_children(&mut self, children: [usize; 2]) {
@@ -84,10 +94,10 @@ where
     }
 
     /// Get the corners of the edge of the node based on the divided direction
-    fn get_edge_corners(
+    pub fn get_edge_corners(
         &self,
         nodes: &Vec<Self>,
-        edge_index: usize,
+        edge_index: usize, // [left-bottom, right-bottom, right-top, left-top] order
     ) -> Vec<SurfacePoint<T, DimNameDiff<D, U1>>> {
         match &self.children {
             Some(children) => match self.direction {
@@ -129,10 +139,11 @@ where
         }
     }
 
+    /// Get all corners of the node
     pub fn get_all_corners(
         &self,
         nodes: &Vec<Self>,
-        edge_index: usize,
+        edge_index: usize, // [left-bottom, right-bottom, right-top, left-top] order
     ) -> Vec<SurfacePoint<T, DimNameDiff<D, U1>>> {
         let base_arr = vec![self.corners[edge_index].clone()];
 
@@ -141,14 +152,18 @@ where
             Some(neighbor) => {
                 let orig = &self.corners;
                 // get opposite edges uvs
-                let corners = nodes[neighbor].get_edge_corners(nodes, (edge_index + 2) % 4);
-                let e = T::default_epsilon();
+                let opposite_index = (edge_index + 2) % 4;
+                let neighbor = &nodes[neighbor];
+                let corners = neighbor.get_edge_corners(nodes, opposite_index);
 
                 // clip the range of uvs to match self one
-                let idx = edge_index % 2;
+                let idx = edge_index % 2; // left-bottom, right-top to x, right-bottom, left-top to y
+                let e = T::default_epsilon();
+                let lower = orig[0].uv[idx] + e;
+                let upper = orig[2].uv[idx] - e;
                 let corner = corners
                     .into_iter()
-                    .filter(|c| c.uv[idx] > orig[0].uv[idx] + e && c.uv[idx] < orig[2].uv[idx] - e)
+                    .filter(|c| lower <= c.uv[idx] && c.uv[idx] <= upper)
                     .rev()
                     .collect_vec();
                 [base_arr, corner].concat()

@@ -57,10 +57,7 @@ fn setup(
                                normal_materials: &mut ResMut<'_, Assets<NormalMaterial>>,
                                surface: &TrimmedSurface<f64>,
                                transform: Transform| {
-        let option = AdaptiveTessellationOptions::<_> {
-            norm_tolerance: 1e-2,
-            ..Default::default()
-        };
+        let option = AdaptiveTessellationOptions::<_>::default().with_norm_tolerance(1e-2);
         let tess = surface.tessellate(Some(option)).unwrap().cast::<f32>();
         let vertices = tess.points().iter().map(|pt| (*pt).into()).collect();
         let normals = tess.normals().iter().map(|n| (*n).into()).collect();
@@ -96,10 +93,7 @@ fn setup(
                        normal_materials: &mut ResMut<'_, Assets<NormalMaterial>>,
                        surface: &NurbsSurface3D<f64>,
                        transform: Transform| {
-        let option = AdaptiveTessellationOptions::<_> {
-            norm_tolerance: 1e-2,
-            ..Default::default()
-        };
+        let option = AdaptiveTessellationOptions::<_>::default().with_norm_tolerance(1e-2);
         let tess = surface.tessellate(Some(option)).cast::<f32>();
         let vertices = tess.points().iter().map(|pt| (*pt).into()).collect();
         let normals = tess.normals().iter().map(|n| (*n).into()).collect();

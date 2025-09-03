@@ -15,6 +15,11 @@ impl<T> CardinalDirection<T> {
     pub fn at(&self, direction: NeighborDirection) -> &Option<T> {
         &self.0[Into::<usize>::into(direction)]
     }
+
+    /// Iterate over the cardinal direction
+    pub fn iter(&self) -> impl Iterator<Item = &Option<T>> {
+        self.0.iter()
+    }
 }
 
 impl<T> Default for CardinalDirection<T> {
@@ -37,6 +42,8 @@ impl<T> IndexMut<usize> for CardinalDirection<T> {
 }
 
 impl<T> From<[Option<T>; 4]> for CardinalDirection<T> {
+    /// Convert an array to a cardinal direction
+    /// Array must be in [south, east, north, west] order (counter-clockwise)
     fn from(array: [Option<T>; 4]) -> Self {
         Self(array)
     }

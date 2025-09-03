@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use super::adaptive_tessellation_option::AdaptiveTessellationOptions;
 use super::adaptive_tessellation_processor::AdaptiveTessellationProcessor;
 use super::boundary_constraints::BoundaryConstraints;
@@ -27,7 +29,8 @@ where
     /// or else it will be tessellated adaptively based on the options
     /// this `adaptive` means that the surface will be tessellated based on the curvature of the surface
     fn tessellate(&self, options: Option<AdaptiveTessellationOptions<T, D, F>>) -> Self::Output {
-        surface_adaptive_tessellate(self, None, options)
+        let nodes = surface_adaptive_tessellate(self, None, options);
+        SurfaceTessellation::new(self, &nodes, None)
     }
 }
 
@@ -49,16 +52,17 @@ where
         constraints: Self::Constraint,
         options: Option<AdaptiveTessellationOptions<T, D, F>>,
     ) -> Self::Output {
-        surface_adaptive_tessellate(self, Some(constraints), options)
+        let nodes = surface_adaptive_tessellate(self, Some(Cow::Borrowed(&constraints)), options);
+        SurfaceTessellation::new(self, &nodes, Some(constraints))
     }
 }
 
 /// Tessellate the surface adaptively
 fn surface_adaptive_tessellate<T: FloatingPoint, D, F>(
     s: &NurbsSurface<T, D>,
-    constraints: Option<BoundaryConstraints<T>>,
+    constraints: Option<Cow<'_, BoundaryConstraints<T>>>,
     options: Option<AdaptiveTessellationOptions<T, D, F>>,
-) -> SurfaceTessellation<T, D>
+) -> Vec<AdaptiveTessellationNode<T, D>>
 where
     D: DimName,
     D: DimNameSub<U1>,
@@ -203,11 +207,13 @@ where
                 let s = south(index, iv, divs_u, divs_v);
                 let e = east(index, iu, divs_u);
                 let n = north(index, iv, divs_u);
-                let w = west(index, iv);
+                let w = west(index, iu);
                 AdaptiveTessellationNode::new(index, corners, [s, e, n, w])
             })
         })
         .collect_vec();
+
+    // return nodes;
 
     let nodes = if !is_adaptive {
         nodes
@@ -224,7 +230,8 @@ where
         processor.into_nodes()
     };
 
-    SurfaceTessellation::new(s, &nodes, constraints)
+    // SurfaceTessellation::new(s, &nodes, constraints)
+    nodes
 }
 
 fn north(index: usize, iv: usize, divs_u: usize) -> Option<usize> {
@@ -251,8 +258,8 @@ fn east(index: usize, iu: usize, divs_u: usize) -> Option<usize> {
     }
 }
 
-fn west(index: usize, iv: usize) -> Option<usize> {
-    if iv == 0 {
+fn west(index: usize, iu: usize) -> Option<usize> {
+    if iu == 0 {
         None
     } else {
         Some(index - 1)

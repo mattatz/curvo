@@ -66,10 +66,10 @@ fn setup(
     };
 
     let surface = NurbsSurface::plane(Point3::new(0., 0., 0.), Vector3::x() * 2., Vector3::y());
-    let options: AdaptiveTessellationOptions<f64, U4, _> = AdaptiveTessellationOptions {
-        min_depth: 3,
-        max_depth: 12,
-        divider: Some(|node: &AdaptiveTessellationNode<f64, U4>| {
+    let options: AdaptiveTessellationOptions<f64, U4, _> = AdaptiveTessellationOptions::default()
+        .with_min_depth(3)
+        .with_max_depth(12)
+        .with_divider(Some(|node: &AdaptiveTessellationNode<f64, U4>| {
             let corners = node.corners().iter().map(|c| field(*c.uv())).collect_vec();
             let uv = node.uv_center();
             let center = field(uv);
@@ -87,9 +87,7 @@ fn setup(
             } else {
                 None
             }
-        }),
-        ..Default::default()
-    };
+        }));
     add_surface(
         &surface,
         &mut commands,
