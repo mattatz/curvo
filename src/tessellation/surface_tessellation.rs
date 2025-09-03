@@ -9,10 +9,8 @@ use ordered_float::OrderedFloat;
 use simba::scalar::SupersetOf;
 
 use crate::{
-    misc::FloatingPoint, prelude::NurbsSurface, surface::UVDirection, tessellation::{
-        adaptive_tessellation_node::{AdaptiveTessellationNode, NeighborDirection},
-        quantize::Quantizer,
-    }
+    misc::FloatingPoint, prelude::NurbsSurface,
+    tessellation::adaptive_tessellation_node::AdaptiveTessellationNode,
 };
 
 use super::boundary_constraints::{BoundaryConstraints, BoundaryEvaluation};
@@ -66,13 +64,7 @@ where
         // Triangulate all nodes
         nodes.iter().for_each(|node| {
             if node.is_leaf() {
-                tess.triangulate(
-                    &mut map,
-                    surface,
-                    nodes,
-                    node,
-                    boundary_evaluation.as_ref(),
-                );
+                tess.triangulate(&mut map, surface, nodes, node, boundary_evaluation.as_ref());
             }
         });
 
@@ -131,15 +123,14 @@ where
 
         let n = pts.len();
         let mut ids = Vec::with_capacity(n);
-        for corner in pts.iter() {
+        for corner in pts.into_iter() {
             let uv = corner.uv();
             let key = (
                 OrderedFloat::from(T::to_f64(&uv.x).unwrap()),
                 OrderedFloat::from(T::to_f64(&uv.y).unwrap()),
             );
-            // let key = quantizer.hash(uv.into_iter().copied());
             let id = map.entry(key).or_insert_with(|| {
-                let (uv, point, normal) = corner.clone().into_tuple();
+                let (uv, point, normal) = corner.into_tuple();
                 self.points.push(point);
                 self.normals.push(normal);
                 self.uvs.push(uv);
@@ -148,8 +139,7 @@ where
             ids.push(*id);
         }
 
-        let m = ids.len();
-        match m {
+        match n {
             0 => {}
             4 => {
                 self.faces.push([ids[0], ids[1], ids[3]]);

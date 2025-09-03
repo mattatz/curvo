@@ -11,9 +11,9 @@ pub struct TessellationEdgeStatistics(HashMap<(usize, usize), usize>);
 
 impl TessellationEdgeStatistics {
     /// Create a new `MeshEdgeStatistics` from a `Mesh`
-    pub fn new<T: FloatingPoint, D: DimName>(tess: &SurfaceTessellation<T, D>) -> Self
+    pub fn new<T: FloatingPoint, D>(tess: &SurfaceTessellation<T, D>) -> Self
     where
-        D: DimNameSub<U1>,
+        D: DimName + DimNameSub<U1>,
         DefaultAllocator: Allocator<D>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
