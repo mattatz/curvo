@@ -1,7 +1,6 @@
 use nalgebra::{
     allocator::Allocator, DefaultAllocator, DimName, OPoint, OVector, RealField, Vector2,
 };
-use uuid::Uuid;
 
 /// Surface point representation
 /// containing evaluated data on a surface in adaptive tessellation processor
@@ -10,7 +9,6 @@ pub struct SurfacePoint<T: RealField, D: DimName>
 where
     DefaultAllocator: Allocator<D>,
 {
-    id: Uuid,
     pub uv: Vector2<T>,
     pub point: OPoint<T, D>,
     pub normal: OVector<T, D>,
@@ -36,7 +34,6 @@ where
         is_normal_degenerated: bool,
     ) -> Self {
         Self {
-            id: Uuid::new_v4(),
             uv,
             point,
             normal,
@@ -48,11 +45,6 @@ where
             v_min: false,
             v_max: false,
         }
-    }
-
-    /// Get the id of the point
-    pub fn id(&self) -> &Uuid {
-        &self.id
     }
 
     pub fn with_constraints(mut self, u: bool, v: bool) -> Self {

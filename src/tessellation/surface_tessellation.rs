@@ -5,8 +5,8 @@ use nalgebra::{
     allocator::Allocator, Const, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint,
     OVector, Vector2, U1,
 };
+use ordered_float::OrderedFloat;
 use simba::scalar::SupersetOf;
-use uuid::Uuid;
 
 use crate::{
     misc::FloatingPoint, prelude::NurbsSurface,
@@ -36,6 +36,8 @@ pub type SurfaceTessellation2D<T> = SurfaceTessellation<T, Const<3>>;
 /// 3D tessellation alias
 pub type SurfaceTessellation3D<T> = SurfaceTessellation<T, Const<4>>;
 
+type HashKey = (OrderedFloat<f64>, OrderedFloat<f64>);
+
 impl<T: FloatingPoint, D: DimName> SurfaceTessellation<T, D>
 where
     D: DimNameSub<U1>,
@@ -56,7 +58,7 @@ where
         };
 
         let boundary_evaluation = constraints.map(|c| BoundaryEvaluation::new(surface, &c));
-        let mut map: HashMap<Uuid, usize> = HashMap::new();
+        let mut map: HashMap<HashKey, usize> = HashMap::new();
 
         // Triangulate all nodes
         nodes.iter().for_each(|node| {
@@ -71,7 +73,7 @@ where
     /// Triangulate the surface with adaptive tessellation nodes recursively
     fn triangulate(
         &mut self,
-        map: &mut HashMap<Uuid, usize>,
+        map: &mut HashMap<HashKey, usize>,
         surface: &NurbsSurface<T, D>,
         nodes: &Vec<AdaptiveTessellationNode<T, D>>,
         leaf_node: &AdaptiveTessellationNode<T, D>,
@@ -117,17 +119,20 @@ where
             pts
         };
 
-        let mut base_index = self.points.len();
         let n = pts.len();
         let mut ids = Vec::with_capacity(n);
         for corner in pts.into_iter() {
-            let id = map.entry(*corner.id()).or_insert_with(|| {
+            let uv = corner.uv();
+            let key = (
+                OrderedFloat::from(T::to_f64(&uv.x).unwrap()),
+                OrderedFloat::from(T::to_f64(&uv.y).unwrap()),
+            );
+            let id = map.entry(key).or_insert_with(|| {
                 let (uv, point, normal) = corner.into_tuple();
                 self.points.push(point);
                 self.normals.push(normal);
                 self.uvs.push(uv);
-                base_index += 1; // increment base_index before returning
-                base_index - 1 // return the index of the new point
+                self.points.len() - 1
             });
             ids.push(*id);
         }
