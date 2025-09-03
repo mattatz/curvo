@@ -33,7 +33,7 @@ argmin = "0.10.0"
 itertools = "0.14.0"
 log = { version = "0.4", optional = true }
 serde = { version = "1.0.219", optional = true }
-uuid = "1.18.1"
+uuid = { version = "1.18.1", features = ["v4"] }
 
 [target.wasm32-unknown-unknown.dependencies]
 argmin = { version = "0.10.0", features = ["wasm-bindgen"] }
