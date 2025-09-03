@@ -88,7 +88,7 @@ where
     fn get_edge_corners(
         &self,
         nodes: &Vec<Self>,
-        edge_index: usize,
+        edge_index: usize, // [left-bottom, right-bottom, right-top, left-top] order
     ) -> Vec<SurfacePoint<T, DimNameDiff<D, U1>>> {
         match &self.children {
             Some(children) => match self.direction {
@@ -130,6 +130,7 @@ where
         }
     }
 
+    /// Get all corners of the node
     pub fn get_all_corners(
         &self,
         nodes: &Vec<Self>,

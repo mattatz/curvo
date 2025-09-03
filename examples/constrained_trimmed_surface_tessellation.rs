@@ -68,10 +68,7 @@ fn setup(
         ],
     );
 
-    let option = AdaptiveTessellationOptions::<_> {
-        norm_tolerance: 1e-3,
-        ..Default::default()
-    };
+    let option = AdaptiveTessellationOptions::<_>::default().with_norm_tolerance(1e-3);
 
     let n = 10;
     let m = 20;
