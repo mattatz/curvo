@@ -64,10 +64,19 @@ where
         self.children.is_none()
     }
 
+    /// get the division direction of the node
+    pub fn division(&self) -> UVDirection {
+        self.direction
+    }
+
     /// get the corners of the node
     /// [left-bottom, right-bottom, right-top, left-top] order
     pub fn corners(&self) -> &[SurfacePoint<T, DimNameDiff<D, U1>>; 4] {
         &self.corners
+    }
+
+    pub fn neighbors(&self) -> &CardinalDirection<usize> {
+        &self.neighbors
     }
 
     pub fn assign_children(&mut self, children: [usize; 2]) {
@@ -85,7 +94,7 @@ where
     }
 
     /// Get the corners of the edge of the node based on the divided direction
-    fn get_edge_corners(
+    pub fn get_edge_corners(
         &self,
         nodes: &Vec<Self>,
         edge_index: usize, // [left-bottom, right-bottom, right-top, left-top] order
@@ -143,7 +152,9 @@ where
             Some(neighbor) => {
                 let orig = &self.corners;
                 // get opposite edges uvs
-                let corners = nodes[neighbor].get_edge_corners(nodes, (edge_index + 2) % 4);
+                let opposite_index = (edge_index + 2) % 4;
+                let neighbor = &nodes[neighbor];
+                let corners = neighbor.get_edge_corners(nodes, opposite_index);
 
                 // clip the range of uvs to match self one
                 let idx = edge_index % 2; // left-bottom, right-top to x, right-bottom, left-top to y

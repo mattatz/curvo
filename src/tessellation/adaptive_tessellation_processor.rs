@@ -91,19 +91,19 @@ where
         let (c0, c1) = {
             match node.direction {
                 UVDirection::U => {
-                    let east = node.evaluate_mid_point(self.surface, NeighborDirection::East);
-                    let west = node.evaluate_mid_point(self.surface, NeighborDirection::West);
+                    let east_mid = node.evaluate_mid_point(self.surface, NeighborDirection::East);
+                    let west_mid = node.evaluate_mid_point(self.surface, NeighborDirection::West);
 
                     // counter-clockwise order [south, east, north, west]
                     let bottom = [
                         node.corners[0].clone(), // left-bottom
                         node.corners[1].clone(), // right-bottom
-                        east.clone(),
-                        west.clone(),
+                        east_mid.clone(),
+                        west_mid.clone(),
                     ];
                     let top = [
-                        west,
-                        east,
+                        west_mid,
+                        east_mid,
                         node.corners[2].clone(), // right-top
                         node.corners[3].clone(), // left-top
                     ];
@@ -132,20 +132,20 @@ where
                     )
                 }
                 UVDirection::V => {
-                    let south = node.evaluate_mid_point(self.surface, NeighborDirection::South);
-                    let north = node.evaluate_mid_point(self.surface, NeighborDirection::North);
+                    let south_mid = node.evaluate_mid_point(self.surface, NeighborDirection::South);
+                    let north_mid = node.evaluate_mid_point(self.surface, NeighborDirection::North);
 
                     let left = [
                         node.corners[0].clone(), // left-bottom
-                        south.clone(),
-                        north.clone(),
+                        south_mid.clone(),
+                        north_mid.clone(),
                         node.corners[3].clone(), // left-top
                     ];
                     let right = [
-                        south,
+                        south_mid,
                         node.corners[1].clone(), // right-bottom
                         node.corners[2].clone(), // right-top
-                        north,
+                        north_mid,
                     ];
 
                     node.assign_children([next_node_id_0, next_node_id_1]);

@@ -9,8 +9,10 @@ use ordered_float::OrderedFloat;
 use simba::scalar::SupersetOf;
 
 use crate::{
-    misc::FloatingPoint, prelude::NurbsSurface,
-    tessellation::adaptive_tessellation_node::AdaptiveTessellationNode,
+    misc::FloatingPoint, prelude::NurbsSurface, surface::UVDirection, tessellation::{
+        adaptive_tessellation_node::{AdaptiveTessellationNode, NeighborDirection},
+        quantize::Quantizer,
+    }
 };
 
 use super::boundary_constraints::{BoundaryConstraints, BoundaryEvaluation};
@@ -37,6 +39,7 @@ pub type SurfaceTessellation2D<T> = SurfaceTessellation<T, Const<3>>;
 pub type SurfaceTessellation3D<T> = SurfaceTessellation<T, Const<4>>;
 
 type HashKey = (OrderedFloat<f64>, OrderedFloat<f64>);
+// type HashKey = String;
 
 impl<T: FloatingPoint, D: DimName> SurfaceTessellation<T, D>
 where
@@ -63,7 +66,13 @@ where
         // Triangulate all nodes
         nodes.iter().for_each(|node| {
             if node.is_leaf() {
-                tess.triangulate(&mut map, surface, nodes, node, boundary_evaluation.as_ref());
+                tess.triangulate(
+                    &mut map,
+                    surface,
+                    nodes,
+                    node,
+                    boundary_evaluation.as_ref(),
+                );
             }
         });
 
@@ -82,6 +91,7 @@ where
         let corners = (0..4)
             .map(|i| leaf_node.get_all_corners(nodes, i))
             .collect_vec();
+
         let split_id = corners
             .iter()
             .position(|c| c.len() == 2)
@@ -121,14 +131,15 @@ where
 
         let n = pts.len();
         let mut ids = Vec::with_capacity(n);
-        for corner in pts.into_iter() {
+        for corner in pts.iter() {
             let uv = corner.uv();
             let key = (
                 OrderedFloat::from(T::to_f64(&uv.x).unwrap()),
                 OrderedFloat::from(T::to_f64(&uv.y).unwrap()),
             );
+            // let key = quantizer.hash(uv.into_iter().copied());
             let id = map.entry(key).or_insert_with(|| {
-                let (uv, point, normal) = corner.into_tuple();
+                let (uv, point, normal) = corner.clone().into_tuple();
                 self.points.push(point);
                 self.normals.push(normal);
                 self.uvs.push(uv);
@@ -137,7 +148,9 @@ where
             ids.push(*id);
         }
 
-        match n {
+        let m = ids.len();
+        match m {
+            0 => {}
             4 => {
                 self.faces.push([ids[0], ids[1], ids[3]]);
                 self.faces.push([ids[3], ids[1], ids[2]]);
@@ -153,16 +166,16 @@ where
                 self.faces.push([a, d, e]);
                 self.faces.push([a, c, d]);
             }
-            n => {
+            m => {
                 let center = leaf_node.center(surface);
                 self.points.push(center.point.clone());
                 self.normals.push(center.normal.clone());
                 self.uvs.push(center.uv);
 
                 let center_index = self.points.len() - 1;
-                let mut j = n - 1;
+                let mut j = m - 1;
                 let mut i = 0;
-                while i < n {
+                while i < m {
                     self.faces.push([center_index, ids[j], ids[i]]);
                     j = i;
                     i += 1;

@@ -15,6 +15,11 @@ impl<T> CardinalDirection<T> {
     pub fn at(&self, direction: NeighborDirection) -> &Option<T> {
         &self.0[Into::<usize>::into(direction)]
     }
+
+    /// Iterate over the cardinal direction
+    pub fn iter(&self) -> impl Iterator<Item = &Option<T>> {
+        self.0.iter()
+    }
 }
 
 impl<T> Default for CardinalDirection<T> {
