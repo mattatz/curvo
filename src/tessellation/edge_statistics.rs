@@ -1,12 +1,11 @@
-use std::collections::HashMap;
-
-use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, U1};
-
+#![allow(unused)]
 use crate::{misc::FloatingPoint, prelude::SurfaceTessellation};
+use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, U1};
+use std::collections::HashMap;
 
 /// Statistics of edges in a mesh
 /// HashMap<(usize, usize), usize> -> ((edge index0, edge index1), count)
-#[derive(Debug, Clone)]
+#[allow(unused)]
 pub struct TessellationEdgeStatistics(HashMap<(usize, usize), usize>);
 
 impl TessellationEdgeStatistics {

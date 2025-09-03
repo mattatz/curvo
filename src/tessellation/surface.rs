@@ -58,7 +58,7 @@ where
 }
 
 /// Tessellate the surface adaptively
-pub fn surface_adaptive_tessellate<T: FloatingPoint, D, F>(
+fn surface_adaptive_tessellate<T: FloatingPoint, D, F>(
     s: &NurbsSurface<T, D>,
     constraints: Option<Cow<'_, BoundaryConstraints<T>>>,
     options: Option<AdaptiveTessellationOptions<T, D, F>>,

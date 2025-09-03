@@ -15,7 +15,6 @@ pub mod trimmed_surface;
 pub mod trimmed_surface_constraints;
 
 pub use adaptive_tessellation_node::DividableDirection;
-pub use edge_statistics::*;
 use nalgebra::U4;
 pub use surface_point::*;
 
