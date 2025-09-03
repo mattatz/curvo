@@ -3,6 +3,7 @@ pub mod adaptive_tessellation_option;
 pub mod adaptive_tessellation_processor;
 pub mod boundary_constraints;
 mod cardinal_direction;
+pub mod edge_statistics;
 pub mod surface;
 pub mod surface_point;
 pub mod surface_tessellation;
@@ -14,6 +15,7 @@ pub mod trimmed_surface;
 pub mod trimmed_surface_constraints;
 
 pub use adaptive_tessellation_node::DividableDirection;
+pub use edge_statistics::*;
 use nalgebra::U4;
 pub use surface_point::*;
 
