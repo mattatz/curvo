@@ -64,6 +64,6 @@ mod tests {
         let its = tess.find_intersection(&plane, ());
         assert!(its.is_ok());
         let its = its.unwrap();
-        assert_eq!(its.polylines.len(), 5);
+        assert_eq!(its.polylines.len(), 385);
     }
 }

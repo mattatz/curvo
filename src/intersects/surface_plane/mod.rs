@@ -37,6 +37,7 @@ pub fn find_surface_plane_intersection_leaf_nodes<'a, T: FloatingPoint + ArgminF
 }
 
 /// Find intersection points between a surface and a plane
+#[allow(clippy::type_complexity)]
 pub fn find_surface_plane_intersection_points<T: FloatingPoint + ArgminFloat>(
     surface: &NurbsSurface3D<T>,
     plane: &Plane<T>,

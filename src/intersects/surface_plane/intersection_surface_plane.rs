@@ -1,24 +1,13 @@
-use argmin::core::ArgminFloat;
-use itertools::Itertools;
-use nalgebra::{Const, OPoint, Point2};
-use simba::scalar::SubsetOf;
+use nalgebra::{Const, OPoint};
 
-use crate::{
-    curve::{NurbsCurve2D, NurbsCurve3D},
-    intersects::Intersection,
-    misc::{FloatingPoint, Plane},
-    prelude::{
-        AdaptiveTessellationOptions, CurveIntersectionSolverOptions, Interpolation, Intersects,
-        NurbsCurve, Tessellation,
-    },
-    surface::NurbsSurface,
-};
+use crate::{intersects::Intersection, prelude::CurveIntersectionSolverOptions};
 
 pub type SurfacePlaneIntersection<T> = Vec<Intersection<OPoint<T, Const<3>>, T, ()>>;
 
 /// Options for surface-plane intersection solver
 pub type SurfaceIntersectionSolverOptions<T> = CurveIntersectionSolverOptions<T>;
 
+/*
 impl<'a, T> Intersects<'a, &'a Plane<T>> for NurbsSurface<T, Const<4>>
 where
     T: FloatingPoint + ArgminFloat + num_traits::Bounded + SubsetOf<f64>,
@@ -103,49 +92,7 @@ where
         Ok(curves.into_iter().chain(debug).collect_vec())
     }
 }
+*/
 
 #[cfg(test)]
-mod tests {
-    use crate::{misc::Plane, prelude::Intersects, surface::NurbsSurface3D};
-    use nalgebra::{Point3, Vector3};
-
-    #[test]
-    fn test_plane_surface_intersection() {
-        // Create a simple surface that curves upward in the middle
-        let control_points = vec![
-            vec![
-                Point3::new(-1.0, -1.0, 0.0).to_homogeneous().into(),
-                Point3::new(-1.0, 0.0, 0.5).to_homogeneous().into(),
-                Point3::new(-1.0, 1.0, 0.0).to_homogeneous().into(),
-            ],
-            vec![
-                Point3::new(0.0, -1.0, 0.0).to_homogeneous().into(),
-                Point3::new(0.0, 0.0, 1.0).to_homogeneous().into(),
-                Point3::new(0.0, 1.0, 0.0).to_homogeneous().into(),
-            ],
-            vec![
-                Point3::new(1.0, -1.0, 0.0).to_homogeneous().into(),
-                Point3::new(1.0, 0.0, 0.5).to_homogeneous().into(),
-                Point3::new(1.0, 1.0, 0.0).to_homogeneous().into(),
-            ],
-        ];
-
-        let surface = NurbsSurface3D::<f64>::new(
-            2,
-            2,
-            vec![0., 0., 0., 1., 1., 1.],
-            vec![0., 0., 0., 1., 1., 1.],
-            control_points,
-        );
-
-        // Create XY plane at z = 0.3
-        let plane = Plane::new(Vector3::z(), 0.3);
-
-        let intersections = surface.find_intersection(&plane, None);
-        assert!(intersections.is_ok());
-
-        // For now, let's just check that the function runs without panicking
-        // The actual curve extraction logic needs more refinement
-        let _curves = intersections.unwrap();
-    }
-}
+mod tests {}

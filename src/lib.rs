@@ -88,7 +88,7 @@ pub mod prelude {
     pub use crate::interpolation::*;
     pub use crate::intersects::*;
     pub use crate::knot::*;
-    pub use crate::marching::*;
+
     pub use crate::misc::{
         binomial::*, curvature::*, end_points::*, floating_point::*, frenet_frame::*,
         invertible::*, line::*, orientation::*, plane::*, polygon_boundary::*, ray::*,

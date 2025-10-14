@@ -46,7 +46,6 @@ struct AppPlugin;
 impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.add_systems(Startup, setup);
-        // .add_systems(Update, update);
     }
 }
 
@@ -97,7 +96,7 @@ fn setup(
         // Visibility::Hidden,
     ));
 
-    let plane = Plane::new(Vector3::y(), -0.2);
+    let plane = Plane::new(Vector3::y(), 0.0);
     let dir = plane.normal().cast::<f32>();
     let size = 8.;
     // ground plane
@@ -142,15 +141,11 @@ fn setup(
     }
     */
 
-    /*
-    let tess = surface.tessellate(Some(AdaptiveTessellationOptions {
-        // norm_tolerance: 1e-2,
-        // max_depth: 1,
-        ..Default::default()
-    }));
+    let tess = surface.tessellate(Some(
+        AdaptiveTessellationOptions::<_>::default().with_norm_tolerance(1e-3),
+    ));
     let its = tess.find_intersection(&plane, ());
     if let Ok(its) = its {
-        println!("polylines: {}", its.polylines.len());
         its.polylines.iter().for_each(|polyline| {
             let n = polyline.len() as f32;
             let line = Mesh::new(PrimitiveTopology::LineStrip, default())
@@ -185,57 +180,10 @@ fn setup(
                     ..Default::default()
                 })),
             ));
-
-            let mut iter = polyline.iter();
-            let first = iter.next().unwrap();
-            let uv = surface.find_closest_parameter(first, None).unwrap();
-            let parameters = iter
-                .try_fold(vec![uv], |mut acc, pt| {
-                    let uv =
-                        surface.find_closest_parameter(pt, Some(acc.last().unwrap().clone()))?;
-                    // let uv = self.find_closest_parameter(pt, None)?;
-                    acc.push(uv);
-                    anyhow::Ok(acc)
-                })
-                .unwrap();
-
-            let projected = parameters
-                .iter()
-                .map(|uv| surface.point_at(uv.0, uv.1))
-                .collect_vec();
-
-            polyline.iter().zip(projected.iter()).for_each(|(pt, pt2)| {
-                let line = Mesh::new(PrimitiveTopology::LineStrip, default())
-                    .with_inserted_attribute(
-                        Mesh::ATTRIBUTE_POSITION,
-                        VertexAttributeValues::Float32x3(vec![
-                            pt.cast::<f32>().into(),
-                            pt2.cast::<f32>().into(),
-                        ]),
-                    );
-                commands.spawn((
-                    Mesh3d(meshes.add(line)),
-                    MeshMaterial3d(line_materials.add(LineMaterial {
-                        color: Color::WHITE,
-                        ..Default::default()
-                    })),
-                ));
-            });
-
-            let degree = (projected.len() - 1).min(3);
-            let curve = NurbsCurve3D::interpolate(&projected, degree).unwrap();
-            add_curve(
-                &curve,
-                Some(TOMATO.into()),
-                None,
-                &mut commands,
-                &mut meshes,
-                &mut line_materials,
-            );
         });
     }
-    */
 
+    /*
     let its = surface.find_intersection(&plane, None);
     match its {
         Ok(its) => {
@@ -298,6 +246,7 @@ fn setup(
             println!("error: {:?}", e);
         }
     }
+    */
 
     /*
     let its = find_surface_plane_intersection_points(&surface, &plane, None);
@@ -349,56 +298,4 @@ fn setup(
         },
         ..Default::default()
     });
-}
-
-#[allow(clippy::type_complexity)]
-fn update(
-    time: Res<Time>,
-    mut surface: Query<
-        (&IntersectionSurface, &mut Transform),
-        (With<IntersectionSurface>, Without<IntersectionPlane>),
-    >,
-    plane: Query<&IntersectionPlane, (With<IntersectionPlane>, Without<IntersectionSurface>)>,
-    mut gizmos: Gizmos,
-) {
-    let speed = 1.0;
-    // let elapsed = time.elapsed_secs() * speed;
-    let delta = time.delta_secs() * speed;
-
-    surface.iter_mut().for_each(|(_, mut tr1)| {
-        tr1.rotate_local_z(-delta);
-    });
-
-    let s = surface.single();
-    let p = plane.single();
-    if let (Ok(s), Ok(p)) = (s, p) {
-        let m = Matrix4::from(s.1.compute_matrix()).cast::<f64>();
-        let surface = s.0 .0.clone().transformed(&m);
-        // let tess = surface.tessellate(Some(AdaptiveTessellationOptions {norm_tolerance: 1e-2, ..Default::default() }));
-        // let its = tess.find_intersection(&p.0, ());
-        let its = surface.find_intersection(&p.0, None);
-        if let Ok(its) = its {
-            /*
-            its.polylines.iter().for_each(|polyline| {
-                gizmos.linestrip(
-                    polyline
-                        .iter()
-                        .map(|it| it.cast::<f32>().into())
-                        .collect_vec(),
-                    Color::WHITE,
-                );
-            });
-            */
-            its.iter().for_each(|curve| {
-                let polyline = curve.tessellate(None);
-                gizmos.linestrip(
-                    polyline
-                        .iter()
-                        .map(|it| it.cast::<f32>().into())
-                        .collect_vec(),
-                    Color::WHITE,
-                );
-            });
-        }
-    }
 }

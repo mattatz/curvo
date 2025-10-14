@@ -45,6 +45,7 @@ where
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub(crate) fn morph_point<T: FloatingPoint + ArgminFloat>(
     point: &Point3<T>,
     reference_surface: &NurbsSurface<T, Const<4>>,
