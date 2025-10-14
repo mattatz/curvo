@@ -468,6 +468,36 @@ where
         self.control_points.iter_mut()
     }
 
+    /// Calculate Greville abscissae (parameters corresponding to each control point)
+    ///
+    /// For each control point i, the Greville parameter is calculated as:
+    /// greville[i] = (knot[i+1] + knot[i+2] + ... + knot[i+degree]) / degree
+    ///
+    /// This provides a natural parameter value for each control point on the curve.
+    /// This implementation uses the OpenNURBS-based algorithm for improved accuracy.
+    ///
+    /// # Returns
+    /// A vector of parameter values, one for each control point
+    ///
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::Point3;
+    ///
+    /// let points = vec![
+    ///     Point3::new(0.0, 0.0, 0.0),
+    ///     Point3::new(1.0, 1.0, 0.0),
+    ///     Point3::new(2.0, 0.0, 0.0),
+    /// ];
+    /// let curve = NurbsCurve3D::try_interpolate(&points, 2).unwrap();
+    /// let greville_params = curve.greville_abscissae().unwrap();
+    /// assert_eq!(greville_params.len(), curve.control_points().len());
+    /// ```
+    pub fn greville_abscissae(&self) -> anyhow::Result<Vec<T>> {
+        let cv_count = self.control_points.len();
+        self.knots.greville_abscissae(self.degree + 1, cv_count)
+    }
+
     pub fn knots_domain(&self) -> (T, T) {
         self.knots.domain(self.degree)
     }

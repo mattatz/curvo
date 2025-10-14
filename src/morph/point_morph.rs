@@ -94,7 +94,8 @@ mod tests {
         // Create a target sphere
         let radius = 1.0;
         let target_sphere =
-            NurbsSurface::try_sphere(&Point3::origin(), &Vector3::z(), &Vector3::x(), radius).unwrap();
+            NurbsSurface::try_sphere(&Point3::origin(), &Vector3::z(), &Vector3::x(), radius)
+                .unwrap();
 
         // Take a point on the reference plane
         let point = Point3::new(0.0, 0.0, 0.0);
