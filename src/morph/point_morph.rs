@@ -1,5 +1,5 @@
 use argmin::core::ArgminFloat;
-use nalgebra::{Const, OPoint};
+use nalgebra::{Const, OPoint, Point3, Vector3};
 
 use crate::{misc::FloatingPoint, morph::Morph, surface::nurbs_surface::NurbsSurface};
 
@@ -41,22 +41,34 @@ where
         reference_surface: &NurbsSurface<T, Const<4>>,
         target_surface: &NurbsSurface<T, Const<4>>,
     ) -> anyhow::Result<Self::Output> {
-        // Find the closest UV parameter on the reference surface
-        let (u, v) = reference_surface.find_closest_parameter(self)?;
-        let ((u_min, u_max), (v_min, v_max)) = reference_surface.knots_domain();
-        let u = (u - u_min) / (u_max - u_min);
-        let v = (v - v_min) / (v_max - v_min);
-
-        // Remap the UV parameter to the target surface
-        let ((u_min, u_max), (v_min, v_max)) = target_surface.knots_domain();
-        let u = u_min + u * (u_max - u_min);
-        let v = v_min + v * (v_max - v_min);
-
-        // Evaluate the target surface at the same UV parameter
-        let morphed_point = target_surface.point_at(u, v);
-
-        Ok(morphed_point)
+        morph_point(self, reference_surface, target_surface).map(|(p, _, _)| p)
     }
+}
+
+pub(crate) fn morph_point<T: FloatingPoint + ArgminFloat>(
+    point: &Point3<T>,
+    reference_surface: &NurbsSurface<T, Const<4>>,
+    target_surface: &NurbsSurface<T, Const<4>>,
+) -> anyhow::Result<(Point3<T>, Vector3<T>, (T, T))> {
+    // Find the closest UV parameter on the reference surface
+    let (u, v) = reference_surface.find_closest_parameter(point)?;
+    let ((u_min, u_max), (v_min, v_max)) = reference_surface.knots_domain();
+    let u = (u - u_min) / (u_max - u_min);
+    let v = (v - v_min) / (v_max - v_min);
+
+    // Remap the UV parameter to the target surface
+    let ((u_min, u_max), (v_min, v_max)) = target_surface.knots_domain();
+    let u = u_min + u * (u_max - u_min);
+    let v = v_min + v * (v_max - v_min);
+
+    // Evaluate the target surface at the same UV parameter
+    let derivs = target_surface.rational_derivatives(u, v, 1);
+    let point = derivs[0][0].clone();
+
+    let v0 = &derivs[1][0];
+    let v1 = &derivs[0][1];
+    let normal = v0.cross(v1);
+    Ok((point.into(), normal, (u, v)))
 }
 
 #[cfg(test)]
