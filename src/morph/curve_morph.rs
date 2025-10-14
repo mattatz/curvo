@@ -1,12 +1,13 @@
 use argmin::core::ArgminFloat;
-use nalgebra::{Const, OPoint};
+use itertools::Itertools;
+use nalgebra::{Const, OPoint, OVector, Point3, Vector3};
 
 use crate::{
     curve::nurbs_curve::NurbsCurve, misc::FloatingPoint, morph::Morph,
     surface::nurbs_surface::NurbsSurface,
 };
 
-// Implementation for NurbsCurve
+// Implementation for NurbsCurve with adaptive subdivision based on surface normals
 impl<T> Morph<T, Const<4>> for NurbsCurve<T, Const<4>>
 where
     T: FloatingPoint + ArgminFloat,
@@ -14,41 +15,57 @@ where
     type Output = NurbsCurve<T, Const<4>>;
 
     /// Morphs a curve from the reference surface to the target surface.
+    ///
+    /// This implementation uses adaptive subdivision based on surface normal changes
+    /// starting from Greville abscissae (parameters corresponding to control points).
+    /// This ensures the morphed curve properly follows the target surface geometry
+    /// while respecting the original curve's parametric structure.
     fn morph(
         &self,
         reference_surface: &NurbsSurface<T, Const<4>>,
         target_surface: &NurbsSurface<T, Const<4>>,
     ) -> anyhow::Result<Self::Output> {
-        // Get dehomogenized control points
-        let dehom_control_points = self.dehomogenized_control_points();
-        let weights = self.weights();
+        let parameters = self.greville_abscissae()?;
 
-        // Morph each control point
-        let morphed_points: anyhow::Result<Vec<_>> = dehom_control_points
-            .iter()
-            .map(|pt| pt.morph(reference_surface, target_surface))
-            .collect();
-        let morphed_points = morphed_points?;
+        let pts = if self.degree() == 1 {
+            self.dehomogenized_control_points()
+        } else {
+            parameters.iter().map(|p| self.point_at(*p)).collect_vec()
+        };
 
-        // Re-homogenize the control points with original weights
-        let homogenized_control_points: Vec<OPoint<T, Const<4>>> = morphed_points
-            .iter()
-            .zip(weights.iter())
-            .map(|(pt, &w)| {
-                let mut homogenized = OPoint::<T, Const<4>>::origin();
-                for i in 0..3 {
-                    homogenized[i] = pt[i] * w;
-                }
-                homogenized[3] = w;
-                homogenized
+        let pts = pts
+            .into_iter()
+            .zip(parameters.into_iter())
+            .map(|(pt, t)| {
+                let m = super::point_morph::morph_point(&pt, reference_surface, target_surface)?;
+                Ok(MorphPoint {
+                    point: m.0,
+                    normal: m.1,
+                    parameter: t,
+                })
             })
-            .collect();
+            .collect::<anyhow::Result<Vec<_>>>()?;
 
-        // Create a new curve with the morphed control points
-        NurbsCurve::try_new(
-            self.degree(),
-            homogenized_control_points,
-            self.knots().to_vec(),
-        )
+        todo!()
     }
+}
+
+fn subdivide<T: FloatingPoint + ArgminFloat>(
+    curve: &NurbsCurve<T, Const<4>>,
+    left: &MorphPoint<T>,
+    right: &MorphPoint<T>,
+    reference_surface: &NurbsSurface<T, Const<4>>,
+    target_surface: &NurbsSurface<T, Const<4>>,
+) -> anyhow::Result<Vec<MorphPoint<T>>> {
+    let mid = (left.parameter + right.parameter) / T::from_f64(2.0).unwrap();
+    let pt = curve.point_at(mid);
+    let m = super::point_morph::morph_point(&pt, reference_surface, target_surface)?;
+    todo!()
+}
+
+#[derive(Debug, Clone)]
+struct MorphPoint<T: FloatingPoint> {
+    point: Point3<T>,
+    normal: Vector3<T>,
+    parameter: T,
 }
