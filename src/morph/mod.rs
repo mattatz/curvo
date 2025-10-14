@@ -2,6 +2,9 @@ pub mod curve_morph;
 pub mod point_morph;
 pub mod surface_morph;
 
+#[cfg(test)]
+mod tests;
+
 use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, U1};
 
 use crate::{misc::FloatingPoint, surface::nurbs_surface::NurbsSurface};
