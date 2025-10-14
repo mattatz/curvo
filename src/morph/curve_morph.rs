@@ -1,6 +1,6 @@
 use argmin::core::ArgminFloat;
 use itertools::Itertools;
-use nalgebra::{Const, OPoint, OVector, Point3, Vector3};
+use nalgebra::{Const, Point3, Vector3};
 
 use crate::{
     curve::nurbs_curve::NurbsCurve, misc::FloatingPoint, morph::Morph,

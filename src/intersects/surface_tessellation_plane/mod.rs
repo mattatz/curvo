@@ -58,10 +58,9 @@ mod tests {
             .collect_vec();
         let surface = NurbsSurface3D::new(degree, degree, knots.to_vec(), knots.to_vec(), pts);
         let plane = Plane::new(Vector3::y(), 0.0);
-        let tess = surface.tessellate(Some(AdaptiveTessellationOptions {
-            norm_tolerance: 1e-3,
-            ..Default::default()
-        }));
+        let tess = surface.tessellate(Some(
+            AdaptiveTessellationOptions::<_>::default().with_norm_tolerance(1e-3),
+        ));
         let its = tess.find_intersection(&plane, ());
         assert!(its.is_ok());
         let its = its.unwrap();

@@ -30,12 +30,7 @@ where
     /// * `plane` - The plane to intersect with
     /// * `options` - Hyperparameters for the intersection solver
     fn find_intersection(&'a self, plane: &'a Plane<T>, _option: Self::Option) -> Self::Output {
-        let tess = self.tessellate(Some(AdaptiveTessellationOptions {
-            // norm_tolerance: T::from_f64(0.005).unwrap(),
-            // min_depth: 1,
-            // max_depth: 1,
-            ..Default::default()
-        }));
+        let tess = self.tessellate(Some(AdaptiveTessellationOptions::<T, Const<4>>::default()));
         let its = tess.find_intersection(plane, ())?;
 
         /*

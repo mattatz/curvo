@@ -51,7 +51,7 @@ pub(crate) fn morph_point<T: FloatingPoint + ArgminFloat>(
     target_surface: &NurbsSurface<T, Const<4>>,
 ) -> anyhow::Result<(Point3<T>, Vector3<T>, (T, T))> {
     // Find the closest UV parameter on the reference surface
-    let (u, v) = reference_surface.find_closest_parameter(point)?;
+    let (u, v) = reference_surface.find_closest_parameter(point, None)?;
     let ((u_min, u_max), (v_min, v_max)) = reference_surface.knots_domain();
     let u = (u - u_min) / (u_max - u_min);
     let v = (v - v_min) / (v_max - v_min);
@@ -63,7 +63,7 @@ pub(crate) fn morph_point<T: FloatingPoint + ArgminFloat>(
 
     // Evaluate the target surface at the same UV parameter
     let derivs = target_surface.rational_derivatives(u, v, 1);
-    let point = derivs[0][0].clone();
+    let point = derivs[0][0];
 
     let v0 = &derivs[1][0];
     let v1 = &derivs[0][1];
