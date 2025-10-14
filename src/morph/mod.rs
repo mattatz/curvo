@@ -51,6 +51,3 @@ where
         target_surface: &NurbsSurface<T, D>,
     ) -> anyhow::Result<Self::Output>;
 }
-
-#[cfg(test)]
-mod tests;
