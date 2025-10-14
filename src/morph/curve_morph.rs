@@ -3,8 +3,8 @@ use itertools::Itertools;
 use nalgebra::{Const, Point3, Vector3};
 
 use crate::{
-    curve::nurbs_curve::NurbsCurve, misc::FloatingPoint, morph::Morph,
-    surface::nurbs_surface::NurbsSurface,
+    curve::nurbs_curve::NurbsCurve, interpolation::Interpolation, misc::FloatingPoint,
+    morph::Morph, surface::nurbs_surface::NurbsSurface,
 };
 
 // Implementation for NurbsCurve with adaptive subdivision based on surface normals
@@ -73,7 +73,13 @@ where
             [acc, tail].concat()
         });
 
-        Ok(NurbsCurve::polyline(&pts, false))
+        // return Ok(NurbsCurve::polyline(&pts, false));
+
+        let degree = self
+            .degree()
+            .max(target_surface.u_degree())
+            .max(target_surface.v_degree());
+        NurbsCurve::interpolate(&pts, degree)
     }
 }
 
