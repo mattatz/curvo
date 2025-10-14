@@ -37,35 +37,100 @@ where
             .into_iter()
             .zip(parameters.into_iter())
             .map(|(pt, t)| {
-                let m = super::point_morph::morph_point(&pt, reference_surface, target_surface)?;
+                let m =
+                    super::point_morph::morph_point(&pt, reference_surface, target_surface, None)?;
                 Ok(MorphPoint {
                     point: m.0,
                     normal: m.1,
+                    uv: m.2,
                     parameter: t,
                 })
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
 
-        todo!()
+        let normal_tolerance = T::from_f64(1e-3).unwrap();
+        let morphed = pts
+            .windows(2)
+            .map(|window| {
+                adaptive_subdivide(
+                    self,
+                    &window[0],
+                    &window[1],
+                    reference_surface,
+                    target_surface,
+                    normal_tolerance,
+                )
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
+
+        let head = morphed
+            .first()
+            .and_then(|x| x.first().map(|x| x.point.clone()))
+            .ok_or(anyhow::anyhow!("Failed to get the first point"))?;
+
+        let pts = morphed.into_iter().fold(vec![head], |acc, x| {
+            let tail = x.into_iter().skip(1).map(|x| x.point.clone()).collect_vec();
+            [acc, tail].concat()
+        });
+
+        Ok(NurbsCurve::polyline(&pts, false))
     }
 }
 
-fn subdivide<T: FloatingPoint + ArgminFloat>(
+/// Adaptive subdivide the curve using the surface normal
+fn adaptive_subdivide<T: FloatingPoint + ArgminFloat>(
     curve: &NurbsCurve<T, Const<4>>,
     left: &MorphPoint<T>,
     right: &MorphPoint<T>,
     reference_surface: &NurbsSurface<T, Const<4>>,
     target_surface: &NurbsSurface<T, Const<4>>,
+    normal_tolerance: T,
 ) -> anyhow::Result<Vec<MorphPoint<T>>> {
     let mid = (left.parameter + right.parameter) / T::from_f64(2.0).unwrap();
+
+    let dn = (left.normal - right.normal).norm_squared();
+    if dn <= normal_tolerance {
+        return Ok(vec![left.clone(), right.clone()]);
+    }
+
     let pt = curve.point_at(mid);
-    let m = super::point_morph::morph_point(&pt, reference_surface, target_surface)?;
-    todo!()
+    let m = super::point_morph::morph_point(&pt, reference_surface, target_surface, Some(left.uv))?;
+    let m = MorphPoint {
+        point: m.0,
+        normal: m.1,
+        uv: m.2,
+        parameter: mid,
+    };
+    let lm = (left.normal - m.normal).norm_squared();
+    let rm = (right.normal - m.normal).norm_squared();
+    if lm > normal_tolerance || rm > normal_tolerance {
+        let mut left = adaptive_subdivide(
+            curve,
+            left,
+            &m,
+            reference_surface,
+            target_surface,
+            normal_tolerance,
+        )?;
+        left.pop();
+        let right = adaptive_subdivide(
+            curve,
+            &m,
+            right,
+            reference_surface,
+            target_surface,
+            normal_tolerance,
+        )?;
+        Ok([left, right].concat())
+    } else {
+        Ok(vec![left.clone(), right.clone()])
+    }
 }
 
 #[derive(Debug, Clone)]
 struct MorphPoint<T: FloatingPoint> {
     point: Point3<T>,
     normal: Vector3<T>,
+    uv: (T, T),
     parameter: T,
 }
