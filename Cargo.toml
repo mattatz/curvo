@@ -228,3 +228,8 @@ required-features = ["bevy"]
 name = "customized_tessellation"
 path = "examples/customized_tessellation.rs"
 required-features = ["bevy"]
+
+[[example]]
+name = "morph"
+path = "examples/morph.rs"
+required-features = ["bevy"]
