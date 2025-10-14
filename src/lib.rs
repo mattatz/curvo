@@ -64,6 +64,7 @@ mod fillet;
 mod intersects;
 mod knot;
 mod misc;
+mod morph;
 mod offset;
 mod polygon_mesh;
 mod region;
@@ -89,6 +90,7 @@ pub mod prelude {
         invertible::*, line::*, orientation::*, plane::*, polygon_boundary::*, ray::*,
         transformable::*, transpose::*, trigonometry::*,
     };
+    pub use crate::morph::*;
     pub use crate::offset::*;
     pub use crate::polygon_mesh::*;
     pub use crate::region::*;
