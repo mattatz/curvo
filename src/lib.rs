@@ -30,7 +30,7 @@
 //!
 //!     // Create a NURBS curve that interpolates the given points with degree 3
 //!     // You can also specify the precision of the curve by generic type (f32 or f64)
-//!     let interpolated = NurbsCurve3D::<f64>::try_interpolate(&points, 3).unwrap();
+//!     let interpolated = NurbsCurve3D::<f64>::interpolate(&points, 3).unwrap();
 //!
 //!     // NURBS curve & surface can be transformed by nalgebra's matrix
 //!     let rotation = Rotation3::from_axis_angle(&Vector3::z_axis(), FRAC_PI_2);
@@ -61,8 +61,10 @@ mod decompose;
 mod dimension;
 mod discontinuity;
 mod fillet;
+mod interpolation;
 mod intersects;
 mod knot;
+mod marching;
 mod misc;
 mod morph;
 mod offset;
@@ -83,8 +85,10 @@ pub mod prelude {
     pub use crate::dimension::*;
     pub use crate::discontinuity::*;
     pub use crate::fillet::*;
+    pub use crate::interpolation::*;
     pub use crate::intersects::*;
     pub use crate::knot::*;
+    pub use crate::marching::*;
     pub use crate::misc::{
         binomial::*, curvature::*, end_points::*, floating_point::*, frenet_frame::*,
         invertible::*, line::*, orientation::*, plane::*, polygon_boundary::*, ray::*,

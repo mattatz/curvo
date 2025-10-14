@@ -64,7 +64,7 @@ fn setup(
             Point3::new(x, y, 0.)
         })
         .collect();
-    let curve = NurbsCurve3D::try_periodic_interpolate(&points, 3, KnotStyle::Uniform).unwrap();
+    let curve = NurbsCurve3D::interpolate_periodic(&points, 3, KnotStyle::Uniform).unwrap();
 
     let mut mesh = Mesh::new(PrimitiveTopology::LineStrip, default());
     let vertices = curve

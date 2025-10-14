@@ -32,15 +32,17 @@ bevy_points = { version = "0.8.0", optional = true }
 argmin = "0.10.0"
 itertools = "0.14.0"
 log = { version = "0.4", optional = true }
+ordered-float = { version = "5.0.0", default-features = false }
 serde = { version = "1.0.219", optional = true }
 ordered-float = "5.0.0"
+hashbrown = "0.15.5"
 
 [target.wasm32-unknown-unknown.dependencies]
 argmin = { version = "0.10.0", features = ["wasm-bindgen"] }
 
 [dev-dependencies]
 approx = { version = "0.5", default-features = false }
-serde_json = "1.0.143"
+serde_json = "1.0"
 
 [features]
 default = []
@@ -162,6 +164,11 @@ required-features = ["bevy"]
 [[example]]
 name = "intersect_surface_curve"
 path = "examples/intersect_surface_curve.rs"
+required-features = ["bevy"]
+
+[[example]]
+name = "intersect_surface_plane"
+path = "examples/intersect_surface_plane.rs"
 required-features = ["bevy"]
 
 [[example]]
