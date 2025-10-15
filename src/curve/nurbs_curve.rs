@@ -904,9 +904,130 @@ where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
-        let x_axis = x_axis.normalize() * radius;
-        let y_axis = y_axis.normalize() * radius;
-        Self::try_ellipse_arc(center, &x_axis, &y_axis, start_angle, end_angle)
+        anyhow::ensure!(
+            end_angle > start_angle,
+            "`end_angle` must be greater than `start_angle`. {} <= {}",
+            end_angle,
+            start_angle
+        );
+
+        let x_axis = x_axis.normalize();
+        let y_axis = y_axis.normalize();
+
+        let angle = end_angle - start_angle;
+
+        let a = T::from_f64(0.5 + 1e-8).unwrap() * T::from_f64(std::f64::consts::PI).unwrap();
+        let span_count = if angle <= a {
+            1
+        } else if angle <= a * T::from_f64(2.0).unwrap() {
+            2
+        // } else if angle <= a * T::from_f64(3.0).unwrap() {
+        // 4 // TODO: make a 3 span case
+        } else {
+            4
+        };
+
+        let cv_count = 2 * span_count + 1;
+
+        // Helper to compute a point on the arc
+        let arc_point = |ang: T| -> OPoint<T, DimNameDiff<D, U1>> {
+            center + &x_axis * (radius * ang.cos()) + &y_axis * (radius * ang.sin())
+        };
+
+        // Calculate control point positions on the arc
+        let mut cvs = Vec::with_capacity(cv_count);
+        match span_count {
+            1 => {
+                cvs.push(arc_point(start_angle));
+                cvs.push(arc_point(start_angle + angle * T::from_f64(0.50).unwrap()));
+                cvs.push(arc_point(end_angle));
+            }
+            2 => {
+                cvs.push(arc_point(start_angle));
+                cvs.push(arc_point(start_angle + angle * T::from_f64(0.25).unwrap()));
+                cvs.push(arc_point(start_angle + angle * T::from_f64(0.50).unwrap()));
+                cvs.push(arc_point(start_angle + angle * T::from_f64(0.75).unwrap()));
+                cvs.push(arc_point(end_angle));
+            }
+            _ => {
+                // 4 spans
+                cvs.push(arc_point(start_angle));
+                cvs.push(arc_point(start_angle + angle * T::from_f64(0.125).unwrap()));
+                cvs.push(arc_point(start_angle + angle * T::from_f64(0.250).unwrap()));
+                cvs.push(arc_point(start_angle + angle * T::from_f64(0.375).unwrap()));
+                cvs.push(arc_point(start_angle + angle * T::from_f64(0.500).unwrap()));
+                cvs.push(arc_point(start_angle + angle * T::from_f64(0.625).unwrap()));
+                cvs.push(arc_point(start_angle + angle * T::from_f64(0.750).unwrap()));
+                cvs.push(arc_point(start_angle + angle * T::from_f64(0.875).unwrap()));
+                cvs.push(arc_point(end_angle));
+            }
+        }
+
+        let angle_per_span = match span_count {
+            1 => angle,
+            2 => angle * T::from_f64(0.5).unwrap(),
+            _ => angle * T::from_f64(0.25).unwrap(),
+        };
+
+        let cos_half_angle = (angle_per_span / T::from_f64(2.0).unwrap()).cos();
+        let b = cos_half_angle - T::one();
+
+        // Build standard clamped knot vector (length cv_count + degree + 1)
+        let degree = 2;
+        let mut knots = vec![start_angle; degree + 1]; // First degree+1 knots
+
+        // Add internal knots (span_count - 1 internal knot values, each with multiplicity 2)
+        for i in 1..span_count {
+            let knot_value = start_angle + angle_per_span * T::from_usize(i).unwrap();
+            knots.push(knot_value);
+            knots.push(knot_value);
+        }
+
+        // Add last degree+1 knots
+        for _ in 0..=degree {
+            knots.push(end_angle);
+        }
+
+        let span_count_doubled = span_count * 2;
+
+        // Adjust odd-indexed control points and set weights
+        // Adjusted homogeneous coordinate is (cvs[j] + b*center) with weight cos_half_angle
+        // The actual 3D coordinate is (cvs[j] + b*center) / cos_half_angle
+        let mut weights = vec![T::one(); cv_count];
+
+        for j in (1..span_count_doubled).step_by(2) {
+            // Compute actual 3D control point: (cvs[j] + b*center) / cos_half_angle
+            let adjusted = &cvs[j] + &center.coords * b;
+            for k in 0..(D::dim() - 1) {
+                cvs[j][k] = adjusted[k] / cos_half_angle;
+            }
+            weights[j] = cos_half_angle;
+        }
+
+        // Apply arc_de_fuzz to odd-indexed control points
+        for j in (1..span_count_doubled).step_by(2) {
+            for k in 0..(D::dim() - 1) {
+                cvs[j][k] = super::helper::arc_de_fuzz(cvs[j][k]);
+            }
+        }
+
+        // Convert to homogeneous coordinates
+        let mut control_points = Vec::with_capacity(cv_count);
+        for i in 0..cv_count {
+            let w = weights[i];
+            let mut coords = vec![];
+            for k in 0..(D::dim() - 1) {
+                coords.push(cvs[i][k] * w);
+            }
+            coords.push(w);
+            control_points.push(OPoint::from_slice(&coords));
+        }
+
+        Ok(Self {
+            degree: 2,
+            control_points,
+            knots: KnotVector::new(knots),
+        })
     }
 
     /// Try to create an ellipse arc curve
