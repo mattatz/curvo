@@ -41,17 +41,19 @@ where
         reference_surface: &NurbsSurface<T, Const<4>>,
         target_surface: &NurbsSurface<T, Const<4>>,
     ) -> anyhow::Result<Self::Output> {
-        morph_point(self, reference_surface, target_surface, None).map(|(p, _, _)| p)
+        let (u, v) = remap_closest_uv(self, reference_surface, target_surface, None)?;
+        let point = target_surface.point_at(u, v);
+        Ok(point)
     }
 }
 
-#[allow(clippy::type_complexity)]
-pub(crate) fn morph_point<T: FloatingPoint + ArgminFloat>(
+/// Remap the UV parameter from the reference surface to the target surface
+pub fn remap_closest_uv<T: FloatingPoint + ArgminFloat>(
     point: &Point3<T>,
     reference_surface: &NurbsSurface<T, Const<4>>,
     target_surface: &NurbsSurface<T, Const<4>>,
     hint: Option<(T, T)>,
-) -> anyhow::Result<(Point3<T>, Vector3<T>, (T, T))> {
+) -> anyhow::Result<(T, T)> {
     // Find the closest UV parameter on the reference surface
     let (u, v) = reference_surface.find_closest_parameter(point, hint)?;
     let ((u_min, u_max), (v_min, v_max)) = reference_surface.knots_domain();
@@ -62,6 +64,18 @@ pub(crate) fn morph_point<T: FloatingPoint + ArgminFloat>(
     let ((u_min, u_max), (v_min, v_max)) = target_surface.knots_domain();
     let u = u_min + ru * (u_max - u_min);
     let v = v_min + rv * (v_max - v_min);
+
+    Ok((u, v))
+}
+
+#[allow(clippy::type_complexity)]
+pub(crate) fn morph_point<T: FloatingPoint + ArgminFloat>(
+    point: &Point3<T>,
+    reference_surface: &NurbsSurface<T, Const<4>>,
+    target_surface: &NurbsSurface<T, Const<4>>,
+    hint: Option<(T, T)>,
+) -> anyhow::Result<(Point3<T>, Vector3<T>, (T, T))> {
+    let (u, v) = remap_closest_uv(point, reference_surface, target_surface, hint)?;
 
     // Evaluate the target surface at the same UV parameter
     let derivs = target_surface.rational_derivatives(u, v, 1);
