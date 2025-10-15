@@ -65,11 +65,11 @@ where
 
         let head = morphed
             .first()
-            .and_then(|x| x.first().map(|x| x.point.clone()))
+            .and_then(|x| x.first().map(|x| x.point))
             .ok_or(anyhow::anyhow!("Failed to get the first point"))?;
 
         let pts = morphed.into_iter().fold(vec![head], |acc, x| {
-            let tail = x.into_iter().skip(1).map(|x| x.point.clone()).collect_vec();
+            let tail = x.into_iter().skip(1).map(|x| x.point).collect_vec();
             [acc, tail].concat()
         });
 

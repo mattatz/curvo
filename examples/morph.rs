@@ -134,7 +134,9 @@ fn setup(
         &mut commands,
         &mut meshes,
         &mut points_materials,
-        &pts.iter().map(|p| p.morph(&ref_surface, &target_surface).unwrap()).collect_vec(),
+        &pts.iter()
+            .map(|p| p.morph(&ref_surface, &target_surface).unwrap())
+            .collect_vec(),
         YELLOW.into(),
         point_size,
     );
