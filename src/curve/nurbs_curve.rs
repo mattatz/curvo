@@ -487,7 +487,7 @@ where
     ///     Point3::new(1.0, 1.0, 0.0),
     ///     Point3::new(2.0, 0.0, 0.0),
     /// ];
-    /// let curve = NurbsCurve3D::try_interpolate(&points, 2).unwrap();
+    /// let curve = NurbsCurve3D::interpolate(&points, 2).unwrap();
     /// let greville_params = curve.greville_abscissae().unwrap();
     /// assert_eq!(greville_params.len(), curve.control_points().len());
     /// ```
