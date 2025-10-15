@@ -140,3 +140,40 @@ struct MorphPoint<T: FloatingPoint> {
     uv: (T, T),
     parameter: T,
 }
+
+#[cfg(test)]
+mod tests {
+    use approx::assert_relative_eq;
+    use nalgebra::{Point3, Vector3};
+
+    use crate::{curve::NurbsCurve3D, misc::EndPoints};
+
+    use super::*;
+
+    #[test]
+    fn test_morph_curve_plane_to_plane() {
+        let ref_surface = NurbsSurface::plane(Point3::origin(), Vector3::x(), Vector3::y());
+        let target_surface =
+            NurbsSurface::plane(Point3::new(0.0, 0.0, 1.0), Vector3::y(), Vector3::z());
+        let curve = NurbsCurve3D::polyline(
+            &vec![
+                Point3::new(0.0, 0.0, 0.0),
+                Point3::new(1.0, 0.0, 0.0),
+            ],
+            false,
+        );
+
+        let morphed = curve.morph(&ref_surface, &target_surface).unwrap();
+        let (start, end) = morphed.end_points();
+        assert_relative_eq!(
+            start,
+            Point3::new(0.0, 0.0, 1.0),
+            epsilon = 1e-4
+        );
+        assert_relative_eq!(
+            end,
+            Point3::new(0.0, 1.0, 1.0),
+            epsilon = 1e-4
+        );
+    }
+}
