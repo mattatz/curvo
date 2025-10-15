@@ -1,6 +1,5 @@
 pub mod curve_morph;
 pub mod point_morph;
-pub mod surface_morph;
 
 #[cfg(test)]
 mod tests;
