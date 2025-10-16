@@ -1,7 +1,11 @@
 use argmin::core::ArgminFloat;
 use nalgebra::{Const, OPoint, Point3, Vector3};
 
-use crate::{misc::FloatingPoint, morph::Morph, surface::nurbs_surface::NurbsSurface};
+use crate::{
+    misc::{FloatingPoint, Plane},
+    morph::Morph,
+    surface::nurbs_surface::NurbsSurface,
+};
 
 // Implementation for Point3
 impl<T> Morph<T, Const<4>> for OPoint<T, Const<3>>
@@ -43,9 +47,13 @@ where
         target_surface: &NurbsSurface<T, Const<4>>,
         _option: Self::Option,
     ) -> anyhow::Result<Self::Output> {
-        let (u, v) = remap_closest_uv(self, reference_surface, target_surface, None)?;
-        let point = target_surface.point_at(u, v);
-        Ok(point)
+        let (uv, uv2) = remap_closest_uv(self, reference_surface, target_surface, None)?;
+        let r = reference_surface.point_normal_at(uv.0, uv.1);
+        let plane = Plane::new(r.1, r.0.coords.dot(&r.1));
+        let distance_plane = plane.signed_distance(&self);
+        let t = target_surface.point_normal_at(uv2.0, uv2.1);
+        let mapped = t.0 + t.1.normalize() * distance_plane;
+        Ok(mapped)
     }
 }
 
@@ -55,19 +63,19 @@ pub fn remap_closest_uv<T: FloatingPoint + ArgminFloat>(
     reference_surface: &NurbsSurface<T, Const<4>>,
     target_surface: &NurbsSurface<T, Const<4>>,
     hint: Option<(T, T)>,
-) -> anyhow::Result<(T, T)> {
+) -> anyhow::Result<((T, T), (T, T))> {
     // Find the closest UV parameter on the reference surface
-    let (u, v) = reference_surface.find_closest_parameter(point, hint)?;
+    let uv = reference_surface.find_closest_parameter(point, hint)?;
     let ((u_min, u_max), (v_min, v_max)) = reference_surface.knots_domain();
-    let ru = (u - u_min) / (u_max - u_min);
-    let rv = (v - v_min) / (v_max - v_min);
+    let ru = (uv.0 - u_min) / (u_max - u_min);
+    let rv = (uv.1 - v_min) / (v_max - v_min);
 
     // Remap the UV parameter to the target surface
     let ((u_min, u_max), (v_min, v_max)) = target_surface.knots_domain();
-    let u = u_min + ru * (u_max - u_min);
-    let v = v_min + rv * (v_max - v_min);
+    let u2 = u_min + ru * (u_max - u_min);
+    let v2 = v_min + rv * (v_max - v_min);
 
-    Ok((u, v))
+    Ok((uv, (u2, v2)))
 }
 
 #[allow(clippy::type_complexity)]
@@ -77,16 +85,11 @@ pub(crate) fn morph_point<T: FloatingPoint + ArgminFloat>(
     target_surface: &NurbsSurface<T, Const<4>>,
     hint: Option<(T, T)>,
 ) -> anyhow::Result<(Point3<T>, Vector3<T>, (T, T))> {
-    let (u, v) = remap_closest_uv(point, reference_surface, target_surface, hint)?;
+    let (uv, uv2) = remap_closest_uv(point, reference_surface, target_surface, hint)?;
 
     // Evaluate the target surface at the same UV parameter
-    let derivs = target_surface.rational_derivatives(u, v, 1);
-    let point = derivs[0][0];
-
-    let v0 = &derivs[1][0];
-    let v1 = &derivs[0][1];
-    let normal = v0.cross(v1);
-    Ok((point.into(), normal, (u, v)))
+    let (t, n) = target_surface.point_normal_at(uv2.0, uv2.1);
+    Ok((t.into(), n, uv))
 }
 
 #[cfg(test)]

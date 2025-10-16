@@ -410,6 +410,21 @@ where
         v0.cross(v1)
     }
 
+    /// Evaluate the point and normal at the given u, v parameters
+    pub fn point_normal_at(
+        &self,
+        u: T,
+        v: T,
+    ) -> (
+        OPoint<T, DimNameDiff<D, U1>>,
+        OVector<T, DimNameDiff<D, U1>>,
+    ) {
+        let deriv = self.rational_derivatives(u, v, 1);
+        let point = deriv[0][0].clone();
+        let normal = deriv[1][0].cross(&deriv[0][1]);
+        (point.into(), normal)
+    }
+
     /// Evaluate the rational derivatives at the given u, v parameters
     pub fn rational_derivatives(
         &self,
