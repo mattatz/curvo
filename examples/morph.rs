@@ -135,7 +135,7 @@ fn setup(
         &mut meshes,
         &mut points_materials,
         &pts.iter()
-            .map(|p| p.morph(&ref_surface, &target_surface).unwrap())
+            .map(|p| p.morph(&ref_surface, &target_surface, ()).unwrap())
             .collect_vec(),
         YELLOW.into(),
         point_size,
@@ -150,7 +150,7 @@ fn setup(
         Point3::new(1.25, 1.25, 0.0),
     ];
     let curve = NurbsCurve3D::interpolate(&curve_points, 1).unwrap();
-    let morphed_curve = curve.morph(&ref_surface, &target_surface).unwrap();
+    let morphed_curve = curve.morph(&ref_surface, &target_surface, None).unwrap();
 
     [curve, morphed_curve].into_iter().for_each(|curve| {
         render_curve(
@@ -169,7 +169,7 @@ fn setup(
         1.25,
     )
     .unwrap();
-    let morphed_circle = circle.morph(&ref_surface, &target_surface).unwrap();
+    let morphed_circle = circle.morph(&ref_surface, &target_surface, None).unwrap();
     [circle, morphed_circle].into_iter().for_each(|circle| {
         render_curve(
             &mut commands,

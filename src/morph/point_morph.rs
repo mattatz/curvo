@@ -8,6 +8,7 @@ impl<T> Morph<T, Const<4>> for OPoint<T, Const<3>>
 where
     T: FloatingPoint + ArgminFloat,
 {
+    type Option = ();
     type Output = OPoint<T, Const<3>>;
 
     /// Morphs a point from the reference surface to the target surface.
@@ -33,13 +34,14 @@ where
     ///
     /// // Morph a point
     /// let point = Point3::new(0.5, 0.5, 0.0);
-    /// let morphed: Point3<f64> = point.morph(&ref_surface, &target_surface).unwrap();
+    /// let morphed: Point3<f64> = point.morph(&ref_surface, &target_surface, ()).unwrap();
     /// assert_relative_eq!(morphed.z, 1.0, epsilon = 1e-6);
     /// ```
     fn morph(
         &self,
         reference_surface: &NurbsSurface<T, Const<4>>,
         target_surface: &NurbsSurface<T, Const<4>>,
+        _option: Self::Option,
     ) -> anyhow::Result<Self::Output> {
         let (u, v) = remap_closest_uv(self, reference_surface, target_surface, None)?;
         let point = target_surface.point_at(u, v);
@@ -105,7 +107,7 @@ mod tests {
 
         // Morph a point from the reference surface to the target surface
         let point = Point3::new(0.5, 0.5, 0.0);
-        let morphed = point.morph(&ref_surface, &target_surface).unwrap();
+        let morphed = point.morph(&ref_surface, &target_surface, ()).unwrap();
 
         // The morphed point should maintain x and y, but have z=1
         let epsilon = 1e-4;
@@ -129,7 +131,7 @@ mod tests {
         let point = Point3::new(0.0, 0.0, 0.0);
 
         // Morph to the target sphere
-        let morphed = point.morph(&ref_surface, &target_sphere).unwrap();
+        let morphed = point.morph(&ref_surface, &target_sphere, ()).unwrap();
 
         // The morphed point should be on the sphere
         let distance = morphed.coords.norm();

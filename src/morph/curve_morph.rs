@@ -12,6 +12,10 @@ impl<T> Morph<T, Const<4>> for NurbsCurve<T, Const<4>>
 where
     T: FloatingPoint + ArgminFloat,
 {
+    /// Normal tolerance for adaptive subdivision
+    type Option = Option<T>;
+
+    /// The output type after morphing
     type Output = NurbsCurve<T, Const<4>>;
 
     /// Morphs a curve from the reference surface to the target surface.
@@ -24,6 +28,7 @@ where
         &self,
         reference_surface: &NurbsSurface<T, Const<4>>,
         target_surface: &NurbsSurface<T, Const<4>>,
+        tolerance: Self::Option,
     ) -> anyhow::Result<Self::Output> {
         let parameters = self.greville_abscissae()?;
 
@@ -48,7 +53,7 @@ where
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
 
-        let normal_tolerance = T::from_f64(1e-3).unwrap();
+        let tolerance = tolerance.unwrap_or(T::from_f64(1e-3).unwrap());
         let morphed = pts
             .windows(2)
             .map(|window| {
@@ -58,7 +63,7 @@ where
                     &window[1],
                     reference_surface,
                     target_surface,
-                    normal_tolerance,
+                    tolerance,
                 )
             })
             .collect::<anyhow::Result<Vec<_>>>()?;
@@ -156,24 +161,13 @@ mod tests {
         let target_surface =
             NurbsSurface::plane(Point3::new(0.0, 0.0, 1.0), Vector3::y(), Vector3::z());
         let curve = NurbsCurve3D::polyline(
-            &vec![
-                Point3::new(0.0, 0.0, 0.0),
-                Point3::new(1.0, 0.0, 0.0),
-            ],
+            &vec![Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 0.0, 0.0)],
             false,
         );
 
-        let morphed = curve.morph(&ref_surface, &target_surface).unwrap();
+        let morphed = curve.morph(&ref_surface, &target_surface, None).unwrap();
         let (start, end) = morphed.end_points();
-        assert_relative_eq!(
-            start,
-            Point3::new(0.0, 0.0, 1.0),
-            epsilon = 1e-4
-        );
-        assert_relative_eq!(
-            end,
-            Point3::new(0.0, 1.0, 1.0),
-            epsilon = 1e-4
-        );
+        assert_relative_eq!(start, Point3::new(0.0, 0.0, 1.0), epsilon = 1e-4);
+        assert_relative_eq!(end, Point3::new(0.0, 1.0, 1.0), epsilon = 1e-4);
     }
 }

@@ -34,6 +34,9 @@ where
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
+    /// The option type for the morphing
+    type Option;
+
     /// The output type after morphing
     type Output;
 
@@ -51,5 +54,6 @@ where
         &self,
         reference_surface: &NurbsSurface<T, D>,
         target_surface: &NurbsSurface<T, D>,
+        option: Self::Option,
     ) -> anyhow::Result<Self::Output>;
 }
