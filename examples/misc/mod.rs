@@ -81,6 +81,60 @@ pub fn add_curve<'a, C: Into<CurveVariant<'a>>>(
 }
 
 #[allow(unused)]
+pub fn add_regular_curve<'a, C: Into<CurveVariant<'a>>>(
+    curve: C,
+    color: Option<Color>,
+    divs: usize,
+    commands: &mut Commands<'_, '_>,
+    meshes: &mut ResMut<'_, Assets<Mesh>>,
+    line_materials: &mut ResMut<'_, Assets<LineMaterial>>,
+) {
+    let curve: CurveVariant<'a> = curve.into();
+
+    let samples = match curve {
+        CurveVariant::NurbsCurve(n) => {
+            n.sample_regular_range(n.knots_domain().0, n.knots_domain().1, divs)
+        }
+        CurveVariant::CompoundCurve(c) => c
+            .spans()
+            .iter()
+            .flat_map(|span| {
+                span.sample_regular_range(span.knots_domain().0, span.knots_domain().1, divs)
+            })
+            .collect(),
+    };
+
+    let line_vertices: Vec<_> = samples
+        .iter()
+        .map(|p| p.cast::<f32>())
+        .map(|p| p.into())
+        .collect();
+    let n = line_vertices.len();
+    let mut line = Mesh::new(PrimitiveTopology::LineStrip, default()).with_inserted_attribute(
+        Mesh::ATTRIBUTE_POSITION,
+        VertexAttributeValues::Float32x3(line_vertices),
+    );
+    if color.is_none() {
+        line.insert_attribute(
+            Mesh::ATTRIBUTE_COLOR,
+            VertexAttributeValues::Float32x4(
+                (0..n)
+                    .map(|i| Color::hsl(((i as f32) / n as f32) * 300., 0.5, 0.5))
+                    .map(|c| c.to_srgba().to_f32_array())
+                    .collect(),
+            ),
+        );
+    }
+    commands.spawn((
+        Mesh3d(meshes.add(line)),
+        MeshMaterial3d(line_materials.add(LineMaterial {
+            color: color.unwrap_or(Color::WHITE),
+            ..Default::default()
+        })),
+    ));
+}
+
+#[allow(unused)]
 pub fn surface_2_mesh(
     surface: &NurbsSurface3D<f64>,
     option: Option<AdaptiveTessellationOptions<f64, U4>>,

@@ -30,7 +30,7 @@ where
     ///     Point2::new(1.0, 1.0),
     ///     Point2::new(-1.0, 1.0),
     /// ];
-    /// let curve2d = NurbsCurve2D::try_interpolate(&points, 3).unwrap();
+    /// let curve2d = NurbsCurve2D::interpolate(&points, 3).unwrap();
     /// let curve3d: NurbsCurve3D<f64> = curve2d.elevate_dimension();
     /// let (start, end) = curve2d.knots_domain();
     /// let (p0, p1) = (curve2d.point_at(start), curve2d.point_at(end));

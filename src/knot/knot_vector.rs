@@ -453,6 +453,100 @@ impl<T: RealField + Copy> KnotVector<T> {
     pub fn cast<F: FloatingPoint + SupersetOf<T>>(&self) -> KnotVector<F> {
         KnotVector::new(self.0.iter().map(|v| convert(*v)).collect())
     }
+
+    /// Calculate a single Greville abscissa for a given index
+    ///
+    /// # Arguments
+    ///
+    /// * `index` - The control point index
+    /// * `order` - The order (degree + 1)
+    ///
+    /// # Returns
+    ///
+    /// The Greville parameter value for the control point at the given index
+    ///
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// let knots = KnotVector::new(vec![0., 0., 0., 1., 2., 3., 3., 3.]);
+    /// let g = knots.single_greville_abscissa(0, 3); // index=0, order=3 (degree=2)
+    /// assert_eq!(g, 0.0);
+    /// ```
+    pub fn single_greville_abscissa(&self, index: usize, order: usize) -> T {
+        if order < 2 {
+            return self[index];
+        }
+
+        // Extract order-1 (degree) knots starting from index
+        let degree = order - 1;
+        let knot_slice = &self.0[index..index + degree];
+
+        // degree = 1 or fully multiple knot
+        if degree == 1 || knot_slice[0] == knot_slice[degree - 1] {
+            return knot_slice[0];
+        }
+
+        // Calculate g = (knot[i]+...+knot[i+degree-1])/degree
+        let k0 = knot_slice[0];
+        let k = knot_slice[degree / 2];
+        let k1 = knot_slice[degree - 1];
+        let tol = (k1 - k0) * T::default_epsilon().sqrt();
+        let const_deg = T::from_usize(degree).unwrap();
+
+        let g = (0..degree)
+            .map(|i| knot_slice[i])
+            .reduce(|a, b| a + b)
+            .unwrap();
+        let g = g / const_deg;
+
+        // Set g to exact value when knot vector is uniform
+        let two = T::from_f64(2.0).unwrap();
+        if (two * k - (k0 + k1)).abs() <= tol
+            && (g - k).abs() <= (g.abs() * T::default_epsilon().sqrt() + tol)
+        {
+            k
+        } else {
+            g
+        }
+    }
+
+    /// Calculate all Greville abscissae for the knot vector
+    ///
+    /// # Arguments
+    ///
+    /// * `order` - The order (degree + 1)
+    /// * `cv_count` - The number of control points
+    ///
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// let knots = KnotVector::new(vec![0., 0., 0., 1., 2., 3., 3., 3.]);
+    /// let degree = 2;
+    /// let cv_count = 5;
+    /// let greville = knots.greville_abscissae(degree + 1, cv_count).unwrap();
+    /// assert_eq!(greville.len(), cv_count);
+    /// ```
+    pub fn greville_abscissae(&self, order: usize, cv_count: usize) -> anyhow::Result<Vec<T>> {
+        anyhow::ensure!(order >= 2, "Order must be at least 2");
+        anyhow::ensure!(cv_count >= order, "Control point count must be >= order");
+        anyhow::ensure!(
+            self.0.len() >= cv_count + order,
+            "Not enough knots: expected at least {}, got {}",
+            cv_count + order,
+            self.0.len()
+        );
+
+        let count = cv_count;
+        let degree = order - 1;
+        if order == 2 {
+            // degree = 1 case
+            Ok((1..=count).map(|i| self[i]).collect())
+        } else {
+            Ok((0..count)
+                .map(|i| self.single_greville_abscissa(i + degree - 1, order))
+                .collect())
+        }
+    }
 }
 
 impl<T> Index<usize> for KnotVector<T> {

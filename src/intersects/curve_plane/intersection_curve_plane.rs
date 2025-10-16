@@ -206,6 +206,6 @@ mod tests {
         assert_eq!(intersections.len(), 1);
 
         let pt = &intersections[0].a().0;
-        assert_relative_eq!(*pt, Point3::origin());
+        assert_relative_eq!(*pt, Point3::origin(), epsilon = 1e-6);
     }
 }

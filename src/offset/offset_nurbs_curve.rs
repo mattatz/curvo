@@ -8,6 +8,7 @@ use nalgebra::{
 };
 
 use crate::curve::NurbsCurve2D;
+use crate::interpolation::Interpolation;
 use crate::offset::curve_offset_option::CurveOffsetOption;
 use crate::offset::helper::{
     round_corner, sharp_corner_intersection, smooth_corner, to_line_helper,
@@ -263,7 +264,7 @@ where
                     offset(&p, &t)
                 })
                 .collect_vec();
-            let mut res = Self::try_interpolate(&tess, self.degree())?;
+            let mut res = Self::interpolate(&tess, self.degree())?;
             res.try_reduce_knots(Some(knot_tol))?;
             Ok(vec![res.into()])
         }

@@ -1,9 +1,12 @@
 use std::borrow::Cow;
 
-use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, U1};
+use itertools::Itertools;
+use nalgebra::{
+    allocator::Allocator, Const, DefaultAllocator, DimName, DimNameDiff, DimNameSub, U1,
+};
 
 use crate::{
-    misc::FloatingPoint,
+    misc::{FloatingPoint, Plane},
     split::{Split, SplitSurfaceOption},
     surface::{NurbsSurface, UVDirection},
 };
@@ -93,5 +96,38 @@ where
     /// Get the bounding box of the surface.
     fn bounding_box(&self) -> BoundingBox<T, DimNameDiff<D, U1>> {
         self.surface.as_ref().into()
+    }
+}
+
+impl<'a, T: FloatingPoint> SurfaceBoundingBoxTree<'a, T, Const<4>> {
+    /// Recursively traverse all leaf nodes from a bounding box tree that intersect the plane
+    pub fn traverse_leaf_nodes_with_plane(&self, plane: &Plane<T>) -> Vec<Self> {
+        let bbox = self.bounding_box();
+        let corners = bbox.corners();
+
+        // Check if bbox straddles the plane
+        let distances = corners
+            .iter()
+            .map(|p| plane.signed_distance(p))
+            .collect_vec();
+        let has_positive = distances.iter().any(|&d| d > T::zero());
+        let has_negative = distances.iter().any(|&d| d < T::zero());
+
+        if !has_positive || !has_negative {
+            // Bbox is entirely on one side of the plane
+            return vec![];
+        }
+
+        if self.is_dividable() {
+            if let Ok((left, right)) = self.try_divide() {
+                let mut nodes = left.traverse_leaf_nodes_with_plane(plane);
+                nodes.extend(right.traverse_leaf_nodes_with_plane(plane));
+                nodes
+            } else {
+                vec![self.clone()]
+            }
+        } else {
+            vec![self.clone()]
+        }
     }
 }

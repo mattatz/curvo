@@ -1,6 +1,6 @@
 use std::f64::consts::{FRAC_PI_2, PI, TAU};
 
-use curvo::prelude::{CompoundCurve, KnotStyle, NurbsCurve2D, Region};
+use curvo::prelude::{CompoundCurve, KnotStyle, NurbsCurve2D, PeriodicInterpolation, Region};
 use nalgebra::{Point2, Vector2};
 
 use super::CurveVariant;
@@ -17,8 +17,8 @@ pub fn circle_rectangle_case() -> CurveVariants {
 pub fn periodic_interpolation_case() -> CurveVariants {
     let dx = 2.25;
     let dy = 0.5;
-    let subject = NurbsCurve2D::<f64>::try_periodic_interpolate(
-        &[
+    let subject = NurbsCurve2D::<f64>::interpolate_periodic(
+        &vec![
             Point2::new(-dx, -dy),
             Point2::new(0., -dy * 0.5),
             Point2::new(dx, -dy),
@@ -36,8 +36,8 @@ pub fn periodic_interpolation_case() -> CurveVariants {
 pub fn island_case() -> CurveVariants {
     let dx = 1.25;
     let dy = 1.5;
-    let subject = NurbsCurve2D::<f64>::try_periodic_interpolate(
-        &[
+    let subject = NurbsCurve2D::<f64>::interpolate_periodic(
+        &vec![
             Point2::new(-dx, -dy),
             Point2::new(0., -dy * 1.25),
             Point2::new(dx, -dy),
