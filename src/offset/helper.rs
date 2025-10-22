@@ -17,7 +17,7 @@ pub fn to_line_helper<T: FloatingPoint>(p0: &Point2<T>, p1: &Point2<T>) -> geo::
 pub fn sharp_corner_intersection<T: FloatingPoint>(
     vertices: [&Point2<T>; 4],
     delta: T,
-) -> anyhow::Result<Point2<T>> {
+) -> Option<Point2<T>> {
     let v0 = vertices[0];
     let v1 = vertices[1];
     let v2 = vertices[2];
@@ -36,10 +36,9 @@ pub fn sharp_corner_intersection<T: FloatingPoint>(
                 is_proper: _,
             } => Some(p),
             _ => None,
-        })
-        .ok_or(anyhow::anyhow!("no intersection"))?;
+        })?;
 
-    Ok(Point2::new(
+    Some(Point2::new(
         T::from_f64(it.x).unwrap(),
         T::from_f64(it.y).unwrap(),
     ))
