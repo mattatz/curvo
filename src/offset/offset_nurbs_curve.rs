@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use geo::LineIntersection;
+use geo::{GeoFloat, LineIntersection};
 use itertools::Itertools;
 use nalgebra::allocator::Allocator;
 use nalgebra::{
@@ -66,6 +66,10 @@ where
             } else {
                 p_segments.len()
             };
+
+            let intersections: Vec<_> =
+                geo::algorithm::sweep::Intersections::from_iter(p_segments.clone()).collect();
+
             let intersections = p_segments
                 .iter()
                 .cycle()
@@ -124,7 +128,7 @@ where
                     let pts = segments
                         .iter()
                         .enumerate()
-                        .map(|(i, s)| match s.start {
+                        .filter_map(|(i, s)| match s.start {
                             Vertex::Point(p) => {
                                 let prev = if i != 0 || is_closed {
                                     Some(&segments[(i + n - 1) % n])
@@ -141,14 +145,14 @@ where
                                             [v0.inner(), v1.inner(), v2.inner(), v3.inner()],
                                             delta,
                                         )?;
-                                        Ok(it)
+                                        Some(it)
                                     }
-                                    _ => Ok(p),
+                                    _ => Some(p),
                                 }
                             }
-                            Vertex::Intersection(p) => Ok(p),
+                            Vertex::Intersection(p) => Some(p),
                         })
-                        .collect::<anyhow::Result<Vec<_>>>()?;
+                        .collect_vec();
 
                     let last = segments.last();
                     let last = if let Some(last) = last {
@@ -281,6 +285,14 @@ struct Segment<T, P> {
 
 type PointSegment<T> = Segment<T, Point2<T>>;
 type VertexSegment<T> = Segment<T, Vertex<T>>;
+
+impl<T: FloatingPoint> geo::algorithm::sweep::Cross for PointSegment<T> {
+    type Scalar = f64;
+
+    fn line(&self) -> geo::sweep::LineOrPoint<Self::Scalar> {
+        geo::algorithm::sweep::Cross::line(&self.line)
+    }
+}
 
 impl<T: FloatingPoint> PointSegment<T> {
     fn new(start: Point2<T>, end: Point2<T>) -> Self {
@@ -468,5 +480,31 @@ mod tests {
                 Point2::new(0.2, 0.2),
             ]
         );
+    }
+
+    #[test]
+    fn error_case() {
+        let points = [
+            [1.530290927895823, 0.],
+            [1.7942607131015276, 0.42543444426298815],
+            [1.585949121235712, 1.01447885145289],
+            [0.6545685990210488, 1.104221787405585],
+            [0.6385717204054977, 1.0880981462477395],
+            [0.6759173543512923, 0.],
+            [1.530290927895823, 0.],
+        ]
+        .iter()
+        .map(|p| Point2::new(p[0], p[1]))
+        .collect::<Vec<_>>();
+
+        let polyline = NurbsCurve2D::polyline(&points, true);
+        let res = polyline.offset(
+            CurveOffsetOption::default()
+                .with_distance(-0.09)
+                .with_corner_type(CurveOffsetCornerType::Sharp),
+        );
+
+        // Should successfully compute offset without errors
+        assert!(res.is_ok());
     }
 }
