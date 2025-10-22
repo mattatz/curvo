@@ -10,15 +10,15 @@ use nalgebra::{
 use simba::scalar::SupersetOf;
 
 use crate::{
-    curve::{
-        nurbs_curve::{dehomogenize, NurbsCurve, NurbsCurve3D},
-        try_interpolate_control_points,
-    },
+    curve::nurbs_curve::{dehomogenize, NurbsCurve, NurbsCurve3D},
     misc::{
         binomial::Binomial, transformable::Transformable, transpose_control_points, FloatingPoint,
         Invertible, Ray,
     },
-    prelude::{AdaptiveTessellationOptions, KnotVector, SurfaceTessellation, Tessellation},
+    prelude::{
+        try_interpolate_control_points, AdaptiveTessellationOptions, KnotVector,
+        SurfaceTessellation, Tessellation,
+    },
     SurfaceClosestParameterNewton, SurfaceClosestParameterProblem,
 };
 
@@ -410,6 +410,21 @@ where
         v0.cross(v1)
     }
 
+    /// Evaluate the point and normal at the given u, v parameters
+    pub fn point_normal_at(
+        &self,
+        u: T,
+        v: T,
+    ) -> (
+        OPoint<T, DimNameDiff<D, U1>>,
+        OVector<T, DimNameDiff<D, U1>>,
+    ) {
+        let deriv = self.rational_derivatives(u, v, 1);
+        let point = deriv[0][0].clone();
+        let normal = deriv[1][0].cross(&deriv[0][1]);
+        (point.into(), normal)
+    }
+
     /// Evaluate the rational derivatives at the given u, v parameters
     pub fn rational_derivatives(
         &self,
@@ -662,7 +677,7 @@ where
     ///     Point3::new(-1.0, 2.0, 0.),
     ///     Point3::new(1.0, 2.5, 0.),
     /// ];
-    /// let interpolated = NurbsCurve3D::try_interpolate(&points, 3).unwrap();
+    /// let interpolated = NurbsCurve3D::interpolate(&points, 3).unwrap();
     /// // Offset the curve by translation of 2.0 in the z direction
     /// let offsetted = interpolated.transformed(&Translation3::new(0.0, 0.0, 2.0).into());
     ///
@@ -915,7 +930,7 @@ where
     ///         // println!("u: {}, v: {}", u, v);
     ///         let pt = sphere.point_at(u, v);
     ///         let pt2 = pt * 5.;
-    ///         let closest = sphere.find_closest_point(&pt2).unwrap();
+    ///         let closest = sphere.find_closest_point(&pt2, None).unwrap();
     ///         assert_relative_eq!(pt, closest, epsilon = 1e-4);
     ///     });
     /// });
@@ -923,13 +938,14 @@ where
     pub fn find_closest_point(
         &self,
         point: &OPoint<T, DimNameDiff<D, U1>>,
+        hint: Option<(T, T)>,
     ) -> anyhow::Result<OPoint<T, DimNameDiff<D, U1>>>
     where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
         T: ArgminFloat,
     {
-        self.find_closest_parameter(point)
+        self.find_closest_parameter(point, hint)
             .map(|(u, v)| self.point_at(u, v))
     }
 
@@ -937,40 +953,34 @@ where
     pub fn find_closest_parameter(
         &self,
         point: &OPoint<T, DimNameDiff<D, U1>>,
+        hint: Option<(T, T)>,
     ) -> anyhow::Result<(T, T)>
     where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
         T: ArgminFloat,
     {
-        let mut uv = Vector2::new(self.u_knots_domain().0, self.v_knots_domain().0);
-        let mut min_dist = T::infinity();
-
-        /*
-        let tess = self.regular_tessellate(10, 10);
-        tess.points().iter().enumerate().for_each(|(i, pt)| {
-            let d = point - pt;
-            let d = d.norm_squared();
-            if d < min_dist {
-                min_dist = d;
-                uv = tess.uvs()[i];
+        let uv = match hint {
+            Some(uv) => Vector2::new(uv.0, uv.1),
+            None => {
+                let mut uv = Vector2::new(self.u_knots_domain().0, self.v_knots_domain().0);
+                let mut min_dist = T::infinity();
+                let tess = self.tessellate(Some(
+                    AdaptiveTessellationOptions::<T, D>::default()
+                        .with_min_divs_u((self.control_points().len() - 1) * 2)
+                        .with_min_divs_v((self.control_points()[0].len() - 1) * 2),
+                ));
+                tess.points().iter().enumerate().for_each(|(i, pt)| {
+                    let d = point - pt;
+                    let d = d.norm_squared();
+                    if d < min_dist {
+                        min_dist = d;
+                        uv = tess.uvs()[i];
+                    }
+                });
+                uv
             }
-        });
-        */
-
-        let tess = self.tessellate(Some(AdaptiveTessellationOptions::<
-            T,
-            D,
-            crate::tessellation::DefaultDivider<T, D>,
-        >::default().with_min_divs_u((self.control_points().len() - 1) * 2).with_min_divs_v((self.control_points()[0].len() - 1) * 2)));
-        tess.points().iter().enumerate().for_each(|(i, pt)| {
-            let d = point - pt;
-            let d = d.norm_squared();
-            if d < min_dist {
-                min_dist = d;
-                uv = tess.uvs()[i];
-            }
-        });
+        };
         // println!("Initial guess: {:?}", uv);
 
         let pts = self.dehomogenized_control_points();
@@ -1104,7 +1114,7 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
     ///     Point3::new(1.0, 1.0, 0.),
     ///     Point3::new(-1.0, 1.0, 0.),
     /// ];
-    /// let profile = NurbsCurve3D::try_interpolate(&points, 3).unwrap();
+    /// let profile = NurbsCurve3D::interpolate(&points, 3).unwrap();
     ///
     /// let points: Vec<Point3<f64>> = vec![
     ///     Point3::new(1.0, 0., 0.),
@@ -1112,7 +1122,7 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
     ///     Point3::new(-1.0, 0., 2.),
     ///     Point3::new(0.0, 1., 3.),
     /// ];
-    /// let rail= NurbsCurve3D::try_interpolate(&points, 3).unwrap();
+    /// let rail= NurbsCurve3D::interpolate(&points, 3).unwrap();
     ///
     /// // Sweep the profile curve along the rail curve to create a NURBS surface
     /// let swept = NurbsSurface::try_sweep(&profile, &rail, Some(3));
@@ -1156,7 +1166,7 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
     ///     Point3::new(1.0, 1.0, 0.),
     ///     Point3::new(-1.0, 1.0, 0.),
     /// ];
-    /// let profile = NurbsCurve3D::try_interpolate(&points, 3).unwrap();
+    /// let profile = NurbsCurve3D::interpolate(&points, 3).unwrap();
     ///
     /// // Revolve the profile curve around the z-axis by PI radians to create a NURBS surface
     /// let reolved = NurbsSurface::try_revolve(&profile, &Point3::origin(), &Vector3::z_axis(), std::f64::consts::PI);

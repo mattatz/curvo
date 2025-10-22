@@ -68,7 +68,7 @@ fn setup(
             Point3::new(x, y, z)
         })
         .collect();
-    let profile = NurbsCurve3D::try_interpolate(&points, 3).unwrap();
+    let profile = NurbsCurve3D::interpolate(&points, 3).unwrap();
     add_curve(
         &profile,
         Some(WHITE.into()),
