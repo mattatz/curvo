@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::marker::PhantomData;
 
 use geo::{GeoFloat, LineIntersection};
@@ -43,14 +44,15 @@ where
             let pts = self.dehomogenized_control_points();
             let p_segments = pts
                 .windows(2)
-                .map(|w| {
+                .enumerate()
+                .map(|(i, w)| {
                     let p0 = &w[0];
                     let p1 = &w[1];
                     let tangent = p1 - p0;
                     let t = tangent.normalize();
                     let start = offset(p0, &t);
                     let end = offset(p1, &t);
-                    PointSegment::new(start, end)
+                    PointSegment::new(i, start, end)
                 })
                 .collect_vec();
 
@@ -67,8 +69,83 @@ where
                 p_segments.len()
             };
 
-            let intersections: Vec<_> =
-                geo::algorithm::sweep::Intersections::from_iter(p_segments.clone()).collect();
+            let its = geo::algorithm::sweep::Intersections::from_iter(p_segments.clone())
+                .collect::<Vec<_>>();
+            let intersections = its
+                .into_iter()
+                .map(|(s0, s1, it)| {
+                    let k = SortedPair::new(s0.id, s1.id);
+                    (k, it)
+                })
+                .collect::<HashMap<SortedPair, LineIntersection<f64>>>();
+
+            if intersections.is_empty() {
+                todo!()
+            }
+
+            // TODO:
+            // - 先頭のsegmentからintersectionを辿る
+            // - intersectionが見つかった場合、もっとも遠いsegmentまでのintersectionを抽出し、間にあるsegmentをskip
+            let mut current = 0;
+            let mut vertices: Vec<(Vertex<T>, Vertex<T>)> = vec![];
+
+            // detect closed loop
+            // find min index of intersections
+            let min_index = intersections.keys().min_by_key(|k| k.0).unwrap().0;
+            let its = intersections
+                .iter()
+                .filter_map(|(k, v)| k.other(min_index).map(|i| (i, v)))
+                .sorted_by_key(|(k, _v)| *k)
+                .collect_vec();
+
+            while current < p_segments.len() {
+                // Vec<(index of other segment, intersection)>
+                let its = intersections
+                    .iter()
+                    .filter_map(|(k, v)| k.other(current).map(|i| (i, v)))
+                    .sorted_by_key(|(k, _v)| *k)
+                    .collect_vec();
+
+                let s = &p_segments[current];
+
+                if its.is_empty() {
+                    vertices.push((
+                        Vertex::Point(s.start().clone()),
+                        Vertex::Point(s.end().clone()),
+                    ));
+                    current += 1;
+                } else {
+                    // partition smaller & larger
+                    let index = its.partition_point(|(i, _)| *i < current);
+                    let (lower, upper) = its.split_at(index);
+
+                    let start = if let Some((_, prev_end)) = vertices.last() {
+                        prev_end.clone()
+                    } else {
+                        if let Some((
+                            _,
+                            LineIntersection::SinglePoint {
+                                intersection: p,
+                                is_proper: _,
+                            },
+                        )) = lower.last()
+                        {
+                            Vertex::Intersection(Point2::new(p.x, p.y).cast::<T>())
+                        } else {
+                            Vertex::Point(s.start().clone())
+                        }
+                    };
+
+                    let end = if upper.is_empty() {
+                        current += 1;
+                        Vertex::Point(s.end().clone())
+                    } else {
+                        todo!()
+                    };
+
+                    vertices.push((start, end));
+                }
+            }
 
             let intersections = p_segments
                 .iter()
@@ -277,6 +354,7 @@ where
 
 #[derive(Debug, Clone)]
 struct Segment<T, P> {
+    id: usize,
     start: P,
     end: P,
     line: geo::Line,
@@ -295,9 +373,10 @@ impl<T: FloatingPoint> geo::algorithm::sweep::Cross for PointSegment<T> {
 }
 
 impl<T: FloatingPoint> PointSegment<T> {
-    fn new(start: Point2<T>, end: Point2<T>) -> Self {
+    fn new(id: usize, start: Point2<T>, end: Point2<T>) -> Self {
         let line = to_line_helper(&start, &end);
         Self {
+            id,
             start,
             end,
             line,
@@ -308,6 +387,7 @@ impl<T: FloatingPoint> PointSegment<T> {
     /// Convert a point segment to a vertex segment
     fn to_vertex_segment(&self, start: Vertex<T>, end: Vertex<T>) -> VertexSegment<T> {
         VertexSegment {
+            id: self.id,
             start,
             end,
             line: self.line,
@@ -331,6 +411,14 @@ impl<T: FloatingPoint, P> Segment<T, P> {
             )),
             _ => None,
         })
+    }
+
+    fn start(&self) -> &P {
+        &self.start
+    }
+
+    fn end(&self) -> &P {
+        &self.end
     }
 }
 
@@ -384,6 +472,53 @@ where
     tessellate_curve_adaptive(curve, start, end, normal_tolerance, &mut rng, &|t, p| {
         (p, curve.tangent_at(t))
     })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct SortedPair(usize, usize);
+
+impl SortedPair {
+    fn new(a: usize, b: usize) -> Self {
+        if a < b {
+            Self(a, b)
+        } else {
+            Self(b, a)
+        }
+    }
+
+    /// Check if the index is in the pair
+    fn has(&self, i: usize) -> bool {
+        self.0 == i || self.1 == i
+    }
+
+    /// Get the other index
+    fn other(&self, i: usize) -> Option<usize> {
+        if self.0 == i {
+            Some(self.1)
+        } else if self.1 == i {
+            Some(self.0)
+        } else {
+            None
+        }
+    }
+}
+
+/// Find the strongly connected components
+fn scc(
+    intersections: &HashMap<SortedPair, LineIntersection<f64>>,
+) -> Vec<Vec<(SortedPair, LineIntersection<f64>)>> {
+    let mut scc = vec![];
+
+    // detect cl}sed loop
+    // find min index of intersections
+    let min_index = intersections.keys().min_by_key(|k| k.0).unwrap().0;
+    let its = intersections
+        .iter()
+        .filter_map(|(k, v)| k.other(min_index).map(|i| (i, v)))
+        .sorted_by_key(|(k, _v)| *k)
+        .collect_vec();
+
+    scc
 }
 
 #[cfg(test)]
