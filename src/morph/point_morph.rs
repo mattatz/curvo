@@ -50,7 +50,7 @@ where
         let (uv, uv2) = remap_closest_uv(self, reference_surface, target_surface, None)?;
         let r = reference_surface.point_normal_at(uv.0, uv.1);
         let plane = Plane::new(r.1, r.0.coords.dot(&r.1));
-        let distance_plane = plane.signed_distance(&self);
+        let distance_plane = plane.signed_distance(self);
         let t = target_surface.point_normal_at(uv2.0, uv2.1);
         let mapped = t.0 + t.1.normalize() * distance_plane;
         Ok(mapped)
@@ -89,7 +89,7 @@ pub(crate) fn morph_point<T: FloatingPoint + ArgminFloat>(
 
     // Evaluate the target surface at the same UV parameter
     let (t, n) = target_surface.point_normal_at(uv2.0, uv2.1);
-    Ok((t.into(), n, uv))
+    Ok((t, n, uv))
 }
 
 #[cfg(test)]

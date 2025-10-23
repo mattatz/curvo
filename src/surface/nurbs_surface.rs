@@ -411,6 +411,7 @@ where
     }
 
     /// Evaluate the point and normal at the given u, v parameters
+    #[allow(clippy::type_complexity)]
     pub fn point_normal_at(
         &self,
         u: T,
