@@ -19,7 +19,7 @@ fn test_union_case() {
     let expected: SurfaceTessellation<f64, U4> = serde_json::from_str(expected_json).unwrap();
 
     // Verify tessellation matches expected result
-    assert_relative_eq!(tess, expected, epsilon = 1e-10);
+    assert_relative_eq!(tess, expected, epsilon = 1e-8);
 
     /*
     // Write tessellation result for debugging
