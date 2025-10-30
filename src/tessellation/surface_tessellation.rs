@@ -17,7 +17,7 @@ use super::boundary_constraints::{BoundaryConstraints, BoundaryEvaluation};
 
 /// Surface tessellation representation
 /// This struct is used to create a mesh data from surface
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SurfaceTessellation<T: FloatingPoint, D: DimName>
 where
     D: DimNameSub<U1>,
@@ -355,8 +355,7 @@ where
                 }
 
                 let points = points.ok_or_else(|| serde::de::Error::missing_field("points"))?;
-                let normals =
-                    normals.ok_or_else(|| serde::de::Error::missing_field("normals"))?;
+                let normals = normals.ok_or_else(|| serde::de::Error::missing_field("normals"))?;
                 let faces = faces.ok_or_else(|| serde::de::Error::missing_field("faces"))?;
                 let uvs = uvs.ok_or_else(|| serde::de::Error::missing_field("uvs"))?;
 
@@ -380,3 +379,133 @@ where
     }
 }
 
+#[cfg(feature = "approx")]
+impl<T, D> approx::AbsDiffEq for SurfaceTessellation<T, D>
+where
+    T: FloatingPoint + approx::AbsDiffEq<Epsilon = T>,
+    D: DimName + DimNameSub<U1>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+{
+    type Epsilon = T;
+
+    fn default_epsilon() -> Self::Epsilon {
+        T::default_epsilon()
+    }
+
+    fn abs_diff_eq(&self, other: &Self, epsilon: Self::Epsilon) -> bool {
+        // Check faces first (exact match)
+        if self.faces != other.faces {
+            return false;
+        }
+
+        // Check lengths
+        if self.points.len() != other.points.len()
+            || self.normals.len() != other.normals.len()
+            || self.uvs.len() != other.uvs.len()
+        {
+            return false;
+        }
+
+        // Check points
+        for (p1, p2) in self.points.iter().zip(other.points.iter()) {
+            if !p1
+                .coords
+                .iter()
+                .zip(p2.coords.iter())
+                .all(|(a, b)| approx::AbsDiffEq::abs_diff_eq(a, b, epsilon))
+            {
+                return false;
+            }
+        }
+
+        // Check normals
+        for (n1, n2) in self.normals.iter().zip(other.normals.iter()) {
+            if !n1
+                .iter()
+                .zip(n2.iter())
+                .all(|(a, b)| approx::AbsDiffEq::abs_diff_eq(a, b, epsilon))
+            {
+                return false;
+            }
+        }
+
+        // Check uvs
+        for (uv1, uv2) in self.uvs.iter().zip(other.uvs.iter()) {
+            if !approx::AbsDiffEq::abs_diff_eq(&uv1.x, &uv2.x, epsilon)
+                || !approx::AbsDiffEq::abs_diff_eq(&uv1.y, &uv2.y, epsilon)
+            {
+                return false;
+            }
+        }
+
+        true
+    }
+}
+
+#[cfg(feature = "approx")]
+impl<T, D> approx::RelativeEq for SurfaceTessellation<T, D>
+where
+    T: FloatingPoint + approx::RelativeEq<Epsilon = T>,
+    D: DimName + DimNameSub<U1>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+{
+    fn default_max_relative() -> Self::Epsilon {
+        T::default_max_relative()
+    }
+
+    fn relative_eq(
+        &self,
+        other: &Self,
+        epsilon: Self::Epsilon,
+        max_relative: Self::Epsilon,
+    ) -> bool {
+        // Check faces first (exact match)
+        if self.faces != other.faces {
+            return false;
+        }
+
+        // Check lengths
+        if self.points.len() != other.points.len()
+            || self.normals.len() != other.normals.len()
+            || self.uvs.len() != other.uvs.len()
+        {
+            return false;
+        }
+
+        // Check points
+        for (p1, p2) in self.points.iter().zip(other.points.iter()) {
+            if !p1
+                .coords
+                .iter()
+                .zip(p2.coords.iter())
+                .all(|(a, b)| approx::RelativeEq::relative_eq(a, b, epsilon, max_relative))
+            {
+                return false;
+            }
+        }
+
+        // Check normals
+        for (n1, n2) in self.normals.iter().zip(other.normals.iter()) {
+            if !n1
+                .iter()
+                .zip(n2.iter())
+                .all(|(a, b)| approx::RelativeEq::relative_eq(a, b, epsilon, max_relative))
+            {
+                return false;
+            }
+        }
+
+        // Check uvs
+        for (uv1, uv2) in self.uvs.iter().zip(other.uvs.iter()) {
+            if !approx::RelativeEq::relative_eq(&uv1.x, &uv2.x, epsilon, max_relative)
+                || !approx::RelativeEq::relative_eq(&uv1.y, &uv2.y, epsilon, max_relative)
+            {
+                return false;
+            }
+        }
+
+        true
+    }
+}
