@@ -1,0 +1,20 @@
+[tasks.fmt-all]
+install_crate = "rustfmt"
+command = "cargo"
+args = ["fmt", "--all"]
+workspace = false
+
+[tasks.clippy-fix]
+install_crate = "clippy"
+command = "cargo"
+args = ["clippy", "--fix", "--allow-dirty"]
+workspace = false
+
+[tasks.format]
+dependencies = ["clippy-fix", "fmt-all"]
+workspace = false
+
+[tasks.test]
+command = "cargo"
+args = ["test", "--features", "serde,approx"]
+description = "Run tests with serde and approx features"
