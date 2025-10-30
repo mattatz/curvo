@@ -334,22 +334,27 @@ fn tessellate_uv_curve_adaptive<T: FloatingPoint>(
             // if the curve is a linear curve, should start tessellation from the knots
             let knots = curve.knots();
             let n = knots.len();
+            let (min, max) = curve.knots_domain();
+            let min = min + T::default_epsilon();
+            let max = max - T::default_epsilon();
 
-            let pts = (1..n - 2).flat_map(|i| {
-                let evaluated = iterate_uv_curve_tessellation(
-                    curve,
-                    surface,
-                    knots[i],
-                    knots[i + 1],
-                    tolerance,
-                );
-                #[allow(clippy::iter_skip_zero)]
-                if i == 1 {
-                    evaluated.into_iter().skip(0)
-                } else {
-                    evaluated.into_iter().skip(1)
-                }
-            });
+            let pts = (1..n - 2)
+                .filter_map(|i| {
+                    let start = knots[i].clamp(min, max);
+                    let end = knots[i + 1].clamp(min, max);
+                    if start == end {
+                        return None;
+                    }
+                    let evaluated =
+                        iterate_uv_curve_tessellation(curve, surface, start, end, tolerance);
+                    #[allow(clippy::iter_skip_zero)]
+                    if i == 1 {
+                        Some(evaluated.into_iter().skip(0))
+                    } else {
+                        Some(evaluated.into_iter().skip(1))
+                    }
+                })
+                .flatten();
 
             pts.map(|uv| {
                 let p = surface.point_at(uv.x, uv.y);
