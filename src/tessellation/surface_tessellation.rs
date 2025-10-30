@@ -243,3 +243,140 @@ where
         }
     }
 }
+
+#[cfg(feature = "serde")]
+impl<T, D> serde::Serialize for SurfaceTessellation<T, D>
+where
+    T: FloatingPoint + serde::Serialize,
+    D: DimName + DimNameSub<U1>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+    <DefaultAllocator as nalgebra::allocator::Allocator<DimNameDiff<D, U1>>>::Buffer<T>:
+        serde::Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("SurfaceTessellation", 4)?;
+        state.serialize_field("points", &self.points)?;
+        state.serialize_field("normals", &self.normals)?;
+        state.serialize_field("faces", &self.faces)?;
+        state.serialize_field("uvs", &self.uvs)?;
+        state.end()
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, T, D> serde::Deserialize<'de> for SurfaceTessellation<T, D>
+where
+    T: FloatingPoint + serde::Deserialize<'de>,
+    D: DimName + DimNameSub<U1>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+    <DefaultAllocator as nalgebra::allocator::Allocator<DimNameDiff<D, U1>>>::Buffer<T>:
+        serde::Deserialize<'de>,
+{
+    fn deserialize<De>(deserializer: De) -> Result<Self, De::Error>
+    where
+        De: serde::Deserializer<'de>,
+    {
+        #[derive(serde::Deserialize)]
+        #[serde(field_identifier, rename_all = "lowercase")]
+        enum Field {
+            Points,
+            Normals,
+            Faces,
+            Uvs,
+        }
+
+        struct SurfaceTessellationVisitor<T, D>
+        where
+            T: FloatingPoint,
+            D: DimName + DimNameSub<U1>,
+            DefaultAllocator: Allocator<D>,
+            DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+        {
+            _phantom: std::marker::PhantomData<(T, D)>,
+        }
+
+        impl<'de, T, D> serde::de::Visitor<'de> for SurfaceTessellationVisitor<T, D>
+        where
+            T: FloatingPoint + serde::Deserialize<'de>,
+            D: DimName + DimNameSub<U1>,
+            DefaultAllocator: Allocator<D>,
+            DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+            <DefaultAllocator as nalgebra::allocator::Allocator<DimNameDiff<D, U1>>>::Buffer<T>:
+                serde::Deserialize<'de>,
+        {
+            type Value = SurfaceTessellation<T, D>;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("struct SurfaceTessellation")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<Self::Value, V::Error>
+            where
+                V: serde::de::MapAccess<'de>,
+            {
+                let mut points = None;
+                let mut normals = None;
+                let mut faces = None;
+                let mut uvs = None;
+
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::Points => {
+                            if points.is_some() {
+                                return Err(serde::de::Error::duplicate_field("points"));
+                            }
+                            points = Some(map.next_value()?);
+                        }
+                        Field::Normals => {
+                            if normals.is_some() {
+                                return Err(serde::de::Error::duplicate_field("normals"));
+                            }
+                            normals = Some(map.next_value()?);
+                        }
+                        Field::Faces => {
+                            if faces.is_some() {
+                                return Err(serde::de::Error::duplicate_field("faces"));
+                            }
+                            faces = Some(map.next_value()?);
+                        }
+                        Field::Uvs => {
+                            if uvs.is_some() {
+                                return Err(serde::de::Error::duplicate_field("uvs"));
+                            }
+                            uvs = Some(map.next_value()?);
+                        }
+                    }
+                }
+
+                let points = points.ok_or_else(|| serde::de::Error::missing_field("points"))?;
+                let normals =
+                    normals.ok_or_else(|| serde::de::Error::missing_field("normals"))?;
+                let faces = faces.ok_or_else(|| serde::de::Error::missing_field("faces"))?;
+                let uvs = uvs.ok_or_else(|| serde::de::Error::missing_field("uvs"))?;
+
+                Ok(SurfaceTessellation {
+                    points,
+                    normals,
+                    faces,
+                    uvs,
+                })
+            }
+        }
+
+        const FIELDS: &[&str] = &["points", "normals", "faces", "uvs"];
+        deserializer.deserialize_struct(
+            "SurfaceTessellation",
+            FIELDS,
+            SurfaceTessellationVisitor {
+                _phantom: std::marker::PhantomData,
+            },
+        )
+    }
+}
+
