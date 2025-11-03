@@ -531,11 +531,32 @@ where
     /// assert_eq!(max, 1.);
     /// ```
     pub fn normalize_knots(&mut self) {
-        let knots = self.knots();
-        let (min, max) = self.knots_domain();
-        let size = max - min;
-        let normalized = knots.iter().map(|k| (*k - min) / size).collect_vec();
-        self.knots = KnotVector::new(normalized);
+        self.knots = self.knots.normalize(self.degree);
+    }
+
+    /// Remap the knot vector to a new domain [start, end]
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point2, Vector2};
+    /// use std::f64::consts::TAU;
+    /// let unit_circle = NurbsCurve2D::try_circle(
+    ///     &Point2::origin(),
+    ///     &Vector2::x(),
+    ///     &Vector2::y(),
+    ///     1.
+    /// ).unwrap();
+    /// let (min, max) = unit_circle.knots_domain();
+    /// assert_eq!(min, 0.);
+    /// assert_eq!(max, TAU);
+    /// let mut remapped = unit_circle.clone();
+    /// remapped.remap_knots(10., 20.);
+    /// let (min, max) = remapped.knots_domain();
+    /// assert_eq!(min, 10.);
+    /// assert_eq!(max, 20.);
+    /// ```
+    pub fn remap_knots(&mut self, start: T, end: T) {
+        self.knots = self.knots.remap(self.degree, start, end);
     }
 
     /// Compute the length of the curve by gauss-legendre quadrature

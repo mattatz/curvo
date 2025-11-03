@@ -111,6 +111,68 @@ where
         (u.1 - u.0, v.1 - v.0)
     }
 
+    /// Remap the u knot vector to a new domain [start, end]
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point3, Vector3};
+    /// let plane = NurbsSurface3D::<f64>::plane(Point3::origin(), Vector3::x(), Vector3::y());
+    /// let (u_min, u_max) = plane.u_knots_domain();
+    /// assert_eq!(u_min, 0.);
+    /// assert_eq!(u_max, 1.);
+    /// let mut remapped = plane.clone();
+    /// remapped.remap_u_knots(10., 20.);
+    /// let (u_min, u_max) = remapped.u_knots_domain();
+    /// assert_eq!(u_min, 10.);
+    /// assert_eq!(u_max, 20.);
+    /// ```
+    pub fn remap_u_knots(&mut self, start: T, end: T) {
+        self.u_knots = self.u_knots.remap(self.u_degree, start, end);
+    }
+
+    /// Remap the v knot vector to a new domain [start, end]
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point3, Vector3};
+    /// let plane = NurbsSurface3D::<f64>::plane(Point3::origin(), Vector3::x(), Vector3::y());
+    /// let (v_min, v_max) = plane.v_knots_domain();
+    /// assert_eq!(v_min, 0.);
+    /// assert_eq!(v_max, 1.);
+    /// let mut remapped = plane.clone();
+    /// remapped.remap_v_knots(30., 40.);
+    /// let (v_min, v_max) = remapped.v_knots_domain();
+    /// assert_eq!(v_min, 30.);
+    /// assert_eq!(v_max, 40.);
+    /// ```
+    pub fn remap_v_knots(&mut self, start: T, end: T) {
+        self.v_knots = self.v_knots.remap(self.v_degree, start, end);
+    }
+
+    /// Remap both u and v knot vectors to new domains
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point3, Vector3};
+    /// let plane = NurbsSurface3D::<f64>::plane(Point3::origin(), Vector3::x(), Vector3::y());
+    /// let ((u_min, u_max), (v_min, v_max)) = plane.knots_domain();
+    /// assert_eq!(u_min, 0.);
+    /// assert_eq!(u_max, 1.);
+    /// assert_eq!(v_min, 0.);
+    /// assert_eq!(v_max, 1.);
+    /// let mut remapped = plane.clone();
+    /// remapped.remap_knots(10., 20., 30., 40.);
+    /// let ((u_min, u_max), (v_min, v_max)) = remapped.knots_domain();
+    /// assert_eq!(u_min, 10.);
+    /// assert_eq!(u_max, 20.);
+    /// assert_eq!(v_min, 30.);
+    /// assert_eq!(v_max, 40.);
+    /// ```
+    pub fn remap_knots(&mut self, u_start: T, u_end: T, v_start: T, v_end: T) {
+        self.remap_u_knots(u_start, u_end);
+        self.remap_v_knots(v_start, v_end);
+    }
+
     pub fn control_points(&self) -> &Vec<Vec<OPoint<T, D>>> {
         &self.control_points
     }

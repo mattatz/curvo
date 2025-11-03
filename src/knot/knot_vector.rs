@@ -79,6 +79,47 @@ impl<T: RealField + Copy> KnotVector<T> {
         u.clamp(min, max)
     }
 
+    /// Normalize the knot vector to [0, 1] domain
+    /// # Example
+    /// ```
+    /// use curvo::prelude::KnotVector;
+    /// let knots: KnotVector<f64> = KnotVector::new(vec![0., 0., 0., 1., 2., 3., 3., 3.]);
+    /// let degree = 2;
+    /// let normalized = knots.normalize(degree);
+    /// let (min, max) = normalized.domain(degree);
+    /// assert_eq!(min, 0.);
+    /// assert_eq!(max, 1.);
+    /// ```
+    pub fn normalize(&self, degree: usize) -> Self {
+        let (min, max) = self.domain(degree);
+        let size = max - min;
+        let normalized = self.0.iter().map(|k| (*k - min) / size).collect();
+        Self(normalized)
+    }
+
+    /// Remap the knot vector to a new domain [start, end]
+    /// # Example
+    /// ```
+    /// use curvo::prelude::KnotVector;
+    /// let knots: KnotVector<f64> = KnotVector::new(vec![0., 0., 0., 1., 2., 3., 3., 3.]);
+    /// let degree = 2;
+    /// let remapped = knots.remap(degree, 10., 20.);
+    /// let (min, max) = remapped.domain(degree);
+    /// assert_eq!(min, 10.);
+    /// assert_eq!(max, 20.);
+    /// ```
+    pub fn remap(&self, degree: usize, start: T, end: T) -> Self {
+        let (min, max) = self.domain(degree);
+        let size = max - min;
+        let new_size = end - start;
+        let remapped = self
+            .0
+            .iter()
+            .map(|k| (*k - min) / size * new_size + start)
+            .collect();
+        Self(remapped)
+    }
+
     /// Returns the index of the first knot greater than or equal to knot
     pub fn floor(&self, knot: T) -> Option<usize> {
         self.iter().rposition(|t| *t <= knot)
