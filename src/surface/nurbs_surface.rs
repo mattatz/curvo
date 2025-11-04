@@ -1241,6 +1241,18 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
         axis: &Vector3<T>,
         theta: T,
     ) -> anyhow::Result<Self> {
+        Self::try_revolve_by_start_end(profile, center, axis, T::zero(), theta)
+    }
+
+    /// Try to revolve a profile curve around an axis by specifying the start and end angles
+    pub fn try_revolve_by_start_end(
+        profile: &NurbsCurve3D<T>,
+        center: &Point3<T>,
+        axis: &Vector3<T>,
+        start: T,
+        end: T,
+    ) -> anyhow::Result<Self> {
+        let theta = end - start;
         let prof_points = profile.dehomogenized_control_points();
         let prof_weights = profile.weights();
 
@@ -1287,7 +1299,7 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
         let wm = (dtheta / two).cos();
 
         let angles = (0..=narcs)
-            .map(|i| T::from_usize(i).unwrap() * dtheta)
+            .map(|i| start + T::from_usize(i).unwrap() * dtheta)
             .collect_vec();
         let sines = angles.iter().map(|a| a.sin()).collect_vec();
         let cosines = angles.iter().map(|a| a.cos()).collect_vec();
