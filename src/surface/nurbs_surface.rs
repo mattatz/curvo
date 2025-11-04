@@ -1357,9 +1357,11 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
                     let nt2 = t2.normalize();
                     let r0 = Ray::new(p0, nt0);
                     let r1 = Ray::new(p2, nt2);
-                    let intersection = r0
-                        .find_intersection(&r1)
-                        .ok_or(anyhow::anyhow!("No intersection between rays"))?;
+                    let intersection = r0.find_intersection(&r1).ok_or(anyhow::anyhow!(
+                        "No intersection between rays: {:?}, {:?}",
+                        r0,
+                        r1
+                    ))?;
 
                     let intersected = intersection.intersection0.0;
                     control_points[l][j].x = intersected.x;
