@@ -1232,8 +1232,8 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
     /// let profile = NurbsCurve3D::interpolate(&points, 3).unwrap();
     ///
     /// // Revolve the profile curve around the z-axis by PI radians to create a NURBS surface
-    /// let reolved = NurbsSurface::try_revolve(&profile, &Point3::origin(), &Vector3::z_axis(), std::f64::consts::PI);
-    /// assert!(reolved.is_ok());
+    /// let revolved = NurbsSurface::try_revolve(&profile, &Point3::origin(), &Vector3::z_axis(), std::f64::consts::PI);
+    /// assert!(revolved.is_ok());
     /// ```
     pub fn try_revolve(
         profile: &NurbsCurve3D<T>,
@@ -1286,14 +1286,11 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
 
         let wm = (dtheta / two).cos();
 
-        let mut angle = T::zero();
-        let mut sines = vec![T::zero(); narcs + 1];
-        let mut cosines = vec![T::zero(); narcs + 1];
-        for i in 0..=narcs {
-            cosines[i] = angle.cos();
-            sines[i] = angle.sin();
-            angle += dtheta;
-        }
+        let angles = (0..=narcs)
+            .map(|i| T::from_usize(i).unwrap() * dtheta)
+            .collect_vec();
+        let sines = angles.iter().map(|a| a.sin()).collect_vec();
+        let cosines = angles.iter().map(|a| a.cos()).collect_vec();
 
         let mut control_points = vec![vec![Point4::origin(); prof_points.len()]; 2 * narcs + 1];
 
