@@ -1323,7 +1323,6 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
                 y *= T::one() / r;
             }
 
-            // control_points[0][j]
             let mut p0 = prof_points[j];
             control_points[0][j].x = p0.x;
             control_points[0][j].y = p0.y;
@@ -1408,6 +1407,330 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
     ) -> anyhow::Result<Self> {
         let arc = NurbsCurve::try_arc(center, &-axis, x_axis, radius, T::zero(), T::pi())?;
         Self::try_revolve(&arc, center, axis, T::two_pi())
+    }
+
+    /// Try to create a torus (or partial torus)
+    ///
+    /// # Arguments
+    /// * `center` - Center point of the torus
+    /// * `x_axis` - X axis direction (will be normalized)
+    /// * `y_axis` - Y axis direction (will be normalized)
+    /// * `major_radius` - Distance from center to tube center
+    /// * `minor_radius` - Radius of the tube
+    /// * `u_domain` - Rotation angle range (major circle), in radians
+    /// * `v_domain` - Profile arc angle range (minor circle), in radians
+    ///
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point3, Vector3};
+    /// use approx::assert_relative_eq;
+    ///
+    /// // Full torus
+    /// let torus = NurbsSurface3D::try_torus(
+    ///     &Point3::origin(),
+    ///     &Vector3::x(),
+    ///     &Vector3::y(),
+    ///     2.0,
+    ///     0.5,
+    ///     (0.0, std::f64::consts::TAU),
+    ///     (0.0, std::f64::consts::TAU)
+    /// ).unwrap();
+    /// let (u_start, u_end) = torus.u_knots_domain();
+    /// let (v_start, v_end) = torus.v_knots_domain();
+    /// assert_eq!(u_start, 0.0);
+    /// assert_relative_eq!(u_end, std::f64::consts::TAU, epsilon = 1e-8);
+    /// assert_eq!(v_start, 0.0);
+    /// assert_relative_eq!(v_end, std::f64::consts::TAU, epsilon = 1e-8);
+    ///
+    /// // Partial torus (half rotation, half profile)
+    /// let partial = NurbsSurface3D::try_torus(
+    ///     &Point3::origin(),
+    ///     &Vector3::x(),
+    ///     &Vector3::y(),
+    ///     2.0,
+    ///     0.5,
+    ///     (0.0, std::f64::consts::PI),
+    ///     (0.0, std::f64::consts::PI)
+    /// ).unwrap();
+    /// ```
+    pub fn try_torus(
+        center: &Point3<T>,
+        x_axis: &Vector3<T>,
+        y_axis: &Vector3<T>,
+        major_radius: T,
+        minor_radius: T,
+        u_domain: (T, T),
+        v_domain: (T, T),
+    ) -> anyhow::Result<Self> {
+        // Normalize the axes
+        let x_axis = x_axis.normalize();
+        let y_axis = y_axis.normalize();
+        let z_axis = x_axis.cross(&y_axis).normalize();
+
+        let u_angle = u_domain.1 - u_domain.0;
+        let v_angle = v_domain.1 - v_domain.0;
+
+        anyhow::ensure!(
+            u_angle > T::zero(),
+            "u_domain end must be greater than start"
+        );
+        anyhow::ensure!(
+            v_angle > T::zero(),
+            "v_domain end must be greater than start"
+        );
+
+        // Calculate number of arcs needed for u direction (major circle)
+        let two = T::from_f64(2.0).unwrap();
+        let pi_2 = T::pi() / two;
+        let (narcs_u, mut u_knots) = if u_angle <= pi_2 {
+            (1, vec![T::zero(); 6])
+        } else if u_angle <= T::pi() {
+            let mut knots = vec![T::zero(); 6 + 2];
+            let half = T::from_f64(0.5).unwrap();
+            knots[3] = half;
+            knots[4] = half;
+            (2, knots)
+        } else if u_angle <= T::from_f64(3.0).unwrap() * pi_2 {
+            let mut knots = vec![T::zero(); 6 + 2 * 2];
+            let frac_three = T::from_f64(1.0 / 3.0).unwrap();
+            let two_frac_three = T::from_f64(2.0 / 3.0).unwrap();
+            knots[3] = frac_three;
+            knots[4] = frac_three;
+            knots[5] = two_frac_three;
+            knots[6] = two_frac_three;
+            (3, knots)
+        } else {
+            let mut knots = vec![T::zero(); 6 + 2 * 3];
+            let frac_four = T::from_f64(1.0 / 4.0).unwrap();
+            let half = T::from_f64(0.5).unwrap();
+            let three_frac_four = T::from_f64(3.0 / 4.0).unwrap();
+            knots[3] = frac_four;
+            knots[4] = frac_four;
+            knots[5] = half;
+            knots[6] = half;
+            knots[7] = three_frac_four;
+            knots[8] = three_frac_four;
+            (4, knots)
+        };
+
+        // Calculate number of arcs needed for v direction (minor circle)
+        let (narcs_v, mut v_knots) = if v_angle <= pi_2 {
+            (1, vec![T::zero(); 6])
+        } else if v_angle <= T::pi() {
+            let mut knots = vec![T::zero(); 6 + 2];
+            let half = T::from_f64(0.5).unwrap();
+            knots[3] = half;
+            knots[4] = half;
+            (2, knots)
+        } else if v_angle <= T::from_f64(3.0).unwrap() * pi_2 {
+            let mut knots = vec![T::zero(); 6 + 2 * 2];
+            let frac_three = T::from_f64(1.0 / 3.0).unwrap();
+            let two_frac_three = T::from_f64(2.0 / 3.0).unwrap();
+            knots[3] = frac_three;
+            knots[4] = frac_three;
+            knots[5] = two_frac_three;
+            knots[6] = two_frac_three;
+            (3, knots)
+        } else {
+            let mut knots = vec![T::zero(); 6 + 2 * 3];
+            let frac_four = T::from_f64(1.0 / 4.0).unwrap();
+            let half = T::from_f64(0.5).unwrap();
+            let three_frac_four = T::from_f64(3.0 / 4.0).unwrap();
+            knots[3] = frac_four;
+            knots[4] = frac_four;
+            knots[5] = half;
+            knots[6] = half;
+            knots[7] = three_frac_four;
+            knots[8] = three_frac_four;
+            (4, knots)
+        };
+
+        let dtheta_u = u_angle / T::from_usize(narcs_u).unwrap();
+        let dtheta_v = v_angle / T::from_usize(narcs_v).unwrap();
+
+        let j_u = 3 + 2 * (narcs_u - 1);
+        let j_v = 3 + 2 * (narcs_v - 1);
+
+        for i in 0..3 {
+            u_knots[i] = T::zero();
+            u_knots[j_u + i] = T::one();
+            v_knots[i] = T::zero();
+            v_knots[j_v + i] = T::one();
+        }
+
+        let wm_u = (dtheta_u / two).cos();
+        let wm_v = (dtheta_v / two).cos();
+
+        let num_u = 2 * narcs_u + 1;
+        let num_v = 2 * narcs_v + 1;
+
+        // Pre-calculate angles and trig values for u direction
+        let mut angles_u = Vec::with_capacity(narcs_u + 1);
+        let mut cosines_u = Vec::with_capacity(narcs_u + 1);
+        let mut sines_u = Vec::with_capacity(narcs_u + 1);
+        for i in 0..=narcs_u {
+            let angle = u_domain.0 + T::from_usize(i).unwrap() * dtheta_u;
+            angles_u.push(angle);
+            cosines_u.push(angle.cos());
+            sines_u.push(angle.sin());
+        }
+
+        // Pre-calculate angles and trig values for v direction
+        let mut angles_v = Vec::with_capacity(narcs_v + 1);
+        let mut cosines_v = Vec::with_capacity(narcs_v + 1);
+        let mut sines_v = Vec::with_capacity(narcs_v + 1);
+        for i in 0..=narcs_v {
+            let angle = v_domain.0 + T::from_usize(i).unwrap() * dtheta_v;
+            angles_v.push(angle);
+            cosines_v.push(angle.cos());
+            sines_v.push(angle.sin());
+        }
+
+        // Build control points
+        let mut control_points = vec![vec![Point4::origin(); num_v]; num_u];
+
+        // Fill in the corner points first (even u, even v indices)
+        for i in 0..=narcs_u {
+            let u_idx = i * 2;
+            let cos_u = cosines_u[i];
+            let sin_u = sines_u[i];
+            let major_dir = &x_axis * cos_u + &y_axis * sin_u;
+
+            for j in 0..=narcs_v {
+                let v_idx = j * 2;
+                let cos_v = cosines_v[j];
+                let sin_v = sines_v[j];
+
+                let radius_at_v = major_radius + minor_radius * cos_v;
+                let p = center + &major_dir * radius_at_v + &z_axis * (minor_radius * sin_v);
+
+                control_points[u_idx][v_idx] = Point4::new(p.x, p.y, p.z, T::one());
+            }
+        }
+
+        // Fill in u-direction middle points (odd u, even v indices)
+        for i in 0..narcs_u {
+            let u_idx = i * 2 + 1;
+            let p0_idx = i * 2;
+            let p2_idx = (i + 1) * 2;
+
+            for j in 0..=narcs_v {
+                let v_idx = j * 2;
+
+                let p0 = Point3::new(
+                    control_points[p0_idx][v_idx].x,
+                    control_points[p0_idx][v_idx].y,
+                    control_points[p0_idx][v_idx].z,
+                );
+                let p2 = Point3::new(
+                    control_points[p2_idx][v_idx].x,
+                    control_points[p2_idx][v_idx].y,
+                    control_points[p2_idx][v_idx].z,
+                );
+
+                // Tangent directions
+                let t0_u = -&x_axis * sines_u[i] + &y_axis * cosines_u[i];
+                let t2_u = -&x_axis * sines_u[i + 1] + &y_axis * cosines_u[i + 1];
+
+                // Find intersection of tangent lines
+                let ray0 = Ray::new(p0, t0_u.normalize());
+                let ray1 = Ray::new(p2, t2_u.normalize());
+
+                if let Some(intersection) = ray0.find_intersection(&ray1) {
+                    let p1 = intersection.intersection0.0;
+                    control_points[u_idx][v_idx] = Point4::new(
+                        p1.x * wm_u,
+                        p1.y * wm_u,
+                        p1.z * wm_u,
+                        wm_u,
+                    );
+                }
+            }
+        }
+
+        // Fill in v-direction middle points (even u, odd v indices)
+        for i in 0..=narcs_u {
+            let u_idx = i * 2;
+
+            for j in 0..narcs_v {
+                let v_idx = j * 2 + 1;
+                let p0_idx = j * 2;
+                let p2_idx = (j + 1) * 2;
+
+                let p0 = Point3::new(
+                    control_points[u_idx][p0_idx].x,
+                    control_points[u_idx][p0_idx].y,
+                    control_points[u_idx][p0_idx].z,
+                );
+                let p2 = Point3::new(
+                    control_points[u_idx][p2_idx].x,
+                    control_points[u_idx][p2_idx].y,
+                    control_points[u_idx][p2_idx].z,
+                );
+
+                let cos_u = cosines_u[i];
+                let sin_u = sines_u[i];
+                let radial_dir = &x_axis * cos_u + &y_axis * sin_u;
+
+                // Tangent directions in v (perpendicular to radial in the z plane)
+                let t0_v = &radial_dir * (-sines_v[j] * minor_radius) + &z_axis * (cosines_v[j] * minor_radius);
+                let t2_v = &radial_dir * (-sines_v[j + 1] * minor_radius) + &z_axis * (cosines_v[j + 1] * minor_radius);
+
+                // Find intersection of tangent lines
+                let ray0 = Ray::new(p0, t0_v.normalize());
+                let ray1 = Ray::new(p2, t2_v.normalize());
+
+                if let Some(intersection) = ray0.find_intersection(&ray1) {
+                    let p1 = intersection.intersection0.0;
+                    control_points[u_idx][v_idx] = Point4::new(
+                        p1.x * wm_v,
+                        p1.y * wm_v,
+                        p1.z * wm_v,
+                        wm_v,
+                    );
+                }
+            }
+        }
+
+        // Fill in the center points (odd u, odd v indices)
+        for i in 0..narcs_u {
+            let u_idx = i * 2 + 1;
+
+            for j in 0..narcs_v {
+                let v_idx = j * 2 + 1;
+
+                // Interpolate from surrounding even/odd points
+                let p_u_even = &control_points[u_idx][j * 2];
+                let p_u_odd = &control_points[u_idx][(j + 1) * 2];
+                let p_v_even = &control_points[i * 2][v_idx];
+                let p_v_odd = &control_points[(i + 1) * 2][v_idx];
+
+                // Average approach with combined weight
+                let w = wm_u * wm_v;
+                let px = (p_u_even.x / p_u_even.w + p_u_odd.x / p_u_odd.w +
+                         p_v_even.x / p_v_even.w + p_v_odd.x / p_v_odd.w) / T::from_f64(4.0).unwrap();
+                let py = (p_u_even.y / p_u_even.w + p_u_odd.y / p_u_odd.w +
+                         p_v_even.y / p_v_even.w + p_v_odd.y / p_v_odd.w) / T::from_f64(4.0).unwrap();
+                let pz = (p_u_even.z / p_u_even.w + p_u_odd.z / p_u_odd.w +
+                         p_v_even.z / p_v_even.w + p_v_odd.z / p_v_odd.w) / T::from_f64(4.0).unwrap();
+
+                control_points[u_idx][v_idx] = Point4::new(px * w, py * w, pz * w, w);
+            }
+        }
+
+        let mut torus = Self {
+            control_points,
+            u_degree: 2,
+            v_degree: 2,
+            u_knots: KnotVector::new(u_knots),
+            v_knots: KnotVector::new(v_knots),
+        };
+
+        // Remap the domains to match the requested u and v domains
+        torus.remap_knots(u_domain.0, u_domain.1, v_domain.0, v_domain.1);
+
+        Ok(torus)
     }
 }
 
@@ -1764,5 +2087,338 @@ where
             "v_knots",
         ];
         deserializer.deserialize_struct("NurbsSurface", FIELDS, NurbsSurfaceVisitor::<T, D>::new())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use approx::assert_relative_eq;
+
+    #[test]
+    fn test_torus_basic() {
+        let torus = NurbsSurface3D::<f64>::try_torus(
+            &Point3::origin(),
+            &Vector3::x(),
+            &Vector3::y(),
+            3.0,
+            1.0,
+            (0.0, std::f64::consts::TAU),
+            (0.0, std::f64::consts::TAU),
+        )
+        .unwrap();
+
+        // Check degrees
+        assert_eq!(torus.u_degree(), 2);
+        assert_eq!(torus.v_degree(), 2);
+
+        // Check domains
+        let (u_start, u_end) = torus.u_knots_domain();
+        let (v_start, v_end) = torus.v_knots_domain();
+        assert_eq!(u_start, 0.0);
+        assert_relative_eq!(u_end, std::f64::consts::TAU, epsilon = 1e-8);
+        assert_eq!(v_start, 0.0);
+        assert_relative_eq!(v_end, std::f64::consts::TAU, epsilon = 1e-8);
+    }
+
+    #[test]
+    fn test_torus_geometry() {
+        let major_radius = 3.0;
+        let minor_radius = 1.0;
+        let torus = NurbsSurface3D::<f64>::try_torus(
+            &Point3::origin(),
+            &Vector3::x(),
+            &Vector3::y(),
+            major_radius,
+            minor_radius,
+            (0.0, std::f64::consts::TAU),
+            (0.0, std::f64::consts::TAU),
+        )
+        .unwrap();
+
+        // Test point at u=0, v=0 (should be at (major_radius + minor_radius, 0, 0))
+        let p00 = torus.point_at(0.0, 0.0);
+        assert_relative_eq!(
+            p00.x,
+            major_radius + minor_radius,
+            epsilon = 1e-8
+        );
+        assert_relative_eq!(p00.y, 0.0, epsilon = 1e-8);
+        assert_relative_eq!(p00.z, 0.0, epsilon = 1e-8);
+
+        // Test point at u=π/2, v=0 (should be at (0, major_radius + minor_radius, 0))
+        let p_half_0 = torus.point_at(std::f64::consts::FRAC_PI_2, 0.0);
+        assert_relative_eq!(p_half_0.x, 0.0, epsilon = 1e-8);
+        assert_relative_eq!(
+            p_half_0.y,
+            major_radius + minor_radius,
+            epsilon = 1e-8
+        );
+        assert_relative_eq!(p_half_0.z, 0.0, epsilon = 1e-8);
+
+        // Test point at u=0, v=π (should be at (major_radius - minor_radius, 0, 0))
+        let p0_half = torus.point_at(0.0, std::f64::consts::PI);
+        assert_relative_eq!(
+            p0_half.x,
+            major_radius - minor_radius,
+            epsilon = 1e-8
+        );
+        assert_relative_eq!(p0_half.y, 0.0, epsilon = 1e-8);
+        assert_relative_eq!(p0_half.z, 0.0, epsilon = 1e-8);
+
+        // Test point at u=0, v=π/2 (should be at (major_radius, 0, minor_radius))
+        let p0_quarter = torus.point_at(0.0, std::f64::consts::FRAC_PI_2);
+        assert_relative_eq!(p0_quarter.x, major_radius, epsilon = 1e-8);
+        assert_relative_eq!(p0_quarter.y, 0.0, epsilon = 1e-8);
+        assert_relative_eq!(p0_quarter.z, minor_radius, epsilon = 1e-8);
+    }
+
+    #[test]
+    fn test_torus_with_custom_axes() {
+        let major_radius = 2.0;
+        let minor_radius = 0.5;
+        // Create a torus oriented in the Y-Z plane
+        let torus = NurbsSurface3D::<f64>::try_torus(
+            &Point3::origin(),
+            &Vector3::y(),
+            &Vector3::z(),
+            major_radius,
+            minor_radius,
+            (0.0, std::f64::consts::TAU),
+            (0.0, std::f64::consts::TAU),
+        )
+        .unwrap();
+
+        // Test point at u=0, v=0
+        let p00 = torus.point_at(0.0, 0.0);
+        assert_relative_eq!(p00.x, 0.0, epsilon = 1e-8);
+        assert_relative_eq!(
+            p00.y,
+            major_radius + minor_radius,
+            epsilon = 1e-8
+        );
+        assert_relative_eq!(p00.z, 0.0, epsilon = 1e-8);
+    }
+
+    #[test]
+    fn test_torus_with_offset_center() {
+        let center = Point3::new(5.0, 3.0, 2.0);
+        let major_radius = 2.0;
+        let minor_radius = 0.5;
+        let torus = NurbsSurface3D::<f64>::try_torus(
+            &center,
+            &Vector3::x(),
+            &Vector3::y(),
+            major_radius,
+            minor_radius,
+            (0.0, std::f64::consts::TAU),
+            (0.0, std::f64::consts::TAU),
+        )
+        .unwrap();
+
+        // Test point at u=0, v=0
+        let p00 = torus.point_at(0.0, 0.0);
+        assert_relative_eq!(
+            p00.x,
+            center.x + major_radius + minor_radius,
+            epsilon = 1e-8
+        );
+        assert_relative_eq!(p00.y, center.y, epsilon = 1e-8);
+        assert_relative_eq!(p00.z, center.z, epsilon = 1e-8);
+    }
+
+    #[test]
+    fn test_partial_torus() {
+        let major_radius = 3.0;
+        let minor_radius = 1.0;
+
+        // Half rotation, full profile
+        let half_rotation = NurbsSurface3D::<f64>::try_torus(
+            &Point3::origin(),
+            &Vector3::x(),
+            &Vector3::y(),
+            major_radius,
+            minor_radius,
+            (0.0, std::f64::consts::PI),
+            (0.0, std::f64::consts::TAU),
+        )
+        .unwrap();
+
+        let (u_start, u_end) = half_rotation.u_knots_domain();
+        let (v_start, v_end) = half_rotation.v_knots_domain();
+        assert_eq!(u_start, 0.0);
+        assert_relative_eq!(u_end, std::f64::consts::PI, epsilon = 1e-8);
+        assert_eq!(v_start, 0.0);
+        assert_relative_eq!(v_end, std::f64::consts::TAU, epsilon = 1e-8);
+
+        // Test point at u=0, v=0
+        let p00 = half_rotation.point_at(0.0, 0.0);
+        assert_relative_eq!(
+            p00.x,
+            major_radius + minor_radius,
+            epsilon = 1e-8
+        );
+
+        // Test point at u=PI, v=0 (should be at (-major_radius - minor_radius, 0, 0))
+        let p_pi_0 = half_rotation.point_at(std::f64::consts::PI, 0.0);
+        assert_relative_eq!(
+            p_pi_0.x,
+            -(major_radius + minor_radius),
+            epsilon = 1e-8
+        );
+
+        // Full rotation, half profile (0 to PI in v)
+        let half_profile = NurbsSurface3D::<f64>::try_torus(
+            &Point3::origin(),
+            &Vector3::x(),
+            &Vector3::y(),
+            major_radius,
+            minor_radius,
+            (0.0, std::f64::consts::TAU),
+            (0.0, std::f64::consts::PI),
+        )
+        .unwrap();
+
+        let (u_start, u_end) = half_profile.u_knots_domain();
+        let (v_start, v_end) = half_profile.v_knots_domain();
+        assert_eq!(u_start, 0.0);
+        assert_relative_eq!(u_end, std::f64::consts::TAU, epsilon = 1e-8);
+        assert_eq!(v_start, 0.0);
+        assert_relative_eq!(v_end, std::f64::consts::PI, epsilon = 1e-8);
+
+        // Test point at u=0, v=0 (outer edge)
+        let p00 = half_profile.point_at(0.0, 0.0);
+        assert_relative_eq!(
+            p00.x,
+            major_radius + minor_radius,
+            epsilon = 1e-8
+        );
+
+        // Test point at u=0, v=PI (inner edge)
+        let p0_pi = half_profile.point_at(0.0, std::f64::consts::PI);
+        assert_relative_eq!(
+            p0_pi.x,
+            major_radius - minor_radius,
+            epsilon = 1e-8
+        );
+    }
+
+    #[test]
+    fn test_quarter_torus() {
+        let major_radius = 2.0;
+        let minor_radius = 0.5;
+
+        // Quarter rotation, quarter profile
+        let quarter = NurbsSurface3D::<f64>::try_torus(
+            &Point3::origin(),
+            &Vector3::x(),
+            &Vector3::y(),
+            major_radius,
+            minor_radius,
+            (0.0, std::f64::consts::FRAC_PI_2),
+            (0.0, std::f64::consts::FRAC_PI_2),
+        )
+        .unwrap();
+
+        let (u_start, u_end) = quarter.u_knots_domain();
+        let (v_start, v_end) = quarter.v_knots_domain();
+        assert_eq!(u_start, 0.0);
+        assert_relative_eq!(u_end, std::f64::consts::FRAC_PI_2, epsilon = 1e-8);
+        assert_eq!(v_start, 0.0);
+        assert_relative_eq!(v_end, std::f64::consts::FRAC_PI_2, epsilon = 1e-8);
+
+        // Test corners
+        let p00 = quarter.point_at(0.0, 0.0);
+        assert_relative_eq!(
+            p00.x,
+            major_radius + minor_radius,
+            epsilon = 1e-8
+        );
+        assert_relative_eq!(p00.y, 0.0, epsilon = 1e-8);
+        assert_relative_eq!(p00.z, 0.0, epsilon = 1e-8);
+
+        let p_half_half = quarter.point_at(
+            std::f64::consts::FRAC_PI_2,
+            std::f64::consts::FRAC_PI_2,
+        );
+        assert_relative_eq!(p_half_half.x, 0.0, epsilon = 1e-8);
+        assert_relative_eq!(p_half_half.y, major_radius, epsilon = 1e-8);
+        assert_relative_eq!(p_half_half.z, minor_radius, epsilon = 1e-8);
+    }
+
+    #[test]
+    fn test_self_intersecting_torus() {
+        // Self-intersecting torus (spindle torus): minor_radius > major_radius
+        let major_radius = 2.5;
+        let minor_radius = 4.0; // larger than major_radius
+
+        let torus = NurbsSurface3D::<f64>::try_torus(
+            &Point3::origin(),
+            &Vector3::x(),
+            &Vector3::y(),
+            major_radius,
+            minor_radius,
+            (0.0, std::f64::consts::TAU),
+            (0.0, std::f64::consts::TAU),
+        )
+        .unwrap();
+
+        // Test point at u=0, v=0 (outer edge)
+        let p00 = torus.point_at(0.0, 0.0);
+        assert_relative_eq!(
+            p00.x,
+            major_radius + minor_radius, // 2.5 + 4.0 = 6.5
+            epsilon = 1e-6
+        );
+        assert_relative_eq!(p00.y, 0.0, epsilon = 1e-6);
+        assert_relative_eq!(p00.z, 0.0, epsilon = 1e-6);
+
+        // Test point at u=0, v=π (inner edge - should be negative, indicating self-intersection)
+        let p0_pi = torus.point_at(0.0, std::f64::consts::PI);
+        assert_relative_eq!(
+            p0_pi.x,
+            major_radius - minor_radius, // 2.5 - 4.0 = -1.5 (negative!)
+            epsilon = 1e-6
+        );
+        assert_relative_eq!(p0_pi.y, 0.0, epsilon = 1e-6);
+        assert_relative_eq!(p0_pi.z, 0.0, epsilon = 1e-6);
+
+        // Verify it's actually negative (self-intersecting)
+        assert!(p0_pi.x < 0.0, "Self-intersecting torus should have negative inner radius");
+
+        // Test point at u=0, v=π/2 (top of the tube)
+        let p0_half = torus.point_at(0.0, std::f64::consts::FRAC_PI_2);
+        assert_relative_eq!(p0_half.x, major_radius, epsilon = 1e-6);
+        assert_relative_eq!(p0_half.y, 0.0, epsilon = 1e-6);
+        assert_relative_eq!(p0_half.z, minor_radius, epsilon = 1e-6);
+    }
+
+    #[test]
+    fn test_horn_torus() {
+        // Horn torus: minor_radius == major_radius
+        let radius = 3.0;
+
+        let torus = NurbsSurface3D::<f64>::try_torus(
+            &Point3::origin(),
+            &Vector3::x(),
+            &Vector3::y(),
+            radius,
+            radius,
+            (0.0, std::f64::consts::TAU),
+            (0.0, std::f64::consts::TAU),
+        )
+        .unwrap();
+
+        // Test point at u=0, v=0
+        let p00 = torus.point_at(0.0, 0.0);
+        assert_relative_eq!(p00.x, radius + radius, epsilon = 1e-6);
+
+        // Test point at u=0, v=π (should touch the center)
+        let p0_pi = torus.point_at(0.0, std::f64::consts::PI);
+        assert_relative_eq!(
+            p0_pi.x,
+            0.0, // radius - radius = 0
+            epsilon = 1e-6
+        );
     }
 }
