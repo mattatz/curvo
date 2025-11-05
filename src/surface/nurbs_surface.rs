@@ -1468,267 +1468,175 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
         let y_axis = y_axis.normalize();
         let z_axis = x_axis.cross(&y_axis).normalize();
 
-        let u_angle = u_domain.1 - u_domain.0;
-        let v_angle = v_domain.1 - v_domain.0;
+        let delta_u = u_domain.1 - u_domain.0;
+        let delta_v = v_domain.1 - v_domain.0;
 
         anyhow::ensure!(
-            u_angle > T::zero(),
-            "u_domain end must be greater than start"
+            delta_u > T::zero() && delta_u <= T::two_pi(),
+            "u_domain must be in range (0, 2π]"
         );
         anyhow::ensure!(
-            v_angle > T::zero(),
-            "v_domain end must be greater than start"
+            delta_v > T::zero() && delta_v <= T::two_pi(),
+            "v_domain must be in range (0, 2π]"
         );
 
-        // Calculate number of arcs needed for u direction (major circle)
+        // Number of spans: match try_arc logic
+        // <= 90°: 1 span, <= 180°: 2 spans, > 180°: 4 spans
+        let half_pi = T::pi() / T::from_f64(2.0).unwrap();
+        let nb_u_spans = if delta_u <= half_pi + T::from_f64(1e-8).unwrap() {
+            1
+        } else if delta_u <= T::pi() + T::from_f64(1e-8).unwrap() {
+            2
+        } else {
+            4
+        };
+
+        let nb_v_spans = if delta_v <= half_pi + T::from_f64(1e-8).unwrap() {
+            1
+        } else if delta_v <= T::pi() + T::from_f64(1e-8).unwrap() {
+            2
+        } else {
+            4
+        };
+
         let two = T::from_f64(2.0).unwrap();
-        let pi_2 = T::pi() / two;
-        let (narcs_u, mut u_knots) = if u_angle <= pi_2 {
-            (1, vec![T::zero(); 6])
-        } else if u_angle <= T::pi() {
-            let mut knots = vec![T::zero(); 6 + 2];
-            let half = T::from_f64(0.5).unwrap();
-            knots[3] = half;
-            knots[4] = half;
-            (2, knots)
-        } else if u_angle <= T::from_f64(3.0).unwrap() * pi_2 {
-            let mut knots = vec![T::zero(); 6 + 2 * 2];
-            let frac_three = T::from_f64(1.0 / 3.0).unwrap();
-            let two_frac_three = T::from_f64(2.0 / 3.0).unwrap();
-            knots[3] = frac_three;
-            knots[4] = frac_three;
-            knots[5] = two_frac_three;
-            knots[6] = two_frac_three;
-            (3, knots)
-        } else {
-            let mut knots = vec![T::zero(); 6 + 2 * 3];
-            let frac_four = T::from_f64(1.0 / 4.0).unwrap();
-            let half = T::from_f64(0.5).unwrap();
-            let three_frac_four = T::from_f64(3.0 / 4.0).unwrap();
-            knots[3] = frac_four;
-            knots[4] = frac_four;
-            knots[5] = half;
-            knots[6] = half;
-            knots[7] = three_frac_four;
-            knots[8] = three_frac_four;
-            (4, knots)
-        };
+        let alfa_u = delta_u / (T::from_usize(nb_u_spans).unwrap() * two);
+        let alfa_v = delta_v / (T::from_usize(nb_v_spans).unwrap() * two);
 
-        // Calculate number of arcs needed for v direction (minor circle)
-        let (narcs_v, mut v_knots) = if v_angle <= pi_2 {
-            (1, vec![T::zero(); 6])
-        } else if v_angle <= T::pi() {
-            let mut knots = vec![T::zero(); 6 + 2];
-            let half = T::from_f64(0.5).unwrap();
-            knots[3] = half;
-            knots[4] = half;
-            (2, knots)
-        } else if v_angle <= T::from_f64(3.0).unwrap() * pi_2 {
-            let mut knots = vec![T::zero(); 6 + 2 * 2];
-            let frac_three = T::from_f64(1.0 / 3.0).unwrap();
-            let two_frac_three = T::from_f64(2.0 / 3.0).unwrap();
-            knots[3] = frac_three;
-            knots[4] = frac_three;
-            knots[5] = two_frac_three;
-            knots[6] = two_frac_three;
-            (3, knots)
-        } else {
-            let mut knots = vec![T::zero(); 6 + 2 * 3];
-            let frac_four = T::from_f64(1.0 / 4.0).unwrap();
-            let half = T::from_f64(0.5).unwrap();
-            let three_frac_four = T::from_f64(3.0 / 4.0).unwrap();
-            knots[3] = frac_four;
-            knots[4] = frac_four;
-            knots[5] = half;
-            knots[6] = half;
-            knots[7] = three_frac_four;
-            knots[8] = three_frac_four;
-            (4, knots)
-        };
+        let nb_u_poles = 2 * nb_u_spans + 1;
+        let nb_v_poles = 2 * nb_v_spans + 1;
 
-        let dtheta_u = u_angle / T::from_usize(narcs_u).unwrap();
-        let dtheta_v = v_angle / T::from_usize(narcs_v).unwrap();
+        // Compute V-direction control points (minor circle profile in XZ plane)
+        // x[j] = distance from Z axis, z[j] = height
+        let mut x_coords = vec![T::zero(); nb_v_poles];
+        let mut z_coords = vec![T::zero(); nb_v_poles];
 
-        let j_u = 3 + 2 * (narcs_u - 1);
-        let j_v = 3 + 2 * (narcs_v - 1);
+        x_coords[0] = major_radius + minor_radius * v_domain.0.cos();
+        z_coords[0] = minor_radius * v_domain.0.sin();
 
-        for i in 0..3 {
-            u_knots[i] = T::zero();
-            u_knots[j_u + i] = T::one();
-            v_knots[i] = T::zero();
-            v_knots[j_v + i] = T::one();
+        let mut v_start = v_domain.0;
+        for i in 1..=nb_v_spans {
+            let cos_alfa_v = alfa_v.cos();
+            // Odd index: tangent intersection point
+            x_coords[2 * i - 1] = major_radius + minor_radius * (v_start + alfa_v).cos() / cos_alfa_v;
+            z_coords[2 * i - 1] = minor_radius * (v_start + alfa_v).sin() / cos_alfa_v;
+            // Even index: point on circle
+            x_coords[2 * i] = major_radius + minor_radius * (v_start + two * alfa_v).cos();
+            z_coords[2 * i] = minor_radius * (v_start + two * alfa_v).sin();
+            v_start = v_start + two * alfa_v;
         }
 
-        let wm_u = (dtheta_u / two).cos();
-        let wm_v = (dtheta_v / two).cos();
+        // Build control points by rotating V-profile around Z axis
+        let mut control_points = vec![vec![Point4::origin(); nb_v_poles]; nb_u_poles];
 
-        let num_u = 2 * narcs_u + 1;
-        let num_v = 2 * narcs_v + 1;
-
-        // Pre-calculate angles and trig values for u direction
-        let mut angles_u = Vec::with_capacity(narcs_u + 1);
-        let mut cosines_u = Vec::with_capacity(narcs_u + 1);
-        let mut sines_u = Vec::with_capacity(narcs_u + 1);
-        for i in 0..=narcs_u {
-            let angle = u_domain.0 + T::from_usize(i).unwrap() * dtheta_u;
-            angles_u.push(angle);
-            cosines_u.push(angle.cos());
-            sines_u.push(angle.sin());
+        // First column (u = u_domain.0)
+        let u_start_cos = u_domain.0.cos();
+        let u_start_sin = u_domain.0.sin();
+        for j in 0..nb_v_poles {
+            let p = center
+                + &x_axis * (x_coords[j] * u_start_cos)
+                + &y_axis * (x_coords[j] * u_start_sin)
+                + &z_axis * z_coords[j];
+            control_points[0][j] = Point4::new(p.x, p.y, p.z, T::one());
         }
 
-        // Pre-calculate angles and trig values for v direction
-        let mut angles_v = Vec::with_capacity(narcs_v + 1);
-        let mut cosines_v = Vec::with_capacity(narcs_v + 1);
-        let mut sines_v = Vec::with_capacity(narcs_v + 1);
-        for i in 0..=narcs_v {
-            let angle = v_domain.0 + T::from_usize(i).unwrap() * dtheta_v;
-            angles_v.push(angle);
-            cosines_v.push(angle.cos());
-            sines_v.push(angle.sin());
-        }
+        // Fill remaining columns
+        let cos_alfa_u = alfa_u.cos();
+        let mut u_angle = u_domain.0;
+        for i in 1..=nb_u_spans {
+            for j in 0..nb_v_poles {
+                // Middle point of span (odd u index): tangent intersection point
+                let u1 = u_angle + alfa_u;
+                let cos_u1 = u1.cos();
+                let sin_u1 = u1.sin();
+                // Dehomogenized position divided by cos(alfa_u)
+                let x1 = x_coords[j] * cos_u1 / cos_alfa_u;
+                let y1 = x_coords[j] * sin_u1 / cos_alfa_u;
+                let z1 = z_coords[j];
+                let p1 = center + &x_axis * x1 + &y_axis * y1 + &z_axis * z1;
+                // Store with weight cos(alfa_u)
+                control_points[2 * i - 1][j] = Point4::new(
+                    p1.x * cos_alfa_u,
+                    p1.y * cos_alfa_u,
+                    p1.z * cos_alfa_u,
+                    cos_alfa_u,
+                );
 
-        // Build control points
-        let mut control_points = vec![vec![Point4::origin(); num_v]; num_u];
-
-        // Fill in the corner points first (even u, even v indices)
-        for i in 0..=narcs_u {
-            let u_idx = i * 2;
-            let cos_u = cosines_u[i];
-            let sin_u = sines_u[i];
-            let major_dir = &x_axis * cos_u + &y_axis * sin_u;
-
-            for j in 0..=narcs_v {
-                let v_idx = j * 2;
-                let cos_v = cosines_v[j];
-                let sin_v = sines_v[j];
-
-                let radius_at_v = major_radius + minor_radius * cos_v;
-                let p = center + &major_dir * radius_at_v + &z_axis * (minor_radius * sin_v);
-
-                control_points[u_idx][v_idx] = Point4::new(p.x, p.y, p.z, T::one());
+                // End point of span (even u index): point on circle
+                let u2 = u_angle + two * alfa_u;
+                let cos_u2 = u2.cos();
+                let sin_u2 = u2.sin();
+                let x2 = x_coords[j] * cos_u2;
+                let y2 = x_coords[j] * sin_u2;
+                let z2 = z_coords[j];
+                let p2 = center + &x_axis * x2 + &y_axis * y2 + &z_axis * z2;
+                control_points[2 * i][j] = Point4::new(p2.x, p2.y, p2.z, T::one());
             }
+            u_angle = u_angle + two * alfa_u;
         }
 
-        // Fill in u-direction middle points (odd u, even v indices)
-        for i in 0..narcs_u {
-            let u_idx = i * 2 + 1;
-            let p0_idx = i * 2;
-            let p2_idx = (i + 1) * 2;
-
-            for j in 0..=narcs_v {
-                let v_idx = j * 2;
-
-                let p0 = Point3::new(
-                    control_points[p0_idx][v_idx].x,
-                    control_points[p0_idx][v_idx].y,
-                    control_points[p0_idx][v_idx].z,
-                );
-                let p2 = Point3::new(
-                    control_points[p2_idx][v_idx].x,
-                    control_points[p2_idx][v_idx].y,
-                    control_points[p2_idx][v_idx].z,
-                );
-
-                // Tangent directions
-                let t0_u = -&x_axis * sines_u[i] + &y_axis * cosines_u[i];
-                let t2_u = -&x_axis * sines_u[i + 1] + &y_axis * cosines_u[i + 1];
-
-                // Find intersection of tangent lines
-                let ray0 = Ray::new(p0, t0_u.normalize());
-                let ray1 = Ray::new(p2, t2_u.normalize());
-
-                if let Some(intersection) = ray0.find_intersection(&ray1) {
-                    let p1 = intersection.intersection0.0;
-                    control_points[u_idx][v_idx] = Point4::new(
-                        p1.x * wm_u,
-                        p1.y * wm_u,
-                        p1.z * wm_u,
-                        wm_u,
-                    );
+        // Set weights for V-direction (already incorporated in control points for U)
+        let cos_alfa_v = alfa_v.cos();
+        for i in 0..nb_u_poles {
+            for j in 0..nb_v_poles {
+                if j % 2 == 1 {
+                    // Odd v index: multiply weight by cos(alfa_v)
+                    let w = control_points[i][j].w * cos_alfa_v;
+                    control_points[i][j].x = control_points[i][j].x / control_points[i][j].w * w;
+                    control_points[i][j].y = control_points[i][j].y / control_points[i][j].w * w;
+                    control_points[i][j].z = control_points[i][j].z / control_points[i][j].w * w;
+                    control_points[i][j].w = w;
                 }
             }
         }
 
-        // Fill in v-direction middle points (even u, odd v indices)
-        for i in 0..=narcs_u {
-            let u_idx = i * 2;
+        // Build knot vectors matching try_arc's approach
+        let mut u_knots = Vec::new();
+        let mut v_knots = Vec::new();
 
-            for j in 0..narcs_v {
-                let v_idx = j * 2 + 1;
-                let p0_idx = j * 2;
-                let p2_idx = (j + 1) * 2;
+        let angle_per_u_span = delta_u / T::from_usize(nb_u_spans).unwrap();
+        let angle_per_v_span = delta_v / T::from_usize(nb_v_spans).unwrap();
 
-                let p0 = Point3::new(
-                    control_points[u_idx][p0_idx].x,
-                    control_points[u_idx][p0_idx].y,
-                    control_points[u_idx][p0_idx].z,
-                );
-                let p2 = Point3::new(
-                    control_points[u_idx][p2_idx].x,
-                    control_points[u_idx][p2_idx].y,
-                    control_points[u_idx][p2_idx].z,
-                );
-
-                let cos_u = cosines_u[i];
-                let sin_u = sines_u[i];
-                let radial_dir = &x_axis * cos_u + &y_axis * sin_u;
-
-                // Tangent directions in v (perpendicular to radial in the z plane)
-                let t0_v = &radial_dir * (-sines_v[j] * minor_radius) + &z_axis * (cosines_v[j] * minor_radius);
-                let t2_v = &radial_dir * (-sines_v[j + 1] * minor_radius) + &z_axis * (cosines_v[j + 1] * minor_radius);
-
-                // Find intersection of tangent lines
-                let ray0 = Ray::new(p0, t0_v.normalize());
-                let ray1 = Ray::new(p2, t2_v.normalize());
-
-                if let Some(intersection) = ray0.find_intersection(&ray1) {
-                    let p1 = intersection.intersection0.0;
-                    control_points[u_idx][v_idx] = Point4::new(
-                        p1.x * wm_v,
-                        p1.y * wm_v,
-                        p1.z * wm_v,
-                        wm_v,
-                    );
-                }
-            }
+        // U knots: degree+1 copies of first
+        let degree = 2;
+        for _ in 0..=degree {
+            u_knots.push(u_domain.0);
         }
 
-        // Fill in the center points (odd u, odd v indices)
-        for i in 0..narcs_u {
-            let u_idx = i * 2 + 1;
-
-            for j in 0..narcs_v {
-                let v_idx = j * 2 + 1;
-
-                // Interpolate from surrounding even/odd points
-                let p_u_even = &control_points[u_idx][j * 2];
-                let p_u_odd = &control_points[u_idx][(j + 1) * 2];
-                let p_v_even = &control_points[i * 2][v_idx];
-                let p_v_odd = &control_points[(i + 1) * 2][v_idx];
-
-                // Average approach with combined weight
-                let w = wm_u * wm_v;
-                let px = (p_u_even.x / p_u_even.w + p_u_odd.x / p_u_odd.w +
-                         p_v_even.x / p_v_even.w + p_v_odd.x / p_v_odd.w) / T::from_f64(4.0).unwrap();
-                let py = (p_u_even.y / p_u_even.w + p_u_odd.y / p_u_odd.w +
-                         p_v_even.y / p_v_even.w + p_v_odd.y / p_v_odd.w) / T::from_f64(4.0).unwrap();
-                let pz = (p_u_even.z / p_u_even.w + p_u_odd.z / p_u_odd.w +
-                         p_v_even.z / p_v_even.w + p_v_odd.z / p_v_odd.w) / T::from_f64(4.0).unwrap();
-
-                control_points[u_idx][v_idx] = Point4::new(px * w, py * w, pz * w, w);
-            }
+        // Internal knots (each with multiplicity 2)
+        for i in 1..nb_u_spans {
+            let knot = u_domain.0 + angle_per_u_span * T::from_usize(i).unwrap();
+            u_knots.push(knot);
+            u_knots.push(knot);
         }
 
-        let mut torus = Self {
+        // degree+1 copies of last
+        for _ in 0..=degree {
+            u_knots.push(u_domain.1);
+        }
+
+        // V knots: same structure
+        for _ in 0..=degree {
+            v_knots.push(v_domain.0);
+        }
+
+        for i in 1..nb_v_spans {
+            let knot = v_domain.0 + angle_per_v_span * T::from_usize(i).unwrap();
+            v_knots.push(knot);
+            v_knots.push(knot);
+        }
+
+        for _ in 0..=degree {
+            v_knots.push(v_domain.1);
+        }
+
+        let torus = Self {
             control_points,
             u_degree: 2,
             v_degree: 2,
             u_knots: KnotVector::new(u_knots),
             v_knots: KnotVector::new(v_knots),
         };
-
-        // Remap the domains to match the requested u and v domains
-        torus.remap_knots(u_domain.0, u_domain.1, v_domain.0, v_domain.1);
 
         Ok(torus)
     }
