@@ -19,7 +19,6 @@ use crate::prelude::{Contains, SurfaceTessellation3D};
 use crate::region::CompoundCurve2D;
 use crate::surface::{NurbsSurface3D, TrimmedSurface};
 pub use constrained_triangulation::TrimmedSurfaceConstrainedTriangulation;
-pub use constrained_triangulation::*;
 pub use trimmed_surface_constraints::*;
 
 #[derive(Debug, Clone, Copy)]
@@ -36,6 +35,14 @@ impl<T: FloatingPoint> Vertex<T> {
 
     pub fn point(&self) -> Point3<T> {
         self.point
+    }
+
+    pub fn normal(&self) -> Vector3<T> {
+        self.normal
+    }
+
+    pub fn uv(&self) -> Vector2<T> {
+        self.uv
     }
 }
 
@@ -90,12 +97,12 @@ where
     F: Fn(&AdaptiveTessellationNode<T, U4>) -> Option<DividableDirection> + Copy,
 {
     let TrimmedSurfaceConstrainedTriangulation {
-        cdt: t,
+        cdt,
         exterior,
         interiors,
     } = TrimmedSurfaceConstrainedTriangulation::try_new(s, constraints, options)?;
 
-    let vmap: HashMap<_, _> = t
+    let vmap: HashMap<_, _> = cdt
         .vertices()
         .enumerate()
         .map(|(i, v)| (v.fix(), i))
@@ -110,11 +117,10 @@ where
 
     let inv_3 = T::from_f64(1. / 3.).unwrap();
 
-    let faces = t
+    let faces = cdt
         .inner_faces()
         .filter_map(|f| {
             let vs = f.vertices();
-
             let tri = vs.iter().map(|v| v.as_ref()).map(|p| p.uv).collect_vec();
 
             let (a, b) = (tri[1] - tri[0], tri[2] - tri[1]);
@@ -146,7 +152,7 @@ where
     // filter out isolated vertices
     let mut remap: HashMap<usize, usize> = HashMap::new();
     let mut vertices = vec![];
-    let vs = t.vertices().collect_vec();
+    let vs = cdt.vertices().collect_vec();
     let remapped_faces = faces
         .iter()
         .filter_map(|face| {
