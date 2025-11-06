@@ -5,7 +5,7 @@ use spade::{ConstrainedDelaunayTriangulation, SpadeNum, Triangulation};
 
 use crate::misc::FloatingPoint;
 use crate::prelude::{
-    AdaptiveTessellationNode, AdaptiveTessellationOptions, SurfaceTessellation,
+    AdaptiveTessellationNode, AdaptiveTessellationOptions, DefaultDivider, SurfaceTessellation,
     TrimmedSurfaceConstraints,
 };
 use crate::surface::TrimmedSurface;
@@ -112,14 +112,14 @@ impl<T: FloatingPoint + SpadeNum> TrimmedSurfaceConstrainedTriangulation<T> {
             ..
         } = tess;
 
+        let mut t = Tri::default();
+
         let surface_division = points
             .into_iter()
             .zip(normals)
             .zip(uvs)
             .map(|((p, n), uv)| Vertex::new(p, n, uv))
             .collect_vec();
-
-        let mut t = Tri::default();
 
         surface_division.iter().for_each(|v| {
             let _ = t.insert(*v);
