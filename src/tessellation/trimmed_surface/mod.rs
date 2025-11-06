@@ -88,7 +88,11 @@ where
 }
 
 /// Tessellate a trimmed surface using an adaptive algorithm with or without constraints
-fn trimmed_surface_adaptive_tessellate<T: FloatingPoint + SpadeNum, S: TrimmedSurfaceExt<T, F>, F>(
+pub fn trimmed_surface_adaptive_tessellate<
+    T: FloatingPoint + SpadeNum,
+    S: TrimmedSurfaceExt<T, F>,
+    F,
+>(
     s: &S,
     constraints: Option<TrimmedSurfaceConstraints<T>>,
     options: Option<AdaptiveTessellationOptions<T, U4, F>>,
