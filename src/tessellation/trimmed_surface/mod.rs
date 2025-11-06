@@ -130,25 +130,25 @@ where
             let (a, b) = (tri[1] - tri[0], tri[2] - tri[1]);
             let area = a.x * b.y - a.y * b.x;
             if ComplexField::abs(area) < T::default_epsilon() {
-                return None;
-            }
-
-            let center: Point2<T> = ((tri[0] + tri[1] + tri[2]) * inv_3).into();
-            if uv_exterior_boundary
-                .as_ref()
-                .map(|exterior| exterior.contains(&center, ()).unwrap_or(false))
-                .unwrap_or(true)
-                && (uv_interior_boundaries.is_empty()
-                    || !uv_interior_boundaries
-                        .iter()
-                        .any(|interior| interior.contains(&center, ()).unwrap_or(false)))
-            {
-                let a = vmap[&vs[0].fix()];
-                let b = vmap[&vs[1].fix()];
-                let c = vmap[&vs[2].fix()];
-                Some([a, b, c])
-            } else {
                 None
+            } else {
+                let center: Point2<T> = ((tri[0] + tri[1] + tri[2]) * inv_3).into();
+                if uv_exterior_boundary
+                    .as_ref()
+                    .map(|exterior| exterior.contains(&center, ()).unwrap_or(false))
+                    .unwrap_or(true)
+                    && (uv_interior_boundaries.is_empty()
+                        || !uv_interior_boundaries
+                            .iter()
+                            .any(|interior| interior.contains(&center, ()).unwrap_or(false)))
+                {
+                    let a = vmap[&vs[0].fix()];
+                    let b = vmap[&vs[1].fix()];
+                    let c = vmap[&vs[2].fix()];
+                    Some([a, b, c])
+                } else {
+                    None
+                }
             }
         })
         .collect_vec();
@@ -222,8 +222,8 @@ fn tessellate_uv_curve_adaptive<T: FloatingPoint, S: TrimmedSurfaceExt<T, F>, F>
             let knots = curve.knots();
             let n = knots.len();
             let (min, max) = curve.knots_domain();
-            let min = min + T::default_epsilon();
-            let max = max - T::default_epsilon();
+            // let min = min + T::default_epsilon();
+            // let max = max - T::default_epsilon();
 
             let pts = (1..n - 2)
                 .filter_map(|i| {
@@ -272,7 +272,7 @@ fn iterate_uv_curve_tessellation<T: FloatingPoint, S: TrimmedSurfaceExt<T, F>, F
     normal_tolerance: T,
 ) -> Vec<Point2<T>> {
     let (u_domain, v_domain) = surface.knots_domain();
-    let eps = T::from_f64(1e-2).unwrap();
+    let eps = T::from_f64(1e-8).unwrap();
     let min = Point2::new(u_domain.0 + eps, v_domain.0 + eps);
     let max = Point2::new(u_domain.1 - eps, v_domain.1 - eps);
 
