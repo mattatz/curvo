@@ -1,6 +1,6 @@
 use super::{DividableDirection, Tessellation};
 use itertools::Itertools;
-use nalgebra::U4;
+use nalgebra::{Point3, Vector3, U3, U4};
 use spade::{ConstrainedDelaunayTriangulation, SpadeNum, Triangulation};
 
 use crate::misc::FloatingPoint;
@@ -8,7 +8,9 @@ use crate::prelude::{
     AdaptiveTessellationNode, AdaptiveTessellationOptions, SurfaceTessellation,
     TrimmedSurfaceConstraints,
 };
+use crate::region::CompoundCurve;
 use crate::surface::TrimmedSurface;
+use crate::tessellation::trimmed_surface::trimmed_surface_ext::TrimmedSurfaceExt;
 use crate::tessellation::trimmed_surface::{tessellate_uv_compound_curve_adaptive, Vertex};
 
 type Tri<T> = ConstrainedDelaunayTriangulation<Vertex<T>>;
@@ -21,12 +23,13 @@ pub struct TrimmedSurfaceConstrainedTriangulation<T: FloatingPoint + SpadeNum> {
 }
 
 impl<T: FloatingPoint + SpadeNum> TrimmedSurfaceConstrainedTriangulation<T> {
-    pub fn try_new<F>(
-        s: &TrimmedSurface<T>,
+    pub fn try_new<S, F>(
+        surface: &S,
         constraints: Option<TrimmedSurfaceConstraints<T>>,
         options: Option<AdaptiveTessellationOptions<T, U4, F>>,
     ) -> anyhow::Result<Self>
     where
+        S: TrimmedSurfaceExt<T, F>,
         F: Fn(&AdaptiveTessellationNode<T, U4>) -> Option<DividableDirection> + Copy,
     {
         let o = options.as_ref();
@@ -38,26 +41,28 @@ impl<T: FloatingPoint + SpadeNum> TrimmedSurfaceConstrainedTriangulation<T> {
         let (exterior, interiors) = match constraints {
             Some(constraints) => {
                 anyhow::ensure!(
-                    constraints.interiors().len() == s.interiors().len(),
+                    constraints.interiors().len() == surface.interiors().len(),
                     "The number of interiors must match the number of trimming curves"
                 );
-                let exterior = s.exterior().map(|curve| match constraints.exterior() {
-                    Some(constraint) => constraint
-                        .iter()
-                        .map(|t| {
-                            let uv = curve.point_at(*t);
-                            let p = s.surface().point_at(uv.x, uv.y);
-                            let n = s.surface().normal_at(uv.x, uv.y);
-                            Vertex::new(p, n, uv.coords)
-                        })
-                        .collect_vec(),
-                    None => tessellate_uv_compound_curve_adaptive(
-                        curve,
-                        s.surface(),
-                        curve_tessellation_option,
-                    ),
-                });
-                let interiors = s
+                let exterior = surface
+                    .exterior()
+                    .map(|curve| match constraints.exterior() {
+                        Some(constraint) => constraint
+                            .iter()
+                            .map(|t| {
+                                let uv = curve.point_at(*t);
+                                let p = surface.point_at(uv.x, uv.y);
+                                let n = surface.normal_at(uv.x, uv.y);
+                                Vertex::new(p, n, uv.coords)
+                            })
+                            .collect_vec(),
+                        None => tessellate_uv_compound_curve_adaptive(
+                            curve,
+                            surface,
+                            curve_tessellation_option,
+                        ),
+                    });
+                let interiors = surface
                     .interiors()
                     .iter()
                     .zip(constraints.interiors())
@@ -66,14 +71,14 @@ impl<T: FloatingPoint + SpadeNum> TrimmedSurfaceConstrainedTriangulation<T> {
                             .iter()
                             .map(|t| {
                                 let uv = curve.point_at(*t);
-                                let p = s.surface().point_at(uv.x, uv.y);
-                                let n = s.surface().normal_at(uv.x, uv.y);
+                                let p = surface.point_at(uv.x, uv.y);
+                                let n = surface.normal_at(uv.x, uv.y);
                                 Vertex::new(p, n, uv.coords)
                             })
                             .collect_vec(),
                         None => tessellate_uv_compound_curve_adaptive(
                             curve,
-                            s.surface(),
+                            surface,
                             curve_tessellation_option,
                         ),
                     })
@@ -81,21 +86,17 @@ impl<T: FloatingPoint + SpadeNum> TrimmedSurfaceConstrainedTriangulation<T> {
                 (exterior, interiors)
             }
             None => {
-                let exterior = s.exterior().map(|curve| {
-                    tessellate_uv_compound_curve_adaptive(
-                        curve,
-                        s.surface(),
-                        curve_tessellation_option,
-                    )
+                let exterior = surface.exterior().map(|curve| {
+                    tessellate_uv_compound_curve_adaptive(curve, surface, curve_tessellation_option)
                 });
 
-                let interiors = s
+                let interiors = surface
                     .interiors()
                     .iter()
                     .map(|curve| {
                         tessellate_uv_compound_curve_adaptive(
                             curve,
-                            s.surface(),
+                            surface,
                             curve_tessellation_option,
                         )
                     })
@@ -104,7 +105,7 @@ impl<T: FloatingPoint + SpadeNum> TrimmedSurfaceConstrainedTriangulation<T> {
             }
         };
 
-        let tess = s.surface().tessellate(options);
+        let tess = surface.tessellate_base_surface(options);
         let SurfaceTessellation {
             points,
             normals,

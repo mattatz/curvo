@@ -1,5 +1,6 @@
 pub mod constrained_triangulation;
 pub mod trimmed_surface_constraints;
+pub mod trimmed_surface_ext;
 
 use std::collections::HashMap;
 
@@ -18,6 +19,7 @@ use crate::misc::PolygonBoundary;
 use crate::prelude::{Contains, SurfaceTessellation3D};
 use crate::region::CompoundCurve2D;
 use crate::surface::{NurbsSurface3D, TrimmedSurface};
+use crate::tessellation::trimmed_surface::trimmed_surface_ext::TrimmedSurfaceExt;
 pub use constrained_triangulation::TrimmedSurfaceConstrainedTriangulation;
 pub use trimmed_surface_constraints::*;
 
@@ -54,8 +56,6 @@ impl<T: FloatingPoint + SpadeNum> HasPosition for Vertex<T> {
     }
 }
 
-type Tri<T> = ConstrainedDelaunayTriangulation<Vertex<T>>;
-
 impl<T: FloatingPoint + SpadeNum, F> Tessellation<Option<AdaptiveTessellationOptions<T, U4, F>>>
     for TrimmedSurface<T>
 where
@@ -88,8 +88,8 @@ where
 }
 
 /// Tessellate a trimmed surface using an adaptive algorithm with or without constraints
-fn trimmed_surface_adaptive_tessellate<T: FloatingPoint + SpadeNum, F>(
-    s: &TrimmedSurface<T>,
+fn trimmed_surface_adaptive_tessellate<T: FloatingPoint + SpadeNum, S: TrimmedSurfaceExt<T, F>, F>(
+    s: &S,
     constraints: Option<TrimmedSurfaceConstraints<T>>,
     options: Option<AdaptiveTessellationOptions<T, U4, F>>,
 ) -> anyhow::Result<SurfaceTessellation3D<T>>
@@ -186,9 +186,9 @@ where
 }
 
 /// Tessellate the compound curve using an adaptive algorithm recursively
-fn tessellate_uv_compound_curve_adaptive<T: FloatingPoint>(
+fn tessellate_uv_compound_curve_adaptive<T: FloatingPoint, S: TrimmedSurfaceExt<T, F>, F>(
     curve: &CompoundCurve2D<T>,
-    surface: &NurbsSurface3D<T>,
+    surface: &S,
     tolerance: T,
 ) -> Vec<Vertex<T>> {
     curve
@@ -206,9 +206,9 @@ fn tessellate_uv_compound_curve_adaptive<T: FloatingPoint>(
 }
 
 /// Tessellate the curve using an adaptive algorithm recursively
-fn tessellate_uv_curve_adaptive<T: FloatingPoint>(
+fn tessellate_uv_curve_adaptive<T: FloatingPoint, S: TrimmedSurfaceExt<T, F>, F>(
     curve: &NurbsCurve2D<T>,
-    surface: &NurbsSurface3D<T>,
+    surface: &S,
     tolerance: T,
 ) -> Vec<Vertex<T>> {
     let degree = curve.degree();
@@ -260,9 +260,9 @@ fn tessellate_uv_curve_adaptive<T: FloatingPoint>(
     }
 }
 
-fn iterate_uv_curve_tessellation<T: FloatingPoint>(
+fn iterate_uv_curve_tessellation<T: FloatingPoint, S: TrimmedSurfaceExt<T, F>, F>(
     curve: &NurbsCurve2D<T>,
-    surface: &NurbsSurface3D<T>,
+    surface: &S,
     start: T,
     end: T,
     normal_tolerance: T,
