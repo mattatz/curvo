@@ -5,7 +5,7 @@ use spade::{ConstrainedDelaunayTriangulation, SpadeNum, Triangulation};
 
 use crate::misc::FloatingPoint;
 use crate::prelude::{
-    AdaptiveTessellationNode, AdaptiveTessellationOptions, DefaultDivider, SurfaceTessellation,
+    AdaptiveTessellationNode, AdaptiveTessellationOptions, SurfaceTessellation,
     TrimmedSurfaceConstraints,
 };
 use crate::surface::TrimmedSurface;
