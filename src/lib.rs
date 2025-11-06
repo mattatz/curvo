@@ -104,8 +104,9 @@ pub mod prelude {
         adaptive_tessellation_node::AdaptiveTessellationNode,
         adaptive_tessellation_option::AdaptiveTessellationOptions,
         boundary_constraints::BoundaryConstraints, surface_tessellation::*,
-        tangent_space::TangentSpace, trimmed_surface::TrimmedSurfaceConstraints,
-        ConstrainedTessellation, DefaultDivider, DividableDirection, Tessellation,
+        tangent_space::TangentSpace, trimmed_surface::TrimmedSurfaceConstrainedTriangulation,
+        trimmed_surface::TrimmedSurfaceConstraints, ConstrainedTessellation, DefaultDivider,
+        DividableDirection, Tessellation,
     };
     pub use crate::trim::*;
 }

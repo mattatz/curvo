@@ -13,13 +13,14 @@ use crate::tessellation::trimmed_surface::{tessellate_uv_compound_curve_adaptive
 
 type Tri<T> = ConstrainedDelaunayTriangulation<Vertex<T>>;
 
-pub struct ConstrainedTriangulation<T: FloatingPoint + SpadeNum> {
+/// Constrained triangulation of a trimmed surface
+pub struct TrimmedSurfaceConstrainedTriangulation<T: FloatingPoint + SpadeNum> {
     pub(crate) cdt: Tri<T>,
     pub(crate) exterior: Option<Vec<Vertex<T>>>,
     pub(crate) interiors: Vec<Vec<Vertex<T>>>,
 }
 
-impl<T: FloatingPoint + SpadeNum> ConstrainedTriangulation<T> {
+impl<T: FloatingPoint + SpadeNum> TrimmedSurfaceConstrainedTriangulation<T> {
     pub fn try_new<F>(
         s: &TrimmedSurface<T>,
         constraints: Option<TrimmedSurfaceConstraints<T>>,

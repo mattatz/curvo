@@ -18,6 +18,7 @@ use crate::misc::PolygonBoundary;
 use crate::prelude::{Contains, SurfaceTessellation3D};
 use crate::region::CompoundCurve2D;
 use crate::surface::{NurbsSurface3D, TrimmedSurface};
+pub use constrained_triangulation::TrimmedSurfaceConstrainedTriangulation;
 pub use constrained_triangulation::*;
 pub use trimmed_surface_constraints::*;
 
@@ -88,11 +89,11 @@ fn trimmed_surface_adaptive_tessellate<T: FloatingPoint + SpadeNum, F>(
 where
     F: Fn(&AdaptiveTessellationNode<T, U4>) -> Option<DividableDirection> + Copy,
 {
-    let ConstrainedTriangulation {
+    let TrimmedSurfaceConstrainedTriangulation {
         cdt: t,
         exterior,
         interiors,
-    } = ConstrainedTriangulation::try_new(s, constraints, options)?;
+    } = TrimmedSurfaceConstrainedTriangulation::try_new(s, constraints, options)?;
 
     let vmap: HashMap<_, _> = t
         .vertices()
