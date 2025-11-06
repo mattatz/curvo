@@ -171,14 +171,17 @@ impl<T: FloatingPoint + SpadeNum> ConstrainedTriangulation<T> {
         })
     }
 
+    #[allow(unused)]
     pub fn cdt(&self) -> &Tri<T> {
         &self.cdt
     }
 
+    #[allow(unused)]
     pub fn exterior(&self) -> Option<&Vec<Vertex<T>>> {
         self.exterior.as_ref()
     }
 
+    #[allow(unused)]
     pub fn interiors(&self) -> &Vec<Vec<Vertex<T>>> {
         &self.interiors
     }
