@@ -22,7 +22,7 @@ pub trait TrimmedSurfaceExt<T: FloatingPoint, F> {
     fn tessellate_base_surface(
         &self,
         options: Option<AdaptiveTessellationOptions<T, U4, F>>,
-    ) -> SurfaceTessellation3D<T>;
+    ) -> anyhow::Result<SurfaceTessellation3D<T>>;
 }
 
 /// Implementation of the `TrimmedSurfaceExt` trait for the `TrimmedSurface` type
@@ -53,7 +53,7 @@ where
     fn tessellate_base_surface(
         &self,
         options: Option<AdaptiveTessellationOptions<T, U4, F>>,
-    ) -> SurfaceTessellation3D<T> {
-        self.surface().tessellate(options)
+    ) -> anyhow::Result<SurfaceTessellation3D<T>> {
+        Ok(self.surface().tessellate(options))
     }
 }

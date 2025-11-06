@@ -105,7 +105,7 @@ impl<T: FloatingPoint + SpadeNum> TrimmedSurfaceConstrainedTriangulation<T> {
             }
         };
 
-        let tess = surface.tessellate_base_surface(options);
+        let tess = surface.tessellate_base_surface(options)?;
         let SurfaceTessellation {
             points,
             normals,

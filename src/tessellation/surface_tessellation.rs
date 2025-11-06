@@ -70,6 +70,21 @@ where
         tess
     }
 
+    /// Create a new surface tessellation from raw data
+    pub fn raw(
+        points: Vec<OPoint<T, DimNameDiff<D, U1>>>,
+        normals: Vec<OVector<T, DimNameDiff<D, U1>>>,
+        uvs: Vec<Vector2<T>>,
+        faces: Vec<[usize; 3]>,
+    ) -> Self {
+        Self {
+            points,
+            normals,
+            uvs,
+            faces,
+        }
+    }
+
     /// Triangulate the surface with adaptive tessellation nodes recursively
     fn triangulate(
         &mut self,
