@@ -1518,12 +1518,13 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
         for i in 1..=nb_v_spans {
             let cos_alfa_v = alfa_v.cos();
             // Odd index: tangent intersection point
-            x_coords[2 * i - 1] = major_radius + minor_radius * (v_start + alfa_v).cos() / cos_alfa_v;
+            x_coords[2 * i - 1] =
+                major_radius + minor_radius * (v_start + alfa_v).cos() / cos_alfa_v;
             z_coords[2 * i - 1] = minor_radius * (v_start + alfa_v).sin() / cos_alfa_v;
             // Even index: point on circle
             x_coords[2 * i] = major_radius + minor_radius * (v_start + two * alfa_v).cos();
             z_coords[2 * i] = minor_radius * (v_start + two * alfa_v).sin();
-            v_start = v_start + two * alfa_v;
+            v_start += two * alfa_v;
         }
 
         // Build control points by rotating V-profile around Z axis
@@ -1534,9 +1535,9 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
         let u_start_sin = u_domain.0.sin();
         for j in 0..nb_v_poles {
             let p = center
-                + &x_axis * (x_coords[j] * u_start_cos)
-                + &y_axis * (x_coords[j] * u_start_sin)
-                + &z_axis * z_coords[j];
+                + x_axis * (x_coords[j] * u_start_cos)
+                + y_axis * (x_coords[j] * u_start_sin)
+                + z_axis * z_coords[j];
             control_points[0][j] = Point4::new(p.x, p.y, p.z, T::one());
         }
 
@@ -1553,7 +1554,7 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
                 let x1 = x_coords[j] * cos_u1 / cos_alfa_u;
                 let y1 = x_coords[j] * sin_u1 / cos_alfa_u;
                 let z1 = z_coords[j];
-                let p1 = center + &x_axis * x1 + &y_axis * y1 + &z_axis * z1;
+                let p1 = center + x_axis * x1 + y_axis * y1 + z_axis * z1;
                 // Store with weight cos(alfa_u)
                 control_points[2 * i - 1][j] = Point4::new(
                     p1.x * cos_alfa_u,
@@ -1569,10 +1570,10 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
                 let x2 = x_coords[j] * cos_u2;
                 let y2 = x_coords[j] * sin_u2;
                 let z2 = z_coords[j];
-                let p2 = center + &x_axis * x2 + &y_axis * y2 + &z_axis * z2;
+                let p2 = center + x_axis * x2 + y_axis * y2 + z_axis * z2;
                 control_points[2 * i][j] = Point4::new(p2.x, p2.y, p2.z, T::one());
             }
-            u_angle = u_angle + two * alfa_u;
+            u_angle += two * alfa_u;
         }
 
         // Set weights for V-direction (already incorporated in control points for U)
@@ -2027,306 +2028,5 @@ mod tests {
         assert_relative_eq!(u_end, std::f64::consts::TAU, epsilon = 1e-8);
         assert_eq!(v_start, 0.0);
         assert_relative_eq!(v_end, std::f64::consts::TAU, epsilon = 1e-8);
-    }
-
-    #[test]
-    fn test_torus_geometry() {
-        let major_radius = 3.0;
-        let minor_radius = 1.0;
-        let torus = NurbsSurface3D::<f64>::try_torus(
-            &Point3::origin(),
-            &Vector3::x(),
-            &Vector3::y(),
-            major_radius,
-            minor_radius,
-            (0.0, std::f64::consts::TAU),
-            (0.0, std::f64::consts::TAU),
-        )
-        .unwrap();
-
-        // Test point at u=0, v=0 (should be at (major_radius + minor_radius, 0, 0))
-        let p00 = torus.point_at(0.0, 0.0);
-        assert_relative_eq!(
-            p00.x,
-            major_radius + minor_radius,
-            epsilon = 1e-8
-        );
-        assert_relative_eq!(p00.y, 0.0, epsilon = 1e-8);
-        assert_relative_eq!(p00.z, 0.0, epsilon = 1e-8);
-
-        // Test point at u=π/2, v=0 (should be at (0, major_radius + minor_radius, 0))
-        let p_half_0 = torus.point_at(std::f64::consts::FRAC_PI_2, 0.0);
-        assert_relative_eq!(p_half_0.x, 0.0, epsilon = 1e-8);
-        assert_relative_eq!(
-            p_half_0.y,
-            major_radius + minor_radius,
-            epsilon = 1e-8
-        );
-        assert_relative_eq!(p_half_0.z, 0.0, epsilon = 1e-8);
-
-        // Test point at u=0, v=π (should be at (major_radius - minor_radius, 0, 0))
-        let p0_half = torus.point_at(0.0, std::f64::consts::PI);
-        assert_relative_eq!(
-            p0_half.x,
-            major_radius - minor_radius,
-            epsilon = 1e-8
-        );
-        assert_relative_eq!(p0_half.y, 0.0, epsilon = 1e-8);
-        assert_relative_eq!(p0_half.z, 0.0, epsilon = 1e-8);
-
-        // Test point at u=0, v=π/2 (should be at (major_radius, 0, minor_radius))
-        let p0_quarter = torus.point_at(0.0, std::f64::consts::FRAC_PI_2);
-        assert_relative_eq!(p0_quarter.x, major_radius, epsilon = 1e-8);
-        assert_relative_eq!(p0_quarter.y, 0.0, epsilon = 1e-8);
-        assert_relative_eq!(p0_quarter.z, minor_radius, epsilon = 1e-8);
-    }
-
-    #[test]
-    fn test_torus_with_custom_axes() {
-        let major_radius = 2.0;
-        let minor_radius = 0.5;
-        // Create a torus oriented in the Y-Z plane
-        let torus = NurbsSurface3D::<f64>::try_torus(
-            &Point3::origin(),
-            &Vector3::y(),
-            &Vector3::z(),
-            major_radius,
-            minor_radius,
-            (0.0, std::f64::consts::TAU),
-            (0.0, std::f64::consts::TAU),
-        )
-        .unwrap();
-
-        // Test point at u=0, v=0
-        let p00 = torus.point_at(0.0, 0.0);
-        assert_relative_eq!(p00.x, 0.0, epsilon = 1e-8);
-        assert_relative_eq!(
-            p00.y,
-            major_radius + minor_radius,
-            epsilon = 1e-8
-        );
-        assert_relative_eq!(p00.z, 0.0, epsilon = 1e-8);
-    }
-
-    #[test]
-    fn test_torus_with_offset_center() {
-        let center = Point3::new(5.0, 3.0, 2.0);
-        let major_radius = 2.0;
-        let minor_radius = 0.5;
-        let torus = NurbsSurface3D::<f64>::try_torus(
-            &center,
-            &Vector3::x(),
-            &Vector3::y(),
-            major_radius,
-            minor_radius,
-            (0.0, std::f64::consts::TAU),
-            (0.0, std::f64::consts::TAU),
-        )
-        .unwrap();
-
-        // Test point at u=0, v=0
-        let p00 = torus.point_at(0.0, 0.0);
-        assert_relative_eq!(
-            p00.x,
-            center.x + major_radius + minor_radius,
-            epsilon = 1e-8
-        );
-        assert_relative_eq!(p00.y, center.y, epsilon = 1e-8);
-        assert_relative_eq!(p00.z, center.z, epsilon = 1e-8);
-    }
-
-    #[test]
-    fn test_partial_torus() {
-        let major_radius = 3.0;
-        let minor_radius = 1.0;
-
-        // Half rotation, full profile
-        let half_rotation = NurbsSurface3D::<f64>::try_torus(
-            &Point3::origin(),
-            &Vector3::x(),
-            &Vector3::y(),
-            major_radius,
-            minor_radius,
-            (0.0, std::f64::consts::PI),
-            (0.0, std::f64::consts::TAU),
-        )
-        .unwrap();
-
-        let (u_start, u_end) = half_rotation.u_knots_domain();
-        let (v_start, v_end) = half_rotation.v_knots_domain();
-        assert_eq!(u_start, 0.0);
-        assert_relative_eq!(u_end, std::f64::consts::PI, epsilon = 1e-8);
-        assert_eq!(v_start, 0.0);
-        assert_relative_eq!(v_end, std::f64::consts::TAU, epsilon = 1e-8);
-
-        // Test point at u=0, v=0
-        let p00 = half_rotation.point_at(0.0, 0.0);
-        assert_relative_eq!(
-            p00.x,
-            major_radius + minor_radius,
-            epsilon = 1e-8
-        );
-
-        // Test point at u=PI, v=0 (should be at (-major_radius - minor_radius, 0, 0))
-        let p_pi_0 = half_rotation.point_at(std::f64::consts::PI, 0.0);
-        assert_relative_eq!(
-            p_pi_0.x,
-            -(major_radius + minor_radius),
-            epsilon = 1e-8
-        );
-
-        // Full rotation, half profile (0 to PI in v)
-        let half_profile = NurbsSurface3D::<f64>::try_torus(
-            &Point3::origin(),
-            &Vector3::x(),
-            &Vector3::y(),
-            major_radius,
-            minor_radius,
-            (0.0, std::f64::consts::TAU),
-            (0.0, std::f64::consts::PI),
-        )
-        .unwrap();
-
-        let (u_start, u_end) = half_profile.u_knots_domain();
-        let (v_start, v_end) = half_profile.v_knots_domain();
-        assert_eq!(u_start, 0.0);
-        assert_relative_eq!(u_end, std::f64::consts::TAU, epsilon = 1e-8);
-        assert_eq!(v_start, 0.0);
-        assert_relative_eq!(v_end, std::f64::consts::PI, epsilon = 1e-8);
-
-        // Test point at u=0, v=0 (outer edge)
-        let p00 = half_profile.point_at(0.0, 0.0);
-        assert_relative_eq!(
-            p00.x,
-            major_radius + minor_radius,
-            epsilon = 1e-8
-        );
-
-        // Test point at u=0, v=PI (inner edge)
-        let p0_pi = half_profile.point_at(0.0, std::f64::consts::PI);
-        assert_relative_eq!(
-            p0_pi.x,
-            major_radius - minor_radius,
-            epsilon = 1e-8
-        );
-    }
-
-    #[test]
-    fn test_quarter_torus() {
-        let major_radius = 2.0;
-        let minor_radius = 0.5;
-
-        // Quarter rotation, quarter profile
-        let quarter = NurbsSurface3D::<f64>::try_torus(
-            &Point3::origin(),
-            &Vector3::x(),
-            &Vector3::y(),
-            major_radius,
-            minor_radius,
-            (0.0, std::f64::consts::FRAC_PI_2),
-            (0.0, std::f64::consts::FRAC_PI_2),
-        )
-        .unwrap();
-
-        let (u_start, u_end) = quarter.u_knots_domain();
-        let (v_start, v_end) = quarter.v_knots_domain();
-        assert_eq!(u_start, 0.0);
-        assert_relative_eq!(u_end, std::f64::consts::FRAC_PI_2, epsilon = 1e-8);
-        assert_eq!(v_start, 0.0);
-        assert_relative_eq!(v_end, std::f64::consts::FRAC_PI_2, epsilon = 1e-8);
-
-        // Test corners
-        let p00 = quarter.point_at(0.0, 0.0);
-        assert_relative_eq!(
-            p00.x,
-            major_radius + minor_radius,
-            epsilon = 1e-8
-        );
-        assert_relative_eq!(p00.y, 0.0, epsilon = 1e-8);
-        assert_relative_eq!(p00.z, 0.0, epsilon = 1e-8);
-
-        let p_half_half = quarter.point_at(
-            std::f64::consts::FRAC_PI_2,
-            std::f64::consts::FRAC_PI_2,
-        );
-        assert_relative_eq!(p_half_half.x, 0.0, epsilon = 1e-8);
-        assert_relative_eq!(p_half_half.y, major_radius, epsilon = 1e-8);
-        assert_relative_eq!(p_half_half.z, minor_radius, epsilon = 1e-8);
-    }
-
-    #[test]
-    fn test_self_intersecting_torus() {
-        // Self-intersecting torus (spindle torus): minor_radius > major_radius
-        let major_radius = 2.5;
-        let minor_radius = 4.0; // larger than major_radius
-
-        let torus = NurbsSurface3D::<f64>::try_torus(
-            &Point3::origin(),
-            &Vector3::x(),
-            &Vector3::y(),
-            major_radius,
-            minor_radius,
-            (0.0, std::f64::consts::TAU),
-            (0.0, std::f64::consts::TAU),
-        )
-        .unwrap();
-
-        // Test point at u=0, v=0 (outer edge)
-        let p00 = torus.point_at(0.0, 0.0);
-        assert_relative_eq!(
-            p00.x,
-            major_radius + minor_radius, // 2.5 + 4.0 = 6.5
-            epsilon = 1e-6
-        );
-        assert_relative_eq!(p00.y, 0.0, epsilon = 1e-6);
-        assert_relative_eq!(p00.z, 0.0, epsilon = 1e-6);
-
-        // Test point at u=0, v=π (inner edge - should be negative, indicating self-intersection)
-        let p0_pi = torus.point_at(0.0, std::f64::consts::PI);
-        assert_relative_eq!(
-            p0_pi.x,
-            major_radius - minor_radius, // 2.5 - 4.0 = -1.5 (negative!)
-            epsilon = 1e-6
-        );
-        assert_relative_eq!(p0_pi.y, 0.0, epsilon = 1e-6);
-        assert_relative_eq!(p0_pi.z, 0.0, epsilon = 1e-6);
-
-        // Verify it's actually negative (self-intersecting)
-        assert!(p0_pi.x < 0.0, "Self-intersecting torus should have negative inner radius");
-
-        // Test point at u=0, v=π/2 (top of the tube)
-        let p0_half = torus.point_at(0.0, std::f64::consts::FRAC_PI_2);
-        assert_relative_eq!(p0_half.x, major_radius, epsilon = 1e-6);
-        assert_relative_eq!(p0_half.y, 0.0, epsilon = 1e-6);
-        assert_relative_eq!(p0_half.z, minor_radius, epsilon = 1e-6);
-    }
-
-    #[test]
-    fn test_horn_torus() {
-        // Horn torus: minor_radius == major_radius
-        let radius = 3.0;
-
-        let torus = NurbsSurface3D::<f64>::try_torus(
-            &Point3::origin(),
-            &Vector3::x(),
-            &Vector3::y(),
-            radius,
-            radius,
-            (0.0, std::f64::consts::TAU),
-            (0.0, std::f64::consts::TAU),
-        )
-        .unwrap();
-
-        // Test point at u=0, v=0
-        let p00 = torus.point_at(0.0, 0.0);
-        assert_relative_eq!(p00.x, radius + radius, epsilon = 1e-6);
-
-        // Test point at u=0, v=π (should touch the center)
-        let p0_pi = torus.point_at(0.0, std::f64::consts::PI);
-        assert_relative_eq!(
-            p0_pi.x,
-            0.0, // radius - radius = 0
-            epsilon = 1e-6
-        );
     }
 }

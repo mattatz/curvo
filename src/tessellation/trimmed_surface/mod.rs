@@ -1,3 +1,6 @@
+pub mod constrained_triangulation;
+pub mod trimmed_surface_constraints;
+
 use std::collections::HashMap;
 
 use super::adaptive_tessellation_node::AdaptiveTessellationNode;
@@ -12,12 +15,14 @@ use spade::{ConstrainedDelaunayTriangulation, HasPosition, SpadeNum, Triangulati
 use crate::curve::NurbsCurve2D;
 use crate::misc::FloatingPoint;
 use crate::misc::PolygonBoundary;
-use crate::prelude::{Contains, SurfaceTessellation3D, TrimmedSurfaceConstraints};
+use crate::prelude::{Contains, SurfaceTessellation3D};
 use crate::region::CompoundCurve2D;
 use crate::surface::{NurbsSurface3D, TrimmedSurface};
+pub use constrained_triangulation::*;
+pub use trimmed_surface_constraints::*;
 
 #[derive(Debug, Clone, Copy)]
-struct Vertex<T: FloatingPoint> {
+pub struct Vertex<T: FloatingPoint> {
     point: Point3<T>,
     normal: Vector3<T>,
     uv: Vector2<T>,
@@ -83,145 +88,16 @@ fn trimmed_surface_adaptive_tessellate<T: FloatingPoint + SpadeNum, F>(
 where
     F: Fn(&AdaptiveTessellationNode<T, U4>) -> Option<DividableDirection> + Copy,
 {
-    let o = options.as_ref();
-
-    let curve_tessellation_option = o
-        .map(|o| o.norm_tolerance)
-        .unwrap_or(T::from_f64(1e-2).unwrap());
-
-    let (exterior, interiors) = match constraints {
-        Some(constraints) => {
-            anyhow::ensure!(
-                constraints.interiors().len() == s.interiors().len(),
-                "The number of interiors must match the number of trimming curves"
-            );
-            let exterior = s.exterior().map(|curve| match constraints.exterior() {
-                Some(constraint) => constraint
-                    .iter()
-                    .map(|t| {
-                        let uv = curve.point_at(*t);
-                        let p = s.surface().point_at(uv.x, uv.y);
-                        let n = s.surface().normal_at(uv.x, uv.y);
-                        Vertex::new(p, n, uv.coords)
-                    })
-                    .collect_vec(),
-                None => tessellate_uv_compound_curve_adaptive(
-                    curve,
-                    s.surface(),
-                    curve_tessellation_option,
-                ),
-            });
-            let interiors = s
-                .interiors()
-                .iter()
-                .zip(constraints.interiors())
-                .map(|(curve, constraint)| match constraint {
-                    Some(constraint) => constraint
-                        .iter()
-                        .map(|t| {
-                            let uv = curve.point_at(*t);
-                            let p = s.surface().point_at(uv.x, uv.y);
-                            let n = s.surface().normal_at(uv.x, uv.y);
-                            Vertex::new(p, n, uv.coords)
-                        })
-                        .collect_vec(),
-                    None => tessellate_uv_compound_curve_adaptive(
-                        curve,
-                        s.surface(),
-                        curve_tessellation_option,
-                    ),
-                })
-                .collect_vec();
-            (exterior, interiors)
-        }
-        None => {
-            let exterior = s.exterior().map(|curve| {
-                tessellate_uv_compound_curve_adaptive(curve, s.surface(), curve_tessellation_option)
-            });
-
-            let interiors = s
-                .interiors()
-                .iter()
-                .map(|curve| {
-                    tessellate_uv_compound_curve_adaptive(
-                        curve,
-                        s.surface(),
-                        curve_tessellation_option,
-                    )
-                })
-                .collect_vec();
-            (exterior, interiors)
-        }
-    };
-
-    let tess = s.surface().tessellate(options);
-    let SurfaceTessellation {
-        points,
-        normals,
-        uvs,
-        ..
-    } = tess;
-
-    let surface_division = points
-        .into_iter()
-        .zip(normals)
-        .zip(uvs)
-        .map(|((p, n), uv)| Vertex::new(p, n, uv))
-        .collect_vec();
-
-    let mut t = Tri::default();
-
-    surface_division.iter().for_each(|v| {
-        let _ = t.insert(*v);
-    });
-
-    let insert_constraint = |t: &mut Tri<T>, vertices: &[Vertex<T>]| {
-        let skip = if let (Some(first), Some(last)) = (vertices.first(), vertices.last()) {
-            // if the input vertices are closed, skip the first vertex to avoid adding a duplicate constraint
-            if first.point() == last.point() {
-                1
-            } else {
-                0
-            }
-        } else {
-            0
-        };
-
-        let handles = vertices
-            .iter()
-            .skip(skip)
-            .map(|v| t.insert(*v))
-            .collect_vec();
-        handles
-            .into_iter()
-            .circular_tuple_windows()
-            .for_each(|(a, b)| {
-                if let (Ok(a), Ok(b)) = (a, b) {
-                    let can_add_constraint = t.can_add_constraint(a, b);
-                    if can_add_constraint {
-                        t.add_constraint(a, b);
-                    }
-                }
-            });
-    };
-
-    if let Some(exterior) = exterior.as_ref() {
-        insert_constraint(&mut t, exterior);
-    }
-    interiors.iter().for_each(|verts| {
-        insert_constraint(&mut t, verts);
-    });
-
-    let mut vertices = vec![];
+    let ConstrainedTriangulation {
+        cdt: t,
+        exterior,
+        interiors,
+    } = ConstrainedTriangulation::try_new(s, constraints, options)?;
 
     let vmap: HashMap<_, _> = t
         .vertices()
         .enumerate()
-        .map(|(i, v)| {
-            let p = v.as_ref();
-            vertices.push(p.uv);
-            (v.fix(), i)
-        })
+        .map(|(i, v)| (v.fix(), i))
         .collect();
 
     let uv_exterior_boundary =
@@ -384,10 +260,18 @@ fn iterate_uv_curve_tessellation<T: FloatingPoint>(
     end: T,
     normal_tolerance: T,
 ) -> Vec<Point2<T>> {
+    let (u_domain, v_domain) = surface.knots_domain();
+    let eps = T::from_f64(1e-2).unwrap();
+    let min = Point2::new(u_domain.0 + eps, v_domain.0 + eps);
+    let max = Point2::new(u_domain.1 - eps, v_domain.1 - eps);
+
     let (p1, n1) = curve.point_tangent_at(start);
     let delta = end - start;
     if delta < T::from_f64(1e-8).unwrap() {
-        return vec![p1];
+        return vec![Point2::new(
+            p1.x.clamp(min.x, max.x),
+            p1.y.clamp(min.y, max.y),
+        )];
     }
 
     let exact_mid = start + (end - start) * T::from_f64(0.5).unwrap();
@@ -419,6 +303,9 @@ fn iterate_uv_curve_tessellation<T: FloatingPoint>(
         left_pts.pop();
         [left_pts, right_pts].concat()
     } else {
-        vec![p1, p3]
+        vec![
+            Point2::new(p1.x.clamp(min.x, max.x), p1.y.clamp(min.y, max.y)),
+            Point2::new(p3.x.clamp(min.x, max.x), p3.y.clamp(min.y, max.y)),
+        ]
     }
 }
