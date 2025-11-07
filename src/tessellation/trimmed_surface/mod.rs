@@ -272,7 +272,7 @@ fn iterate_uv_curve_tessellation<T: FloatingPoint, S: TrimmedSurfaceExt<T, F>, F
     normal_tolerance: T,
 ) -> Vec<Point2<T>> {
     let (u_domain, v_domain) = surface.knots_domain();
-    let eps = T::from_f64(1e-8).unwrap();
+    let eps = T::default_epsilon();
     let min = Point2::new(u_domain.0 + eps, v_domain.0 + eps);
     let max = Point2::new(u_domain.1 - eps, v_domain.1 - eps);
 
