@@ -1,6 +1,6 @@
-use super::{DividableDirection, Tessellation};
+use super::DividableDirection;
 use itertools::Itertools;
-use nalgebra::{Point3, Vector3, U3, U4};
+use nalgebra::U4;
 use spade::{ConstrainedDelaunayTriangulation, SpadeNum, Triangulation};
 
 use crate::misc::FloatingPoint;
@@ -8,8 +8,6 @@ use crate::prelude::{
     AdaptiveTessellationNode, AdaptiveTessellationOptions, SurfaceTessellation,
     TrimmedSurfaceConstraints,
 };
-use crate::region::CompoundCurve;
-use crate::surface::TrimmedSurface;
 use crate::tessellation::trimmed_surface::trimmed_surface_ext::TrimmedSurfaceExt;
 use crate::tessellation::trimmed_surface::{tessellate_uv_compound_curve_adaptive, Vertex};
 

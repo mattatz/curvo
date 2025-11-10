@@ -11,14 +11,14 @@ use super::{ConstrainedTessellation, DividableDirection, Tessellation};
 use itertools::Itertools;
 use nalgebra::{ComplexField, Point2, Point3, Vector3};
 use nalgebra::{Vector2, U4};
-use spade::{ConstrainedDelaunayTriangulation, HasPosition, SpadeNum, Triangulation};
+use spade::{HasPosition, SpadeNum, Triangulation};
 
 use crate::curve::NurbsCurve2D;
 use crate::misc::FloatingPoint;
 use crate::misc::PolygonBoundary;
 use crate::prelude::{Contains, SurfaceTessellation3D};
 use crate::region::CompoundCurve2D;
-use crate::surface::{NurbsSurface3D, TrimmedSurface};
+use crate::surface::TrimmedSurface;
 use crate::tessellation::trimmed_surface::trimmed_surface_ext::TrimmedSurfaceExt;
 pub use constrained_triangulation::TrimmedSurfaceConstrainedTriangulation;
 pub use trimmed_surface_constraints::*;
