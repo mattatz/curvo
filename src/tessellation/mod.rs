@@ -12,7 +12,6 @@ pub mod tessellation_compound_curve;
 pub mod tessellation_curve;
 pub mod tessellation_region;
 pub mod trimmed_surface;
-pub mod trimmed_surface_constraints;
 
 pub use adaptive_tessellation_node::DividableDirection;
 use nalgebra::U4;

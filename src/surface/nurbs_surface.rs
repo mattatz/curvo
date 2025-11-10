@@ -1232,8 +1232,8 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
     /// let profile = NurbsCurve3D::interpolate(&points, 3).unwrap();
     ///
     /// // Revolve the profile curve around the z-axis by PI radians to create a NURBS surface
-    /// let reolved = NurbsSurface::try_revolve(&profile, &Point3::origin(), &Vector3::z_axis(), std::f64::consts::PI);
-    /// assert!(reolved.is_ok());
+    /// let revolved = NurbsSurface::try_revolve(&profile, &Point3::origin(), &Vector3::z_axis(), std::f64::consts::PI);
+    /// assert!(revolved.is_ok());
     /// ```
     pub fn try_revolve(
         profile: &NurbsCurve3D<T>,
@@ -1241,6 +1241,18 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
         axis: &Vector3<T>,
         theta: T,
     ) -> anyhow::Result<Self> {
+        Self::try_revolve_by_start_end(profile, center, axis, T::zero(), theta)
+    }
+
+    /// Try to revolve a profile curve around an axis by specifying the start and end angles
+    pub fn try_revolve_by_start_end(
+        profile: &NurbsCurve3D<T>,
+        center: &Point3<T>,
+        axis: &Vector3<T>,
+        start: T,
+        end: T,
+    ) -> anyhow::Result<Self> {
+        let theta = end - start;
         let prof_points = profile.dehomogenized_control_points();
         let prof_weights = profile.weights();
 
@@ -1286,14 +1298,11 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
 
         let wm = (dtheta / two).cos();
 
-        let mut angle = T::zero();
-        let mut sines = vec![T::zero(); narcs + 1];
-        let mut cosines = vec![T::zero(); narcs + 1];
-        for i in 0..=narcs {
-            cosines[i] = angle.cos();
-            sines[i] = angle.sin();
-            angle += dtheta;
-        }
+        let angles = (0..=narcs)
+            .map(|i| start + T::from_usize(i).unwrap() * dtheta)
+            .collect_vec();
+        let sines = angles.iter().map(|a| a.sin()).collect_vec();
+        let cosines = angles.iter().map(|a| a.cos()).collect_vec();
 
         let mut control_points = vec![vec![Point4::origin(); prof_points.len()]; 2 * narcs + 1];
 
@@ -1314,7 +1323,6 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
                 y *= T::one() / r;
             }
 
-            // control_points[0][j]
             let mut p0 = prof_points[j];
             control_points[0][j].x = p0.x;
             control_points[0][j].y = p0.y;
@@ -1348,9 +1356,11 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
                     let nt2 = t2.normalize();
                     let r0 = Ray::new(p0, nt0);
                     let r1 = Ray::new(p2, nt2);
-                    let intersection = r0
-                        .find_intersection(&r1)
-                        .ok_or(anyhow::anyhow!("No intersection between rays"))?;
+                    let intersection = r0.find_intersection(&r1).ok_or(anyhow::anyhow!(
+                        "No intersection between rays: {:?}, {:?}",
+                        r0,
+                        r1
+                    ))?;
 
                     let intersected = intersection.intersection0.0;
                     control_points[l][j].x = intersected.x;
@@ -1397,6 +1407,239 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
     ) -> anyhow::Result<Self> {
         let arc = NurbsCurve::try_arc(center, &-axis, x_axis, radius, T::zero(), T::pi())?;
         Self::try_revolve(&arc, center, axis, T::two_pi())
+    }
+
+    /// Try to create a torus (or partial torus)
+    ///
+    /// # Arguments
+    /// * `center` - Center point of the torus
+    /// * `x_axis` - X axis direction (will be normalized)
+    /// * `y_axis` - Y axis direction (will be normalized)
+    /// * `major_radius` - Distance from center to tube center
+    /// * `minor_radius` - Radius of the tube
+    /// * `u_domain` - Rotation angle range (major circle), in radians
+    /// * `v_domain` - Profile arc angle range (minor circle), in radians
+    ///
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point3, Vector3};
+    /// use approx::assert_relative_eq;
+    ///
+    /// // Full torus
+    /// let torus = NurbsSurface3D::try_torus(
+    ///     &Point3::origin(),
+    ///     &Vector3::x(),
+    ///     &Vector3::y(),
+    ///     2.0,
+    ///     0.5,
+    ///     (0.0, std::f64::consts::TAU),
+    ///     (0.0, std::f64::consts::TAU)
+    /// ).unwrap();
+    /// let (u_start, u_end) = torus.u_knots_domain();
+    /// let (v_start, v_end) = torus.v_knots_domain();
+    /// assert_eq!(u_start, 0.0);
+    /// assert_relative_eq!(u_end, std::f64::consts::TAU, epsilon = 1e-8);
+    /// assert_eq!(v_start, 0.0);
+    /// assert_relative_eq!(v_end, std::f64::consts::TAU, epsilon = 1e-8);
+    ///
+    /// // Partial torus (half rotation, half profile)
+    /// let partial = NurbsSurface3D::try_torus(
+    ///     &Point3::origin(),
+    ///     &Vector3::x(),
+    ///     &Vector3::y(),
+    ///     2.0,
+    ///     0.5,
+    ///     (0.0, std::f64::consts::PI),
+    ///     (0.0, std::f64::consts::PI)
+    /// ).unwrap();
+    /// ```
+    pub fn try_torus(
+        center: &Point3<T>,
+        x_axis: &Vector3<T>,
+        y_axis: &Vector3<T>,
+        major_radius: T,
+        minor_radius: T,
+        u_domain: (T, T),
+        v_domain: (T, T),
+    ) -> anyhow::Result<Self> {
+        // Normalize the axes
+        let x_axis = x_axis.normalize();
+        let y_axis = y_axis.normalize();
+        let z_axis = x_axis.cross(&y_axis).normalize();
+
+        let delta_u = u_domain.1 - u_domain.0;
+        let delta_v = v_domain.1 - v_domain.0;
+
+        anyhow::ensure!(
+            delta_u > T::zero() && delta_u <= T::two_pi(),
+            "u_domain must be in range (0, 2π]"
+        );
+        anyhow::ensure!(
+            delta_v > T::zero() && delta_v <= T::two_pi(),
+            "v_domain must be in range (0, 2π]"
+        );
+
+        // Number of spans: match try_arc logic
+        // <= 90°: 1 span, <= 180°: 2 spans, > 180°: 4 spans
+        let half_pi = T::pi() / T::from_f64(2.0).unwrap();
+        let nb_u_spans = if delta_u <= half_pi + T::from_f64(1e-8).unwrap() {
+            1
+        } else if delta_u <= T::pi() + T::from_f64(1e-8).unwrap() {
+            2
+        } else {
+            4
+        };
+
+        let nb_v_spans = if delta_v <= half_pi + T::from_f64(1e-8).unwrap() {
+            1
+        } else if delta_v <= T::pi() + T::from_f64(1e-8).unwrap() {
+            2
+        } else {
+            4
+        };
+
+        let two = T::from_f64(2.0).unwrap();
+        let alfa_u = delta_u / (T::from_usize(nb_u_spans).unwrap() * two);
+        let alfa_v = delta_v / (T::from_usize(nb_v_spans).unwrap() * two);
+
+        let nb_u_poles = 2 * nb_u_spans + 1;
+        let nb_v_poles = 2 * nb_v_spans + 1;
+
+        // Compute V-direction control points (minor circle profile in XZ plane)
+        // x[j] = distance from Z axis, z[j] = height
+        let mut x_coords = vec![T::zero(); nb_v_poles];
+        let mut z_coords = vec![T::zero(); nb_v_poles];
+
+        x_coords[0] = major_radius + minor_radius * v_domain.0.cos();
+        z_coords[0] = minor_radius * v_domain.0.sin();
+
+        let mut v_start = v_domain.0;
+        for i in 1..=nb_v_spans {
+            let cos_alfa_v = alfa_v.cos();
+            // Odd index: tangent intersection point
+            x_coords[2 * i - 1] =
+                major_radius + minor_radius * (v_start + alfa_v).cos() / cos_alfa_v;
+            z_coords[2 * i - 1] = minor_radius * (v_start + alfa_v).sin() / cos_alfa_v;
+            // Even index: point on circle
+            x_coords[2 * i] = major_radius + minor_radius * (v_start + two * alfa_v).cos();
+            z_coords[2 * i] = minor_radius * (v_start + two * alfa_v).sin();
+            v_start += two * alfa_v;
+        }
+
+        // Build control points by rotating V-profile around Z axis
+        let mut control_points = vec![vec![Point4::origin(); nb_v_poles]; nb_u_poles];
+
+        // First column (u = u_domain.0)
+        let u_start_cos = u_domain.0.cos();
+        let u_start_sin = u_domain.0.sin();
+        for j in 0..nb_v_poles {
+            let p = center
+                + x_axis * (x_coords[j] * u_start_cos)
+                + y_axis * (x_coords[j] * u_start_sin)
+                + z_axis * z_coords[j];
+            control_points[0][j] = Point4::new(p.x, p.y, p.z, T::one());
+        }
+
+        // Fill remaining columns
+        let cos_alfa_u = alfa_u.cos();
+        let mut u_angle = u_domain.0;
+        for i in 1..=nb_u_spans {
+            for j in 0..nb_v_poles {
+                // Middle point of span (odd u index): tangent intersection point
+                let u1 = u_angle + alfa_u;
+                let cos_u1 = u1.cos();
+                let sin_u1 = u1.sin();
+                // Dehomogenized position divided by cos(alfa_u)
+                let x1 = x_coords[j] * cos_u1 / cos_alfa_u;
+                let y1 = x_coords[j] * sin_u1 / cos_alfa_u;
+                let z1 = z_coords[j];
+                let p1 = center + x_axis * x1 + y_axis * y1 + z_axis * z1;
+                // Store with weight cos(alfa_u)
+                control_points[2 * i - 1][j] = Point4::new(
+                    p1.x * cos_alfa_u,
+                    p1.y * cos_alfa_u,
+                    p1.z * cos_alfa_u,
+                    cos_alfa_u,
+                );
+
+                // End point of span (even u index): point on circle
+                let u2 = u_angle + two * alfa_u;
+                let cos_u2 = u2.cos();
+                let sin_u2 = u2.sin();
+                let x2 = x_coords[j] * cos_u2;
+                let y2 = x_coords[j] * sin_u2;
+                let z2 = z_coords[j];
+                let p2 = center + x_axis * x2 + y_axis * y2 + z_axis * z2;
+                control_points[2 * i][j] = Point4::new(p2.x, p2.y, p2.z, T::one());
+            }
+            u_angle += two * alfa_u;
+        }
+
+        // Set weights for V-direction (already incorporated in control points for U)
+        let cos_alfa_v = alfa_v.cos();
+        for i in 0..nb_u_poles {
+            for j in 0..nb_v_poles {
+                if j % 2 == 1 {
+                    // Odd v index: multiply weight by cos(alfa_v)
+                    let w = control_points[i][j].w * cos_alfa_v;
+                    control_points[i][j].x = control_points[i][j].x / control_points[i][j].w * w;
+                    control_points[i][j].y = control_points[i][j].y / control_points[i][j].w * w;
+                    control_points[i][j].z = control_points[i][j].z / control_points[i][j].w * w;
+                    control_points[i][j].w = w;
+                }
+            }
+        }
+
+        // Build knot vectors matching try_arc's approach
+        let mut u_knots = Vec::new();
+        let mut v_knots = Vec::new();
+
+        let angle_per_u_span = delta_u / T::from_usize(nb_u_spans).unwrap();
+        let angle_per_v_span = delta_v / T::from_usize(nb_v_spans).unwrap();
+
+        // U knots: degree+1 copies of first
+        let degree = 2;
+        for _ in 0..=degree {
+            u_knots.push(u_domain.0);
+        }
+
+        // Internal knots (each with multiplicity 2)
+        for i in 1..nb_u_spans {
+            let knot = u_domain.0 + angle_per_u_span * T::from_usize(i).unwrap();
+            u_knots.push(knot);
+            u_knots.push(knot);
+        }
+
+        // degree+1 copies of last
+        for _ in 0..=degree {
+            u_knots.push(u_domain.1);
+        }
+
+        // V knots: same structure
+        for _ in 0..=degree {
+            v_knots.push(v_domain.0);
+        }
+
+        for i in 1..nb_v_spans {
+            let knot = v_domain.0 + angle_per_v_span * T::from_usize(i).unwrap();
+            v_knots.push(knot);
+            v_knots.push(knot);
+        }
+
+        for _ in 0..=degree {
+            v_knots.push(v_domain.1);
+        }
+
+        let torus = Self {
+            control_points,
+            u_degree: 2,
+            v_degree: 2,
+            u_knots: KnotVector::new(u_knots),
+            v_knots: KnotVector::new(v_knots),
+        };
+
+        Ok(torus)
     }
 }
 
@@ -1753,5 +1996,37 @@ where
             "v_knots",
         ];
         deserializer.deserialize_struct("NurbsSurface", FIELDS, NurbsSurfaceVisitor::<T, D>::new())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use approx::assert_relative_eq;
+
+    #[test]
+    fn test_torus_basic() {
+        let torus = NurbsSurface3D::<f64>::try_torus(
+            &Point3::origin(),
+            &Vector3::x(),
+            &Vector3::y(),
+            3.0,
+            1.0,
+            (0.0, std::f64::consts::TAU),
+            (0.0, std::f64::consts::TAU),
+        )
+        .unwrap();
+
+        // Check degrees
+        assert_eq!(torus.u_degree(), 2);
+        assert_eq!(torus.v_degree(), 2);
+
+        // Check domains
+        let (u_start, u_end) = torus.u_knots_domain();
+        let (v_start, v_end) = torus.v_knots_domain();
+        assert_eq!(u_start, 0.0);
+        assert_relative_eq!(u_end, std::f64::consts::TAU, epsilon = 1e-8);
+        assert_eq!(v_start, 0.0);
+        assert_relative_eq!(v_end, std::f64::consts::TAU, epsilon = 1e-8);
     }
 }

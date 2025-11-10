@@ -6,8 +6,8 @@ use bevy::{
 use bevy_egui::EguiContexts;
 use bevy_normal_material::prelude::NormalMaterial;
 use curvo::prelude::{
-    AdaptiveTessellationNode, AdaptiveTessellationOptions, CompoundCurve3D, DefaultDivider,
-    DividableDirection, NurbsCurve3D, NurbsSurface3D, SurfaceTessellation3D, Tessellation,
+    AdaptiveTessellationNode, AdaptiveTessellationOptions, CompoundCurve3D, DividableDirection,
+    NurbsCurve3D, NurbsSurface3D, SurfaceTessellation3D, Tessellation,
 };
 use nalgebra::U4;
 

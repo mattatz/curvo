@@ -3,6 +3,7 @@ use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, OPoint, OVector}
 use crate::misc::FloatingPoint;
 
 /// Represents a ray in D dimensions.
+#[derive(Clone, Debug)]
 pub struct Ray<T: FloatingPoint, D>
 where
     D: DimName,

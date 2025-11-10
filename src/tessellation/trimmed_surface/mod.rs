@@ -1,3 +1,7 @@
+pub mod constrained_triangulation;
+pub mod trimmed_surface_constraints;
+pub mod trimmed_surface_ext;
+
 use std::collections::HashMap;
 
 use super::adaptive_tessellation_node::AdaptiveTessellationNode;
@@ -7,17 +11,20 @@ use super::{ConstrainedTessellation, DividableDirection, Tessellation};
 use itertools::Itertools;
 use nalgebra::{ComplexField, Point2, Point3, Vector3};
 use nalgebra::{Vector2, U4};
-use spade::{ConstrainedDelaunayTriangulation, HasPosition, SpadeNum, Triangulation};
+use spade::{HasPosition, SpadeNum, Triangulation};
 
 use crate::curve::NurbsCurve2D;
 use crate::misc::FloatingPoint;
 use crate::misc::PolygonBoundary;
-use crate::prelude::{Contains, SurfaceTessellation3D, TrimmedSurfaceConstraints};
+use crate::prelude::{Contains, SurfaceTessellation3D};
 use crate::region::CompoundCurve2D;
-use crate::surface::{NurbsSurface3D, TrimmedSurface};
+use crate::surface::TrimmedSurface;
+use crate::tessellation::trimmed_surface::trimmed_surface_ext::TrimmedSurfaceExt;
+pub use constrained_triangulation::TrimmedSurfaceConstrainedTriangulation;
+pub use trimmed_surface_constraints::*;
 
 #[derive(Debug, Clone, Copy)]
-struct Vertex<T: FloatingPoint> {
+pub struct Vertex<T: FloatingPoint> {
     point: Point3<T>,
     normal: Vector3<T>,
     uv: Vector2<T>,
@@ -31,6 +38,14 @@ impl<T: FloatingPoint> Vertex<T> {
     pub fn point(&self) -> Point3<T> {
         self.point
     }
+
+    pub fn normal(&self) -> Vector3<T> {
+        self.normal
+    }
+
+    pub fn uv(&self) -> Vector2<T> {
+        self.uv
+    }
 }
 
 impl<T: FloatingPoint + SpadeNum> HasPosition for Vertex<T> {
@@ -40,8 +55,6 @@ impl<T: FloatingPoint + SpadeNum> HasPosition for Vertex<T> {
         spade::Point2::from([self.uv.x, self.uv.y])
     }
 }
-
-type Tri<T> = ConstrainedDelaunayTriangulation<Vertex<T>>;
 
 impl<T: FloatingPoint + SpadeNum, F> Tessellation<Option<AdaptiveTessellationOptions<T, U4, F>>>
     for TrimmedSurface<T>
@@ -75,153 +88,28 @@ where
 }
 
 /// Tessellate a trimmed surface using an adaptive algorithm with or without constraints
-fn trimmed_surface_adaptive_tessellate<T: FloatingPoint + SpadeNum, F>(
-    s: &TrimmedSurface<T>,
+pub fn trimmed_surface_adaptive_tessellate<
+    T: FloatingPoint + SpadeNum,
+    S: TrimmedSurfaceExt<T, F>,
+    F,
+>(
+    s: &S,
     constraints: Option<TrimmedSurfaceConstraints<T>>,
     options: Option<AdaptiveTessellationOptions<T, U4, F>>,
 ) -> anyhow::Result<SurfaceTessellation3D<T>>
 where
     F: Fn(&AdaptiveTessellationNode<T, U4>) -> Option<DividableDirection> + Copy,
 {
-    let o = options.as_ref();
+    let TrimmedSurfaceConstrainedTriangulation {
+        cdt,
+        exterior,
+        interiors,
+    } = TrimmedSurfaceConstrainedTriangulation::try_new(s, constraints, options)?;
 
-    let curve_tessellation_option = o
-        .map(|o| o.norm_tolerance)
-        .unwrap_or(T::from_f64(1e-2).unwrap());
-
-    let (exterior, interiors) = match constraints {
-        Some(constraints) => {
-            anyhow::ensure!(
-                constraints.interiors().len() == s.interiors().len(),
-                "The number of interiors must match the number of trimming curves"
-            );
-            let exterior = s.exterior().map(|curve| match constraints.exterior() {
-                Some(constraint) => constraint
-                    .iter()
-                    .map(|t| {
-                        let uv = curve.point_at(*t);
-                        let p = s.surface().point_at(uv.x, uv.y);
-                        let n = s.surface().normal_at(uv.x, uv.y);
-                        Vertex::new(p, n, uv.coords)
-                    })
-                    .collect_vec(),
-                None => tessellate_uv_compound_curve_adaptive(
-                    curve,
-                    s.surface(),
-                    curve_tessellation_option,
-                ),
-            });
-            let interiors = s
-                .interiors()
-                .iter()
-                .zip(constraints.interiors())
-                .map(|(curve, constraint)| match constraint {
-                    Some(constraint) => constraint
-                        .iter()
-                        .map(|t| {
-                            let uv = curve.point_at(*t);
-                            let p = s.surface().point_at(uv.x, uv.y);
-                            let n = s.surface().normal_at(uv.x, uv.y);
-                            Vertex::new(p, n, uv.coords)
-                        })
-                        .collect_vec(),
-                    None => tessellate_uv_compound_curve_adaptive(
-                        curve,
-                        s.surface(),
-                        curve_tessellation_option,
-                    ),
-                })
-                .collect_vec();
-            (exterior, interiors)
-        }
-        None => {
-            let exterior = s.exterior().map(|curve| {
-                tessellate_uv_compound_curve_adaptive(curve, s.surface(), curve_tessellation_option)
-            });
-
-            let interiors = s
-                .interiors()
-                .iter()
-                .map(|curve| {
-                    tessellate_uv_compound_curve_adaptive(
-                        curve,
-                        s.surface(),
-                        curve_tessellation_option,
-                    )
-                })
-                .collect_vec();
-            (exterior, interiors)
-        }
-    };
-
-    let tess = s.surface().tessellate(options);
-    let SurfaceTessellation {
-        points,
-        normals,
-        uvs,
-        ..
-    } = tess;
-
-    let surface_division = points
-        .into_iter()
-        .zip(normals)
-        .zip(uvs)
-        .map(|((p, n), uv)| Vertex::new(p, n, uv))
-        .collect_vec();
-
-    let mut t = Tri::default();
-
-    surface_division.iter().for_each(|v| {
-        let _ = t.insert(*v);
-    });
-
-    let insert_constraint = |t: &mut Tri<T>, vertices: &[Vertex<T>]| {
-        let skip = if let (Some(first), Some(last)) = (vertices.first(), vertices.last()) {
-            // if the input vertices are closed, skip the first vertex to avoid adding a duplicate constraint
-            if first.point() == last.point() {
-                1
-            } else {
-                0
-            }
-        } else {
-            0
-        };
-
-        let handles = vertices
-            .iter()
-            .skip(skip)
-            .map(|v| t.insert(*v))
-            .collect_vec();
-        handles
-            .into_iter()
-            .circular_tuple_windows()
-            .for_each(|(a, b)| {
-                if let (Ok(a), Ok(b)) = (a, b) {
-                    let can_add_constraint = t.can_add_constraint(a, b);
-                    if can_add_constraint {
-                        t.add_constraint(a, b);
-                    }
-                }
-            });
-    };
-
-    if let Some(exterior) = exterior.as_ref() {
-        insert_constraint(&mut t, exterior);
-    }
-    interiors.iter().for_each(|verts| {
-        insert_constraint(&mut t, verts);
-    });
-
-    let mut vertices = vec![];
-
-    let vmap: HashMap<_, _> = t
+    let vmap: HashMap<_, _> = cdt
         .vertices()
         .enumerate()
-        .map(|(i, v)| {
-            let p = v.as_ref();
-            vertices.push(p.uv);
-            (v.fix(), i)
-        })
+        .map(|(i, v)| (v.fix(), i))
         .collect();
 
     let uv_exterior_boundary =
@@ -233,35 +121,34 @@ where
 
     let inv_3 = T::from_f64(1. / 3.).unwrap();
 
-    let faces = t
+    let faces = cdt
         .inner_faces()
         .filter_map(|f| {
             let vs = f.vertices();
-
             let tri = vs.iter().map(|v| v.as_ref()).map(|p| p.uv).collect_vec();
 
             let (a, b) = (tri[1] - tri[0], tri[2] - tri[1]);
             let area = a.x * b.y - a.y * b.x;
             if ComplexField::abs(area) < T::default_epsilon() {
-                return None;
-            }
-
-            let center: Point2<T> = ((tri[0] + tri[1] + tri[2]) * inv_3).into();
-            if uv_exterior_boundary
-                .as_ref()
-                .map(|exterior| exterior.contains(&center, ()).unwrap_or(false))
-                .unwrap_or(true)
-                && (uv_interior_boundaries.is_empty()
-                    || !uv_interior_boundaries
-                        .iter()
-                        .any(|interior| interior.contains(&center, ()).unwrap_or(false)))
-            {
-                let a = vmap[&vs[0].fix()];
-                let b = vmap[&vs[1].fix()];
-                let c = vmap[&vs[2].fix()];
-                Some([a, b, c])
-            } else {
                 None
+            } else {
+                let center: Point2<T> = ((tri[0] + tri[1] + tri[2]) * inv_3).into();
+                if uv_exterior_boundary
+                    .as_ref()
+                    .map(|exterior| exterior.contains(&center, ()).unwrap_or(false))
+                    .unwrap_or(true)
+                    && (uv_interior_boundaries.is_empty()
+                        || !uv_interior_boundaries
+                            .iter()
+                            .any(|interior| interior.contains(&center, ()).unwrap_or(false)))
+                {
+                    let a = vmap[&vs[0].fix()];
+                    let b = vmap[&vs[1].fix()];
+                    let c = vmap[&vs[2].fix()];
+                    Some([a, b, c])
+                } else {
+                    None
+                }
             }
         })
         .collect_vec();
@@ -269,7 +156,7 @@ where
     // filter out isolated vertices
     let mut remap: HashMap<usize, usize> = HashMap::new();
     let mut vertices = vec![];
-    let vs = t.vertices().collect_vec();
+    let vs = cdt.vertices().collect_vec();
     let remapped_faces = faces
         .iter()
         .filter_map(|face| {
@@ -303,9 +190,9 @@ where
 }
 
 /// Tessellate the compound curve using an adaptive algorithm recursively
-fn tessellate_uv_compound_curve_adaptive<T: FloatingPoint>(
+fn tessellate_uv_compound_curve_adaptive<T: FloatingPoint, S: TrimmedSurfaceExt<T, F>, F>(
     curve: &CompoundCurve2D<T>,
-    surface: &NurbsSurface3D<T>,
+    surface: &S,
     tolerance: T,
 ) -> Vec<Vertex<T>> {
     curve
@@ -323,9 +210,9 @@ fn tessellate_uv_compound_curve_adaptive<T: FloatingPoint>(
 }
 
 /// Tessellate the curve using an adaptive algorithm recursively
-fn tessellate_uv_curve_adaptive<T: FloatingPoint>(
+fn tessellate_uv_curve_adaptive<T: FloatingPoint, S: TrimmedSurfaceExt<T, F>, F>(
     curve: &NurbsCurve2D<T>,
-    surface: &NurbsSurface3D<T>,
+    surface: &S,
     tolerance: T,
 ) -> Vec<Vertex<T>> {
     let degree = curve.degree();
@@ -335,8 +222,8 @@ fn tessellate_uv_curve_adaptive<T: FloatingPoint>(
             let knots = curve.knots();
             let n = knots.len();
             let (min, max) = curve.knots_domain();
-            let min = min + T::default_epsilon();
-            let max = max - T::default_epsilon();
+            // let min = min + T::default_epsilon();
+            // let max = max - T::default_epsilon();
 
             let pts = (1..n - 2)
                 .filter_map(|i| {
@@ -377,17 +264,25 @@ fn tessellate_uv_curve_adaptive<T: FloatingPoint>(
     }
 }
 
-fn iterate_uv_curve_tessellation<T: FloatingPoint>(
+fn iterate_uv_curve_tessellation<T: FloatingPoint, S: TrimmedSurfaceExt<T, F>, F>(
     curve: &NurbsCurve2D<T>,
-    surface: &NurbsSurface3D<T>,
+    surface: &S,
     start: T,
     end: T,
     normal_tolerance: T,
 ) -> Vec<Point2<T>> {
+    let (u_domain, v_domain) = surface.knots_domain();
+    let eps = T::default_epsilon();
+    let min = Point2::new(u_domain.0 + eps, v_domain.0 + eps);
+    let max = Point2::new(u_domain.1 - eps, v_domain.1 - eps);
+
     let (p1, n1) = curve.point_tangent_at(start);
     let delta = end - start;
     if delta < T::from_f64(1e-8).unwrap() {
-        return vec![p1];
+        return vec![Point2::new(
+            p1.x.clamp(min.x, max.x),
+            p1.y.clamp(min.y, max.y),
+        )];
     }
 
     let exact_mid = start + (end - start) * T::from_f64(0.5).unwrap();
@@ -419,6 +314,9 @@ fn iterate_uv_curve_tessellation<T: FloatingPoint>(
         left_pts.pop();
         [left_pts, right_pts].concat()
     } else {
-        vec![p1, p3]
+        vec![
+            Point2::new(p1.x.clamp(min.x, max.x), p1.y.clamp(min.y, max.y)),
+            Point2::new(p3.x.clamp(min.x, max.x), p3.y.clamp(min.y, max.y)),
+        ]
     }
 }
