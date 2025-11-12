@@ -1,7 +1,8 @@
 use itertools::Itertools;
 use nalgebra::{allocator::Allocator, Const, DefaultAllocator, DimName, OPoint, Point2};
+use spade::{ConstrainedDelaunayTriangulation, Point2 as SP2, SpadeNum, Triangulation};
 
-use crate::prelude::Contains;
+use crate::prelude::{Contains, PolygonMesh, Tessellation};
 
 use super::{orientation, FloatingPoint, Orientation};
 
@@ -74,5 +75,57 @@ impl<T: FloatingPoint> Contains<OPoint<T, Const<2>>> for PolygonBoundary<T, Cons
             },
         );
         Ok(winding_number != 0)
+    }
+}
+
+impl<T: FloatingPoint + SpadeNum> Tessellation<()> for PolygonBoundary<T, Const<2>> {
+    type Output = anyhow::Result<PolygonMesh<T, Const<2>>>;
+
+    /// Tessellate the polygon boundary into a polygon mesh
+    fn tessellate(&self, _options: ()) -> Self::Output {
+        let mut cdt = ConstrainedDelaunayTriangulation::<SP2<T>>::default();
+
+        // Insert boundary points and build constraint edges
+        let mut vertex_handles = Vec::new();
+        for point in self.vertices() {
+            let spade_point = SP2::new(point.x, point.y);
+            let handle = cdt.insert(spade_point)?;
+            vertex_handles.push(handle);
+        }
+
+        // Add constraint edges to form the boundary
+        for i in 0..vertex_handles.len() {
+            let next = (i + 1) % vertex_handles.len();
+            cdt.add_constraint(vertex_handles[i], vertex_handles[next]);
+        }
+
+        // Extract triangles and convert to 3D
+        let mut vertices = Vec::new();
+        let mut faces = Vec::new();
+        let mut vertex_map = std::collections::HashMap::new();
+
+        for face in cdt.inner_faces() {
+            let indices = face
+                .vertices()
+                .iter()
+                .map(|vertex| {
+                    let idx = if let Some(&existing_idx) = vertex_map.get(&vertex.fix()) {
+                        existing_idx
+                    } else {
+                        let pos = vertex.position();
+                        let new_idx = vertices.len();
+                        vertices.push(Point2::new(pos.x, pos.y));
+                        vertex_map.insert(vertex.fix(), new_idx);
+                        new_idx
+                    };
+                    idx
+                })
+                .collect_array::<3>();
+            if let Some(indices) = indices {
+                faces.push(indices);
+            }
+        }
+
+        Ok(PolygonMesh::new(vertices, faces))
     }
 }
