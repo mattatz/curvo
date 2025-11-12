@@ -105,23 +105,25 @@ impl<T: FloatingPoint + SpadeNum> Tessellation<()> for PolygonBoundary<T, Const<
         let mut vertex_map = std::collections::HashMap::new();
 
         for face in cdt.inner_faces() {
-            let [v0, v1, v2] = face.vertices();
-
-            let mut face_indices = Vec::new();
-            for vertex in [v0, v1, v2] {
-                let idx = if let Some(&existing_idx) = vertex_map.get(&vertex.fix()) {
-                    existing_idx
-                } else {
-                    let pos = vertex.position();
-                    let new_idx = vertices.len();
-                    vertices.push(Point2::new(pos.x, pos.y));
-                    vertex_map.insert(vertex.fix(), new_idx);
-                    new_idx
-                };
-                face_indices.push(idx);
+            let indices = face
+                .vertices()
+                .iter()
+                .map(|vertex| {
+                    let idx = if let Some(&existing_idx) = vertex_map.get(&vertex.fix()) {
+                        existing_idx
+                    } else {
+                        let pos = vertex.position();
+                        let new_idx = vertices.len();
+                        vertices.push(Point2::new(pos.x, pos.y));
+                        vertex_map.insert(vertex.fix(), new_idx);
+                        new_idx
+                    };
+                    idx
+                })
+                .collect_array::<3>();
+            if let Some(indices) = indices {
+                faces.push(indices);
             }
-
-            faces.push([face_indices[0], face_indices[1], face_indices[2]]);
         }
 
         Ok(PolygonMesh::new(vertices, faces))
