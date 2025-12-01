@@ -241,3 +241,8 @@ required-features = ["bevy"]
 name = "morph"
 path = "examples/morph.rs"
 required-features = ["bevy"]
+
+[[example]]
+name = "catmull_rom_curve"
+path = "examples/catmull_rom_curve.rs"
+required-features = ["bevy"]
