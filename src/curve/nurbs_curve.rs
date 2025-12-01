@@ -218,6 +218,116 @@ where
         }
     }
 
+    /// Create a closed Catmull-Rom spline curve passing through the given points in NURBS form.
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::Point2;
+    /// use approx::assert_relative_eq;
+    ///
+    /// let points = vec![
+    ///     Point2::new(0.0, 0.0),
+    ///     Point2::new(1.0, 0.0),
+    ///     Point2::new(1.0, 1.0),
+    ///     Point2::new(0.0, 1.0),
+    /// ];
+    /// let curve = NurbsCurve2D::catmull_rom(&points, 0.5);
+    /// let (start, end) = curve.knots_domain();
+    ///
+    /// // The curve passes through all input points
+    /// let n = points.len();
+    /// for (i, p) in points.iter().enumerate() {
+    ///     let t = start + (end - start) * (i as f64) / (n as f64);
+    ///     let pt = curve.point_at(t);
+    ///     assert_relative_eq!(p, &pt, epsilon = 1e-10);
+    /// }
+    ///
+    /// // The curve is closed (start and end points are the same)
+    /// assert_relative_eq!(curve.point_at(start), curve.point_at(end), epsilon = 1e-10);
+    /// ```
+    pub fn catmull_rom(points: &[OPoint<T, DimNameDiff<D, U1>>], tension: T) -> Self
+    where
+        D: DimNameSub<U1>,
+        <D as DimNameSub<U1>>::Output: DimNameAdd<U1>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+        DefaultAllocator: Allocator<<<D as DimNameSub<U1>>::Output as DimNameAdd<U1>>::Output>,
+    {
+        let n = points.len();
+        assert!(
+            n >= 3,
+            "At least 3 points are required for a Catmull-Rom spline"
+        );
+
+        let six = T::from_f64(6.0).unwrap();
+        let tau = six * tension;
+
+        // Collect all bezier control points for each segment
+        let mut control_points = Vec::new();
+        let degree = 3;
+
+        for i in 0..n {
+            // Get four consecutive points (wrapping around for closed curve)
+            let p0 = &points[(i + n - 1) % n];
+            let p1 = &points[i];
+            let p2 = &points[(i + 1) % n];
+            let p3 = &points[(i + 2) % n];
+
+            // Convert Catmull-Rom segment to Bezier control points
+            // B0 = P1
+            // B1 = P1 + (P2 - P0) / (6 * tension)
+            // B2 = P2 - (P3 - P1) / (6 * tension)
+            // B3 = P2
+            let b0 = p1.clone();
+            let b1 =
+                OPoint::from(p1.coords.clone() + (p2.coords.clone() - p0.coords.clone()) / tau);
+            let b2 =
+                OPoint::from(p2.coords.clone() - (p3.coords.clone() - p1.coords.clone()) / tau);
+            let b3 = p2.clone();
+
+            if i == 0 {
+                // First segment: include all 4 control points
+                control_points.push(b0);
+                control_points.push(b1);
+                control_points.push(b2);
+                control_points.push(b3);
+            } else {
+                // Subsequent segments: skip first point (same as last of previous segment)
+                control_points.push(b1);
+                control_points.push(b2);
+                control_points.push(b3);
+            }
+        }
+
+        // Build knot vector for concatenated cubic Bezier segments
+        // For n cubic segments: knots = [0,0,0,0, 1,1,1, 2,2,2, ..., n,n,n,n]
+        let mut knots = vec![T::zero(); degree + 1];
+        for i in 1..n {
+            let knot_value = T::from_usize(i).unwrap();
+            for _ in 0..degree {
+                knots.push(knot_value);
+            }
+        }
+        let final_knot = T::from_usize(n).unwrap();
+        for _ in 0..=degree {
+            knots.push(final_knot);
+        }
+
+        // Convert to homogeneous coordinates
+        let control_points = control_points
+            .iter()
+            .map(|p| {
+                let coord = p.to_homogeneous();
+                OPoint::from_slice(coord.as_slice())
+            })
+            .collect();
+
+        Self {
+            degree,
+            knots: KnotVector::new(knots),
+            control_points,
+        }
+    }
+
     /// Create a dehomogenized version of the curve
     pub fn dehomogenize(&self) -> NurbsCurve<T, DimNameDiff<D, U1>>
     where
