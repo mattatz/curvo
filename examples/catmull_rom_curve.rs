@@ -123,12 +123,10 @@ fn setup(
 
         commands
             .spawn((
-                Mesh3d(
-                    meshes.add(PointsMesh {
-                        vertices: control_pts,
-                        ..Default::default()
-                    }),
-                ),
+                Mesh3d(meshes.add(PointsMesh {
+                    vertices: control_pts,
+                    ..Default::default()
+                })),
                 MeshMaterial3d(points_materials.add(PointsMaterial {
                     settings: bevy_points::material::PointsShaderSettings {
                         color: color.into(),
