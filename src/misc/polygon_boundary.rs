@@ -96,7 +96,9 @@ impl<T: FloatingPoint + SpadeNum> Tessellation<()> for PolygonBoundary<T, Const<
         // Add constraint edges to form the boundary
         for i in 0..vertex_handles.len() {
             let next = (i + 1) % vertex_handles.len();
-            cdt.add_constraint(vertex_handles[i], vertex_handles[next]);
+            if cdt.can_add_constraint(vertex_handles[i], vertex_handles[next]) {
+                cdt.add_constraint(vertex_handles[i], vertex_handles[next]);
+            }
         }
 
         // Extract triangles and convert to 3D
