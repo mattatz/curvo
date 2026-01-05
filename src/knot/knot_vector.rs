@@ -423,7 +423,7 @@ impl<T: RealField + Copy> KnotVector<T> {
 
     /// Compute a regularly spaced basis functions
     /// Returns a tuple of knot spans and basis functions
-    pub fn regulary_spaced_basis_functions(
+    pub fn regularly_spaced_basis_functions(
         &self,
         degree: usize,
         divs: usize,
@@ -435,7 +435,7 @@ impl<T: RealField + Copy> KnotVector<T> {
         let mut u = start;
         let mut knot_index = self.find_knot_span_index(n, degree, u);
 
-        // compute all of the basis functions
+        // compute all the basis functions
         for _i in 0..=divs {
             while u >= self[knot_index + 1] && knot_index < n {
                 knot_index += 1;
@@ -462,7 +462,7 @@ impl<T: RealField + Copy> KnotVector<T> {
         let mut u = start;
         let mut knot_index = self.find_knot_span_index(n, degree, u);
 
-        // compute all of the basis functions
+        // compute all the basis functions
         for _i in 0..=divs {
             while u >= self[knot_index + 1] && knot_index < n {
                 knot_index += 1;

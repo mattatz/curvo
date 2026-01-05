@@ -8,10 +8,12 @@ pub use curve_offset_option::*;
 /// Corner type for offsetting NURBS curves
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Default)]
 pub enum CurveOffsetCornerType {
     /// Just offset the curve segments
     None,
     /// Extend the two segments & trim at the intersection
+    #[default]
     Sharp,
     /// Insert arc at the corner
     Round,
@@ -19,12 +21,6 @@ pub enum CurveOffsetCornerType {
     Smooth,
     /// Insert chamfer at the corner
     Chamfer,
-}
-
-impl Default for CurveOffsetCornerType {
-    fn default() -> Self {
-        Self::Sharp
-    }
 }
 
 /// Trait for offsetting a geometry
