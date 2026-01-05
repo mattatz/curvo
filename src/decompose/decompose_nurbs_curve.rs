@@ -3,6 +3,73 @@ use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, Dim
 
 use crate::{curve::NurbsCurve, knot::KnotVector, misc::FloatingPoint, prelude::Decompose};
 
+impl<T: FloatingPoint, D: DimName> Decompose for NurbsCurve<T, D>
+where
+    DefaultAllocator: Allocator<D>,
+    D: DimNameSub<U1>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+{
+    type Output = Vec<NurbsCurve<T, D>>;
+
+    /// Decompose the curve into a set of Bezier segments of the same degree
+    fn try_decompose(&self) -> anyhow::Result<Self::Output> {
+        let mut cloned = self.clone();
+        let degree = cloned.degree();
+        let req_mult = degree + 1;
+
+        // Get the domain boundaries before any modification
+        let (domain_start, domain_end) = cloned.knots_domain();
+
+        // Get unique knots within the domain and count them
+        let knot_mults = cloned.knots().multiplicity();
+        let domain_knot_values: Vec<T> = knot_mults
+            .iter()
+            .filter(|m| *m.knot() >= domain_start && *m.knot() <= domain_end)
+            .map(|m| *m.knot())
+            .collect();
+        let num_segments = if domain_knot_values.len() > 1 {
+            domain_knot_values.len() - 1
+        } else {
+            1
+        };
+
+        // Insert knots to make each unique knot within domain have multiplicity degree + 1
+        for knot_mult in knot_mults.iter() {
+            let knot = *knot_mult.knot();
+            if knot >= domain_start && knot <= domain_end && knot_mult.multiplicity() < req_mult {
+                let knots_insert = vec![knot; req_mult - knot_mult.multiplicity()];
+                cloned.try_refine_knot(knots_insert)?;
+            }
+        }
+
+        if num_segments <= 1 {
+            Ok(vec![cloned])
+        } else {
+            // Find the starting index in the refined knot vector for domain_start
+            let knots_slice = cloned.knots().as_slice();
+            let start_idx = knots_slice
+                .iter()
+                .position(|&k| k == domain_start)
+                .unwrap_or(0);
+
+            let knot_length = req_mult * 2;
+            let segments = (0..num_segments)
+                .map(|i| {
+                    let idx = start_idx + i * req_mult;
+                    let knots = cloned.knots().as_slice()[idx..(idx + knot_length)].to_vec();
+                    let control_points = cloned.control_points()[idx..(idx + req_mult)].to_vec();
+                    NurbsCurve::new_unchecked(
+                        cloned.degree(),
+                        control_points,
+                        KnotVector::new(knots),
+                    )
+                })
+                .collect_vec();
+            Ok(segments)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::prelude::*;
@@ -189,72 +256,5 @@ mod tests {
         assert!(seg.is_clamped());
         assert_eq!(seg.degree(), 3);
         assert_eq!(seg.control_points().len(), 4);
-    }
-}
-
-impl<T: FloatingPoint, D: DimName> Decompose for NurbsCurve<T, D>
-where
-    DefaultAllocator: Allocator<D>,
-    D: DimNameSub<U1>,
-    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
-{
-    type Output = Vec<NurbsCurve<T, D>>;
-
-    /// Decompose the curve into a set of Bezier segments of the same degree
-    fn try_decompose(&self) -> anyhow::Result<Self::Output> {
-        let mut cloned = self.clone();
-        let degree = cloned.degree();
-        let req_mult = degree + 1;
-
-        // Get the domain boundaries before any modification
-        let (domain_start, domain_end) = cloned.knots_domain();
-
-        // Get unique knots within the domain and count them
-        let knot_mults = cloned.knots().multiplicity();
-        let domain_knot_values: Vec<T> = knot_mults
-            .iter()
-            .filter(|m| *m.knot() >= domain_start && *m.knot() <= domain_end)
-            .map(|m| *m.knot())
-            .collect();
-        let num_segments = if domain_knot_values.len() > 1 {
-            domain_knot_values.len() - 1
-        } else {
-            1
-        };
-
-        // Insert knots to make each unique knot within domain have multiplicity degree + 1
-        for knot_mult in knot_mults.iter() {
-            let knot = *knot_mult.knot();
-            if knot >= domain_start && knot <= domain_end && knot_mult.multiplicity() < req_mult {
-                let knots_insert = vec![knot; req_mult - knot_mult.multiplicity()];
-                cloned.try_refine_knot(knots_insert)?;
-            }
-        }
-
-        if num_segments <= 1 {
-            Ok(vec![cloned])
-        } else {
-            // Find the starting index in the refined knot vector for domain_start
-            let knots_slice = cloned.knots().as_slice();
-            let start_idx = knots_slice
-                .iter()
-                .position(|&k| k == domain_start)
-                .unwrap_or(0);
-
-            let knot_length = req_mult * 2;
-            let segments = (0..num_segments)
-                .map(|i| {
-                    let idx = start_idx + i * req_mult;
-                    let knots = cloned.knots().as_slice()[idx..(idx + knot_length)].to_vec();
-                    let control_points = cloned.control_points()[idx..(idx + req_mult)].to_vec();
-                    NurbsCurve::new_unchecked(
-                        cloned.degree(),
-                        control_points,
-                        KnotVector::new(knots),
-                    )
-                })
-                .collect_vec();
-            Ok(segments)
-        }
     }
 }
