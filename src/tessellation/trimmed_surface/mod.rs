@@ -114,6 +114,7 @@ where
 
     let uv_exterior_boundary =
         exterior.map(|c| PolygonBoundary::new(c.iter().map(|v| v.uv.into()).collect()));
+
     let uv_interior_boundaries = interiors
         .into_iter()
         .map(|c| PolygonBoundary::new(c.iter().map(|v| v.uv.into()).collect()))
@@ -133,15 +134,15 @@ where
                 None
             } else {
                 let center: Point2<T> = ((tri[0] + tri[1] + tri[2]) * inv_3).into();
-                if uv_exterior_boundary
+                let exterior_contains = uv_exterior_boundary
                     .as_ref()
                     .map(|exterior| exterior.contains(&center, ()).unwrap_or(false))
-                    .unwrap_or(true)
-                    && (uv_interior_boundaries.is_empty()
-                        || !uv_interior_boundaries
-                            .iter()
-                            .any(|interior| interior.contains(&center, ()).unwrap_or(false)))
-                {
+                    .unwrap_or(true);
+                let interior_contains = !uv_interior_boundaries.is_empty()
+                    && uv_interior_boundaries
+                        .iter()
+                        .any(|interior| interior.contains(&center, ()).unwrap_or(false));
+                if exterior_contains && !interior_contains {
                     let a = vmap[&vs[0].fix()];
                     let b = vmap[&vs[1].fix()];
                     let c = vmap[&vs[2].fix()];
@@ -276,8 +277,13 @@ fn iterate_uv_curve_tessellation<T: FloatingPoint, S: TrimmedSurfaceExt<T, F>, F
     let min = Point2::new(u_domain.0 + eps, v_domain.0 + eps);
     let max = Point2::new(u_domain.1 - eps, v_domain.1 - eps);
 
-    let (p1, n1) = curve.point_tangent_at(start);
-    let delta = end - start;
+    // Clamp end to avoid NaN at exact knot domain boundary
+    let curve_domain = curve.knots_domain();
+    let safe_start = start.max(curve_domain.0 + eps);
+    let safe_end = end.min(curve_domain.1 - eps);
+
+    let (p1, n1) = curve.point_tangent_at(safe_start);
+    let delta = safe_end - safe_start;
     if delta < T::from_f64(1e-8).unwrap() {
         return vec![Point2::new(
             p1.x.clamp(min.x, max.x),
@@ -285,9 +291,9 @@ fn iterate_uv_curve_tessellation<T: FloatingPoint, S: TrimmedSurfaceExt<T, F>, F
         )];
     }
 
-    let exact_mid = start + (end - start) * T::from_f64(0.5).unwrap();
+    let exact_mid = safe_start + (safe_end - safe_start) * T::from_f64(0.5).unwrap();
     let (p2, n2) = curve.point_tangent_at(exact_mid);
-    let (p3, n3) = curve.point_tangent_at(end);
+    let (p3, n3) = curve.point_tangent_at(safe_end);
 
     let flag = {
         if curve.degree() == 1 {
