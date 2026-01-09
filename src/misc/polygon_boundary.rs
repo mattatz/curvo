@@ -239,10 +239,6 @@ where
         }
 
         const FIELDS: &[&str] = &["vertices"];
-        deserializer.deserialize_struct(
-            "PolygonBoundary",
-            FIELDS,
-            PolygonBoundaryVisitor::new(),
-        )
+        deserializer.deserialize_struct("PolygonBoundary", FIELDS, PolygonBoundaryVisitor::new())
     }
 }
