@@ -227,7 +227,7 @@ where
     {
         let start = self.spans.first().map(|s| s.point_at(s.knots_domain().0));
         let end = self.spans.last().map(|s| s.point_at(s.knots_domain().1));
-        let eps = epsilon.unwrap_or(T::default_epsilon() * T::from_usize(10).unwrap());
+        let eps = epsilon.unwrap_or(T::default_epsilon() * T::from_usize(1000).unwrap());
         match (start, end) {
             (Some(start), Some(end)) => {
                 let delta = start - end;
