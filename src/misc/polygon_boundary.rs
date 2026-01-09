@@ -131,3 +131,118 @@ impl<T: FloatingPoint + SpadeNum> Tessellation<()> for PolygonBoundary<T, Const<
         Ok(PolygonMesh::new(vertices, faces))
     }
 }
+
+#[cfg(feature = "serde")]
+impl<T, D: DimName> serde::Serialize for PolygonBoundary<T, D>
+where
+    T: FloatingPoint + serde::Serialize,
+    DefaultAllocator: Allocator<D>,
+    <DefaultAllocator as nalgebra::allocator::Allocator<D>>::Buffer<T>: serde::Serialize,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut state = serializer.serialize_struct("PolygonBoundary", 1)?;
+        state.serialize_field("vertices", &self.vertices)?;
+        state.end()
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, T, D: DimName> serde::Deserialize<'de> for PolygonBoundary<T, D>
+where
+    T: FloatingPoint + serde::Deserialize<'de>,
+    DefaultAllocator: Allocator<D>,
+    <DefaultAllocator as nalgebra::allocator::Allocator<D>>::Buffer<T>: serde::Deserialize<'de>,
+{
+    fn deserialize<S>(deserializer: S) -> Result<Self, S::Error>
+    where
+        S: serde::Deserializer<'de>,
+    {
+        use serde::de::{self, MapAccess, Visitor};
+
+        #[derive(Debug)]
+        enum Field {
+            Vertices,
+        }
+
+        impl<'de> serde::Deserialize<'de> for Field {
+            fn deserialize<S>(deserializer: S) -> Result<Self, S::Error>
+            where
+                S: serde::Deserializer<'de>,
+            {
+                struct FieldVisitor;
+
+                impl Visitor<'_> for FieldVisitor {
+                    type Value = Field;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                        formatter.write_str("`vertices`")
+                    }
+
+                    fn visit_str<E>(self, value: &str) -> Result<Field, E>
+                    where
+                        E: de::Error,
+                    {
+                        match value {
+                            "vertices" => Ok(Field::Vertices),
+                            _ => Err(de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+
+                deserializer.deserialize_identifier(FieldVisitor)
+            }
+        }
+
+        struct PolygonBoundaryVisitor<T, D>(std::marker::PhantomData<(T, D)>);
+
+        impl<T, D> PolygonBoundaryVisitor<T, D> {
+            fn new() -> Self {
+                Self(std::marker::PhantomData)
+            }
+        }
+
+        impl<'de, T, D: DimName> Visitor<'de> for PolygonBoundaryVisitor<T, D>
+        where
+            T: FloatingPoint + serde::Deserialize<'de>,
+            DefaultAllocator: Allocator<D>,
+            <DefaultAllocator as nalgebra::allocator::Allocator<D>>::Buffer<T>:
+                serde::Deserialize<'de>,
+        {
+            type Value = PolygonBoundary<T, D>;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("struct PolygonBoundary")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<Self::Value, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                let mut vertices = None;
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::Vertices => {
+                            if vertices.is_some() {
+                                return Err(de::Error::duplicate_field("vertices"));
+                            }
+                            vertices = Some(map.next_value()?);
+                        }
+                    }
+                }
+                let vertices = vertices.ok_or_else(|| de::Error::missing_field("vertices"))?;
+                Ok(PolygonBoundary::new(vertices))
+            }
+        }
+
+        const FIELDS: &[&str] = &["vertices"];
+        deserializer.deserialize_struct(
+            "PolygonBoundary",
+            FIELDS,
+            PolygonBoundaryVisitor::new(),
+        )
+    }
+}
