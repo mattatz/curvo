@@ -1769,7 +1769,7 @@ where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
-        let eps = T::default_epsilon() * T::from_usize(10).unwrap();
+        let eps = T::default_epsilon() * T::from_usize(1000).unwrap();
         match self.knots.is_clamped(self.degree) {
             true => {
                 let pts = self.dehomogenized_control_points();
