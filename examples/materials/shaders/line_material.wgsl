@@ -4,7 +4,8 @@ struct LineMaterial {
     color: vec4<f32>,
 };
 
-@group(2) @binding(0) var<storage, read> material: LineMaterial;
+@group(#{MATERIAL_BIND_GROUP}) @binding(0)
+var<uniform> material: LineMaterial;
 
 @fragment
 fn fragment(
