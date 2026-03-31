@@ -1,5 +1,7 @@
 #![allow(unused_imports)]
 
+mod advancing_front;
+
 use approx::assert_relative_eq;
 use curvo::prelude::{
     AdaptiveTessellationOptions, SurfaceTessellation, Tessellation, TrimmedSurface,
