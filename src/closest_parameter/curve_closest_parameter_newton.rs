@@ -47,7 +47,7 @@ where
     O: Gradient<Param = F, Gradient = F> + Hessian<Param = F, Hessian = F>,
     F: Clone + ArgminFloat,
 {
-    const NAME: &'static str = "Closest parameter newton method";
+    fn name(&self) -> &str { "Closest parameter newton method" }
 
     fn next_iter(
         &mut self,
