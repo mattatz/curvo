@@ -348,10 +348,9 @@ where
         let sv = (pv - p) / (v_h - v);
 
         let e = su.dot(&su);
-        let f = su.dot(&sv);
         let g = sv.dot(&sv);
 
-        SurfaceMetric::new(e, f, g)
+        SurfaceMetric::new(e, g)
     }
 
     /// Extract faces from the CDT that are inside the trim region.

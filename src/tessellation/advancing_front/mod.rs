@@ -1,4 +1,3 @@
-mod front;
 mod mesher;
 mod options;
 

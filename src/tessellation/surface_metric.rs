@@ -1,4 +1,4 @@
-use nalgebra::{Matrix2, Vector2};
+use nalgebra::Vector2;
 
 use crate::misc::FloatingPoint;
 
@@ -10,33 +10,13 @@ use crate::misc::FloatingPoint;
 pub struct SurfaceMetric<T: FloatingPoint> {
     /// E = Su · Su
     pub e: T,
-    /// F = Su · Sv
-    pub f: T,
     /// G = Sv · Sv
     pub g: T,
 }
 
 impl<T: FloatingPoint> SurfaceMetric<T> {
-    pub fn new(e: T, f: T, g: T) -> Self {
-        Self { e, f, g }
-    }
-
-    /// Compute the metric tensor matrix [[E, F], [F, G]]
-    pub fn matrix(&self) -> Matrix2<T> {
-        Matrix2::new(self.e, self.f, self.f, self.g)
-    }
-
-    /// Compute the 3D length of a UV vector under this metric.
-    /// |v|² = E·du² + 2F·du·dv + G·dv²
-    pub fn length_squared(&self, dv: &Vector2<T>) -> T {
-        self.e * dv.x * dv.x
-            + T::from_f64(2.0).unwrap() * self.f * dv.x * dv.y
-            + self.g * dv.y * dv.y
-    }
-
-    /// Compute the 3D length of a UV vector under this metric.
-    pub fn length(&self, dv: &Vector2<T>) -> T {
-        self.length_squared(dv).sqrt()
+    pub fn new(e: T, g: T) -> Self {
+        Self { e, g }
     }
 
     /// Compute the maximum allowable UV step size given a target 3D edge length.
