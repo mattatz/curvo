@@ -9,7 +9,6 @@ use crate::tessellation::surface_metric::{curvature_to_edge_length, SurfaceMetri
 use crate::tessellation::trimmed_surface::trimmed_surface_ext::TrimmedSurfaceExt;
 use crate::tessellation::trimmed_surface::Vertex;
 
-use super::front::{Front, FrontEdge};
 use super::options::AdvancingFrontOptions;
 
 /// Advancing front mesher for trimmed parametric surfaces.
@@ -31,7 +30,7 @@ pub struct AdvancingFrontMesher<'a, T: FloatingPoint, S> {
 impl<'a, T, S> AdvancingFrontMesher<'a, T, S>
 where
     T: FloatingPoint + SpadeNum,
-    S: TrimmedSurfaceExt<T, fn(&crate::prelude::AdaptiveTessellationNode<T, nalgebra::U4>) -> Option<crate::prelude::DividableDirection>>,
+    S: TrimmedSurfaceExt<T, fn(&crate::prelude::AdaptiveTessellationNode<T, nalgebra::U4>) -> Option<crate::prelude::DividableDirection>> + Sync,
 {
     pub fn new(surface: &'a S, options: AdvancingFrontOptions<T>) -> Self {
         Self {
@@ -187,6 +186,8 @@ where
     /// Insert interior points into the CDT using locally adaptive curvature-based spacing.
     /// Walks along the U direction, computing local metric at each step to determine
     /// the next point's position. This produces denser points where curvature is high.
+    ///
+    /// When the `rayon` feature is enabled, surface evaluations are parallelized.
     fn insert_interior_points(
         &mut self,
         cdt: &mut ConstrainedDelaunayTriangulation<Vertex<T>>,
@@ -197,31 +198,65 @@ where
 
         // First pass: determine V-direction row positions using locally adaptive spacing
         let v_positions = self.adaptive_parameter_steps(v_min + eps, v_max - eps, |v| {
-            // Sample curvature along the V-center of the domain
             let u_mid = (u_min + u_max) * T::from_f64(0.5).unwrap();
             self.target_uv_step_at(u_mid, v).y
         });
 
-        // Second pass: for each V row, determine U positions using locally adaptive spacing
+        // Second pass: for each V row, determine U positions
+        let mut uv_grid: Vec<Vector2<T>> = Vec::new();
         for &v in &v_positions {
             let u_positions = self.adaptive_parameter_steps(u_min + eps, u_max - eps, |u| {
                 self.target_uv_step_at(u, v).x
             });
-
             for &u in &u_positions {
-                let uv = Vector2::new(u, v);
-                let p = self.surface.point_at(u, v);
-                let n = self.surface.normal_at(u, v);
-                let vertex = Vertex::new(p, n, uv);
-                let _ = cdt.insert(vertex);
-
-                self.points.push(p);
-                self.normals.push(n);
-                self.uvs.push(uv);
+                uv_grid.push(Vector2::new(u, v));
             }
         }
 
+        // Evaluate surface at all interior UV positions (parallelized when rayon is enabled)
+        let evaluated = self.evaluate_points_batch(&uv_grid);
+
+        // Insert into CDT sequentially (spade requirement)
+        for (uv, p, n) in evaluated {
+            let vertex = Vertex::new(p, n, uv);
+            let _ = cdt.insert(vertex);
+            self.points.push(p);
+            self.normals.push(n);
+            self.uvs.push(uv);
+        }
+
         Ok(())
+    }
+
+    /// Evaluate surface point and normal at multiple UV positions.
+    /// Parallelized with rayon when the feature is enabled.
+    fn evaluate_points_batch(
+        &self,
+        uv_positions: &[Vector2<T>],
+    ) -> Vec<(Vector2<T>, Point3<T>, Vector3<T>)> {
+        #[cfg(feature = "rayon")]
+        {
+            use rayon::prelude::*;
+            uv_positions
+                .par_iter()
+                .map(|uv| {
+                    let p = self.surface.point_at(uv.x, uv.y);
+                    let n = self.surface.normal_at(uv.x, uv.y);
+                    (*uv, p, n)
+                })
+                .collect()
+        }
+        #[cfg(not(feature = "rayon"))]
+        {
+            uv_positions
+                .iter()
+                .map(|uv| {
+                    let p = self.surface.point_at(uv.x, uv.y);
+                    let n = self.surface.normal_at(uv.x, uv.y);
+                    (*uv, p, n)
+                })
+                .collect()
+        }
     }
 
     /// Generate parameter values with locally adaptive spacing.
@@ -322,6 +357,7 @@ where
     }
 
     /// Extract faces from the CDT that are inside the trim region.
+    /// Contains-check is parallelized with rayon when available.
     fn extract_trimmed_faces(
         &mut self,
         cdt: &ConstrainedDelaunayTriangulation<Vertex<T>>,
@@ -333,6 +369,8 @@ where
         use nalgebra::ComplexField;
 
         let inv_3 = T::from_f64(1. / 3.).unwrap();
+        let half = T::from_f64(0.5).unwrap();
+        let shrink = T::from_f64(0.01).unwrap();
 
         let uv_exterior = exterior.as_ref().map(|ext| {
             PolygonBoundary::new(ext.iter().map(|&i| Point2::from(self.uvs[i])).collect())
@@ -345,7 +383,7 @@ where
             })
             .collect();
 
-        // Build vertex index map: CDT vertex handle → output index
+        // Build vertex index map: CDT vertex handle → sequential index
         let mut vmap = std::collections::HashMap::new();
         for (i, v) in cdt.vertices().enumerate() {
             vmap.insert(v.fix(), i);
@@ -353,10 +391,21 @@ where
 
         let cdt_verts: Vec<_> = cdt.vertices().collect();
 
+        // Phase 1: collect candidate faces (sequential CDT iteration)
+        struct CandidateFace<T> {
+            tri_uvs: [nalgebra::Vector2<T>; 3],
+            cdt_indices: [usize; 3],
+        }
+
+        let mut candidates: Vec<CandidateFace<T>> = Vec::new();
+
         for face in cdt.inner_faces() {
             let vs = face.vertices();
-            let tri_uvs: Vec<Vector2<T>> =
-                vs.iter().map(|v| v.as_ref().uv()).collect();
+            let tri_uvs: [Vector2<T>; 3] = [
+                vs[0].as_ref().uv(),
+                vs[1].as_ref().uv(),
+                vs[2].as_ref().uv(),
+            ];
 
             let (a, b) = (tri_uvs[1] - tri_uvs[0], tri_uvs[2] - tri_uvs[1]);
             let area = a.x * b.y - a.y * b.x;
@@ -364,14 +413,22 @@ where
                 continue;
             }
 
+            let cdt_indices = [
+                vmap[&vs[0].fix()],
+                vmap[&vs[1].fix()],
+                vmap[&vs[2].fix()],
+            ];
+
+            candidates.push(CandidateFace {
+                tri_uvs,
+                cdt_indices,
+            });
+        }
+
+        // Phase 2: contains-check (parallelized when rayon is available)
+        let is_inside = |tri_uvs: &[Vector2<T>; 3]| -> bool {
             let center: Point2<T> =
                 ((tri_uvs[0] + tri_uvs[1] + tri_uvs[2]) * inv_3).into();
-
-            // Check center + edge midpoints (slightly offset toward center)
-            // against trim boundaries. Edge midpoints are offset inward to avoid
-            // edge cases where boundary-coincident points fail winding number test.
-            let half = T::from_f64(0.5).unwrap();
-            let shrink = T::from_f64(0.01).unwrap(); // 1% offset toward center
             let mid_01: Point2<T> =
                 ((tri_uvs[0] + tri_uvs[1]) * half * (T::one() - shrink)
                     + (tri_uvs[2]) * shrink)
@@ -385,9 +442,7 @@ where
                     + (tri_uvs[1]) * shrink)
                     .into();
 
-            let test_points = [center, mid_01, mid_12, mid_20];
-
-            let all_inside = test_points.iter().all(|pt| {
+            [center, mid_01, mid_12, mid_20].iter().all(|pt| {
                 let in_ext = uv_exterior
                     .as_ref()
                     .map(|ext| ext.contains(pt, ()).unwrap_or(false))
@@ -397,23 +452,35 @@ where
                         .iter()
                         .any(|int| int.contains(pt, ()).unwrap_or(false));
                 in_ext && !in_int
-            });
+            })
+        };
 
-            if all_inside {
-                // Remap CDT vertex indices to our vertex array
-                let indices: Option<[usize; 3]> = vs
-                    .iter()
-                    .map(|v| {
-                        let cdt_idx = vmap[&v.fix()];
-                        let vert = cdt_verts[cdt_idx].as_ref();
-                        // Find matching vertex in our arrays by UV proximity
-                        self.find_or_add_vertex(vert.point(), vert.normal(), vert.uv())
-                    })
-                    .collect_array::<3>();
+        #[cfg(feature = "rayon")]
+        let inside_flags: Vec<bool> = {
+            use rayon::prelude::*;
+            candidates
+                .par_iter()
+                .map(|c| is_inside(&c.tri_uvs))
+                .collect()
+        };
+        #[cfg(not(feature = "rayon"))]
+        let inside_flags: Vec<bool> = candidates.iter().map(|c| is_inside(&c.tri_uvs)).collect();
 
-                if let Some(face) = indices {
-                    self.faces.push(face);
-                }
+        // Phase 3: add accepted faces (sequential vertex remapping)
+        for (candidate, &inside) in candidates.iter().zip(inside_flags.iter()) {
+            if !inside {
+                continue;
+            }
+            let indices: Option<[usize; 3]> = candidate
+                .cdt_indices
+                .iter()
+                .map(|&cdt_idx| {
+                    let vert = cdt_verts[cdt_idx].as_ref();
+                    self.find_or_add_vertex(vert.point(), vert.normal(), vert.uv())
+                })
+                .collect_array::<3>();
+            if let Some(face) = indices {
+                self.faces.push(face);
             }
         }
 
