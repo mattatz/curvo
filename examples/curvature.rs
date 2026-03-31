@@ -1,9 +1,10 @@
 use std::f64::consts::TAU;
 
+use bevy::window::WindowResolution;
 use bevy::{
     color::palettes::css::{RED, WHITE, YELLOW},
+    mesh::{PrimitiveTopology, VertexAttributeValues},
     prelude::*,
-    render::mesh::{PrimitiveTopology, VertexAttributeValues},
 };
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 
@@ -15,14 +16,14 @@ use materials::*;
 use nalgebra::Point3;
 
 use curvo::prelude::*;
-use rand::Rng;
+use rand::RngExt;
 mod materials;
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                resolution: (640., 480.).into(),
+                resolution: WindowResolution::new(640, 480),
                 ..Default::default()
             }),
             ..Default::default()

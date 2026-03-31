@@ -1,9 +1,8 @@
+use bevy::window::WindowResolution;
 use bevy::{
+    camera::ScalingMode,
+    mesh::{PrimitiveTopology, VertexAttributeValues},
     prelude::*,
-    render::{
-        camera::ScalingMode,
-        mesh::{PrimitiveTopology, VertexAttributeValues},
-    },
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
 use std::f64::consts::{FRAC_PI_2, PI, TAU};
@@ -24,7 +23,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                resolution: (640., 480.).into(),
+                resolution: WindowResolution::new(640, 480),
                 ..Default::default()
             }),
             ..Default::default()

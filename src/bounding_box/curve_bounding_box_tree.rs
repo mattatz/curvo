@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, U1};
-use rand::Rng;
+use rand::RngExt;
 
 use crate::{curve::NurbsCurve, misc::FloatingPoint, split::Split};
 

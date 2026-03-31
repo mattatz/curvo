@@ -62,7 +62,9 @@ where
         + CostFunction<Param = Vector2<F>, Output = F>,
     F: FloatingPoint + ArgminFloat,
 {
-    const NAME: &'static str = "Curve intersection newton method with line search";
+    fn name(&self) -> &str {
+        "Curve intersection newton method with line search"
+    }
 
     fn init(
         &mut self,

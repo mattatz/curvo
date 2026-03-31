@@ -3,6 +3,7 @@ use std::f64::consts::FRAC_PI_2;
 use bevy::{color::palettes::css::TOMATO, prelude::*};
 use bevy_infinite_grid::InfiniteGridPlugin;
 
+use bevy::window::WindowResolution;
 use bevy_normal_material::{material::NormalMaterial, plugin::NormalMaterialPlugin};
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use bevy_points::{
@@ -22,7 +23,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                resolution: (640., 480.).into(),
+                resolution: WindowResolution::new(640, 480),
                 ..Default::default()
             }),
             ..Default::default()

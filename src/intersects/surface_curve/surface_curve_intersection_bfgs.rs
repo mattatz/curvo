@@ -58,7 +58,9 @@ where
         + CostFunction<Param = SurfaceCurveParam<F>, Output = F>,
     F: FloatingPoint + ArgminFloat,
 {
-    const NAME: &'static str = "Surface curve intersection newton method with line search";
+    fn name(&self) -> &str {
+        "Surface curve intersection newton method with line search"
+    }
 
     fn init(
         &mut self,

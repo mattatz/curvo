@@ -1,10 +1,8 @@
 use bevy::{
+    camera::ScalingMode,
     color::palettes::css::{BLUE, CORNFLOWER_BLUE, GREEN, RED, TOMATO, YELLOW},
+    mesh::{PrimitiveTopology, VertexAttributeValues},
     prelude::*,
-    render::{
-        camera::ScalingMode,
-        mesh::{PrimitiveTopology, VertexAttributeValues},
-    },
 };
 
 use bevy_normal_material::{plugin::NormalMaterialPlugin, prelude::NormalMaterial};
@@ -20,7 +18,7 @@ mod misc;
 
 use materials::*;
 use misc::*;
-use rand::Rng;
+use rand::RngExt;
 
 fn main() {
     App::new()

@@ -1,10 +1,11 @@
+use bevy::window::WindowResolution;
 use bevy::{
+    camera::ScalingMode,
     color::palettes::{
         css::{BLUE, TOMATO, WHITE},
         tailwind::LIME_300,
     },
     prelude::*,
-    render::camera::ScalingMode,
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
 
@@ -30,7 +31,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                resolution: (640., 480.).into(),
+                resolution: WindowResolution::new(640, 480),
                 ..Default::default()
             }),
             ..Default::default()

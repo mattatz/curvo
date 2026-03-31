@@ -231,18 +231,18 @@ where
             return None;
         }
 
-        // println!("{}, {}", surface.v_degree() >= 2, surface.u_degree() >= 2);
+        let tolerance_squared = normal_tolerance * normal_tolerance;
 
         let v_direction = (self.corners[0].normal() - self.corners[1].normal()).norm_squared()
-            > normal_tolerance
+            > tolerance_squared
             || (self.corners[2].normal() - self.corners[3].normal()).norm_squared()
-                > normal_tolerance;
+                > tolerance_squared;
         let v_direction = v_direction && self.corners.iter().all(|c| !c.is_u_constrained());
 
         let u_direction = (self.corners[1].normal() - self.corners[2].normal()).norm_squared()
-            > normal_tolerance
+            > tolerance_squared
             || (self.corners[3].normal() - self.corners[0].normal()).norm_squared()
-                > normal_tolerance;
+                > tolerance_squared;
         let u_direction = u_direction && self.corners.iter().all(|c| !c.is_v_constrained());
 
         match (u_direction, v_direction) {

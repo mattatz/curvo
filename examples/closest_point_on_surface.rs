@@ -1,7 +1,8 @@
+use bevy::window::WindowResolution;
 use bevy::{
     color::palettes::css::WHITE,
+    mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
     prelude::*,
-    render::mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
 };
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 
@@ -13,7 +14,7 @@ use materials::*;
 use nalgebra::{Point3, Point4};
 
 use curvo::prelude::*;
-use rand::Rng;
+use rand::RngExt;
 mod materials;
 mod systems;
 use systems::screenshot_on_spacebar;
@@ -22,7 +23,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                resolution: (640., 480.).into(),
+                resolution: WindowResolution::new(640, 480),
                 ..Default::default()
             }),
             ..Default::default()
@@ -70,8 +71,7 @@ fn setup(
             let tess = surf.tessellate(Some(option));
             let tess = tess.cast::<f32>();
 
-            let mut line_list =
-                Mesh::new(bevy::render::mesh::PrimitiveTopology::LineList, default());
+            let mut line_list = Mesh::new(bevy::mesh::PrimitiveTopology::LineList, default());
             let normal_length = 0.15;
             let normals = tess.normals();
 

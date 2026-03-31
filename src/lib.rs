@@ -103,12 +103,15 @@ pub mod prelude {
     pub use crate::tessellation::{
         adaptive_tessellation_node::AdaptiveTessellationNode,
         adaptive_tessellation_option::AdaptiveTessellationOptions,
-        boundary_constraints::BoundaryConstraints, surface_tessellation::*,
-        tangent_space::TangentSpace, trimmed_surface::trimmed_surface_adaptive_tessellate,
+        advancing_front::{AdvancingFrontMesher, AdvancingFrontOptions},
+        boundary_constraints::BoundaryConstraints,
+        surface_tessellation::*,
+        tangent_space::TangentSpace,
+        trimmed_surface::trimmed_surface_adaptive_tessellate,
         trimmed_surface::trimmed_surface_ext::TrimmedSurfaceExt,
         trimmed_surface::TrimmedSurfaceConstrainedTriangulation,
-        trimmed_surface::TrimmedSurfaceConstraints, ConstrainedTessellation, DefaultDivider,
-        DividableDirection, Tessellation,
+        trimmed_surface::TrimmedSurfaceConstraints,
+        ConstrainedTessellation, DefaultDivider, DividableDirection, Tessellation,
     };
     pub use crate::trim::*;
 }

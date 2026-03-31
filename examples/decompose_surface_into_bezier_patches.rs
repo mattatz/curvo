@@ -1,6 +1,6 @@
 use std::f64::consts::PI;
 
-use bevy::prelude::*;
+use bevy::{prelude::*, window::WindowResolution};
 use bevy_infinite_grid::InfiniteGridPlugin;
 
 use bevy_normal_material::plugin::NormalMaterialPlugin;
@@ -21,7 +21,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                resolution: (640., 480.).into(),
+                resolution: WindowResolution::new(640, 480),
                 ..Default::default()
             }),
             ..Default::default()

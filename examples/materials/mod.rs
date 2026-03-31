@@ -1,10 +1,11 @@
 use bevy::{
-    asset::weak_handle,
+    asset::uuid_handle,
     prelude::*,
-    render::render_resource::{AsBindGroup, ShaderRef, ShaderType},
+    render::render_resource::{AsBindGroup, ShaderType},
+    shader::ShaderRef,
 };
 
-const SHADER_HANDLE: Handle<Shader> = weak_handle!("558d5700-88d3-405b-aa87-82f925828be3");
+const SHADER_HANDLE: Handle<Shader> = uuid_handle!("558d5700-88d3-405b-aa87-82f925828be3");
 
 #[derive(AsBindGroup, Asset, TypePath, Debug, Clone)]
 #[bind_group_data(LineMaterialKey)]
@@ -49,7 +50,7 @@ impl Material for LineMaterial {
         ShaderRef::Handle(SHADER_HANDLE.clone())
     }
 
-    fn alpha_mode(&self) -> bevy::prelude::AlphaMode {
+    fn alpha_mode(&self) -> AlphaMode {
         self.alpha_mode
     }
 
@@ -58,23 +59,20 @@ impl Material for LineMaterial {
     }
 
     fn specialize(
-        _pipeline: &bevy::pbr::MaterialPipeline<Self>,
+        _pipeline: &bevy::pbr::MaterialPipeline,
         descriptor: &mut bevy::render::render_resource::RenderPipelineDescriptor,
-        layout: &bevy::render::mesh::MeshVertexBufferLayoutRef,
+        layout: &bevy::mesh::MeshVertexBufferLayoutRef,
         _key: bevy::pbr::MaterialPipelineKey<Self>,
     ) -> Result<(), bevy::render::render_resource::SpecializedMeshPipelineError> {
-        // WebGL2 structs must be 16 byte aligned.
-        let mut shader_defs = vec![
-            #[cfg(feature = "webgl")]
-            "SIXTEEN_BYTE_ALIGNMENT".into(),
-        ];
-
-        if layout.0.contains(Mesh::ATTRIBUTE_COLOR) {
-            shader_defs.push("VERTEX_COLORS".into());
+        #[cfg(feature = "webgl")]
+        if let Some(fragment) = &mut descriptor.fragment {
+            fragment.shader_defs.push("SIXTEEN_BYTE_ALIGNMENT".into());
         }
 
-        if let Some(fragment) = &mut descriptor.fragment {
-            fragment.shader_defs = shader_defs;
+        if layout.0.contains(Mesh::ATTRIBUTE_COLOR) {
+            if let Some(fragment) = &mut descriptor.fragment {
+                fragment.shader_defs.push("VERTEX_COLORS".into());
+            }
         }
 
         Ok(())
@@ -90,21 +88,16 @@ impl From<&LineMaterial> for LineMaterialKey {
     }
 }
 
-use bevy::{
-    asset::load_internal_asset,
-    prelude::{MaterialPlugin, Plugin, Shader},
-};
-
 pub struct LineMaterialPlugin;
 
 impl Plugin for LineMaterialPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
-        load_internal_asset!(
-            app,
-            SHADER_HANDLE,
-            "../shaders/line_material.wgsl",
-            Shader::from_wgsl
-        );
+        // Use Shader::from_wgsl_direct to bypass naga_oil preprocessing,
+        // then bevy's pipeline will process #{MATERIAL_BIND_GROUP} at pipeline creation time.
+        let shader_source = include_str!("shaders/line_material.wgsl");
+        app.world_mut()
+            .resource_mut::<Assets<Shader>>()
+            .insert(&SHADER_HANDLE, Shader::from_wgsl(shader_source, file!()));
         app.add_plugins(MaterialPlugin::<LineMaterial>::default());
     }
 }

@@ -1,4 +1,5 @@
 use std::f64::consts::{FRAC_PI_2, TAU};
+use std::num::NonZeroUsize;
 use std::vec;
 
 use argmin::core::{ArgminFloat, Executor, State};
@@ -709,7 +710,7 @@ where
         let segments = &segments[i..j];
 
         let (_, u) = self.knots_domain();
-        let gauss = GaussLegendre::new(16 + self.degree)?;
+        let gauss = GaussLegendre::new(NonZeroUsize::new(16 + self.degree).unwrap());
 
         if segments.len() <= 1 {
             // If the curve is a single Bezier segment, compute the length directly
@@ -754,7 +755,7 @@ where
         }
 
         let segments = self.try_decompose()?;
-        let gauss = GaussLegendre::new(16 + self.degree)?;
+        let gauss = GaussLegendre::new(NonZeroUsize::new(16 + self.degree).unwrap());
         let tolerance = tolerance.unwrap_or(T::from_f64(1e-4).unwrap());
 
         let mut acc_length = T::zero();
@@ -833,7 +834,7 @@ where
         let mut acc = T::zero();
         let mut acc_prev = T::zero();
 
-        let gauss = GaussLegendre::new(16 + self.degree)?;
+        let gauss = GaussLegendre::new(NonZeroUsize::new(16 + self.degree).unwrap());
         let eps = T::from_f64(1e-6).unwrap();
         let tolerance = T::from_f64(1e-3 * 2.5).unwrap();
 

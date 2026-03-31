@@ -1,10 +1,8 @@
 use bevy::{
+    camera::ScalingMode,
     color::palettes::css::{TOMATO, WHITE},
+    mesh::{PrimitiveTopology, VertexAttributeValues},
     prelude::*,
-    render::{
-        camera::ScalingMode,
-        mesh::{PrimitiveTopology, VertexAttributeValues},
-    },
 };
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};

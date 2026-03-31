@@ -1,9 +1,9 @@
 use bevy::{
     color::palettes::css::YELLOW,
+    mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
     prelude::*,
-    render::mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
 };
-use bevy_egui::EguiContexts;
+use bevy_egui::input::EguiWantsInput;
 use bevy_normal_material::prelude::NormalMaterial;
 use curvo::prelude::{
     AdaptiveTessellationNode, AdaptiveTessellationOptions, CompoundCurve3D, DividableDirection,
@@ -244,7 +244,7 @@ pub fn add_surface_normals(
     meshes: &mut ResMut<'_, Assets<Mesh>>,
     line_materials: &mut ResMut<'_, Assets<LineMaterial>>,
 ) {
-    let mut line_list = Mesh::new(bevy::render::mesh::PrimitiveTopology::LineList, default());
+    let mut line_list = Mesh::new(bevy::mesh::PrimitiveTopology::LineList, default());
     let normal_length = 0.15;
     let normals = tess.normals();
 
@@ -277,8 +277,11 @@ pub fn add_surface_normals(
 }
 
 #[allow(unused)]
-pub fn absorb_egui_inputs(mut mouse: ResMut<ButtonInput<MouseButton>>, mut contexts: EguiContexts) {
-    if contexts.ctx_mut().is_pointer_over_area() {
+pub fn absorb_egui_inputs(
+    mut mouse: ResMut<ButtonInput<MouseButton>>,
+    egui_wants_input: Res<EguiWantsInput>,
+) {
+    if egui_wants_input.is_pointer_over_area() {
         mouse.reset_all();
     }
 }

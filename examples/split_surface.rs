@@ -1,7 +1,7 @@
 use std::f64::consts::FRAC_PI_2;
 
-use bevy::{prelude::*, render::mesh::PrimitiveTopology};
-use bevy_egui::{egui, EguiContextPass, EguiContexts, EguiPlugin};
+use bevy::{mesh::PrimitiveTopology, prelude::*, window::WindowResolution};
+use bevy_egui::{egui, EguiContexts, EguiPlugin, EguiPrimaryContextPass};
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 
 use bevy_normal_material::{plugin::NormalMaterialPlugin, prelude::NormalMaterial};
@@ -31,7 +31,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                resolution: (640., 480.).into(),
+                resolution: WindowResolution::new(640, 480),
                 ..Default::default()
             }),
             ..Default::default()
@@ -39,9 +39,7 @@ fn main() {
         .add_plugins(InfiniteGridPlugin)
         .add_plugins(PanOrbitCameraPlugin)
         .add_plugins(NormalMaterialPlugin)
-        .add_plugins(EguiPlugin {
-            enable_multipass_for_primary_context: true,
-        })
+        .add_plugins(EguiPlugin::default())
         .add_plugins(AppPlugin)
         .run();
 }
@@ -51,7 +49,7 @@ impl Plugin for AppPlugin {
     fn build(&self, app: &mut bevy::prelude::App) {
         app.insert_resource(Setting::default())
             .add_systems(Startup, setup)
-            .add_systems(EguiContextPass, update_ui)
+            .add_systems(EguiPrimaryContextPass, update_ui)
             .add_systems(Update, split_animation);
     }
 }
@@ -135,7 +133,7 @@ fn update_ui(mut contexts: EguiContexts, mut settings: ResMut<Setting>) {
         .default_width(420.)
         .min_width(420.)
         .max_width(420.)
-        .show(contexts.ctx_mut(), |ui| {
+        .show(contexts.ctx_mut().unwrap(), |ui| {
             egui::ComboBox::from_label("split direction")
                 .selected_text(format!("{:?}", settings.direction))
                 .show_ui(ui, |ui| {

@@ -1,9 +1,10 @@
 use std::f32::consts::FRAC_PI_2;
 
+use bevy::window::WindowResolution;
 use bevy::{
     color::palettes::{css::TOMATO, tailwind::LIME_500},
+    mesh::{PrimitiveTopology, VertexAttributeValues},
     prelude::*,
-    render::mesh::{PrimitiveTopology, VertexAttributeValues},
 };
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin, InfiniteGridSettings};
 
@@ -21,7 +22,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                resolution: (640., 480.).into(),
+                resolution: WindowResolution::new(640, 480),
                 ..Default::default()
             }),
             ..Default::default()

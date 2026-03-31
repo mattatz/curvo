@@ -1,9 +1,10 @@
+use bevy::window::WindowResolution;
 use bevy::{
+    camera::ScalingMode,
     color::palettes::css::{BLUE, LIGHT_GREEN, WHITE, YELLOW},
     prelude::*,
-    render::camera::ScalingMode,
 };
-use bevy_egui::{egui, EguiContextPass, EguiContexts, EguiPlugin};
+use bevy_egui::{egui, EguiContexts, EguiPlugin, EguiPrimaryContextPass};
 use bevy_infinite_grid::InfiniteGridPlugin;
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
@@ -18,7 +19,7 @@ mod misc;
 
 use materials::*;
 use misc::*;
-use rand::Rng;
+use rand::RngExt;
 
 #[derive(Debug, PartialEq)]
 enum Dimension {
@@ -72,7 +73,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                resolution: (640., 480.).into(),
+                resolution: WindowResolution::new(640, 480),
                 ..Default::default()
             }),
             ..Default::default()
@@ -81,9 +82,7 @@ fn main() {
         .add_plugins(InfiniteGridPlugin)
         .add_plugins(PanOrbitCameraPlugin)
         .add_plugins(PointsPlugin)
-        .add_plugins(EguiPlugin {
-            enable_multipass_for_primary_context: true,
-        })
+        .add_plugins(EguiPlugin::default())
         .add_plugins(AppPlugin)
         .run();
 }
@@ -99,7 +98,7 @@ impl Plugin for AppPlugin {
                     .after(bevy_egui::input::write_egui_input_system)
                     .before(bevy_egui::begin_pass_system),
             )
-            .add_systems(EguiContextPass, update_ui)
+            .add_systems(EguiPrimaryContextPass, update_ui)
             .add_systems(Update, gizmos_curve);
     }
 }
@@ -235,7 +234,7 @@ fn update_ui(
         .default_width(420.)
         .min_width(420.)
         .max_width(420.)
-        .show(contexts.ctx_mut(), |ui| {
+        .show(contexts.ctx_mut().unwrap(), |ui| {
             ui.heading("dimension");
             ui.group(|g| {
                 g.horizontal(|ui| {

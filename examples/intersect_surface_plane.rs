@@ -1,7 +1,8 @@
+use bevy::window::WindowResolution;
 use bevy::{
     color::palettes::css::{CORNFLOWER_BLUE, TOMATO, WHITE},
+    mesh::{PrimitiveTopology, VertexAttributeValues},
     prelude::*,
-    render::mesh::{PrimitiveTopology, VertexAttributeValues},
 };
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin, InfiniteGridSettings};
 
@@ -20,7 +21,7 @@ mod materials;
 mod misc;
 
 use materials::*;
-use rand::Rng;
+use rand::RngExt;
 
 use crate::misc::{add_curve, add_regular_curve};
 
@@ -28,7 +29,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                resolution: (640., 480.).into(),
+                resolution: WindowResolution::new(640, 480),
                 ..Default::default()
             }),
             ..Default::default()

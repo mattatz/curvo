@@ -1,10 +1,9 @@
+use bevy::window::WindowResolution;
 use bevy::{
+    camera::ScalingMode,
     color::palettes::css::{BLUE, LIME, TOMATO, WHITE},
+    mesh::{PrimitiveTopology, VertexAttributeValues},
     prelude::*,
-    render::{
-        camera::ScalingMode,
-        mesh::{PrimitiveTopology, VertexAttributeValues},
-    },
 };
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
@@ -21,7 +20,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                resolution: (800., 600.).into(),
+                resolution: WindowResolution::new(800, 600),
                 title: "Catmull-Rom Spline".to_string(),
                 ..Default::default()
             }),

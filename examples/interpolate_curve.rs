@@ -1,7 +1,9 @@
+use bevy::window::WindowResolution;
 use bevy::{
+    camera::ScalingMode,
     color::palettes::css::{AQUAMARINE, GRAY, TOMATO, WHITE},
+    mesh::VertexAttributeValues,
     prelude::*,
-    render::{camera::ScalingMode, mesh::VertexAttributeValues},
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
 
@@ -23,7 +25,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                resolution: (640., 480.).into(),
+                resolution: WindowResolution::new(640, 480),
                 ..Default::default()
             }),
             ..Default::default()
@@ -77,7 +79,7 @@ fn setup(
                 t += step;
             }
 
-            let mut line = Mesh::new(bevy::render::mesh::PrimitiveTopology::LineList, default());
+            let mut line = Mesh::new(bevy::mesh::PrimitiveTopology::LineList, default());
             let line_list_vertices = vertices
                 .iter()
                 .enumerate()
@@ -103,7 +105,7 @@ fn setup(
                 .insert(Name::new("normal"));
 
             let samples = curve.tessellate(Some(1e-8));
-            let mut line = Mesh::new(bevy::render::mesh::PrimitiveTopology::LineStrip, default());
+            let mut line = Mesh::new(bevy::mesh::PrimitiveTopology::LineStrip, default());
             let line_vertices = samples
                 .iter()
                 .map(|p| p.cast::<f32>())

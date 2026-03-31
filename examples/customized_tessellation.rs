@@ -1,10 +1,11 @@
 use std::f64::consts::FRAC_PI_2;
 
+use bevy::window::WindowResolution;
 use bevy::{
+    mesh::{PrimitiveTopology, VertexAttributeValues},
     prelude::*,
-    render::mesh::{PrimitiveTopology, VertexAttributeValues},
 };
-use bevy_egui::{egui, EguiContextPass, EguiContexts, EguiPlugin};
+use bevy_egui::{egui, EguiContexts, EguiPlugin, EguiPrimaryContextPass};
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 
 use bevy_normal_material::{plugin::NormalMaterialPlugin, prelude::NormalMaterial};
@@ -24,7 +25,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                resolution: (640., 480.).into(),
+                resolution: WindowResolution::new(640, 480),
                 ..Default::default()
             }),
             ..Default::default()
@@ -33,9 +34,7 @@ fn main() {
         .add_plugins(PanOrbitCameraPlugin)
         .add_plugins(NormalMaterialPlugin)
         .add_plugins(LineMaterialPlugin)
-        .add_plugins(EguiPlugin {
-            enable_multipass_for_primary_context: true,
-        })
+        .add_plugins(EguiPlugin::default())
         .add_plugins(AppPlugin)
         .run();
 }
