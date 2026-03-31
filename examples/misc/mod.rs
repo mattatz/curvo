@@ -277,7 +277,10 @@ pub fn add_surface_normals(
 }
 
 #[allow(unused)]
-pub fn absorb_egui_inputs(mut mouse: ResMut<ButtonInput<MouseButton>>, egui_wants_input: Res<EguiWantsInput>) {
+pub fn absorb_egui_inputs(
+    mut mouse: ResMut<ButtonInput<MouseButton>>,
+    egui_wants_input: Res<EguiWantsInput>,
+) {
     if egui_wants_input.is_pointer_over_area() {
         mouse.reset_all();
     }

@@ -1,11 +1,11 @@
 use std::f64::consts::TAU;
 
+use bevy::window::WindowResolution;
 use bevy::{
     color::palettes::css::{RED, WHITE, YELLOW},
-    prelude::*,
     mesh::{PrimitiveTopology, VertexAttributeValues},
+    prelude::*,
 };
-use bevy::window::WindowResolution;
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 
 use bevy_normal_material::plugin::NormalMaterialPlugin;

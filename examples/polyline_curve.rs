@@ -1,7 +1,7 @@
 use bevy::{
+    camera::ScalingMode,
     color::palettes::css::{TOMATO, WHITE},
     prelude::*,
-    camera::ScalingMode,
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
 

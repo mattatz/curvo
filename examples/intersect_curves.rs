@@ -1,11 +1,11 @@
 use std::f32::consts::FRAC_PI_2;
 
+use bevy::window::WindowResolution;
 use bevy::{
     color::palettes::{css::TOMATO, tailwind::LIME_500},
-    prelude::*,
     mesh::{PrimitiveTopology, VertexAttributeValues},
+    prelude::*,
 };
-use bevy::window::WindowResolution;
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin, InfiniteGridSettings};
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};

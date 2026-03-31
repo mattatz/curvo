@@ -3,12 +3,12 @@ use std::f64::consts::FRAC_PI_2;
 use bevy::{color::palettes::css::TOMATO, prelude::*};
 use bevy_infinite_grid::InfiniteGridPlugin;
 
+use bevy::window::WindowResolution;
 use bevy_normal_material::{material::NormalMaterial, plugin::NormalMaterialPlugin};
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use bevy_points::{
     material::PointsShaderSettings, mesh::PointsMesh, plugin::PointsPlugin, prelude::PointsMaterial,
 };
-use bevy::window::WindowResolution;
 use materials::*;
 use misc::*;
 use nalgebra::{Point3, Rotation3, Translation3, Vector3};

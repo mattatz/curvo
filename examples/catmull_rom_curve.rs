@@ -1,10 +1,10 @@
+use bevy::window::WindowResolution;
 use bevy::{
     camera::ScalingMode,
     color::palettes::css::{BLUE, LIME, TOMATO, WHITE},
     mesh::{PrimitiveTopology, VertexAttributeValues},
     prelude::*,
 };
-use bevy::window::WindowResolution;
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use bevy_points::{plugin::PointsPlugin, prelude::PointsMaterial, prelude::PointsMesh};

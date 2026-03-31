@@ -1,7 +1,7 @@
 use bevy::{
     color::palettes::css::{SALMON, TOMATO},
-    prelude::*,
     mesh::{PrimitiveTopology, VertexAttributeValues},
+    prelude::*,
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
 

@@ -1,9 +1,9 @@
+use bevy::window::WindowResolution;
 use bevy::{
     color::palettes::css::WHITE,
-    prelude::*,
     mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
+    prelude::*,
 };
-use bevy::window::WindowResolution;
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 
 use bevy_normal_material::{material::NormalMaterial, plugin::NormalMaterialPlugin};
@@ -71,8 +71,7 @@ fn setup(
             let tess = surf.tessellate(Some(option));
             let tess = tess.cast::<f32>();
 
-            let mut line_list =
-                Mesh::new(bevy::mesh::PrimitiveTopology::LineList, default());
+            let mut line_list = Mesh::new(bevy::mesh::PrimitiveTopology::LineList, default());
             let normal_length = 0.15;
             let normals = tess.normals();
 

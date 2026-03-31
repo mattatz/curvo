@@ -1,9 +1,9 @@
+use bevy::window::WindowResolution;
 use bevy::{
     color::palettes::css::{SEA_GREEN, TURQUOISE},
-    prelude::*,
     mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
+    prelude::*,
 };
-use bevy::window::WindowResolution;
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 
 use bevy_normal_material::{material::NormalMaterial, plugin::NormalMaterialPlugin};

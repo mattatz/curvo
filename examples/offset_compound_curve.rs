@@ -1,10 +1,10 @@
+use bevy::window::WindowResolution;
 use bevy::{
+    camera::ScalingMode,
     color::palettes::css::{BLUE, LIGHT_GREEN, WHITE, YELLOW},
     prelude::*,
-    camera::ScalingMode,
 };
-use bevy::window::WindowResolution;
-use bevy_egui::{egui, EguiPrimaryContextPass, EguiContexts, EguiPlugin};
+use bevy_egui::{egui, EguiContexts, EguiPlugin, EguiPrimaryContextPass};
 use bevy_infinite_grid::InfiniteGridPlugin;
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};

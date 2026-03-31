@@ -1,12 +1,12 @@
+use bevy::window::WindowResolution;
 use bevy::{
+    camera::ScalingMode,
     color::palettes::{
         css::{BLUE, TOMATO, WHITE},
         tailwind::LIME_300,
     },
     prelude::*,
-    camera::ScalingMode,
 };
-use bevy::window::WindowResolution;
 use bevy_infinite_grid::InfiniteGridPlugin;
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};

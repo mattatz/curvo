@@ -1,10 +1,10 @@
 use std::f64::consts::FRAC_PI_2;
 
-use bevy::{
-    prelude::*,
-    mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
-};
 use bevy::window::WindowResolution;
+use bevy::{
+    mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
+    prelude::*,
+};
 use bevy_infinite_grid::InfiniteGridPlugin;
 
 use bevy_normal_material::{material::NormalMaterial, plugin::NormalMaterialPlugin};

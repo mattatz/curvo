@@ -1,7 +1,7 @@
 use std::f64::consts::FRAC_PI_2;
 
 use bevy::{mesh::PrimitiveTopology, prelude::*, window::WindowResolution};
-use bevy_egui::{egui, EguiPrimaryContextPass, EguiContexts, EguiPlugin};
+use bevy_egui::{egui, EguiContexts, EguiPlugin, EguiPrimaryContextPass};
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 
 use bevy_normal_material::{plugin::NormalMaterialPlugin, prelude::NormalMaterial};

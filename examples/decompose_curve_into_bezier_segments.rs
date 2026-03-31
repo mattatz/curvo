@@ -2,8 +2,8 @@ use std::f64::consts::TAU;
 
 use bevy::{
     color::palettes::css::WHITE,
-    prelude::*,
     mesh::{PrimitiveTopology, VertexAttributeValues},
+    prelude::*,
 };
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 

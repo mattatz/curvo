@@ -1,9 +1,9 @@
+use bevy::window::WindowResolution;
 use bevy::{
     camera::ScalingMode,
     mesh::{PrimitiveTopology, VertexAttributeValues},
     prelude::*,
 };
-use bevy::window::WindowResolution;
 use bevy_infinite_grid::InfiniteGridPlugin;
 use std::f64::consts::{FRAC_PI_2, PI, TAU};
 use systems::screenshot_on_spacebar;

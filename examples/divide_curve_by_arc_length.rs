@@ -1,10 +1,10 @@
+use bevy::window::WindowResolution;
 use bevy::{
     color::palettes::css::{ALICE_BLUE, AQUAMARINE, WHITE, YELLOW},
-    prelude::*,
     mesh::{PrimitiveTopology, VertexAttributeValues},
+    prelude::*,
 };
-use bevy::window::WindowResolution;
-use bevy_egui::{egui, EguiPrimaryContextPass, EguiContexts, EguiPlugin};
+use bevy_egui::{egui, EguiContexts, EguiPlugin, EguiPrimaryContextPass};
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 
 use bevy_normal_material::plugin::NormalMaterialPlugin;

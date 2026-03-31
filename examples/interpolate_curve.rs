@@ -1,10 +1,10 @@
-use bevy::{
-    color::palettes::css::{AQUAMARINE, GRAY, TOMATO, WHITE},
-    prelude::*,
-    camera::ScalingMode,
-    mesh::VertexAttributeValues,
-};
 use bevy::window::WindowResolution;
+use bevy::{
+    camera::ScalingMode,
+    color::palettes::css::{AQUAMARINE, GRAY, TOMATO, WHITE},
+    mesh::VertexAttributeValues,
+    prelude::*,
+};
 use bevy_infinite_grid::InfiniteGridPlugin;
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
