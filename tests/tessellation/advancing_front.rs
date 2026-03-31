@@ -63,7 +63,9 @@ fn test_advancing_front_cylinder() {
     let trimmed = make_trimmed_cylinder(5.0, 10.0);
     let opts = AdvancingFrontOptions::<f64>::default().with_deflection(0.1);
     let mesher = AdvancingFrontMesher::new(&trimmed, opts);
-    let tess = mesher.mesh().expect("Advancing front mesher should succeed");
+    let tess = mesher
+        .mesh()
+        .expect("Advancing front mesher should succeed");
 
     let points = tess.points();
     let faces = tess.faces();
@@ -122,7 +124,9 @@ fn test_advancing_front_plane_minimal_subdivision() {
     let trimmed = make_trimmed_plane();
     let opts = AdvancingFrontOptions::<f64>::default().with_deflection(0.1);
     let mesher = AdvancingFrontMesher::new(&trimmed, opts);
-    let tess = mesher.mesh().expect("Advancing front mesher should succeed on plane");
+    let tess = mesher
+        .mesh()
+        .expect("Advancing front mesher should succeed on plane");
 
     let points = tess.points();
     let faces = tess.faces();

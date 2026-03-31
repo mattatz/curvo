@@ -37,10 +37,7 @@ impl<T: FloatingPoint> Front<T> {
     pub fn push(&mut self, edge: FrontEdge, length_3d: T) {
         let id = self.next_id;
         self.next_id += 1;
-        let key = (
-            OrderedFloat(T::to_f64(&length_3d).unwrap()),
-            id,
-        );
+        let key = (OrderedFloat(T::to_f64(&length_3d).unwrap()), id);
         self.edges.insert(key, edge);
     }
 

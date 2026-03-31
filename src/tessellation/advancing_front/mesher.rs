@@ -30,7 +30,12 @@ pub struct AdvancingFrontMesher<'a, T: FloatingPoint, S> {
 impl<'a, T, S> AdvancingFrontMesher<'a, T, S>
 where
     T: FloatingPoint + SpadeNum,
-    S: TrimmedSurfaceExt<T, fn(&crate::prelude::AdaptiveTessellationNode<T, nalgebra::U4>) -> Option<crate::prelude::DividableDirection>> + Sync,
+    S: TrimmedSurfaceExt<
+            T,
+            fn(
+                &crate::prelude::AdaptiveTessellationNode<T, nalgebra::U4>,
+            ) -> Option<crate::prelude::DividableDirection>,
+        > + Sync,
 {
     pub fn new(surface: &'a S, options: AdvancingFrontOptions<T>) -> Self {
         Self {
@@ -74,16 +79,16 @@ where
             .collect::<Vec<_>>();
 
         // Add boundary constraint edges
-        let add_constraints =
-            |cdt: &mut ConstrainedDelaunayTriangulation<Vertex<T>>, indices: &[usize]| {
-                for (a, b) in indices.iter().circular_tuple_windows() {
-                    if let (Ok(ha), Ok(hb)) = (&handles[*a], &handles[*b]) {
-                        if cdt.can_add_constraint(*ha, *hb) {
-                            cdt.add_constraint(*ha, *hb);
-                        }
+        let add_constraints = |cdt: &mut ConstrainedDelaunayTriangulation<Vertex<T>>,
+                               indices: &[usize]| {
+            for (a, b) in indices.iter().circular_tuple_windows() {
+                if let (Ok(ha), Ok(hb)) = (&handles[*a], &handles[*b]) {
+                    if cdt.can_add_constraint(*ha, *hb) {
+                        cdt.add_constraint(*ha, *hb);
                     }
                 }
-            };
+            }
+        };
 
         if let Some(ref ext) = exterior_pts {
             add_constraints(&mut cdt, ext);
@@ -107,17 +112,13 @@ where
     }
 
     /// Discretize a boundary curve with curvature-adaptive sampling.
-    fn discretize_boundary(
-        &mut self,
-        curve: &CompoundCurve2D<T>,
-    ) -> anyhow::Result<Vec<usize>> {
+    fn discretize_boundary(&mut self, curve: &CompoundCurve2D<T>) -> anyhow::Result<Vec<usize>> {
         let mut indices = Vec::new();
         let eps = T::from_f64(1e-8).unwrap();
 
         for (i, span) in curve.spans().iter().enumerate() {
             let (t_start, t_end) = span.knots_domain();
-            let pts =
-                self.adaptive_discretize_curve(span, t_start, t_end, 0);
+            let pts = self.adaptive_discretize_curve(span, t_start, t_end, 0);
 
             for (j, uv) in pts.into_iter().enumerate() {
                 // Skip first point of subsequent spans (shared with previous)
@@ -261,12 +262,7 @@ where
 
     /// Generate parameter values with locally adaptive spacing.
     /// `step_fn(t)` returns the desired step size at parameter `t`.
-    fn adaptive_parameter_steps(
-        &self,
-        t_min: T,
-        t_max: T,
-        step_fn: impl Fn(T) -> T,
-    ) -> Vec<T> {
+    fn adaptive_parameter_steps(&self, t_min: T, t_max: T, step_fn: impl Fn(T) -> T) -> Vec<T> {
         let mut positions = Vec::new();
         let mut t = t_min;
         let max_iters = 1000; // safety limit
@@ -275,14 +271,16 @@ where
         while t < t_max && iters < max_iters {
             positions.push(t);
             let step = step_fn(t).max(self.options.min_edge_length);
-            t = t + step;
+            t += step;
             iters += 1;
         }
 
         // Don't include the boundary itself (boundary points already exist)
         positions
             .into_iter()
-            .filter(|&t| t > t_min + self.options.min_edge_length && t < t_max - self.options.min_edge_length)
+            .filter(|&t| {
+                t > t_min + self.options.min_edge_length && t < t_max - self.options.min_edge_length
+            })
             .collect()
     }
 
@@ -301,7 +299,7 @@ where
         // Estimate principal curvatures via finite differences of normals
         let n0 = self.surface.normal_at(u, v);
 
-        let ((u_min, u_max), (v_min, v_max)) = self.surface.knots_domain();
+        let ((_u_min, u_max), (_v_min, v_max)) = self.surface.knots_domain();
         let u_h = (u + h).min(u_max - eps);
         let v_h = (v + h).min(v_max - eps);
 
@@ -338,7 +336,7 @@ where
         let eps = T::from_f64(1e-6).unwrap();
         let h = T::from_f64(1e-5).unwrap();
 
-        let ((u_min, u_max), (v_min, v_max)) = self.surface.knots_domain();
+        let ((_u_min, u_max), (_v_min, v_max)) = self.surface.knots_domain();
         let u_h = (u + h).min(u_max - eps);
         let v_h = (v + h).min(v_max - eps);
 
@@ -413,11 +411,7 @@ where
                 continue;
             }
 
-            let cdt_indices = [
-                vmap[&vs[0].fix()],
-                vmap[&vs[1].fix()],
-                vmap[&vs[2].fix()],
-            ];
+            let cdt_indices = [vmap[&vs[0].fix()], vmap[&vs[1].fix()], vmap[&vs[2].fix()]];
 
             candidates.push(CandidateFace {
                 tri_uvs,
@@ -427,20 +421,16 @@ where
 
         // Phase 2: contains-check (parallelized when rayon is available)
         let is_inside = |tri_uvs: &[Vector2<T>; 3]| -> bool {
-            let center: Point2<T> =
-                ((tri_uvs[0] + tri_uvs[1] + tri_uvs[2]) * inv_3).into();
-            let mid_01: Point2<T> =
-                ((tri_uvs[0] + tri_uvs[1]) * half * (T::one() - shrink)
-                    + (tri_uvs[2]) * shrink)
-                    .into();
-            let mid_12: Point2<T> =
-                ((tri_uvs[1] + tri_uvs[2]) * half * (T::one() - shrink)
-                    + (tri_uvs[0]) * shrink)
-                    .into();
-            let mid_20: Point2<T> =
-                ((tri_uvs[2] + tri_uvs[0]) * half * (T::one() - shrink)
-                    + (tri_uvs[1]) * shrink)
-                    .into();
+            let center: Point2<T> = ((tri_uvs[0] + tri_uvs[1] + tri_uvs[2]) * inv_3).into();
+            let mid_01: Point2<T> = ((tri_uvs[0] + tri_uvs[1]) * half * (T::one() - shrink)
+                + (tri_uvs[2]) * shrink)
+                .into();
+            let mid_12: Point2<T> = ((tri_uvs[1] + tri_uvs[2]) * half * (T::one() - shrink)
+                + (tri_uvs[0]) * shrink)
+                .into();
+            let mid_20: Point2<T> = ((tri_uvs[2] + tri_uvs[0]) * half * (T::one() - shrink)
+                + (tri_uvs[1]) * shrink)
+                .into();
 
             [center, mid_01, mid_12, mid_20].iter().all(|pt| {
                 let in_ext = uv_exterior

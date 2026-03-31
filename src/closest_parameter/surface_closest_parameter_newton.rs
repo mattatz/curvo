@@ -60,7 +60,9 @@ where
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
-    fn name(&self) -> &str { "Closest parameter newton method" }
+    fn name(&self) -> &str {
+        "Closest parameter newton method"
+    }
 
     fn init(
         &mut self,
