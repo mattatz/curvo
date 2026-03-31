@@ -1,7 +1,7 @@
 use nalgebra::{
     allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, U1,
 };
-use rand::{rngs::ThreadRng, Rng};
+use rand::{rngs::ThreadRng, RngExt};
 
 use crate::{
     curve::NurbsCurve,

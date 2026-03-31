@@ -25,7 +25,7 @@ impl<'a, T: FloatingPoint + SubsetOf<f64>> Intersects<'a, &'a Plane<T>>
 mod tests {
     use itertools::Itertools;
     use nalgebra::{Point4, Vector3};
-    use rand::Rng;
+    use rand::RngExt;
 
     use crate::{
         knot::KnotVector,
