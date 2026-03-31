@@ -3,7 +3,7 @@ use std::f64::consts::TAU;
 use bevy::{
     color::palettes::css::{GREEN, RED, WHITE, YELLOW},
     prelude::*,
-    render::mesh::{PrimitiveTopology, VertexAttributeValues},
+    mesh::{PrimitiveTopology, VertexAttributeValues},
 };
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 
@@ -14,7 +14,7 @@ use materials::*;
 use nalgebra::{Matrix4, Point3};
 
 use curvo::prelude::*;
-use rand::Rng;
+use rand::RngExt;
 mod materials;
 
 fn main() {

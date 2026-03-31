@@ -1,8 +1,9 @@
 use bevy::{
     color::palettes::css::TOMATO,
     prelude::*,
-    render::mesh::{PrimitiveTopology, VertexAttributeValues},
+    mesh::{PrimitiveTopology, VertexAttributeValues},
 };
+use bevy::window::WindowResolution;
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin, InfiniteGridSettings};
 
 use bevy_normal_material::{plugin::NormalMaterialPlugin, prelude::NormalMaterial};
@@ -18,13 +19,13 @@ mod materials;
 mod misc;
 
 use materials::*;
-use rand::Rng;
+use rand::RngExt;
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                resolution: (640., 480.).into(),
+                resolution: WindowResolution::new(640, 480),
                 ..Default::default()
             }),
             ..Default::default()
@@ -232,7 +233,7 @@ fn update(
         .p1()
         .iter()
         .map(|(s, tr)| {
-            let mat = tr.compute_matrix();
+            let mat = tr.to_matrix();
             let m = Matrix4::from(mat);
             s.0.transformed(&m.cast::<f64>())
         })
@@ -243,7 +244,7 @@ fn update(
         .p2()
         .iter()
         .map(|(c2, tr)| {
-            let mat = tr.compute_matrix();
+            let mat = tr.to_matrix();
             let m = Matrix4::from(mat);
             c2.0.transformed(&m.cast::<f64>())
         })

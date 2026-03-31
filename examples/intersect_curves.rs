@@ -3,8 +3,9 @@ use std::f32::consts::FRAC_PI_2;
 use bevy::{
     color::palettes::{css::TOMATO, tailwind::LIME_500},
     prelude::*,
-    render::mesh::{PrimitiveTopology, VertexAttributeValues},
+    mesh::{PrimitiveTopology, VertexAttributeValues},
 };
+use bevy::window::WindowResolution;
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin, InfiniteGridSettings};
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
@@ -21,7 +22,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                resolution: (640., 480.).into(),
+                resolution: WindowResolution::new(640, 480),
                 ..Default::default()
             }),
             ..Default::default()

@@ -1,8 +1,9 @@
 use bevy::{
     color::palettes::css::{CORNFLOWER_BLUE, GOLD, WHITE},
     prelude::*,
-    render::mesh::{PrimitiveTopology, VertexAttributeValues},
+    mesh::{PrimitiveTopology, VertexAttributeValues},
 };
+use bevy::window::WindowResolution;
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 
 use bevy_normal_material::plugin::NormalMaterialPlugin;
@@ -19,7 +20,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                resolution: (640., 480.).into(),
+                resolution: WindowResolution::new(640, 480),
                 ..Default::default()
             }),
             ..Default::default()

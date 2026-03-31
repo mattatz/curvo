@@ -4,8 +4,9 @@ use bevy::{
         tailwind::LIME_300,
     },
     prelude::*,
-    render::camera::ScalingMode,
+    camera::ScalingMode,
 };
+use bevy::window::WindowResolution;
 use bevy_infinite_grid::InfiniteGridPlugin;
 
 use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
@@ -30,7 +31,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                resolution: (640., 480.).into(),
+                resolution: WindowResolution::new(640, 480),
                 ..Default::default()
             }),
             ..Default::default()

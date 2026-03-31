@@ -8,6 +8,7 @@ use bevy_panorbit_camera::{PanOrbitCamera, PanOrbitCameraPlugin};
 use bevy_points::{
     material::PointsShaderSettings, mesh::PointsMesh, plugin::PointsPlugin, prelude::PointsMaterial,
 };
+use bevy::window::WindowResolution;
 use materials::*;
 use misc::*;
 use nalgebra::{Point3, Rotation3, Translation3, Vector3};
@@ -22,7 +23,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                resolution: (640., 480.).into(),
+                resolution: WindowResolution::new(640, 480),
                 ..Default::default()
             }),
             ..Default::default()

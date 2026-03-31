@@ -2,8 +2,9 @@ use std::f64::consts::FRAC_PI_2;
 
 use bevy::{
     prelude::*,
-    render::mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
+    mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
 };
+use bevy::window::WindowResolution;
 use bevy_infinite_grid::InfiniteGridPlugin;
 
 use bevy_normal_material::{material::NormalMaterial, plugin::NormalMaterialPlugin};
@@ -22,7 +23,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                resolution: (640., 480.).into(),
+                resolution: WindowResolution::new(640, 480),
                 ..Default::default()
             }),
             ..Default::default()

@@ -1,6 +1,6 @@
 use std::f64::consts::TAU;
 
-use bevy::{color::palettes::css::WHITE, prelude::*};
+use bevy::{color::palettes::css::WHITE, prelude::*, window::WindowResolution};
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 
 use bevy_normal_material::{material::NormalMaterial, plugin::NormalMaterialPlugin};
@@ -11,7 +11,7 @@ use misc::{add_curve, add_surface};
 use nalgebra::{Point3, Vector3};
 
 use curvo::prelude::*;
-use rand::Rng;
+use rand::RngExt;
 use systems::screenshot_on_spacebar;
 mod materials;
 mod misc;
@@ -21,7 +21,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                resolution: (640., 480.).into(),
+                resolution: WindowResolution::new(640, 480),
                 ..Default::default()
             }),
             ..Default::default()

@@ -1,10 +1,11 @@
 use bevy::{
-    asset::weak_handle,
+    asset::uuid_handle,
     prelude::*,
-    render::render_resource::{AsBindGroup, ShaderRef, ShaderType},
+    render::render_resource::{AsBindGroup, ShaderType},
+    shader::ShaderRef,
 };
 
-const SHADER_HANDLE: Handle<Shader> = weak_handle!("558d5700-88d3-405b-aa87-82f925828be3");
+const SHADER_HANDLE: Handle<Shader> = uuid_handle!("558d5700-88d3-405b-aa87-82f925828be3");
 
 #[derive(AsBindGroup, Asset, TypePath, Debug, Clone)]
 #[bind_group_data(LineMaterialKey)]
@@ -58,9 +59,9 @@ impl Material for LineMaterial {
     }
 
     fn specialize(
-        _pipeline: &bevy::pbr::MaterialPipeline<Self>,
+        _pipeline: &bevy::pbr::MaterialPipeline,
         descriptor: &mut bevy::render::render_resource::RenderPipelineDescriptor,
-        layout: &bevy::render::mesh::MeshVertexBufferLayoutRef,
+        layout: &bevy::mesh::MeshVertexBufferLayoutRef,
         _key: bevy::pbr::MaterialPipelineKey<Self>,
     ) -> Result<(), bevy::render::render_resource::SpecializedMeshPipelineError> {
         // WebGL2 structs must be 16 byte aligned.

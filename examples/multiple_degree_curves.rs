@@ -3,7 +3,7 @@ use std::ops::Range;
 use bevy::{
     color::palettes::css::WHITE,
     prelude::*,
-    render::mesh::{PrimitiveTopology, VertexAttributeValues},
+    mesh::{PrimitiveTopology, VertexAttributeValues},
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
 

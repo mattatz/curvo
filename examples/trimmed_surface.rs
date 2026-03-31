@@ -1,8 +1,9 @@
 use bevy::{
     color::palettes::css::TOMATO,
     prelude::*,
-    render::mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
+    mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
 };
+use bevy::window::WindowResolution;
 use bevy_infinite_grid::{InfiniteGridBundle, InfiniteGridPlugin};
 
 use bevy_normal_material::{material::NormalMaterial, plugin::NormalMaterialPlugin};
@@ -13,7 +14,7 @@ use materials::*;
 use nalgebra::{Point2, Point3, Point4, Vector2, Vector3};
 
 use curvo::prelude::*;
-use rand::Rng;
+use rand::RngExt;
 use systems::screenshot_on_spacebar;
 mod materials;
 mod misc;
@@ -23,7 +24,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                resolution: (640., 480.).into(),
+                resolution: WindowResolution::new(640, 480),
                 ..Default::default()
             }),
             ..Default::default()
@@ -143,7 +144,7 @@ fn setup(
         }
 
         let samples = curve.tessellate(Some(1e-8));
-        let mut line = Mesh::new(bevy::render::mesh::PrimitiveTopology::LineStrip, default());
+        let mut line = Mesh::new(bevy::mesh::PrimitiveTopology::LineStrip, default());
         let line_vertices = samples
             .iter()
             .map(|p| p.cast::<f32>())

@@ -1,11 +1,9 @@
 use std::f64::consts::TAU;
 
 use bevy::{
+    camera::ScalingMode,
+    mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
     prelude::*,
-    render::{
-        camera::ScalingMode,
-        mesh::{Indices, PrimitiveTopology, VertexAttributeValues},
-    },
 };
 use bevy_infinite_grid::InfiniteGridPlugin;
 
