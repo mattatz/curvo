@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use super::adaptive_tessellation_node::AdaptiveTessellationNode;
 use super::adaptive_tessellation_option::AdaptiveTessellationOptions;
 use super::surface_tessellation::SurfaceTessellation;
+use super::advancing_front::AdvancingFrontOptions;
 use super::{ConstrainedTessellation, DividableDirection, Tessellation};
 use itertools::Itertools;
 use nalgebra::{ComplexField, Point2, Point3, Vector3};
@@ -84,6 +85,30 @@ where
         adaptive_options: Option<AdaptiveTessellationOptions<T, U4, F>>,
     ) -> Self::Output {
         trimmed_surface_adaptive_tessellate(self, Some(constraints), adaptive_options)
+    }
+}
+
+impl<T: FloatingPoint + SpadeNum> Tessellation<AdvancingFrontOptions<T>> for TrimmedSurface<T> {
+    type Output = anyhow::Result<SurfaceTessellation3D<T>>;
+
+    fn tessellate(&self, options: AdvancingFrontOptions<T>) -> Self::Output {
+        super::advancing_front::AdvancingFrontMesher::new(self, options).mesh()
+    }
+}
+
+impl<T: FloatingPoint + SpadeNum> ConstrainedTessellation<AdvancingFrontOptions<T>>
+    for TrimmedSurface<T>
+{
+    type Constraint = TrimmedSurfaceConstraints<T>;
+    type Output = anyhow::Result<SurfaceTessellation3D<T>>;
+
+    fn constrained_tessellate(
+        &self,
+        constraints: Self::Constraint,
+        options: AdvancingFrontOptions<T>,
+    ) -> Self::Output {
+        super::advancing_front::AdvancingFrontMesher::new(self, options)
+            .mesh_with_constraints(Some(constraints))
     }
 }
 
