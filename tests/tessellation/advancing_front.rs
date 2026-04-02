@@ -379,26 +379,18 @@ fn test_advancing_front_shared_edge_vertices_match() {
     // For face_b, the shared edge is span index 3 (u=0, v varies from 1 to 0).
     // Since both are polylines with knots_domain (0,1), we parameterize within each span.
     let n_shared = 6;
-    let shared_params: Vec<f64> = (0..=n_shared)
-        .map(|i| i as f64 / n_shared as f64)
-        .collect();
+    let shared_params: Vec<f64> = (0..=n_shared).map(|i| i as f64 / n_shared as f64).collect();
 
     // For face_a: exterior has 4 spans [bottom, right, top, left]
     // Shared edge = span 1 (right edge, u=1, v: 0→1), param 0→1
     // Other spans use None (adaptive)
-    let constraints_a = TrimmedSurfaceConstraints::new(
-        Some(shared_params.clone()),
-        vec![],
-    );
+    let constraints_a = TrimmedSurfaceConstraints::new(Some(shared_params.clone()), vec![]);
 
     // For face_b: shared edge = span 3 (left edge, u=0, v: 1→0), param 0→1
     // The left edge goes from (0,1) to (0,0), so reversed v direction.
     // We need the same 3D points, so reverse the parameter order.
     let shared_params_reversed: Vec<f64> = shared_params.iter().rev().cloned().collect();
-    let constraints_b = TrimmedSurfaceConstraints::new(
-        Some(shared_params_reversed),
-        vec![],
-    );
+    let constraints_b = TrimmedSurfaceConstraints::new(Some(shared_params_reversed), vec![]);
 
     let opts = AdvancingFrontOptions::<f64>::default().with_tolerance(0.1);
 

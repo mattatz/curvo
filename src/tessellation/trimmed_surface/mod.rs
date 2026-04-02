@@ -6,8 +6,8 @@ use std::collections::HashMap;
 
 use super::adaptive_tessellation_node::AdaptiveTessellationNode;
 use super::adaptive_tessellation_option::AdaptiveTessellationOptions;
-use super::surface_tessellation::SurfaceTessellation;
 use super::advancing_front::AdvancingFrontOptions;
+use super::surface_tessellation::SurfaceTessellation;
 use super::{ConstrainedTessellation, DividableDirection, Tessellation};
 use itertools::Itertools;
 use nalgebra::{ComplexField, Point2, Point3, Vector3};

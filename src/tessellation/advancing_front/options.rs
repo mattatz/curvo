@@ -42,5 +42,4 @@ impl<T: FloatingPoint> AdvancingFrontOptions<T> {
         self.max_edge_length = len;
         self
     }
-
 }

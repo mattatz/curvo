@@ -3,8 +3,8 @@ use nalgebra::{Point3, Vector3, U3, U4};
 use crate::{
     misc::FloatingPoint,
     prelude::{
-        AdaptiveTessellationNode, AdaptiveTessellationOptions, DividableDirection,
-        NurbsSurface3D, SurfaceTessellation3D, Tessellation,
+        AdaptiveTessellationNode, AdaptiveTessellationOptions, DividableDirection, NurbsSurface3D,
+        SurfaceTessellation3D, Tessellation,
     },
     region::CompoundCurve,
     surface::TrimmedSurface,
