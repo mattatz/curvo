@@ -9,6 +9,10 @@ use crate::tessellation::DefaultDivider;
 pub struct AdaptiveTessellationOptions<T = f64, D = U4, F = DefaultDivider<T, D>> {
     /// Tolerance for the normal vector: if the L2 norm of the normal vectors is below this value, the edge is considered flat
     pub norm_tolerance: T,
+    /// Maximum allowed 3D edge length. Subdivides when any edge exceeds this length.
+    pub max_edge_length: Option<T>,
+    /// Minimum allowed 3D edge length. Stops subdivision when edges are shorter than this.
+    pub min_edge_length: Option<T>,
     /// Minimum number of divisions in u direction
     pub min_divs_u: usize,
     /// Minimum number of divisions in v direction
@@ -27,6 +31,8 @@ impl<T: RealField, D, F> Default for AdaptiveTessellationOptions<T, D, F> {
         Self {
             // This value is compared as tolerance² against norm_squared in should_divide().
             norm_tolerance: T::from_f64(1.58e-1).unwrap(),
+            max_edge_length: None,
+            min_edge_length: None,
             min_divs_u: 1,
             min_divs_v: 1,
             min_depth: 0,
@@ -41,6 +47,18 @@ impl<T: RealField, D, F> AdaptiveTessellationOptions<T, D, F> {
     /// Set the tolerance for the normal vector
     pub fn with_norm_tolerance(mut self, norm_tolerance: T) -> Self {
         self.norm_tolerance = norm_tolerance;
+        self
+    }
+
+    /// Set the maximum allowed 3D edge length
+    pub fn with_max_edge_length(mut self, max_edge_length: T) -> Self {
+        self.max_edge_length = Some(max_edge_length);
+        self
+    }
+
+    /// Set the minimum allowed 3D edge length
+    pub fn with_min_edge_length(mut self, min_edge_length: T) -> Self {
+        self.min_edge_length = Some(min_edge_length);
         self
     }
 

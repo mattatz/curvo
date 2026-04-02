@@ -71,11 +71,31 @@ where
         } else if current_depth >= options.max_depth {
             None
         } else {
-            options
+            // Check min_edge_length: stop subdivision if edges are already short enough
+            if let Some(ref min_edge_length) = options.min_edge_length {
+                let edge = node.max_edge_length();
+                if edge < *min_edge_length {
+                    return;
+                }
+            }
+
+            // Normal-based criterion
+            let normal_criterion = options
                 .divider
                 .and_then(|f| f(node))
-                .or(node.should_divide(options.norm_tolerance))
-            // node.should_divide(options.norm_tolerance).or(options.divider.and_then(|f| f(node)))
+                .or(node.should_divide(options.norm_tolerance));
+
+            // Edge length criterion: subdivide if any edge exceeds max_edge_length
+            let edge_criterion = options.max_edge_length.as_ref().and_then(|max_len| {
+                let edge = node.max_edge_length();
+                if edge > *max_len {
+                    Some(DividableDirection::Both)
+                } else {
+                    None
+                }
+            });
+
+            normal_criterion.or(edge_criterion)
         };
 
         // set the divided direction of the node

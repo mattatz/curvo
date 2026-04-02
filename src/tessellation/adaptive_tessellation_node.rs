@@ -224,6 +224,20 @@ where
 
     /// Check if the node should be divided
     /// if the norm of the adjacent normals is greater than the normal_tolerance, the node should be divided
+    /// Compute the maximum 3D edge length among the four edges of this node.
+    pub fn max_edge_length(&self) -> T {
+        let edges = [
+            (self.corners[0].point(), self.corners[1].point()), // bottom
+            (self.corners[1].point(), self.corners[2].point()), // right
+            (self.corners[2].point(), self.corners[3].point()), // top
+            (self.corners[3].point(), self.corners[0].point()), // left
+        ];
+        edges
+            .iter()
+            .map(|(a, b)| (*a - *b).norm())
+            .fold(T::zero(), |acc, x| if x > acc { x } else { acc })
+    }
+
     pub fn should_divide(&mut self, normal_tolerance: T) -> Option<DividableDirection> {
         if self.has_bad_normals() {
             self.fix_normals();

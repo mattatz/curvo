@@ -4,6 +4,7 @@ use spade::{ConstrainedDelaunayTriangulation, SpadeNum, Triangulation};
 
 use crate::misc::FloatingPoint;
 use crate::prelude::SurfaceTessellation3D;
+use crate::prelude::TrimmedSurfaceConstraints;
 use crate::region::CompoundCurve2D;
 use crate::tessellation::surface_metric::{curvature_to_edge_length, SurfaceMetric};
 use crate::tessellation::trimmed_surface::trimmed_surface_ext::TrimmedSurfaceExt;
@@ -49,19 +50,60 @@ where
     }
 
     /// Run the mesher and return the tessellation result.
-    pub fn mesh(mut self) -> anyhow::Result<SurfaceTessellation3D<T>> {
-        // Step 1: Discretize boundary curves with curvature-adaptive sampling
-        let exterior_pts = self
-            .surface
-            .exterior()
-            .map(|curve| self.discretize_boundary(curve))
-            .transpose()?;
-        let interior_pts: Vec<Vec<usize>> = self
-            .surface
-            .interiors()
-            .iter()
-            .map(|curve| self.discretize_boundary(curve))
-            .collect::<anyhow::Result<Vec<_>>>()?;
+    pub fn mesh(self) -> anyhow::Result<SurfaceTessellation3D<T>> {
+        self.mesh_with_constraints(None)
+    }
+
+    /// Run the mesher with optional boundary constraints and return the tessellation result.
+    pub fn mesh_with_constraints(
+        mut self,
+        constraints: Option<TrimmedSurfaceConstraints<T>>,
+    ) -> anyhow::Result<SurfaceTessellation3D<T>> {
+        // Step 1: Discretize boundary curves
+        let (exterior_pts, interior_pts) = match constraints {
+            Some(ref constraints) => {
+                anyhow::ensure!(
+                    constraints.interiors().len() == self.surface.interiors().len(),
+                    "The number of interior constraints must match the number of trimming curves"
+                );
+                let exterior_pts = match self.surface.exterior() {
+                    Some(curve) => match constraints.exterior() {
+                        Some(params) => Some(self.discretize_boundary_constrained(curve, params)),
+                        None => Some(self.discretize_boundary(curve)?),
+                    },
+                    None => None,
+                };
+                let interior_pts: Vec<Vec<usize>> = self
+                    .surface
+                    .interiors()
+                    .iter()
+                    .zip(constraints.interiors())
+                    .map(|(curve, constraint)| match constraint {
+                        Some(params) => Ok(self.discretize_boundary_constrained(curve, params)),
+                        None => self.discretize_boundary(curve),
+                    })
+                    .collect::<anyhow::Result<Vec<_>>>()?;
+                (exterior_pts, interior_pts)
+            }
+            None => {
+                let exterior_pts = match self.surface.exterior() {
+                    Some(curve) => Some(self.discretize_boundary(curve)?),
+                    None => {
+                        // No exterior boundary: generate UV domain rectangle as boundary.
+                        // This is needed for untrimmed NURBS surfaces to provide CDT
+                        // boundary constraints and prevent artifacts at seams/poles.
+                        Some(self.generate_domain_boundary())
+                    }
+                };
+                let interior_pts: Vec<Vec<usize>> = self
+                    .surface
+                    .interiors()
+                    .iter()
+                    .map(|curve| self.discretize_boundary(curve))
+                    .collect::<anyhow::Result<Vec<_>>>()?;
+                (exterior_pts, interior_pts)
+            }
+        };
 
         // Step 2: Build CDT from boundary points as initial triangulation
         let mut cdt = ConstrainedDelaunayTriangulation::<Vertex<T>>::default();
@@ -111,6 +153,85 @@ where
         ))
     }
 
+    /// Generate boundary points from the UV domain rectangle.
+    /// Used for untrimmed NURBS surfaces that have no explicit trim boundary.
+    /// Each edge is adaptively subdivided using the same chord-height criterion
+    /// as trim curve discretization, ensuring density matches surface curvature.
+    fn generate_domain_boundary(&mut self) -> Vec<usize> {
+        let ((u_min, u_max), (v_min, v_max)) = self.surface.knots_domain();
+
+        let mut indices = Vec::new();
+
+        // Four edges of the UV domain rectangle, each defined by
+        // (start_uv, end_uv) traversed counter-clockwise.
+        let edges: [(Vector2<T>, Vector2<T>); 4] = [
+            (Vector2::new(u_min, v_min), Vector2::new(u_max, v_min)), // bottom
+            (Vector2::new(u_max, v_min), Vector2::new(u_max, v_max)), // right
+            (Vector2::new(u_max, v_max), Vector2::new(u_min, v_max)), // top
+            (Vector2::new(u_min, v_max), Vector2::new(u_min, v_min)), // left
+        ];
+
+        for (edge_idx, (uv_start, uv_end)) in edges.iter().enumerate() {
+            let pts = self.adaptive_discretize_edge(*uv_start, *uv_end, 0);
+            for (j, uv) in pts.into_iter().enumerate() {
+                // Skip first point of subsequent edges (shared with previous edge's last point)
+                if edge_idx > 0 && j == 0 {
+                    continue;
+                }
+                let idx = self.add_surface_vertex(uv);
+                indices.push(idx);
+            }
+        }
+
+        // Remove last point if it matches first (closing the loop)
+        if indices.len() > 1 {
+            let eps = T::from_f64(1e-8).unwrap();
+            let first_uv = self.uvs[indices[0]];
+            let last_uv = self.uvs[*indices.last().unwrap()];
+            if (first_uv - last_uv).norm() < eps {
+                indices.pop();
+            }
+        }
+
+        indices
+    }
+
+    /// Adaptively discretize a straight UV-space edge using chord-height criterion
+    /// on the 3D surface. Subdivides where the surface deviates from linear interpolation
+    /// or where the 3D edge length exceeds the maximum.
+    fn adaptive_discretize_edge(
+        &self,
+        uv_start: Vector2<T>,
+        uv_end: Vector2<T>,
+        depth: usize,
+    ) -> Vec<Vector2<T>> {
+        let max_depth = 10;
+        let half = T::from_f64(0.5).unwrap();
+
+        let uv_mid = (uv_start + uv_end) * half;
+
+        let p_start = self.surface.point_at(uv_start.x, uv_start.y);
+        let p_end = self.surface.point_at(uv_end.x, uv_end.y);
+        let p_mid = self.surface.point_at(uv_mid.x, uv_mid.y);
+
+        let linear_mid = (p_start.coords + p_end.coords) * half;
+        let deviation = (p_mid.coords - linear_mid).norm();
+        let edge_len = (p_end - p_start).norm();
+
+        let needs_split = depth < max_depth
+            && (deviation > self.options.tolerance || edge_len > self.options.max_edge_length);
+
+        if needs_split {
+            let mut left = self.adaptive_discretize_edge(uv_start, uv_mid, depth + 1);
+            let right = self.adaptive_discretize_edge(uv_mid, uv_end, depth + 1);
+            left.pop(); // remove duplicate midpoint
+            left.extend(right);
+            left
+        } else {
+            vec![uv_start, uv_end]
+        }
+    }
+
     /// Discretize a boundary curve with curvature-adaptive sampling.
     fn discretize_boundary(&mut self, curve: &CompoundCurve2D<T>) -> anyhow::Result<Vec<usize>> {
         let mut indices = Vec::new();
@@ -142,6 +263,34 @@ where
         Ok(indices)
     }
 
+    /// Discretize a boundary curve using fixed constraint parameters.
+    /// Only vertices at the specified parameter values are placed on the boundary.
+    fn discretize_boundary_constrained(
+        &mut self,
+        curve: &CompoundCurve2D<T>,
+        parameters: &[T],
+    ) -> Vec<usize> {
+        let eps = T::from_f64(1e-8).unwrap();
+        let mut indices: Vec<usize> = parameters
+            .iter()
+            .map(|t| {
+                let uv = curve.point_at(*t);
+                self.add_surface_vertex(uv.coords)
+            })
+            .collect();
+
+        // Close the boundary: skip last if it matches first
+        if indices.len() > 1 {
+            let first_uv = self.uvs[indices[0]];
+            let last_uv = self.uvs[*indices.last().unwrap()];
+            if (first_uv - last_uv).norm() < eps {
+                indices.pop();
+            }
+        }
+
+        indices
+    }
+
     /// Adaptively discretize a 2D curve on the surface using chord-height criterion.
     fn adaptive_discretize_curve(
         &self,
@@ -171,7 +320,7 @@ where
         let edge_len = (p_end - p_start).norm();
 
         let needs_split = depth < max_depth
-            && (deviation > self.options.deflection || edge_len > self.options.max_edge_length);
+            && (deviation > self.options.tolerance || edge_len > self.options.max_edge_length);
 
         if needs_split {
             let mut left = self.adaptive_discretize_curve(curve, t_start, t_mid, depth + 1);
@@ -325,7 +474,7 @@ where
         };
 
         let k_max = k_u.max(k_v);
-        let target = curvature_to_edge_length(k_max, self.options.deflection);
+        let target = curvature_to_edge_length(k_max, self.options.tolerance);
         target
             .max(self.options.min_edge_length)
             .min(self.options.max_edge_length)
