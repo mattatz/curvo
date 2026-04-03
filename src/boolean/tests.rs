@@ -5,7 +5,7 @@ use nalgebra::{Point2, Vector2, U3};
 use crate::{
     curve::NurbsCurve2D,
     prelude::CurveIntersectionSolverOptions,
-    region::{CompoundCurve, CompoundCurve2D, Region},
+    region::{CompoundCurve, Region},
 };
 
 use super::Boolean;
@@ -86,23 +86,23 @@ fn test_circle_x_rectangle() {
     let regions = union.into_regions();
     assert_eq!(regions.len(), 1);
     let region = regions.first().unwrap();
-    assert_eq!(&region.exterior().spans()[0], &subject);
+    assert_eq!(region.exterior().spans()[0].curve(), &subject);
     assert_eq!(region.interiors().len(), 0);
 
     let intersection = subject.intersection(&clip, Some(OPTIONS)).unwrap();
     let regions = intersection.into_regions();
     assert_eq!(regions.len(), 1);
     let region = regions.first().unwrap();
-    assert_eq!(&region.exterior().spans()[0], &clip);
+    assert_eq!(region.exterior().spans()[0].curve(), &clip);
     assert_eq!(region.interiors().len(), 0);
 
     let diff = subject.difference(&clip, Some(OPTIONS)).unwrap();
     let regions = diff.into_regions();
     assert_eq!(regions.len(), 1);
     let region = regions.first().unwrap();
-    assert_eq!(&region.exterior().spans()[0], &subject);
+    assert_eq!(region.exterior().spans()[0].curve(), &subject);
     assert_eq!(region.interiors().len(), 1);
-    assert_eq!(&region.interiors()[0].spans()[0], &clip);
+    assert_eq!(region.interiors()[0].spans()[0].curve(), &clip);
 }
 
 /// Test boolean operations between a compound circle (CompoundCurve) and a rectangle
@@ -122,7 +122,7 @@ fn test_compound_circle_x_rectangle() {
     let regions = intersection.into_regions();
     assert_eq!(regions.len(), 1);
     let region = regions.first().unwrap();
-    assert_eq!(&region.exterior().spans()[0], &clip);
+    assert_eq!(region.exterior().spans()[0].curve(), &clip);
     assert_eq!(region.interiors().len(), 0);
 
     let diff = subject.difference(&clip, Some(OPTIONS)).unwrap();
@@ -131,7 +131,7 @@ fn test_compound_circle_x_rectangle() {
     let region = regions.first().unwrap();
     assert_eq!(region.exterior(), &subject);
     assert_eq!(region.interiors().len(), 1);
-    assert_eq!(&region.interiors()[0].spans()[0], &clip);
+    assert_eq!(region.interiors()[0].spans()[0].curve(), &clip);
 }
 
 /// Test boolean operations between a rectangular annulus (Region) and a rectangle
@@ -151,7 +151,7 @@ fn test_rectangular_annulus_x_rectangle() {
     let regions = intersection.into_regions();
     assert_eq!(regions.len(), 1);
     let region = regions.first().unwrap();
-    assert_eq!(&region.exterior().spans()[0], &clip);
+    assert_eq!(region.exterior().spans()[0].curve(), &clip);
     assert_eq!(region.interiors().len(), 1);
     assert_eq!(region.interiors(), subject.interiors());
 
@@ -161,7 +161,7 @@ fn test_rectangular_annulus_x_rectangle() {
     let region = regions.first().unwrap();
     assert_eq!(region.exterior(), subject.exterior());
     assert_eq!(region.interiors().len(), 1);
-    assert_eq!(&region.interiors()[0].spans()[0], &clip);
+    assert_eq!(region.interiors()[0].spans()[0].curve(), &clip);
 }
 
 #[test]

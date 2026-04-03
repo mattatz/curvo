@@ -88,11 +88,11 @@ where
                     }
                     Corner::Curve(corner) => o
                         .into_iter()
-                        .flat_map(|c| c.into_spans())
+                        .flat_map(|c| c.into_nurbs_spans())
                         .chain(vec![corner.clone()])
                         .collect_vec(),
                 },
-                (_, None) => o.into_iter().flat_map(|c| c.into_spans()).collect_vec(),
+                (_, None) => o.into_iter().flat_map(|c| c.into_nurbs_spans()).collect_vec(),
             }
         });
 

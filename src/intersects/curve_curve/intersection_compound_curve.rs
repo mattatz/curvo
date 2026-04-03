@@ -89,7 +89,7 @@ where
         let res: anyhow::Result<Vec<_>> = other
             .spans()
             .iter()
-            .map(|span| self.find_intersection(span, options.clone()))
+            .map(|span| self.find_intersection(span.curve(), options.clone()))
             .collect();
 
         Ok(res?.into_iter().flatten().collect())

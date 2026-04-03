@@ -24,7 +24,7 @@ impl<T: FloatingPoint + ArgminFloat> Contains<CompoundCurve<T, Const<3>>>
         let all = other
             .spans()
             .iter()
-            .map(|span| self.contains(span, option.clone()))
+            .map(|span| self.contains(span.curve(), option.clone()))
             .collect::<anyhow::Result<Vec<_>>>()?;
         Ok(all.iter().all(|it| *it))
     }
