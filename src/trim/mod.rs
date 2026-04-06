@@ -92,10 +92,10 @@ where
                     (false, false) => {
                         let contains = range.contains(&d0);
                         match (inside, contains) {
-                            (true, true) => Ok(vec![curve.clone()]),
+                            (true, true) => Ok(vec![curve.curve().clone()]),
                             (true, false) => Ok(vec![]),
                             (false, true) => Ok(vec![]),
-                            (false, false) => Ok(vec![curve.clone()]),
+                            (false, false) => Ok(vec![curve.curve().clone()]),
                         }
                     }
                 }

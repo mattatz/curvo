@@ -256,7 +256,7 @@ where
         .iter()
         .flat_map(|c| {
             if c.degree() > 1 {
-                vec![CompoundSegment::Curve(c.clone())]
+                vec![CompoundSegment::Curve(c.curve().clone())]
             } else {
                 let segments = decompose_into_segments(c);
                 segments
