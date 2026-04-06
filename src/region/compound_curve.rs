@@ -8,19 +8,22 @@ use nalgebra::{
 };
 
 use crate::{
-    curve::NurbsCurve,
+    curve::{NurbsCurve, TrimmedCurve},
     misc::{FloatingPoint, Invertible, Transformable},
 };
 
 use super::curve_direction::CurveDirection;
 
 /// A struct representing a compound curve.
+/// Each span is a `TrimmedCurve` that stores a full NURBS curve plus
+/// an active parameter domain. This allows representing sub-intervals
+/// of a shared underlying curve without splitting.
 #[derive(Clone, Debug, PartialEq)]
 pub struct CompoundCurve<T: FloatingPoint, D: DimName>
 where
     DefaultAllocator: Allocator<D>,
 {
-    spans: Vec<NurbsCurve<T, D>>,
+    spans: Vec<TrimmedCurve<T, D>>,
 }
 
 /// 2D compound curve alias
@@ -32,18 +35,21 @@ impl<T: FloatingPoint, D: DimName> CompoundCurve<T, D>
 where
     DefaultAllocator: Allocator<D>,
 {
-    /// Create a new compound curve from a list of spans without checking if the spans are connected.
+    /// Create from a list of NurbsCurve spans (each becomes a full-domain TrimmedCurve).
     pub fn new_unchecked(spans: Vec<NurbsCurve<T, D>>) -> Self {
+        Self {
+            spans: spans.into_iter().map(TrimmedCurve::from_curve).collect(),
+        }
+    }
+
+    /// Create from a list of TrimmedCurve spans directly.
+    pub fn new_unchecked_trimmed(spans: Vec<TrimmedCurve<T, D>>) -> Self {
         Self { spans }
     }
 
-    /// Create a new compound curve from a list of spans without checking if the spans are connected.
-    /// The knot vectors of the spans are aligned to the first span's knot vector.
+    /// Create from NurbsCurve spans with aligned knot vectors.
     pub fn new_unchecked_aligned(spans: Vec<NurbsCurve<T, D>>) -> Self {
-        // Align knot vectors
-        // The first knot vector starts at 0, the rest are aligned to the previous knot vector
         let mut knot_offset = T::zero();
-
         let mut spans = spans;
         spans.iter_mut().for_each(|curve| {
             let start = curve.knots().first();
@@ -52,21 +58,18 @@ where
             });
             knot_offset = curve.knots().last();
         });
-
-        Self { spans }
+        Self {
+            spans: spans.into_iter().map(TrimmedCurve::from_curve).collect(),
+        }
     }
 
-    /// Create a new compound curve from a list of spans.
-    /// The spans must be connected.
+    /// Create from NurbsCurve spans, checking connectivity.
     pub fn try_new(spans: Vec<NurbsCurve<T, D>>) -> anyhow::Result<Self>
     where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
-        // epsilon for determining the connected points
         let epsilon = T::from_f64(1e-4).unwrap();
-
-        // Ensure the adjacent spans are connected in the forward direction.
         let mut curves = spans.clone();
         let mut connected = vec![curves.remove(0)];
 
@@ -80,15 +83,9 @@ where
                 Some((index, direction)) => {
                     let next = curves.remove(index);
                     match direction {
-                        CurveDirection::Forward => {
-                            connected.push(next);
-                        }
-                        CurveDirection::Backward => {
-                            connected.insert(current, next);
-                        }
-                        CurveDirection::Facing => {
-                            connected.push(next.inverse());
-                        }
+                        CurveDirection::Forward => connected.push(next),
+                        CurveDirection::Backward => connected.insert(current, next),
+                        CurveDirection::Facing => connected.push(next.inverse()),
                         CurveDirection::Opposite => {
                             if current == 0 {
                                 connected.insert(current, next.inverse());
@@ -103,38 +100,44 @@ where
                 }
             }
         }
-
         Ok(Self::new_unchecked_aligned(connected))
     }
 
-    pub fn spans(&self) -> &[NurbsCurve<T, D>] {
+    /// Get spans as a slice. Each span is a TrimmedCurve that derefs to NurbsCurve.
+    pub fn spans(&self) -> &[TrimmedCurve<T, D>] {
         &self.spans
     }
 
-    pub fn spans_mut(&mut self) -> &mut [NurbsCurve<T, D>] {
+    /// Get mutable spans.
+    pub fn spans_mut(&mut self) -> &mut [TrimmedCurve<T, D>] {
         &mut self.spans
     }
 
-    /// Convert the compound curve into a vector of spans.
-    pub fn into_spans(self) -> Vec<NurbsCurve<T, D>> {
+    /// Convert into TrimmedCurves.
+    pub fn into_spans(self) -> Vec<TrimmedCurve<T, D>> {
         self.spans
     }
 
-    /// Get the domain of the compound curve
+    /// Convert into underlying NurbsCurves (drops domain info).
+    pub fn into_nurbs_spans(self) -> Vec<NurbsCurve<T, D>> {
+        self.spans.into_iter().map(|tc| tc.into_curve()).collect()
+    }
+
+    /// Get the domain of the compound curve.
     pub fn knots_domain(&self) -> (T, T) {
-        let knots = self.spans.iter().map(|span| span.knots_domain());
+        let knots = self.spans.iter().map(|span| span.domain());
         knots.reduce(|a, b| (a.0.min(b.0), a.1.max(b.1))).unwrap()
     }
 
     /// Find the index of the span containing the parameter t.
     pub fn find_span_index(&self, t: T) -> usize {
         let index = self.spans.iter().find_position(|span| {
-            let (d0, d1) = span.knots_domain();
+            let (d0, d1) = span.domain();
             (d0..=d1).contains(&t)
         });
         if let Some((index, _)) = index {
             index
-        } else if t < self.spans[0].knots_domain().0 {
+        } else if t < self.spans[0].domain().0 {
             0
         } else {
             self.spans.len() - 1
@@ -148,7 +151,7 @@ where
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
         let index = self.find_span_index(t);
-        &self.spans[index]
+        self.spans[index].curve()
     }
 
     /// Evaluate the curve containing the parameter t at the given parameter t.
@@ -316,7 +319,7 @@ where
 {
     fn from_iter<I: IntoIterator<Item = NurbsCurve<T, D>>>(iter: I) -> Self {
         Self {
-            spans: iter.into_iter().collect(),
+            spans: iter.into_iter().map(TrimmedCurve::from_curve).collect(),
         }
     }
 }

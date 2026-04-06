@@ -1,6 +1,6 @@
 use nalgebra::{allocator::Allocator, DefaultAllocator, DimName};
 
-use crate::{misc::FloatingPoint, region::CompoundCurve};
+use crate::{curve::TrimmedCurve, misc::FloatingPoint, region::CompoundCurve};
 
 use super::Split;
 
@@ -52,15 +52,23 @@ where
         Ok((
             if li <= T::default_epsilon() {
                 anyhow::ensure!(!left.is_empty(), "left is empty");
-                Self::new_unchecked(left)
+                Self::new_unchecked_trimmed(left)
             } else {
-                Self::new_unchecked(left.into_iter().chain(vec![l]).collect())
+                let spans = left
+                    .into_iter()
+                    .chain(vec![TrimmedCurve::from_curve(l)])
+                    .collect();
+                Self::new_unchecked_trimmed(spans)
             },
             if ri <= T::default_epsilon() {
                 anyhow::ensure!(!right.is_empty(), "right is empty");
-                Self::new_unchecked(right)
+                Self::new_unchecked_trimmed(right)
             } else {
-                Self::new_unchecked(vec![r].into_iter().chain(right).collect())
+                let spans = vec![TrimmedCurve::from_curve(r)]
+                    .into_iter()
+                    .chain(right)
+                    .collect();
+                Self::new_unchecked_trimmed(spans)
             },
         ))
     }
