@@ -92,7 +92,10 @@ where
                         .chain(vec![corner.clone()])
                         .collect_vec(),
                 },
-                (_, None) => o.into_iter().flat_map(|c| c.into_nurbs_spans()).collect_vec(),
+                (_, None) => o
+                    .into_iter()
+                    .flat_map(|c| c.into_nurbs_spans())
+                    .collect_vec(),
             }
         });
 
