@@ -107,6 +107,7 @@ pub mod prelude {
         boundary_constraints::BoundaryConstraints,
         surface_tessellation::*,
         tangent_space::TangentSpace,
+        tessellation_curve::AdaptiveCurveTessellationOptions,
         trimmed_surface::trimmed_surface_adaptive_tessellate,
         trimmed_surface::trimmed_surface_ext::TrimmedSurfaceExt,
         trimmed_surface::TrimmedSurfaceConstrainedTriangulation,
