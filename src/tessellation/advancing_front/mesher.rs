@@ -219,7 +219,8 @@ where
         let edge_len = (p_end - p_start).norm();
 
         let needs_split = depth < max_depth
-            && (deviation > self.options.chord_height_tolerance || edge_len > self.options.max_edge_length);
+            && (deviation > self.options.chord_height_tolerance
+                || edge_len > self.options.max_edge_length);
 
         if needs_split {
             let mut left = self.adaptive_discretize_edge(uv_start, uv_mid, depth + 1);
@@ -320,7 +321,8 @@ where
         let edge_len = (p_end - p_start).norm();
 
         let needs_split = depth < max_depth
-            && (deviation > self.options.chord_height_tolerance || edge_len > self.options.max_edge_length);
+            && (deviation > self.options.chord_height_tolerance
+                || edge_len > self.options.max_edge_length);
 
         if needs_split {
             let mut left = self.adaptive_discretize_curve(curve, t_start, t_mid, depth + 1);
