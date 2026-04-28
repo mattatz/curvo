@@ -1,6 +1,6 @@
 use super::DividableDirection;
 use itertools::Itertools;
-use nalgebra::U4;
+use nalgebra::{Vector2, U4};
 use spade::{ConstrainedDelaunayTriangulation, SpadeNum, Triangulation};
 
 use crate::misc::FloatingPoint;
@@ -120,7 +120,63 @@ impl<T: FloatingPoint + SpadeNum> TrimmedSurfaceConstrainedTriangulation<T> {
             .map(|((p, n), uv)| Vertex::new(p, n, uv))
             .collect_vec();
 
+        // Collect uv-space boundary segments from the (already tessellated) constraints
+        // so we can drop interior steiner points that would land on a boundary edge and
+        // cause spade to split the constraint edge — that split breaks the shared-edge
+        // alignment between adjacent faces.
+        let boundary_segments: Vec<(Vector2<T>, Vector2<T>)> = {
+            let mut segs = Vec::new();
+            let push_loop = |segs: &mut Vec<(Vector2<T>, Vector2<T>)>, verts: &[Vertex<T>]| {
+                if verts.len() < 2 {
+                    return;
+                }
+                for w in verts.windows(2) {
+                    segs.push((w[0].uv(), w[1].uv()));
+                }
+                // close the loop only if it isn't already closed
+                let first = verts.first().unwrap().uv();
+                let last = verts.last().unwrap().uv();
+                if (first - last).norm() > T::from_f64(1e-8).unwrap() {
+                    segs.push((last, first));
+                }
+            };
+            if let Some(ext) = exterior.as_ref() {
+                push_loop(&mut segs, ext);
+            }
+            for inter in interiors.iter() {
+                push_loop(&mut segs, inter);
+            }
+            segs
+        };
+
+        let on_boundary_edge = |uv: Vector2<T>| -> bool {
+            // Distance from uv to segment (a, b) in uv-space; reject if smaller than eps
+            // AND the projection lies inside the segment.
+            let eps = T::from_f64(1e-6).unwrap();
+            let eps_sq = eps * eps;
+            for (a, b) in boundary_segments.iter() {
+                let ab = *b - *a;
+                let len_sq = ab.norm_squared();
+                if len_sq < T::from_f64(1e-20).unwrap() {
+                    continue;
+                }
+                let ap = uv - *a;
+                let t_param = ap.dot(&ab) / len_sq;
+                if t_param < T::zero() || t_param > T::one() {
+                    continue;
+                }
+                let proj = *a + ab * t_param;
+                if (uv - proj).norm_squared() < eps_sq {
+                    return true;
+                }
+            }
+            false
+        };
+
         surface_division.iter().for_each(|v| {
+            if on_boundary_edge(v.uv()) {
+                return;
+            }
             let _ = t.insert(*v);
         });
 
