@@ -85,13 +85,21 @@ where
                 .and_then(|f| f(node))
                 .or(node.should_divide(options.norm_tolerance));
 
-            // Edge length criterion: subdivide if any edge exceeds max_edge_length
+            // Edge length criterion: subdivide if any edge exceeds max_edge_length.
+            // Mirror the constraint logic from `should_divide`: a direction is locked
+            // when any corner is constrained on that direction, so subdivision must not
+            // introduce new vertices on that boundary.
             let edge_criterion = options.max_edge_length.as_ref().and_then(|max_len| {
-                let edge = node.max_edge_length();
-                if edge > *max_len {
-                    Some(DividableDirection::Both)
-                } else {
-                    None
+                if node.max_edge_length() <= *max_len {
+                    return None;
+                }
+                let v_dir_ok = node.corners.iter().all(|c| !c.is_u_constrained());
+                let u_dir_ok = node.corners.iter().all(|c| !c.is_v_constrained());
+                match (u_dir_ok, v_dir_ok) {
+                    (true, true) => Some(DividableDirection::Both),
+                    (true, false) => Some(DividableDirection::U),
+                    (false, true) => Some(DividableDirection::V),
+                    (false, false) => None,
                 }
             });
 

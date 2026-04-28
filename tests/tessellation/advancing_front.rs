@@ -64,7 +64,7 @@ fn make_trimmed_plane() -> TrimmedSurface<f64> {
 #[test]
 fn test_advancing_front_cylinder() {
     let trimmed = make_trimmed_cylinder(5.0, 10.0);
-    let opts = AdvancingFrontOptions::<f64>::default().with_deflection(0.1);
+    let opts = AdvancingFrontOptions::<f64>::default().with_chord_height_tolerance(0.1);
     let mesher = AdvancingFrontMesher::new(&trimmed, opts);
     let tess = mesher
         .mesh()
@@ -125,7 +125,7 @@ fn test_advancing_front_cylinder() {
 fn test_advancing_front_plane_minimal_subdivision() {
     // A flat plane should produce very few faces since curvature is zero
     let trimmed = make_trimmed_plane();
-    let opts = AdvancingFrontOptions::<f64>::default().with_deflection(0.1);
+    let opts = AdvancingFrontOptions::<f64>::default().with_chord_height_tolerance(0.1);
     let mesher = AdvancingFrontMesher::new(&trimmed, opts);
     let tess = mesher
         .mesh()
@@ -160,12 +160,12 @@ fn test_advancing_front_deflection_controls_density() {
     let trimmed = make_trimmed_cylinder(5.0, 10.0);
 
     // Coarse tessellation
-    let opts_coarse = AdvancingFrontOptions::<f64>::default().with_deflection(0.5);
+    let opts_coarse = AdvancingFrontOptions::<f64>::default().with_chord_height_tolerance(0.5);
     let mesher_coarse = AdvancingFrontMesher::new(&trimmed, opts_coarse);
     let tess_coarse = mesher_coarse.mesh().unwrap();
 
     // Fine tessellation
-    let opts_fine = AdvancingFrontOptions::<f64>::default().with_deflection(0.05);
+    let opts_fine = AdvancingFrontOptions::<f64>::default().with_chord_height_tolerance(0.05);
     let mesher_fine = AdvancingFrontMesher::new(&trimmed, opts_fine);
     let tess_fine = mesher_fine.mesh().unwrap();
 
@@ -208,7 +208,7 @@ fn test_advancing_front_torus() {
     ]);
 
     let trimmed = TrimmedSurface::new(torus, Some(exterior), vec![]);
-    let opts = AdvancingFrontOptions::<f64>::default().with_deflection(0.1);
+    let opts = AdvancingFrontOptions::<f64>::default().with_chord_height_tolerance(0.1);
     let mesher = AdvancingFrontMesher::new(&trimmed, opts);
     let tess = mesher.mesh().expect("Torus tessellation should succeed");
 
@@ -245,7 +245,7 @@ fn test_advancing_front_constrained_tessellation() {
             .unwrap();
     let trimmed = TrimmedSurface::new(surface, Some(exterior.into()), vec![]);
 
-    let opts = AdvancingFrontOptions::<f64>::default().with_deflection(0.1);
+    let opts = AdvancingFrontOptions::<f64>::default().with_chord_height_tolerance(0.1);
 
     // Constrain exterior boundary with evenly spaced parameters
     let n = 20;
@@ -267,7 +267,7 @@ fn test_advancing_front_constrained_tessellation() {
 fn test_advancing_front_tessellation_trait() {
     // Verify that TrimmedSurface implements Tessellation<AdvancingFrontOptions>
     let trimmed = make_trimmed_plane();
-    let opts = AdvancingFrontOptions::<f64>::default().with_deflection(0.1);
+    let opts = AdvancingFrontOptions::<f64>::default().with_chord_height_tolerance(0.1);
 
     let tess: anyhow::Result<SurfaceTessellation3D<f64>> = trimmed.tessellate(opts);
     let tess = tess.expect("Tessellation trait should work with AdvancingFrontOptions");
@@ -318,7 +318,7 @@ fn test_advancing_front_single_face_manifold() {
     // A single trimmed surface should have no non-manifold edges,
     // and all boundary edges should form a closed loop.
     let trimmed = make_trimmed_cylinder(5.0, 10.0);
-    let opts = AdvancingFrontOptions::<f64>::default().with_tolerance(0.1);
+    let opts = AdvancingFrontOptions::<f64>::default().with_chord_height_tolerance(0.1);
     let tess = trimmed.tessellate(opts).unwrap();
 
     let (boundary, non_manifold) = count_edge_types(tess.faces());
@@ -392,7 +392,7 @@ fn test_advancing_front_shared_edge_vertices_match() {
     let shared_params_reversed: Vec<f64> = shared_params.iter().rev().cloned().collect();
     let constraints_b = TrimmedSurfaceConstraints::new(Some(shared_params_reversed), vec![]);
 
-    let opts = AdvancingFrontOptions::<f64>::default().with_tolerance(0.1);
+    let opts = AdvancingFrontOptions::<f64>::default().with_chord_height_tolerance(0.1);
 
     let tess_a = trimmed_a
         .constrained_tessellate(constraints_a, opts.clone())

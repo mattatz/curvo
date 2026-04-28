@@ -197,8 +197,9 @@ where
     }
 
     /// Adaptively discretize a straight UV-space edge using chord-height criterion
-    /// on the 3D surface. Subdivides where the surface deviates from linear interpolation
-    /// or where the 3D edge length exceeds the maximum.
+    /// on the 3D surface. Subdivides where the surface deviates from linear interpolation,
+    /// where the surface normal varies across the segment, or where the 3D edge length
+    /// exceeds the maximum.
     fn adaptive_discretize_edge(
         &self,
         uv_start: Vector2<T>,
@@ -218,8 +219,15 @@ where
         let deviation = (p_mid.coords - linear_mid).norm();
         let edge_len = (p_end - p_start).norm();
 
+        let n_start = self.surface.normal_at(uv_start.x, uv_start.y);
+        let n_mid = self.surface.normal_at(uv_mid.x, uv_mid.y);
+        let n_end = self.surface.normal_at(uv_end.x, uv_end.y);
+        let normal_deviation = ((n_mid - n_start) - (n_end - n_mid)).norm();
+
         let needs_split = depth < max_depth
-            && (deviation > self.options.tolerance || edge_len > self.options.max_edge_length);
+            && (deviation > self.options.chord_height_tolerance
+                || normal_deviation > self.options.norm_tolerance
+                || edge_len > self.options.max_edge_length);
 
         if needs_split {
             let mut left = self.adaptive_discretize_edge(uv_start, uv_mid, depth + 1);
@@ -291,7 +299,14 @@ where
         indices
     }
 
-    /// Adaptively discretize a 2D curve on the surface using chord-height criterion.
+    /// Adaptively discretize a 2D curve on the surface, splitting whenever any
+    /// of the following criteria are exceeded:
+    ///   - chord height (3D distance between mesh midpoint and surface midpoint)
+    ///   - surface normal deviation across the segment (catches curved surfaces)
+    ///   - curve tangent deviation (catches curved boundaries on flat surfaces,
+    ///     e.g. arcs on a plane — `surface.normal_at` is constant there so the
+    ///     surface-normal criterion alone wouldn't fire)
+    ///   - 3D edge length vs max_edge_length
     fn adaptive_discretize_curve(
         &self,
         curve: &crate::curve::NurbsCurve2D<T>,
@@ -302,10 +317,10 @@ where
         let max_depth = 10;
         let half = T::from_f64(0.5).unwrap();
 
-        let uv_start = curve.point_at(t_start);
-        let uv_end = curve.point_at(t_end);
+        let (uv_start, dt_start) = curve.point_tangent_at(t_start);
+        let (uv_end, dt_end) = curve.point_tangent_at(t_end);
         let t_mid = t_start + (t_end - t_start) * half;
-        let uv_mid = curve.point_at(t_mid);
+        let (uv_mid, dt_mid) = curve.point_tangent_at(t_mid);
 
         // 3D positions
         let p_start = self.surface.point_at(uv_start.x, uv_start.y);
@@ -316,11 +331,26 @@ where
         let linear_mid = (p_start.coords + p_end.coords) * half;
         let deviation = (p_mid.coords - linear_mid).norm();
 
+        // Surface normal deviation across the segment (drives finer sampling
+        // on highly curved surfaces; zero for planar base surfaces).
+        let n_start = self.surface.normal_at(uv_start.x, uv_start.y);
+        let n_mid = self.surface.normal_at(uv_mid.x, uv_mid.y);
+        let n_end = self.surface.normal_at(uv_end.x, uv_end.y);
+        let surface_normal_deviation = ((n_mid - n_start) - (n_end - n_mid)).norm();
+
+        // Curve tangent deviation in uv-space — captures the boundary curve's
+        // own curvature even when the underlying surface is flat (e.g. an arc
+        // on a plane).
+        let curve_tangent_deviation = ((dt_mid - dt_start) - (dt_end - dt_mid)).norm();
+
         // Also check 3D edge length vs max_edge_length
         let edge_len = (p_end - p_start).norm();
 
         let needs_split = depth < max_depth
-            && (deviation > self.options.tolerance || edge_len > self.options.max_edge_length);
+            && (deviation > self.options.chord_height_tolerance
+                || surface_normal_deviation > self.options.norm_tolerance
+                || curve_tangent_deviation > self.options.norm_tolerance
+                || edge_len > self.options.max_edge_length);
 
         if needs_split {
             let mut left = self.adaptive_discretize_curve(curve, t_start, t_mid, depth + 1);
@@ -474,7 +504,7 @@ where
         };
 
         let k_max = k_u.max(k_v);
-        let target = curvature_to_edge_length(k_max, self.options.tolerance);
+        let target = curvature_to_edge_length(k_max, self.options.chord_height_tolerance);
         target
             .max(self.options.min_edge_length)
             .min(self.options.max_edge_length)

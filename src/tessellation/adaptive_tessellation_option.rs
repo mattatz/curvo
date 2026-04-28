@@ -29,8 +29,10 @@ pub struct AdaptiveTessellationOptions<T = f64, D = U4, F = DefaultDivider<T, D>
 impl<T: RealField, D, F> Default for AdaptiveTessellationOptions<T, D, F> {
     fn default() -> Self {
         Self {
-            // This value is compared as tolerance² against norm_squared in should_divide().
-            norm_tolerance: T::from_f64(1.58e-1).unwrap(),
+            // Compared as tolerance² against norm_squared in should_divide();
+            // 0.025 corresponds to ~1.4° normal-deviation per quad and gives
+            // reasonable mesh density for typical CAD usage.
+            norm_tolerance: T::from_f64(2.5e-2).unwrap(),
             max_edge_length: None,
             min_edge_length: None,
             min_divs_u: 1,
