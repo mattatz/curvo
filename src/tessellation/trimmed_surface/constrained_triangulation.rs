@@ -54,11 +54,9 @@ impl<T: FloatingPoint + SpadeNum> TrimmedSurfaceConstrainedTriangulation<T> {
                                 Vertex::new(p, n, uv.coords)
                             })
                             .collect_vec(),
-                        None => tessellate_uv_compound_curve_adaptive(
-                            curve,
-                            surface,
-                            angle_tolerance,
-                        ),
+                        None => {
+                            tessellate_uv_compound_curve_adaptive(curve, surface, angle_tolerance)
+                        }
                     });
                 let interiors = surface
                     .interiors()
@@ -74,11 +72,9 @@ impl<T: FloatingPoint + SpadeNum> TrimmedSurfaceConstrainedTriangulation<T> {
                                 Vertex::new(p, n, uv.coords)
                             })
                             .collect_vec(),
-                        None => tessellate_uv_compound_curve_adaptive(
-                            curve,
-                            surface,
-                            angle_tolerance,
-                        ),
+                        None => {
+                            tessellate_uv_compound_curve_adaptive(curve, surface, angle_tolerance)
+                        }
                     })
                     .collect_vec();
                 (exterior, interiors)
@@ -92,11 +88,7 @@ impl<T: FloatingPoint + SpadeNum> TrimmedSurfaceConstrainedTriangulation<T> {
                     .interiors()
                     .iter()
                     .map(|curve| {
-                        tessellate_uv_compound_curve_adaptive(
-                            curve,
-                            surface,
-                            angle_tolerance,
-                        )
+                        tessellate_uv_compound_curve_adaptive(curve, surface, angle_tolerance)
                     })
                     .collect_vec();
                 (exterior, interiors)
