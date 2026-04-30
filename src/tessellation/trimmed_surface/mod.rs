@@ -10,7 +10,8 @@ use super::advancing_front::AdvancingFrontOptions;
 use super::surface_tessellation::SurfaceTessellation;
 use super::{ConstrainedTessellation, DividableDirection, Tessellation};
 use itertools::Itertools;
-use nalgebra::{ComplexField, Point2, Point3, Vector3};
+use nalgebra::allocator::Allocator;
+use nalgebra::{ComplexField, DefaultAllocator, DimName, OVector, Point2, Point3, Vector3};
 use nalgebra::{Vector2, U4};
 use spade::{HasPosition, SpadeNum, Triangulation};
 
@@ -219,14 +220,14 @@ where
 fn tessellate_uv_compound_curve_adaptive<T: FloatingPoint, S: TrimmedSurfaceExt<T, F>, F>(
     curve: &CompoundCurve2D<T>,
     surface: &S,
-    tolerance: T,
+    angle_tolerance: T,
 ) -> Vec<Vertex<T>> {
     curve
         .spans()
         .iter()
         .enumerate()
         .flat_map(|(i, span)| {
-            let mut vertices = tessellate_uv_curve_adaptive(span, surface, tolerance);
+            let mut vertices = tessellate_uv_curve_adaptive(span, surface, angle_tolerance);
             if i > 0 {
                 vertices.remove(0); // Skip the first vertex for spans after the first
             }
@@ -239,7 +240,7 @@ fn tessellate_uv_compound_curve_adaptive<T: FloatingPoint, S: TrimmedSurfaceExt<
 fn tessellate_uv_curve_adaptive<T: FloatingPoint, S: TrimmedSurfaceExt<T, F>, F>(
     curve: &NurbsCurve2D<T>,
     surface: &S,
-    tolerance: T,
+    angle_tolerance: T,
 ) -> Vec<Vertex<T>> {
     let degree = curve.degree();
     match degree {
@@ -259,7 +260,7 @@ fn tessellate_uv_curve_adaptive<T: FloatingPoint, S: TrimmedSurfaceExt<T, F>, F>
                         return None;
                     }
                     let evaluated =
-                        iterate_uv_curve_tessellation(curve, surface, start, end, tolerance);
+                        iterate_uv_curve_tessellation(curve, surface, start, end, angle_tolerance);
                     #[allow(clippy::iter_skip_zero)]
                     if i == 1 {
                         Some(evaluated.into_iter().skip(0))
@@ -278,7 +279,7 @@ fn tessellate_uv_curve_adaptive<T: FloatingPoint, S: TrimmedSurfaceExt<T, F>, F>
         }
         _ => {
             let (start, end) = curve.knots_domain();
-            let pts = iterate_uv_curve_tessellation(curve, surface, start, end, tolerance);
+            let pts = iterate_uv_curve_tessellation(curve, surface, start, end, angle_tolerance);
             pts.into_iter()
                 .map(|uv| {
                     let p = surface.point_at(uv.x, uv.y);
@@ -290,12 +291,20 @@ fn tessellate_uv_curve_adaptive<T: FloatingPoint, S: TrimmedSurfaceExt<T, F>, F>
     }
 }
 
+/// Adaptively tessellate a 2D curve in the surface's UV domain.
+///
+/// `angle_tolerance` is in **radians** and bounds the angle traversed in each
+/// half-segment by both:
+///   * the curve's UV-tangent direction (catches curved boundaries on flat
+///     surfaces — the surface-normal criterion below is constant there)
+///   * the surface normal evaluated at the curve sample (catches highly
+///     curved base surfaces)
 fn iterate_uv_curve_tessellation<T: FloatingPoint, S: TrimmedSurfaceExt<T, F>, F>(
     curve: &NurbsCurve2D<T>,
     surface: &S,
     start: T,
     end: T,
-    normal_tolerance: T,
+    angle_tolerance: T,
 ) -> Vec<Point2<T>> {
     let (u_domain, v_domain) = surface.knots_domain();
     let eps = T::default_epsilon();
@@ -317,31 +326,35 @@ fn iterate_uv_curve_tessellation<T: FloatingPoint, S: TrimmedSurfaceExt<T, F>, F
     }
 
     let exact_mid = safe_start + (safe_end - safe_start) * T::from_f64(0.5).unwrap();
-    let (p2, n2) = curve.point_tangent_at(exact_mid);
+    let (_, n2) = curve.point_tangent_at(exact_mid);
     let (p3, n3) = curve.point_tangent_at(safe_end);
 
     let flag = {
         if curve.degree() == 1 {
-            // if the curve is a linear curve, we don't need to tessellate it by normal
+            // Linear curves are straight in UV; their tangent is constant so
+            // there is no angular contribution to detect.
             false
         } else {
-            let diff = n2 - n1;
-            let diff2 = n3 - n2;
-            (diff - diff2).norm() > normal_tolerance
+            // Closed curves have nn1 ≈ nn3, so the half-segment checks via the
+            // midpoint are required to detect them at the top recursion level.
+            let a1 = angle_between(&n1, &n2, eps);
+            let a2 = angle_between(&n2, &n3, eps);
+            a1 > angle_tolerance || a2 > angle_tolerance
         }
     } || {
+        // Surface normal across the segment. Closed-curve detection is already
+        // handled by the tangent branch above, so a single start-to-end check
+        // is sufficient and gives a clean "total normal change ≤ tolerance"
+        // semantic for the leaf segment.
         let sn1 = surface.normal_at(p1.x, p1.y);
-        let sn2 = surface.normal_at(p2.x, p2.y);
         let sn3 = surface.normal_at(p3.x, p3.y);
-        let diff = sn2 - sn1;
-        let diff2 = sn3 - sn2;
-        (diff - diff2).norm() > normal_tolerance
+        angle_between(&sn1, &sn3, eps) > angle_tolerance
     };
     if flag {
         let mut left_pts =
-            iterate_uv_curve_tessellation(curve, surface, start, exact_mid, normal_tolerance);
+            iterate_uv_curve_tessellation(curve, surface, start, exact_mid, angle_tolerance);
         let right_pts =
-            iterate_uv_curve_tessellation(curve, surface, exact_mid, end, normal_tolerance);
+            iterate_uv_curve_tessellation(curve, surface, exact_mid, end, angle_tolerance);
         left_pts.pop();
         [left_pts, right_pts].concat()
     } else {
@@ -349,5 +362,20 @@ fn iterate_uv_curve_tessellation<T: FloatingPoint, S: TrimmedSurfaceExt<T, F>, F
             Point2::new(p1.x.clamp(min.x, max.x), p1.y.clamp(min.y, max.y)),
             Point2::new(p3.x.clamp(min.x, max.x), p3.y.clamp(min.y, max.y)),
         ]
+    }
+}
+
+/// Angle (radians) between two vectors of arbitrary dimension. Returns 0 if
+/// either vector is below `eps` so callers can treat degenerate samples as
+/// "no angular deviation" instead of triggering subdivision.
+fn angle_between<T, D>(a: &OVector<T, D>, b: &OVector<T, D>, eps: T) -> T
+where
+    T: FloatingPoint,
+    D: DimName,
+    DefaultAllocator: Allocator<D>,
+{
+    match (a.clone().try_normalize(eps), b.clone().try_normalize(eps)) {
+        (Some(na), Some(nb)) => na.dot(&nb).clamp(-T::one(), T::one()).acos(),
+        _ => T::zero(),
     }
 }

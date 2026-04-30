@@ -32,7 +32,7 @@ impl<T: FloatingPoint + SpadeNum> TrimmedSurfaceConstrainedTriangulation<T> {
     {
         let o = options.as_ref();
 
-        let curve_tessellation_option = o
+        let angle_tolerance = o
             .map(|o| o.norm_tolerance)
             .unwrap_or(T::from_f64(1e-2).unwrap());
 
@@ -57,7 +57,7 @@ impl<T: FloatingPoint + SpadeNum> TrimmedSurfaceConstrainedTriangulation<T> {
                         None => tessellate_uv_compound_curve_adaptive(
                             curve,
                             surface,
-                            curve_tessellation_option,
+                            angle_tolerance,
                         ),
                     });
                 let interiors = surface
@@ -77,7 +77,7 @@ impl<T: FloatingPoint + SpadeNum> TrimmedSurfaceConstrainedTriangulation<T> {
                         None => tessellate_uv_compound_curve_adaptive(
                             curve,
                             surface,
-                            curve_tessellation_option,
+                            angle_tolerance,
                         ),
                     })
                     .collect_vec();
@@ -85,7 +85,7 @@ impl<T: FloatingPoint + SpadeNum> TrimmedSurfaceConstrainedTriangulation<T> {
             }
             None => {
                 let exterior = surface.exterior().map(|curve| {
-                    tessellate_uv_compound_curve_adaptive(curve, surface, curve_tessellation_option)
+                    tessellate_uv_compound_curve_adaptive(curve, surface, angle_tolerance)
                 });
 
                 let interiors = surface
@@ -95,7 +95,7 @@ impl<T: FloatingPoint + SpadeNum> TrimmedSurfaceConstrainedTriangulation<T> {
                         tessellate_uv_compound_curve_adaptive(
                             curve,
                             surface,
-                            curve_tessellation_option,
+                            angle_tolerance,
                         )
                     })
                     .collect_vec();
