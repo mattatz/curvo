@@ -5,7 +5,7 @@ use nalgebra::{Point2, Vector2, U3};
 use crate::{
     curve::NurbsCurve2D,
     prelude::CurveIntersectionSolverOptions,
-    region::{CompoundCurve, Region},
+    region::{CompoundCurve, CompoundCurve2D, Region},
 };
 
 use super::Boolean;
