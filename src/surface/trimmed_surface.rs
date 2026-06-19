@@ -134,7 +134,7 @@ fn try_project_curve<T: FloatingPoint + ArgminFloat>(
     let pts = curve
         .dehomogenized_control_points()
         .iter()
-        .zip(weights.into_iter())
+        .zip(weights)
         .map(|(p, w)| {
             let ray =
                 NurbsCurve3D::polyline(&[p - offset, p + offset + direction * ray_length], true);
@@ -170,7 +170,7 @@ fn try_map_curve_closest_point<T: FloatingPoint + ArgminFloat>(
             let pts = curve
                 .dehomogenized_control_points()
                 .iter()
-                .zip(weights.into_iter())
+                .zip(weights)
                 .map(|(p, w)| {
                     let uv = surface.find_closest_parameter(p, None)?;
                     Ok(Point3::new(uv.0 * w, uv.1 * w, w))
@@ -310,7 +310,8 @@ where
                             if exterior.is_some() {
                                 return Err(de::Error::duplicate_field("exterior"));
                             }
-                            exterior = map.next_value().ok();
+                            // Propagate errors instead of silently dropping the boundary.
+                            exterior = map.next_value()?;
                         }
                         Field::Interiors => {
                             if interiors.is_some() {

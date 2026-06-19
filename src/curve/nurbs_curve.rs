@@ -1345,14 +1345,14 @@ where
         for i in 1..=ph2 {
             let inv = T::one() / binom.get(ph, i);
             let mpi = new_degree.min(i);
-            for j in 0.max(i - degree_inc)..=mpi {
+            for j in i - degree_inc..=mpi {
                 bezalfs[i][j] = inv * binom.get(new_degree, j) * binom.get(degree_inc, i - j);
             }
         }
 
         for i in (ph2 + 1)..ph {
             let mpi = new_degree.min(i);
-            for j in 0.max(i - degree_inc)..=mpi {
+            for j in i - degree_inc..=mpi {
                 bezalfs[i][j] = bezalfs[ph - i][new_degree - j];
             }
         }
@@ -1421,7 +1421,7 @@ where
             for i in lbz..=ph {
                 e_bpts[i] = OPoint::origin();
                 let mpi = new_degree.min(i);
-                for j in 0.max(i - degree_inc)..=mpi {
+                for j in i - degree_inc..=mpi {
                     e_bpts[i].coords = &e_bpts[i].coords + &bpts[j].coords * bezalfs[i][j];
                 }
             }

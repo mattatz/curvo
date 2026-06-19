@@ -315,7 +315,7 @@ where
         .take(m)
         .collect_vec()
         .windows(2)
-        .zip(angle_fillet_length.into_iter())
+        .zip(angle_fillet_length)
         .map(|(w, af)| {
             let s0 = &w[0];
             let s1 = &w[1];
