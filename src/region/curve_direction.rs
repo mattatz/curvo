@@ -35,12 +35,9 @@ impl CurveDirection {
             ((&a0 - &b0).norm(), Self::Opposite),
         ];
 
-        // Closest direction within epsilon; ties (gaps equal up to rounding) fall
-        // back to priority order Forward, Backward, Facing, Opposite. A strict min
-        // would let ~1e-16 noise pick an inverting direction for closed loops
-        // (start ≈ end) and corrupt the assembled order, while ignoring the gap
-        // entirely would drop a genuinely closer join. `tie` separates rounding
-        // noise from real distance differences.
+        // Closest direction within epsilon; rounding-level ties fall back to the
+        // array's priority order so ~1e-16 noise can't pick an inverting join for a
+        // closed loop (start ≈ end) and corrupt the assembled order.
         let tie = epsilon * T::from_f64(1e-3).unwrap();
         directions
             .iter()

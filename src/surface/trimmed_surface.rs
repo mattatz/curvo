@@ -310,7 +310,8 @@ where
                             if exterior.is_some() {
                                 return Err(de::Error::duplicate_field("exterior"));
                             }
-                            exterior = map.next_value().ok();
+                            // Propagate errors instead of silently dropping the boundary.
+                            exterior = map.next_value()?;
                         }
                         Field::Interiors => {
                             if interiors.is_some() {

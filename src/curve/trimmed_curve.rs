@@ -13,11 +13,8 @@ use super::NurbsCurve;
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(
     feature = "serde",
-    derive(serde::Serialize, serde::Deserialize),
-    serde(bound(
-        serialize = "T: serde::Serialize, NurbsCurve<T, D>: serde::Serialize",
-        deserialize = "T: serde::Deserialize<'de>, NurbsCurve<T, D>: serde::Deserialize<'de>"
-    ))
+    derive(serde::Serialize),
+    serde(bound(serialize = "T: serde::Serialize, NurbsCurve<T, D>: serde::Serialize"))
 )]
 pub struct TrimmedCurve<T: FloatingPoint, D: DimName>
 where
@@ -26,6 +23,49 @@ where
     curve: NurbsCurve<T, D>,
     /// Active parameter domain. If None, uses the full knot domain.
     domain: Option<(T, T)>,
+}
+
+/// Also accepts the legacy form where a span was a bare `NurbsCurve` (read as a
+/// full-domain trimmed curve), so older serialized data still loads.
+#[cfg(feature = "serde")]
+impl<'de, T, D> serde::Deserialize<'de> for TrimmedCurve<T, D>
+where
+    T: FloatingPoint + serde::Deserialize<'de>,
+    D: DimName,
+    DefaultAllocator: Allocator<D>,
+    NurbsCurve<T, D>: serde::Deserialize<'de>,
+{
+    fn deserialize<De>(deserializer: De) -> Result<Self, De::Error>
+    where
+        De: serde::Deserializer<'de>,
+    {
+        #[derive(serde::Deserialize)]
+        #[serde(
+            bound(
+                deserialize = "T: serde::Deserialize<'de>, NurbsCurve<T, D>: serde::Deserialize<'de>"
+            ),
+            untagged
+        )]
+        enum Repr<T: FloatingPoint, D: DimName>
+        where
+            DefaultAllocator: Allocator<D>,
+        {
+            Trimmed {
+                curve: NurbsCurve<T, D>,
+                #[serde(default)]
+                domain: Option<(T, T)>,
+            },
+            Bare(NurbsCurve<T, D>),
+        }
+
+        Ok(match Repr::<T, D>::deserialize(deserializer)? {
+            Repr::Trimmed { curve, domain } => Self { curve, domain },
+            Repr::Bare(curve) => Self {
+                curve,
+                domain: None,
+            },
+        })
+    }
 }
 
 impl<T: FloatingPoint, D: DimName> TrimmedCurve<T, D>
@@ -188,3 +228,27 @@ pub type TrimmedCurve2D<T> = TrimmedCurve<T, nalgebra::U3>;
 
 /// Type alias for 3D trimmed NURBS curve (homogeneous: x*w, y*w, z*w, w)
 pub type TrimmedCurve3D<T> = TrimmedCurve<T, nalgebra::U4>;
+
+#[cfg(all(test, feature = "serde"))]
+mod tests {
+    use super::{TrimmedCurve, TrimmedCurve3D};
+    use crate::prelude::NurbsCurve3D;
+    use nalgebra::Point3;
+
+    #[test]
+    fn deserialize_accepts_legacy_and_current_forms() {
+        let curve = NurbsCurve3D::polyline(&[Point3::origin(), Point3::new(1.0, 0.0, 0.0)], true);
+
+        // Legacy form: a span serialized as a bare NurbsCurve loads as full-domain.
+        let legacy_json = serde_json::to_string(&curve).unwrap();
+        let from_legacy: TrimmedCurve3D<f64> = serde_json::from_str(&legacy_json).unwrap();
+        assert!(from_legacy.is_full_domain());
+        assert_eq!(from_legacy.curve(), &curve);
+
+        // Current form: { curve, domain } round-trips.
+        let wrapped = TrimmedCurve::from_curve(curve);
+        let wrapped_json = serde_json::to_string(&wrapped).unwrap();
+        let back: TrimmedCurve3D<f64> = serde_json::from_str(&wrapped_json).unwrap();
+        assert_eq!(back, wrapped);
+    }
+}
