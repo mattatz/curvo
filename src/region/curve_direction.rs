@@ -35,9 +35,76 @@ impl CurveDirection {
             ((&a0 - &b0).norm(), Self::Opposite),
         ];
 
+        // Closest direction within epsilon; ties (gaps equal up to rounding) fall
+        // back to priority order Forward, Backward, Facing, Opposite. A strict min
+        // would let ~1e-16 noise pick an inverting direction for closed loops
+        // (start ≈ end) and corrupt the assembled order, while ignoring the gap
+        // entirely would drop a genuinely closer join. `tie` separates rounding
+        // noise from real distance differences.
+        let tie = epsilon * T::from_f64(1e-3).unwrap();
         directions
             .iter()
-            .min_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal))
-            .and_then(|min| if min.0 < epsilon { Some(min.1) } else { None })
+            .filter(|(gap, _)| *gap < epsilon)
+            .min_by(|a, b| {
+                if (a.0 - b.0).abs() <= tie {
+                    Ordering::Equal
+                } else {
+                    a.0.partial_cmp(&b.0).unwrap_or(Ordering::Equal)
+                }
+            })
+            .map(|(_, direction)| *direction)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CurveDirection;
+    use crate::prelude::NurbsCurve3D;
+    use nalgebra::Point3;
+
+    const EPS: f64 = 1e-4;
+
+    fn line(a: Point3<f64>, b: Point3<f64>) -> NurbsCurve3D<f64> {
+        NurbsCurve3D::polyline(&[a, b], true)
+    }
+
+    /// When several directions tie within epsilon (e.g. a curve whose start == end),
+    /// the non-inverting `Forward` must win so the assembled chain is not reordered.
+    #[test]
+    fn tie_prefers_forward() {
+        let p = Point3::new(0.0, 0.0, 0.0);
+        // `a` is a closed loop (triangle): start == end == p, but with real extent.
+        let a = NurbsCurve3D::polyline(
+            &[p, Point3::new(1.0, 0.0, 0.0), Point3::new(0.0, 1.0, 0.0), p],
+            true,
+        );
+        // `b` starts at p, so both Forward (a1->b0) and Opposite (a0->b0) gaps are ~0.
+        let b = line(p, Point3::new(2.0, 2.0, 0.0));
+        assert!(matches!(
+            CurveDirection::new(&a, &b, EPS),
+            Some(CurveDirection::Forward)
+        ));
+    }
+
+    /// A genuinely closer join within epsilon must beat a near-miss that is also
+    /// within epsilon — the gap magnitude is not discarded.
+    #[test]
+    fn closest_within_epsilon_wins() {
+        // Forward gap = 5e-5 (within epsilon but a near-miss).
+        // Backward gap = 0 (exact). Backward must be chosen.
+        let a = line(Point3::new(1.0, 0.0, 0.0), Point3::new(0.0, 0.0, 0.0));
+        let b = line(Point3::new(5e-5, 0.0, 0.0), Point3::new(1.0, 0.0, 0.0));
+        assert!(matches!(
+            CurveDirection::new(&a, &b, EPS),
+            Some(CurveDirection::Backward)
+        ));
+    }
+
+    /// Endpoints farther apart than epsilon do not connect.
+    #[test]
+    fn beyond_epsilon_is_none() {
+        let a = line(Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 0.0, 0.0));
+        let b = line(Point3::new(2.0, 0.0, 0.0), Point3::new(3.0, 0.0, 0.0));
+        assert!(CurveDirection::new(&a, &b, EPS).is_none());
     }
 }

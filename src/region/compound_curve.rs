@@ -470,3 +470,29 @@ where
         )
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::prelude::*;
+    use nalgebra::{Point3, Vector3};
+    use std::f64::consts::TAU;
+
+    /// Regression: boundaries of a surface extruded from a closed periodic
+    /// profile include two closed rim loops; try_new must assemble them without
+    /// FP-noise mis-ordering ("No connection found").
+    #[test]
+    fn try_new_assembles_closed_extrusion_boundary() {
+        let pts: Vec<Point3<f64>> = (0..24)
+            .map(|i| {
+                let t = TAU * i as f64 / 24.0;
+                let r = 2.0 + t.cos();
+                Point3::new(r * t.cos(), r * t.sin(), 0.0)
+            })
+            .collect();
+        let profile = NurbsCurve3D::interpolate_periodic(&pts, 3, KnotStyle::Centripetal).unwrap();
+        let surface = NurbsSurface3D::extrude(&profile, &Vector3::z());
+        let curves = surface.try_boundary_curves().unwrap();
+        let compound = CompoundCurve::try_new(curves.to_vec());
+        assert!(compound.is_ok(), "try_new failed: {:?}", compound.err());
+    }
+}
