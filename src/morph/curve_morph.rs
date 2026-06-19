@@ -40,7 +40,7 @@ where
 
         let pts = pts
             .into_iter()
-            .zip(parameters.into_iter())
+            .zip(parameters)
             .map(|(pt, t)| {
                 let m =
                     super::point_morph::morph_point(&pt, reference_surface, target_surface, None)?;

@@ -271,7 +271,7 @@ where
         .take(m)
         .collect_vec()
         .windows(2)
-        .zip(angle_fillet_length.into_iter())
+        .zip(angle_fillet_length)
         .map(|(w, af)| create_fillet_corner_between_trimmed_segments(&[w[0], w[1]], af))
         .collect::<anyhow::Result<Vec<_>>>()?;
 
