@@ -279,6 +279,7 @@ where
         let uind = knot_span_u - self.u_degree;
         let mut vind = knot_span_v - self.v_degree;
 
+        #[allow(clippy::explicit_counter_loop)]
         for l in 0..(self.v_degree + 1) {
             let mut temp = OPoint::<T, D>::origin();
 

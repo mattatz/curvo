@@ -1431,6 +1431,7 @@ where
                 let mut last = kind;
                 let den = ub - ua;
                 let bet = (ub - u_h[kind - 1]) / den;
+                #[allow(clippy::explicit_counter_loop)]
                 for tr in 1..oldr {
                     let mut i = first;
                     let mut j = last;
@@ -1611,6 +1612,7 @@ where
         let mut t = 0usize;
 
         // use multiplicity as # of times to remove knot
+        #[allow(clippy::explicit_counter_loop)]
         for _ in 0..s {
             let off = first - 1;
             temp[0] = removed_control_points[off].clone();
