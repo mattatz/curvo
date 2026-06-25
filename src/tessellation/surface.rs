@@ -174,7 +174,7 @@ where
 
     // Collapse the divided cells into a structured tensor grid (union of all
     // u/v cut lines) to drop T-junctions.
-    let nodes = if options.grid {
+    if options.grid {
         let (us, vs) = grid_lines(&nodes);
         build_grid_nodes(
             s,
@@ -189,10 +189,7 @@ where
         )
     } else {
         nodes
-    };
-
-    // SurfaceTessellation::new(s, &nodes, constraints)
-    nodes
+    }
 }
 
 /// Distinct, sorted u and v cut lines across all leaf cells' corners.
