@@ -5,6 +5,7 @@ pub mod advancing_front;
 pub mod boundary_constraints;
 mod cardinal_direction;
 pub mod edge_statistics;
+pub mod structured_tessellation_option;
 pub mod surface;
 pub mod surface_metric;
 pub mod surface_point;

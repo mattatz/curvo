@@ -105,6 +105,7 @@ pub mod prelude {
         adaptive_tessellation_option::AdaptiveTessellationOptions,
         advancing_front::{AdvancingFrontMesher, AdvancingFrontOptions},
         boundary_constraints::BoundaryConstraints,
+        structured_tessellation_option::StructuredTessellationOptions,
         surface_tessellation::*,
         tangent_space::TangentSpace,
         tessellation_curve::AdaptiveCurveTessellationOptions,
