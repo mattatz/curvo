@@ -23,6 +23,8 @@ pub struct AdaptiveTessellationOptions<T = f64, D = U4, F = DefaultDivider<T, D>
     pub max_depth: usize,
     /// Divider function
     pub divider: Option<F>,
+    /// Collapse the divided cells into a structured tensor grid (no T-junctions).
+    pub grid: bool,
     _marker: PhantomData<D>,
 }
 
@@ -40,6 +42,7 @@ impl<T: RealField, D, F> Default for AdaptiveTessellationOptions<T, D, F> {
             min_depth: 0,
             max_depth: 8,
             divider: None,
+            grid: false,
             _marker: PhantomData,
         }
     }
@@ -55,6 +58,12 @@ impl<T: RealField, D, F> AdaptiveTessellationOptions<T, D, F> {
     /// Set the maximum allowed 3D edge length
     pub fn with_max_edge_length(mut self, max_edge_length: T) -> Self {
         self.max_edge_length = Some(max_edge_length);
+        self
+    }
+
+    /// Collapse the divided cells into a structured tensor grid.
+    pub fn with_grid(mut self, grid: bool) -> Self {
+        self.grid = grid;
         self
     }
 

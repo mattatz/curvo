@@ -3,16 +3,14 @@ use std::borrow::Cow;
 use super::adaptive_tessellation_option::AdaptiveTessellationOptions;
 use super::adaptive_tessellation_processor::AdaptiveTessellationProcessor;
 use super::boundary_constraints::BoundaryConstraints;
-use super::structured_tessellation_option::StructuredTessellationOptions;
 use super::surface_tessellation::SurfaceTessellation;
 use super::{adaptive_tessellation_node::AdaptiveTessellationNode, Tessellation};
 use super::{ConstrainedTessellation, SurfacePoint};
 use itertools::Itertools;
 use nalgebra::{
-    allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, Vector2, U1,
+    allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, Vector2, U1,
 };
 
-use crate::misc::three_points_are_flat;
 use crate::tessellation::DividableDirection;
 use crate::{misc::FloatingPoint, surface::NurbsSurface};
 
@@ -56,96 +54,6 @@ where
     ) -> Self::Output {
         let nodes = surface_adaptive_tessellate(self, Some(Cow::Borrowed(&constraints)), options);
         SurfaceTessellation::new(self, &nodes, Some(constraints))
-    }
-}
-
-impl<T: FloatingPoint, D: DimName> Tessellation<StructuredTessellationOptions<T>>
-    for NurbsSurface<T, D>
-where
-    D: DimNameSub<U1>,
-    DefaultAllocator: Allocator<D>,
-    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
-{
-    type Output = SurfaceTessellation<T, D>;
-
-    /// Structured (tensor-product) tessellation — see `StructuredTessellationOptions`.
-    fn tessellate(&self, options: StructuredTessellationOptions<T>) -> Self::Output {
-        let nodes = surface_structured_tessellate(self, &options);
-        SurfaceTessellation::new(self, &nodes, None)
-    }
-}
-
-/// Structured tessellation: sample u and v once each (each direction flattened
-/// to `tolerance` per knot span) and build their tensor-product grid. No
-/// recursive divide, so the connectivity is regular (no T-junctions).
-fn surface_structured_tessellate<T: FloatingPoint, D>(
-    s: &NurbsSurface<T, D>,
-    options: &StructuredTessellationOptions<T>,
-) -> Vec<AdaptiveTessellationNode<T, D>>
-where
-    D: DimNameSub<U1>,
-    DefaultAllocator: Allocator<D>,
-    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
-{
-    let ((u0, _u1), (v0, _v1)) = s.knots_domain();
-    let u_breaks = knot_breakpoints(s.u_knots().as_slice());
-    let v_breaks = knot_breakpoints(s.v_knots().as_slice());
-    let us = flatten_direction(&u_breaks, options.tolerance, |u| s.point_at(u, v0));
-    let vs = flatten_direction(&v_breaks, options.tolerance, |v| s.point_at(u0, v));
-    build_grid_nodes(s, &us, &vs, (false, false, false, false))
-}
-
-/// Unique interior knot values plus the domain endpoints, preserving sharp
-/// corners / arc joints as grid lines.
-fn knot_breakpoints<T: FloatingPoint>(knots: &[T]) -> Vec<T> {
-    let eps = T::from_f64(1e-9).unwrap();
-    let mut bps = vec![knots[0]];
-    for &k in knots {
-        if k > knots[0] + eps && k < knots[knots.len() - 1] - eps && k - *bps.last().unwrap() > eps
-        {
-            bps.push(k);
-        }
-    }
-    bps.push(knots[knots.len() - 1]);
-    bps
-}
-
-/// Sample each `[breakpoints[i], breakpoints[i+1]]` span, recursively bisecting
-/// (deterministically) until `eval`'s three points are flat to `tolerance`.
-fn flatten_direction<T: FloatingPoint, P>(
-    breakpoints: &[T],
-    tolerance: T,
-    eval: impl Fn(T) -> OPoint<T, P>,
-) -> Vec<T>
-where
-    P: DimName,
-    DefaultAllocator: Allocator<P>,
-{
-    let mut params = Vec::new();
-    for w in breakpoints.windows(2) {
-        subdivide_flat(&eval, w[0], w[1], tolerance, &mut params);
-    }
-    params.push(*breakpoints.last().unwrap());
-    params
-}
-
-fn subdivide_flat<T: FloatingPoint, P>(
-    eval: &impl Fn(T) -> OPoint<T, P>,
-    a: T,
-    b: T,
-    tolerance: T,
-    out: &mut Vec<T>,
-) where
-    P: DimName,
-    DefaultAllocator: Allocator<P>,
-{
-    let eps = T::from_f64(1e-8).unwrap();
-    let mid = (a + b) * T::from_f64(0.5).unwrap();
-    if b - a > eps && !three_points_are_flat(&eval(a), &eval(mid), &eval(b), tolerance) {
-        subdivide_flat(eval, a, mid, tolerance, out);
-        subdivide_flat(eval, mid, b, tolerance, out);
-    } else {
-        out.push(a);
     }
 }
 
@@ -264,14 +172,56 @@ where
         processor.into_nodes()
     };
 
+    // Collapse the divided cells into a structured tensor grid (union of all
+    // u/v cut lines) to drop T-junctions.
+    let nodes = if options.grid {
+        let (us, vs) = grid_lines(&nodes);
+        build_grid_nodes(
+            s,
+            &us,
+            &vs,
+            (
+                u_min_constraint,
+                u_max_constraint,
+                v_min_constraint,
+                v_max_constraint,
+            ),
+        )
+    } else {
+        nodes
+    };
+
     // SurfaceTessellation::new(s, &nodes, constraints)
     nodes
 }
 
+/// Distinct, sorted u and v cut lines across all leaf cells' corners.
+fn grid_lines<T: FloatingPoint, D>(nodes: &[AdaptiveTessellationNode<T, D>]) -> (Vec<T>, Vec<T>)
+where
+    D: DimNameSub<U1>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+{
+    let eps = T::from_f64(1e-9).unwrap();
+    let mut us = Vec::new();
+    let mut vs = Vec::new();
+    for node in nodes.iter().filter(|n| n.is_leaf()) {
+        for c in node.corners() {
+            us.push(c.uv.x);
+            vs.push(c.uv.y);
+        }
+    }
+    let dedup = |mut xs: Vec<T>| {
+        xs.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        xs.dedup_by(|a, b| (*a - *b).abs() < eps);
+        xs
+    };
+    (dedup(us), dedup(vs))
+}
+
 /// Build the quad-grid nodes for the tensor product `us` × `vs`, evaluating the
-/// surface point and normal at each sample. `constraints` are the per-seam
-/// flags (u_in_v_min, u_in_v_max, v_in_u_min, v_in_u_max). Shared by the
-/// adaptive and structured paths.
+/// surface point and normal at each sample. `constraints` are the per-seam flags
+/// (u_in_v_min, u_in_v_max, v_in_u_min, v_in_u_max).
 #[allow(clippy::type_complexity)]
 fn build_grid_nodes<T: FloatingPoint, D>(
     s: &NurbsSurface<T, D>,
@@ -471,12 +421,10 @@ mod tests {
         assert!(back_points.iter().all(|p| vertices.contains(p)));
     }
 
-    /// Structured tessellation of a revolved profile is a regular grid: a
-    /// straight (degree-1) v-direction keeps just its knots, while the revolved
-    /// u-direction is sampled by curvature, and the result is a clean tensor
-    /// product (rows × cols, no T-junctions).
+    /// The `grid` flag rebuilds the adaptive subdivision into a regular
+    /// tensor-product grid (no T-junctions) — verified on a revolved profile.
     #[test]
-    fn surface_structured_tessellation_is_regular_grid() {
+    fn adaptive_grid_flag_is_regular_grid() {
         use std::f64::consts::TAU;
         let profile = NurbsCurve3D::<f64>::polyline(
             &[
@@ -491,8 +439,10 @@ mod tests {
         let surface =
             NurbsSurface::try_revolve(&profile, &Point3::origin(), &Vector3::z(), TAU).unwrap();
 
-        let opts = StructuredTessellationOptions::new(1e-3);
-        let tess = surface.tessellate(opts);
+        let opts = AdaptiveTessellationOptions::<f64>::default()
+            .with_norm_tolerance(1e-2)
+            .with_grid(true);
+        let tess = surface.tessellate(Some(opts));
         let faces = tess.faces().len();
         // Regular grid → every triangle pair forms a quad; face count is even and
         // matches nu*nv*2 for some grid. Just assert it produced a non-trivial
