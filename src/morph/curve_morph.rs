@@ -161,7 +161,7 @@ mod tests {
         let target_surface =
             NurbsSurface::plane(Point3::new(0.0, 0.0, 1.0), Vector3::y(), Vector3::z());
         let curve = NurbsCurve3D::polyline(
-            &vec![Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 0.0, 0.0)],
+            &[Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 0.0, 0.0)],
             false,
         );
 

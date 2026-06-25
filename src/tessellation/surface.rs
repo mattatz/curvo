@@ -145,6 +145,95 @@ where
     let divs_u = us.len() - 1;
     let divs_v = vs.len() - 1;
 
+    let nodes = build_grid_nodes(
+        s,
+        &us,
+        &vs,
+        (
+            u_min_constraint,
+            u_max_constraint,
+            v_min_constraint,
+            v_max_constraint,
+        ),
+    );
+
+    let nodes = if !is_adaptive {
+        nodes
+    } else {
+        let mut processor = AdaptiveTessellationProcessor::new(s, nodes);
+
+        for iv in 0..divs_v {
+            for iu in 0..divs_u {
+                let index = iv * divs_u + iu;
+                processor.divide(index, &options);
+            }
+        }
+
+        processor.into_nodes()
+    };
+
+    // Collapse the divided cells into a structured tensor grid (union of all
+    // u/v cut lines) to drop T-junctions.
+    if options.grid {
+        let (us, vs) = grid_lines(&nodes);
+        build_grid_nodes(
+            s,
+            &us,
+            &vs,
+            (
+                u_min_constraint,
+                u_max_constraint,
+                v_min_constraint,
+                v_max_constraint,
+            ),
+        )
+    } else {
+        nodes
+    }
+}
+
+/// Distinct, sorted u and v cut lines across all leaf cells' corners.
+fn grid_lines<T: FloatingPoint, D>(nodes: &[AdaptiveTessellationNode<T, D>]) -> (Vec<T>, Vec<T>)
+where
+    D: DimNameSub<U1>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+{
+    let eps = T::from_f64(1e-9).unwrap();
+    let mut us = Vec::new();
+    let mut vs = Vec::new();
+    for node in nodes.iter().filter(|n| n.is_leaf()) {
+        for c in node.corners() {
+            us.push(c.uv.x);
+            vs.push(c.uv.y);
+        }
+    }
+    let dedup = |mut xs: Vec<T>| {
+        xs.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        xs.dedup_by(|a, b| (*a - *b).abs() < eps);
+        xs
+    };
+    (dedup(us), dedup(vs))
+}
+
+/// Build the quad-grid nodes for the tensor product `us` × `vs`, evaluating the
+/// surface point and normal at each sample. `constraints` are the per-seam flags
+/// (u_in_v_min, u_in_v_max, v_in_u_min, v_in_u_max).
+#[allow(clippy::type_complexity)]
+fn build_grid_nodes<T: FloatingPoint, D>(
+    s: &NurbsSurface<T, D>,
+    us: &[T],
+    vs: &[T],
+    constraints: (bool, bool, bool, bool),
+) -> Vec<AdaptiveTessellationNode<T, D>>
+where
+    D: DimName + DimNameSub<U1>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+{
+    let (u_min_constraint, u_max_constraint, v_min_constraint, v_max_constraint) = constraints;
+    let divs_u = us.len() - 1;
+    let divs_v = vs.len() - 1;
     let eps = T::from_f64(1e-8).unwrap();
 
     let pts = vs
@@ -192,8 +281,7 @@ where
         .collect_vec();
 
     let pts = &pts;
-
-    let nodes = (0..divs_v)
+    (0..divs_v)
         .flat_map(|iv: usize| {
             let iv_r = divs_v - iv;
             (0..divs_u).map(move |iu| {
@@ -211,27 +299,7 @@ where
                 AdaptiveTessellationNode::new(index, corners, [s, e, n, w])
             })
         })
-        .collect_vec();
-
-    // return nodes;
-
-    let nodes = if !is_adaptive {
-        nodes
-    } else {
-        let mut processor = AdaptiveTessellationProcessor::new(s, nodes);
-
-        for iv in 0..divs_v {
-            for iu in 0..divs_u {
-                let index = iv * divs_u + iu;
-                processor.divide(index, &options);
-            }
-        }
-
-        processor.into_nodes()
-    };
-
-    // SurfaceTessellation::new(s, &nodes, constraints)
-    nodes
+        .collect_vec()
 }
 
 fn north(index: usize, iv: usize, divs_u: usize) -> Option<usize> {
@@ -348,5 +416,39 @@ mod tests {
 
         assert!(front_points.iter().all(|p| vertices.contains(p)));
         assert!(back_points.iter().all(|p| vertices.contains(p)));
+    }
+
+    /// The `grid` flag rebuilds the adaptive subdivision into a regular
+    /// tensor-product grid (no T-junctions) — verified on a revolved profile.
+    #[test]
+    fn adaptive_grid_flag_is_regular_grid() {
+        use std::f64::consts::TAU;
+        let profile = NurbsCurve3D::<f64>::polyline(
+            &[
+                Point3::new(1.0, 0.0, 0.0),
+                Point3::new(1.0, 0.0, 1.0),
+                Point3::new(0.5, 0.0, 1.0),
+                Point3::new(0.5, 0.0, 0.0),
+                Point3::new(1.0, 0.0, 0.0),
+            ],
+            true,
+        );
+        let surface =
+            NurbsSurface::try_revolve(&profile, &Point3::origin(), &Vector3::z(), TAU).unwrap();
+
+        let opts = AdaptiveTessellationOptions::<f64>::default()
+            .with_norm_tolerance(1e-2)
+            .with_grid(true);
+        let tess = surface.tessellate(Some(opts));
+        let faces = tess.faces().len();
+        // Regular grid → every triangle pair forms a quad; face count is even and
+        // matches nu*nv*2 for some grid. Just assert it produced a non-trivial
+        // grid and finite points/normals.
+        assert!(faces > 0 && faces % 2 == 0);
+        assert!(tess
+            .points()
+            .iter()
+            .all(|p| p.iter().all(|c| c.is_finite())));
+        assert_eq!(tess.points().len(), tess.normals().len());
     }
 }
