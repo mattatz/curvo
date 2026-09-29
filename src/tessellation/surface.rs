@@ -451,4 +451,40 @@ mod tests {
             .all(|p| p.iter().all(|c| c.is_finite())));
         assert_eq!(tess.points().len(), tess.normals().len());
     }
+
+    /// Grid cells must triangulate as plain quads even when the uv values are
+    /// not below 1 (non-normalized knots): an absolute epsilon in the
+    /// neighbor-corner clip used to let duplicate corners through, forcing
+    /// center fans that are non-manifold on the degenerate on-axis strip of a
+    /// revolved profile.
+    #[test]
+    fn grid_cells_are_quads_with_large_uv() {
+        use std::f64::consts::TAU;
+        let profile = NurbsCurve3D::<f64>::polyline(
+            &[
+                Point3::new(0.0, 0.0, 0.0),
+                Point3::new(10.0, 0.0, 0.0),
+                Point3::new(10.0, 0.0, 10.0),
+                Point3::new(0.0, 0.0, 10.0),
+                Point3::new(0.0, 0.0, 0.0),
+            ],
+            false,
+        );
+        let surface =
+            NurbsSurface::try_revolve(&profile, &Point3::origin(), &Vector3::z(), TAU).unwrap();
+
+        let opts = AdaptiveTessellationOptions::<f64>::default()
+            .with_norm_tolerance(1e-2)
+            .with_grid(true);
+        let tess = surface.tessellate(Some(opts));
+        let count = |f: fn(&Vector2<f64>) -> f64| {
+            let mut xs = tess.uvs().iter().map(f).collect_vec();
+            xs.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            xs.dedup();
+            xs.len()
+        };
+        let (nu, nv) = (count(|uv| uv.x), count(|uv| uv.y));
+        assert_eq!(tess.points().len(), nu * nv);
+        assert_eq!(tess.faces().len(), 2 * (nu - 1) * (nv - 1));
+    }
 }
