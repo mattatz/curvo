@@ -1217,8 +1217,10 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
         Self::try_loft(&curves, degree_v)
     }
 
-    /// Try to revolve a profile curve around an axis to create a surface
-    /// /// # Example
+    /// Try to revolve a profile curve around an axis to create a surface.
+    /// `axis` need not be unit length; `theta` is in radians (negative turns
+    /// clockwise) and must not exceed a full turn.
+    /// # Example
     /// ```
     /// use curvo::prelude::*;
     /// use nalgebra::{Point3, Vector3};
@@ -1245,7 +1247,9 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
         Self::try_revolve_by_start_end(profile, center, axis, T::zero(), theta)
     }
 
-    /// Try to revolve a profile curve around an axis by specifying the start and end angles
+    /// Try to revolve a profile curve around an axis by specifying the start and end angles.
+    /// Angles are in radians measured from the profile's own position, so the
+    /// surface's first isocurve is the profile rotated by `start`.
     pub fn try_revolve_by_start_end(
         profile: &NurbsCurve3D<T>,
         center: &Point3<T>,
@@ -1253,20 +1257,27 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
         start: T,
         end: T,
     ) -> anyhow::Result<Self> {
+        let axis = axis
+            .try_normalize(T::default_epsilon())
+            .ok_or(anyhow::anyhow!("Revolution axis must be a non-zero vector"))?;
         let theta = end - start;
+        let abs_theta = theta.abs();
+        if abs_theta > T::two_pi() + T::from_f64(1e-9).unwrap() {
+            anyhow::bail!("Revolution angle exceeds a full turn: {}", theta);
+        }
         let prof_points = profile.dehomogenized_control_points();
         let prof_weights = profile.weights();
 
         let two = T::from_f64(2.0).unwrap();
-        let (narcs, mut u_knots) = if theta <= T::pi() / two {
+        let (narcs, mut u_knots) = if abs_theta <= T::pi() / two {
             (1, vec![T::zero(); 6])
-        } else if theta <= T::pi() {
+        } else if abs_theta <= T::pi() {
             let mut knots = vec![T::zero(); 6 + 2];
             let half = T::from_f64(0.5).unwrap();
             knots[3] = half;
             knots[4] = half;
             (2, knots)
-        } else if theta <= T::from_f64(3.0).unwrap() * T::pi() / two {
+        } else if abs_theta <= T::from_f64(3.0).unwrap() * T::pi() / two {
             let mut knots = vec![T::zero(); 6 + 2 * 2];
             let frac_three = T::from_f64(1.0 / 3.0).unwrap();
             let two_frac_three = T::from_f64(2.0 / 3.0).unwrap();
@@ -1309,7 +1320,7 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
 
         for j in 0..prof_points.len() {
             let p = &prof_points[j];
-            let s = (p - center).dot(axis);
+            let s = (p - center).dot(&axis);
             let o = center + axis * s;
 
             // vector from the axis
@@ -1324,13 +1335,17 @@ impl<T: FloatingPoint> NurbsSurface3D<T> {
                 y *= T::one() / r;
             }
 
-            let mut p0 = prof_points[j];
+            let mut p0 = if r <= T::default_epsilon() {
+                *p
+            } else {
+                o + x * cosines[0] * r + y * sines[0] * r
+            };
             control_points[0][j].x = p0.x;
             control_points[0][j].y = p0.y;
             control_points[0][j].z = p0.z;
             control_points[0][j].w = prof_weights[j];
 
-            let mut t0 = y;
+            let mut t0 = y * cosines[0] - x * sines[0];
             let mut index = 0;
             for i in 1..=narcs {
                 let p2 = if r <= T::default_epsilon() {
@@ -2004,6 +2019,7 @@ where
 mod tests {
     use super::*;
     use approx::assert_relative_eq;
+    use std::f64::consts::{FRAC_PI_2, PI, TAU};
 
     #[test]
     fn test_torus_basic() {
@@ -2029,5 +2045,78 @@ mod tests {
         assert_relative_eq!(u_end, std::f64::consts::TAU, epsilon = 1e-8);
         assert_eq!(v_start, 0.0);
         assert_relative_eq!(v_end, std::f64::consts::TAU, epsilon = 1e-8);
+    }
+
+    /// Vertical segment at radius 5 on the XZ plane.
+    fn revolve_profile() -> NurbsCurve3D<f64> {
+        NurbsCurve3D::polyline(&[Point3::new(5., 0., 0.), Point3::new(5., 0., 3.)], true)
+    }
+
+    /// Point of the revolved bottom circle (v = v_min) at normalized u.
+    fn bottom_point(s: &NurbsSurface3D<f64>, t: f64) -> Point3<f64> {
+        let ((u0, u1), (v0, _)) = s.knots_domain();
+        s.point_at(u0 + (u1 - u0) * t, v0)
+    }
+
+    #[test]
+    fn revolve_is_independent_of_axis_length() {
+        let profile = revolve_profile();
+        let o = Point3::origin();
+        let unit = NurbsSurface3D::try_revolve(&profile, &o, &Vector3::z(), PI).unwrap();
+        let long = NurbsSurface3D::try_revolve(&profile, &o, &(Vector3::z() * 7.), PI).unwrap();
+        for t in [0., 0.3, 0.5, 1.] {
+            assert_relative_eq!(
+                bottom_point(&unit, t),
+                bottom_point(&long, t),
+                epsilon = 1e-9
+            );
+        }
+        assert!(NurbsSurface3D::try_revolve(&profile, &o, &Vector3::zeros(), PI).is_err());
+    }
+
+    #[test]
+    fn revolve_by_start_end_starts_at_start_angle() {
+        let profile = revolve_profile();
+        let s = NurbsSurface3D::try_revolve_by_start_end(
+            &profile,
+            &Point3::origin(),
+            &Vector3::z(),
+            FRAC_PI_2,
+            PI,
+        )
+        .unwrap();
+        assert_relative_eq!(
+            bottom_point(&s, 0.),
+            Point3::new(0., 5., 0.),
+            epsilon = 1e-9
+        );
+        assert_relative_eq!(
+            bottom_point(&s, 1.),
+            Point3::new(-5., 0., 0.),
+            epsilon = 1e-9
+        );
+        for t in [0.25, 0.5, 0.75] {
+            let p = bottom_point(&s, t);
+            assert_relative_eq!(p.coords.norm(), 5., epsilon = 1e-9);
+            assert!(
+                p.x <= 1e-9 && p.y >= -1e-9,
+                "outside the 2nd quadrant: {p:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn revolve_negative_angle_turns_clockwise() {
+        let profile = revolve_profile();
+        let o = Point3::origin();
+        for theta in [-FRAC_PI_2, -PI * 1.5, -TAU] {
+            let s = NurbsSurface3D::try_revolve(&profile, &o, &Vector3::z(), theta).unwrap();
+            let end = Point3::new(5. * theta.cos(), 5. * theta.sin(), 0.);
+            assert_relative_eq!(bottom_point(&s, 1.), end, epsilon = 1e-9);
+            let mid = bottom_point(&s, 0.5);
+            assert_relative_eq!(mid.coords.norm(), 5., epsilon = 1e-9);
+            assert!(mid.y <= 1e-9, "not clockwise: {mid:?}");
+        }
+        assert!(NurbsSurface3D::try_revolve(&profile, &o, &Vector3::z(), TAU * 1.5).is_err());
     }
 }
