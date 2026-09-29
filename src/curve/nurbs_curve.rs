@@ -691,32 +691,12 @@ where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
-        let mult = self.knots.multiplicity();
-        let start = mult.first().unwrap().multiplicity();
-        let end = mult.last().unwrap().multiplicity();
-
+        // `try_decompose` only returns the Bezier segments within the knot domain,
+        // so unclamped (e.g. periodic) knot vectors are handled without trimming.
         let segments = self.try_decompose()?;
-
-        // If the start/end parts of the knot vector are not duplicated,
-        // the Bezier segments will not be generated correctly,
-        // so reduce the number of segments by the amount that falls below the required duplication degree.
-        let required_multiplicity = self.degree + 1;
-        let i = required_multiplicity.saturating_sub(start);
-        let j = if end < required_multiplicity {
-            segments.len() - (required_multiplicity - end)
-        } else {
-            segments.len()
-        };
-        let segments = &segments[i..j];
 
         let (_, u) = self.knots_domain();
         let gauss = GaussLegendre::new(NonZeroUsize::new(16 + self.degree).unwrap());
-
-        if segments.len() <= 1 {
-            // If the curve is a single Bezier segment, compute the length directly
-            let l = compute_bezier_segment_length(self, u, &gauss);
-            return Ok(l);
-        }
 
         let length = segments
             .iter()
@@ -1930,30 +1910,48 @@ where
     }
 
     /// Try to clamp knots of the curve
-    /// Multiplex the start/end part of the knot vector so that the knot has `degree + 1` overlap
+    /// Multiplex the start/end of the knot domain so that the knot has `degree + 1` overlap,
+    /// and discard the knots & control points outside of the domain.
+    /// The shape of the curve within the domain is preserved.
     pub fn try_clamp(&mut self) -> anyhow::Result<()> {
         let degree = self.degree();
+        let required = degree + 1;
+        let (start, end) = self.knots_domain();
 
-        let start = self.knots.first();
-        let end = self.knots.last();
-        let multiplicity = self.knots.multiplicity();
-        let start_knot_count = multiplicity
+        let count = |knots: &[T], u: T| knots.iter().filter(|k| **k == u).count();
+        let knots = self.knots.as_slice();
+        let knots_to_insert =
+            std::iter::repeat_n(start, required.saturating_sub(count(knots, start)))
+                .chain(std::iter::repeat_n(
+                    end,
+                    required.saturating_sub(count(knots, end)),
+                ))
+                .collect_vec();
+        if !knots_to_insert.is_empty() {
+            self.try_refine_knot(knots_to_insert)?;
+        }
+
+        let knots = self.knots.as_slice();
+        // take the last `degree + 1` knots of the start run and the first `degree + 1` knots of the end run
+        let first = knots
             .iter()
-            .find(|m| *m.knot() == start)
+            .rposition(|k| *k == start)
             .ok_or(anyhow::anyhow!("Start knot not found"))?
-            .multiplicity();
-        let end_knot_count = multiplicity
+            - degree;
+        let last = knots
             .iter()
-            .find(|m| *m.knot() == end)
+            .position(|k| *k == end)
             .ok_or(anyhow::anyhow!("End knot not found"))?
-            .multiplicity();
+            + degree;
+        anyhow::ensure!(
+            last > first + 2 * degree,
+            "Invalid knot vector for clamping"
+        );
 
-        for _ in start_knot_count..=degree {
-            self.try_add_knot(start)?;
-        }
-        for _ in end_knot_count..=degree {
-            self.try_add_knot(end)?;
-        }
+        let knots = knots[first..=last].to_vec();
+        let control_points = self.control_points[first..=(last - required)].to_vec();
+        self.knots = KnotVector::new(knots);
+        self.control_points = control_points;
 
         Ok(())
     }
