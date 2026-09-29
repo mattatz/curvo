@@ -7,7 +7,7 @@ use crate::{
     misc::{three_points_are_flat, FloatingPoint},
 };
 
-use super::Tessellation;
+use super::{ParametricTessellation, Tessellation};
 
 impl<T: FloatingPoint, D: DimName> Tessellation<Option<T>> for NurbsCurve<T, D>
 where
@@ -28,6 +28,48 @@ where
         let mut sampler = FlatnessSampler::default();
         tessellate_curve_adaptive(self, start, end, tol, &mut sampler, &|_t, p| p)
     }
+}
+
+impl<T: FloatingPoint, D: DimName> ParametricTessellation<Option<T>> for NurbsCurve<T, D>
+where
+    D: DimNameSub<U1>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+{
+    type Output = Vec<(T, OPoint<T, DimNameDiff<D, U1>>)>;
+    /// Tessellate the curve using an adaptive algorithm,
+    /// returning the parameter and the point of each tessellated vertex.
+    /// The points are identical to the ones returned by [`Tessellation::tessellate`].
+    fn tessellate_with_parameters(&self, tolerance: Option<T>) -> Self::Output {
+        if self.degree() == 1 {
+            return polyline_with_parameters(self);
+        }
+
+        let tol = tolerance.unwrap_or(T::from_f64(1e-6).unwrap());
+        let (start, end) = self.knots_domain();
+        let mut sampler = FlatnessSampler::default();
+        tessellate_curve_adaptive(self, start, end, tol, &mut sampler, &|t, p| (t, p))
+    }
+}
+
+/// Returns the control points of a degree 1 curve paired with their parameters.
+/// The control point `i` of a degree 1 curve is located at the knot `i + 1`.
+#[allow(clippy::type_complexity)]
+fn polyline_with_parameters<T: FloatingPoint, D>(
+    curve: &NurbsCurve<T, D>,
+) -> Vec<(T, OPoint<T, DimNameDiff<D, U1>>)>
+where
+    D: DimName + DimNameSub<U1>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+{
+    let knots = curve.knots().as_slice();
+    curve
+        .dehomogenized_control_points()
+        .into_iter()
+        .enumerate()
+        .map(|(i, p)| (knots[i + 1], p))
+        .collect()
 }
 
 /// Options for length-based adaptive curve tessellation.
@@ -80,6 +122,31 @@ where
 
         let (start, end) = self.knots_domain();
         tessellate_curve_adaptive_length(self, start, end, options.max_edge_length, &|_t, p| p)
+    }
+}
+
+impl<T: FloatingPoint, D: DimName> ParametricTessellation<AdaptiveCurveTessellationOptions<T>>
+    for NurbsCurve<T, D>
+where
+    D: DimNameSub<U1>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+{
+    type Output = Vec<(T, OPoint<T, DimNameDiff<D, U1>>)>;
+
+    /// Tessellate the curve using a length-based adaptive algorithm,
+    /// returning the parameter and the point of each tessellated vertex.
+    /// The points are identical to the ones returned by [`Tessellation::tessellate`].
+    fn tessellate_with_parameters(
+        &self,
+        options: AdaptiveCurveTessellationOptions<T>,
+    ) -> Self::Output {
+        if self.degree() == 1 {
+            return polyline_with_parameters(self);
+        }
+
+        let (start, end) = self.knots_domain();
+        tessellate_curve_adaptive_length(self, start, end, options.max_edge_length, &|t, p| (t, p))
     }
 }
 
@@ -197,6 +264,7 @@ where
 
 #[cfg(test)]
 mod tests {
+    use approx::assert_relative_eq;
     use nalgebra::{Point3, Point4};
 
     use crate::prelude::*;
@@ -232,6 +300,43 @@ mod tests {
             for _ in 0..8 {
                 assert_eq!(curve.tessellate(Some(1e-6)), first);
             }
+        }
+    }
+
+    fn assert_parameters<O: Clone>(curve: &NurbsCurve3D<f64>, options: O)
+    where
+        NurbsCurve3D<f64>: Tessellation<O, Output = Vec<Point3<f64>>>
+            + ParametricTessellation<O, Output = Vec<(f64, Point3<f64>)>>,
+    {
+        let points = curve.tessellate(options.clone());
+        let with_parameters = curve.tessellate_with_parameters(options);
+        assert_eq!(points.len(), with_parameters.len());
+
+        let (start, end) = curve.knots_domain();
+        assert_eq!(with_parameters.first().unwrap().0, start);
+        assert_eq!(with_parameters.last().unwrap().0, end);
+        for w in with_parameters.windows(2) {
+            assert!(w[0].0 < w[1].0);
+        }
+        for (p, (t, q)) in points.iter().zip(with_parameters.iter()) {
+            assert_eq!(p, q);
+            assert_relative_eq!(curve.point_at(*t), *q, epsilon = 1e-12);
+        }
+    }
+
+    #[test]
+    fn tessellate_with_parameters() {
+        let polyline = NurbsCurve3D::polyline(
+            &[
+                Point3::new(0.0, 0.0, 0.0),
+                Point3::new(1.0, 0.0, 0.0),
+                Point3::new(1.0, 2.0, 0.0),
+            ],
+            true,
+        );
+        for curve in [bezier(), closed_curve(), polyline] {
+            assert_parameters(&curve, Some(1e-6));
+            assert_parameters(&curve, AdaptiveCurveTessellationOptions::new(0.05));
         }
     }
 
