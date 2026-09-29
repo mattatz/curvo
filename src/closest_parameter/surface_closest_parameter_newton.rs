@@ -109,7 +109,9 @@ where
         let grad = Vector2::new(s_u.dot(&dif), s_v.dot(&dif));
 
         let distance = dif.norm();
-        let eps = F::from_f64(1e-5).unwrap();
+        // Relative to the model scale: an absolute 1e-5 left on-surface points
+        // (e.g. trimming curve control points mapped to UV) that far off.
+        let eps = F::from_f64(1e-12).unwrap() * nalgebra::RealField::max(e[0][0].norm(), F::one());
 
         // halt if point is close enough
         if distance < eps {
