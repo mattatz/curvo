@@ -158,7 +158,12 @@ where
 
                 // clip the range of uvs to match self one
                 let idx = edge_index % 2; // left-bottom, right-top to x, right-bottom, left-top to y
-                let e = T::default_epsilon();
+
+                // Relative to the edge length: an absolute machine epsilon is
+                // lost when added to uv values >= 1, which let the neighbor's
+                // copies of our own corners through (duplicate corners force a
+                // center fan, which is non-manifold on degenerate cells).
+                let e = (orig[2].uv[idx] - orig[0].uv[idx]).abs() * T::from_f64(1e-9).unwrap();
                 let lower = orig[0].uv[idx] + e;
                 let upper = orig[2].uv[idx] - e;
                 let corner = corners
