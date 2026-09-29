@@ -124,3 +124,65 @@ fn greville_abscissae_circle() {
             assert_relative_eq!(curve.point_at(*t), pt);
         });
 }
+
+/// Degree 3 curve with an unclamped uniform knot vector (issue #104)
+fn unclamped_curve() -> crate::curve::NurbsCurve3D<f64> {
+    use nalgebra::Point4;
+    let square = [(1.0, 0.0), (0.0, 1.0), (-1.0, 0.0), (0.0, -1.0)];
+    let control_points: Vec<Point4<f64>> = square
+        .iter()
+        .chain(square[..3].iter())
+        .map(|(x, y)| Point4::new(*x, *y, 0.0, 1.0))
+        .collect();
+    let knots: Vec<f64> = (0..11).map(|i| i as f64 - 7.0).collect();
+    crate::curve::NurbsCurve3D::try_new(3, control_points, knots).unwrap()
+}
+
+fn sampled_length(curve: &crate::curve::NurbsCurve3D<f64>) -> f64 {
+    let (start, end) = curve.knots_domain();
+    let n = 10000;
+    (0..n)
+        .map(|i| {
+            let t0 = start + (end - start) * (i as f64) / (n as f64);
+            let t1 = start + (end - start) * ((i + 1) as f64) / (n as f64);
+            (curve.point_at(t1) - curve.point_at(t0)).norm()
+        })
+        .sum()
+}
+
+#[test]
+fn length_of_unclamped_curve() {
+    let curve = unclamped_curve();
+    assert_eq!(curve.knots_domain(), (-4.0, 0.0));
+    assert!(!curve.is_clamped());
+
+    let length = curve.try_length().unwrap();
+    assert_relative_eq!(length, sampled_length(&curve), epsilon = 1e-4);
+}
+
+#[test]
+fn clamp_unclamped_curve() {
+    let curve = unclamped_curve();
+    let mut clamped = curve.clone();
+    clamped.try_clamp().unwrap();
+
+    assert!(clamped.is_clamped());
+    assert_eq!(clamped.knots_domain(), curve.knots_domain());
+
+    let (start, end) = curve.knots_domain();
+    for i in 0..=100 {
+        let t = start + (end - start) * (i as f64) / 100.;
+        assert_relative_eq!(curve.point_at(t), clamped.point_at(t), epsilon = 1e-10);
+    }
+    assert_relative_eq!(
+        curve.try_length().unwrap(),
+        clamped.try_length().unwrap(),
+        epsilon = 1e-8
+    );
+
+    // clamping an already clamped curve does nothing
+    let mut twice = clamped.clone();
+    twice.try_clamp().unwrap();
+    assert_eq!(twice.knots().as_slice(), clamped.knots().as_slice());
+    assert_eq!(twice.control_points(), clamped.control_points());
+}

@@ -112,7 +112,8 @@ pub mod prelude {
         trimmed_surface::trimmed_surface_ext::TrimmedSurfaceExt,
         trimmed_surface::TrimmedSurfaceConstrainedTriangulation,
         trimmed_surface::TrimmedSurfaceConstraints,
-        ConstrainedTessellation, DefaultDivider, DividableDirection, Tessellation,
+        ConstrainedTessellation, DefaultDivider, DividableDirection, ParametricTessellation,
+        Tessellation,
     };
     pub use crate::trim::*;
 }

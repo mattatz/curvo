@@ -2119,4 +2119,32 @@ mod tests {
         }
         assert!(NurbsSurface3D::try_revolve(&profile, &o, &Vector3::z(), TAU * 1.5).is_err());
     }
+
+    /// Points on the surface map back to themselves to machine precision (the
+    /// Newton solver used to stop within an absolute 1e-5, which misplaced
+    /// trimming curves mapped onto planar caps).
+    #[test]
+    fn closest_parameter_is_exact_for_points_on_surface() {
+        let plane = NurbsSurface3D::new(
+            1,
+            1,
+            vec![0., 0., 1., 1.],
+            vec![0., 0., 1., 1.],
+            vec![
+                vec![Point4::new(-5., -5., 0., 1.), Point4::new(-5., 5., 0., 1.)],
+                vec![Point4::new(5., -5., 0., 1.), Point4::new(5., 5., 0., 1.)],
+            ],
+        );
+        let sphere =
+            NurbsSurface3D::try_sphere(&Point3::origin(), &Vector3::z(), &Vector3::x(), 5.)
+                .unwrap();
+        for s in [plane, sphere] {
+            let ((u0, u1), (v0, v1)) = s.knots_domain();
+            for (a, b) in [(0.13, 0.71), (0.5, 0.5), (0.91, 0.27)] {
+                let p = s.point_at(u0 + (u1 - u0) * a, v0 + (v1 - v0) * b);
+                let (u, v) = s.find_closest_parameter(&p, None).unwrap();
+                assert_relative_eq!(s.point_at(u, v), p, epsilon = 1e-10);
+            }
+        }
+    }
 }

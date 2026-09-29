@@ -30,6 +30,12 @@ pub trait Tessellation<Opt> {
     fn tessellate(&self, options: Opt) -> Self::Output;
 }
 
+/// A trait for tessellating a shape and getting the parameter of each tessellated point
+pub trait ParametricTessellation<Opt> {
+    type Output;
+    fn tessellate_with_parameters(&self, options: Opt) -> Self::Output;
+}
+
 /// A trait for tessellating a shape with constraints
 pub trait ConstrainedTessellation<Opt> {
     type Constraint;
