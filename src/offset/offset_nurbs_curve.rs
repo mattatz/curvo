@@ -16,7 +16,7 @@ use crate::offset::helper::{
 use crate::offset::vertex::Vertex;
 use crate::offset::CurveOffsetCornerType;
 use crate::region::{CompoundCurve, CompoundCurve2D};
-use crate::tessellation::tessellation_curve::tessellate_curve_adaptive;
+use crate::tessellation::tessellation_curve::{tessellate_curve_adaptive, FlatnessSampler};
 use crate::{curve::NurbsCurve, misc::FloatingPoint, offset::Offset};
 
 impl<'a, T> Offset<'a, T> for NurbsCurve2D<T>
@@ -367,11 +367,16 @@ where
     DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
-    let mut rng = rand::rng();
     let (start, end) = curve.knots_domain();
-    tessellate_curve_adaptive(curve, start, end, normal_tolerance, &mut rng, &|t, p| {
-        (p, curve.tangent_at(t))
-    })
+    let mut sampler = FlatnessSampler::default();
+    tessellate_curve_adaptive(
+        curve,
+        start,
+        end,
+        normal_tolerance,
+        &mut sampler,
+        &|t, p| (p, curve.tangent_at(t)),
+    )
 }
 
 #[cfg(test)]
