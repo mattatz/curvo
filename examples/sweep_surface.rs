@@ -99,7 +99,8 @@ fn setup(
         &mut commands,
         &mut meshes,
         &mut normal_materials,
-        None,
+        // The default tolerance is too fine for this long swept surface.
+        Some(AdaptiveTessellationOptions::default().with_norm_tolerance(1.58e-1)),
     );
 
     commands.spawn((
