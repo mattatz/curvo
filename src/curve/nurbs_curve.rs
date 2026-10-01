@@ -705,6 +705,62 @@ where
         length.ok_or(anyhow::anyhow!("Failed to compute the length of the curve"))
     }
 
+    /// Compute the arc length of the curve between two parameters.
+    ///
+    /// The parameters are clamped to the knot domain and may be given in either order. The length
+    /// is integrated per Bezier segment the same way as [`NurbsCurve::try_length`], so
+    /// `try_length_between(start, end)` over the whole domain agrees with `try_length()`.
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point2, Vector2};
+    /// use approx::assert_relative_eq;
+    /// let unit_circle = NurbsCurve2D::try_circle(
+    ///     &Point2::origin(),
+    ///     &Vector2::x(),
+    ///     &Vector2::y(),
+    ///     1.
+    /// ).unwrap();
+    /// let (start, end) = unit_circle.knots_domain();
+    /// let quarter = start + (end - start) / 4.;
+    /// let length = unit_circle.try_length_between(start, quarter).unwrap();
+    /// assert_relative_eq!(length, std::f64::consts::FRAC_PI_2, epsilon = 1e-10);
+    /// let whole = unit_circle.try_length_between(end, start).unwrap();
+    /// assert_relative_eq!(whole, unit_circle.try_length().unwrap(), epsilon = 1e-10);
+    /// ```
+    pub fn try_length_between(&self, start: T, end: T) -> anyhow::Result<T>
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+    {
+        anyhow::ensure!(
+            start.is_finite() && end.is_finite(),
+            "Parameters must be finite"
+        );
+        let (lo, hi) = if start <= end {
+            (start, end)
+        } else {
+            (end, start)
+        };
+        let (lo, hi) = (self.knots_constrain(lo), self.knots_constrain(hi));
+        let segments = self.try_decompose()?;
+        let gauss = GaussLegendre::new(NonZeroUsize::new(16 + self.degree).unwrap());
+
+        let length = segments
+            .iter()
+            .map(|s| {
+                let (a, b) = s.knots_domain();
+                let (a, b) = (a.max(lo), b.min(hi));
+                if a < b {
+                    compute_bezier_segment_length_between(s, a, b, &gauss)
+                } else {
+                    T::zero()
+                }
+            })
+            .fold(T::zero(), T::add);
+        Ok(length)
+    }
+
     /// Compute the parameter at a given length
     /// `tolerance` defines the precision of the result (default: 1e-4)
     /// # Example
@@ -2216,6 +2272,26 @@ where
 
 /// Compute the length of a Bezier segment of a NURBS curve
 /// by gauss-legendre quadrature
+/// The arc length of a Bezier segment between two parameters inside its own domain.
+fn compute_bezier_segment_length_between<T: FloatingPoint, D>(
+    s: &NurbsCurve<T, D>,
+    start: T,
+    end: T,
+    gauss: &GaussLegendre,
+) -> T
+where
+    D: DimName + DimNameSub<U1>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+{
+    let sum = gauss.integrate(start.to_f64().unwrap(), end.to_f64().unwrap(), |x| {
+        let x = T::from_f64(x).unwrap();
+        let deriv = s.rational_derivatives(x, 1);
+        deriv[1].norm().to_f64().unwrap()
+    });
+    T::from_f64(sum).unwrap()
+}
+
 fn compute_bezier_segment_length<T: FloatingPoint, D>(
     s: &NurbsCurve<T, D>,
     u: T,
