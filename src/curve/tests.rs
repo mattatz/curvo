@@ -249,3 +249,30 @@ fn knots_out_of_order_or_outside_the_domain_do_not_refine_a_curve() {
     assert!(refine(vec![start - 0.5]).is_err());
     assert!(refine(vec![4.5, end + 0.5]).is_err());
 }
+
+#[test]
+fn try_new_refuses_a_description_it_cannot_build() {
+    use crate::curve::NurbsCurve3D;
+    use nalgebra::Point4;
+    let points = || {
+        vec![
+            Point4::new(0., 0., 0., 1.),
+            Point4::new(1., 1., 0., 1.),
+            Point4::new(2., 0., 0., 1.),
+        ]
+    };
+    let knots = vec![0., 0., 0., 1., 1., 1.];
+    assert!(NurbsCurve3D::try_new(2, points(), knots.clone()).is_ok());
+
+    // A decreasing knot vector describes no curve; sorting it would build a different one.
+    assert!(NurbsCurve3D::try_new(2, points(), vec![0., 0., 1., 0., 1., 1.]).is_err());
+    // A NaN knot is an error, not a panic.
+    assert!(NurbsCurve3D::try_new(2, points(), vec![0., 0., f64::NAN, 1., 1., 1.]).is_err());
+
+    let mut nan = points();
+    nan[1].x = f64::NAN;
+    assert!(NurbsCurve3D::try_new(2, nan, knots.clone()).is_err());
+    let mut weightless = points();
+    weightless[1].w = 0.;
+    assert!(NurbsCurve3D::try_new(2, weightless, knots).is_err());
+}

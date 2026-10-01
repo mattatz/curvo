@@ -75,22 +75,26 @@ where
     /// let nurbs = NurbsCurve::try_new(3, control_points, knots);
     /// assert!(nurbs.is_ok());
     /// ```
+    ///
+    /// # Errors
+    /// Returns an error if there are too few control points for the degree, if the knot vector is
+    /// the wrong length, holds a non-finite knot or decreases anywhere
+    /// (see [`KnotVector::try_validate`]), or if a control point is not finite or has a weight that
+    /// is not positive. A decreasing knot vector is refused rather than sorted: sorting it would
+    /// return a different curve from the one that was described.
     pub fn try_new(
         degree: usize,
         control_points: Vec<OPoint<T, D>>,
-        mut knots: Vec<T>,
+        knots: Vec<T>,
     ) -> anyhow::Result<Self> {
-        ensure_curve(degree, control_points.len(), knots.len())?;
-
-        // The sort is stable, so knots already in order are left as they are.
-        if !knots.is_sorted() {
-            knots.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        }
+        let knots = KnotVector::new(knots);
+        knots.try_validate(degree, control_points.len())?;
+        try_validate_control_points(&control_points)?;
 
         Ok(Self {
             degree,
             control_points,
-            knots: KnotVector::new(knots),
+            knots,
         })
     }
 
@@ -2316,6 +2320,25 @@ where
     }
 
     (control_points_post, knots_post)
+}
+
+/// Check that every homogeneous control point is finite and has a positive weight, its last
+/// coordinate.
+pub(crate) fn try_validate_control_points<T: FloatingPoint, D: DimName>(
+    control_points: &[OPoint<T, D>],
+) -> anyhow::Result<()>
+where
+    DefaultAllocator: Allocator<D>,
+{
+    for p in control_points {
+        anyhow::ensure!(
+            p.iter().all(|c| c.is_finite()),
+            "Control point contains a non-finite coordinate"
+        );
+        let weight = p[D::dim() - 1];
+        anyhow::ensure!(weight > T::zero(), "Control point weight must be positive");
+    }
+    Ok(())
 }
 
 /// Dehomogenize a point
