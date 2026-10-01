@@ -12,7 +12,7 @@ use nalgebra::{
 };
 use simba::scalar::SupersetOf;
 
-use crate::misc::binomial::Binomial;
+use crate::misc::binomial::{binomial_coefficient, Binomial};
 use crate::misc::frenet_frame::FrenetFrame;
 use crate::misc::transformable::Transformable;
 use crate::misc::trigonometry::segment_closest_point;
@@ -419,13 +419,15 @@ where
     pub(crate) fn point(&self, t: T) -> OPoint<T, D> {
         let n = self.knots.len() - self.degree - 2;
         let knot_span_index = self.knots.find_knot_span_index(n, self.degree, t);
-        let basis = self.knots.basis_functions(knot_span_index, t, self.degree);
-        let mut position = OPoint::<T, D>::origin();
-        for i in 0..=self.degree {
-            position.coords +=
-                &self.control_points[knot_span_index - self.degree + i].coords * basis[i];
-        }
-        position
+        self.knots
+            .with_basis_functions(knot_span_index, t, self.degree, |basis| {
+                let mut position = OPoint::<T, D>::origin();
+                for i in 0..=self.degree {
+                    position.coords +=
+                        &self.control_points[knot_span_index - self.degree + i].coords * basis[i];
+                }
+                position
+            })
     }
 
     /// Evaluate the curve at a given parameter to get a tangent vector
@@ -497,29 +499,20 @@ where
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
         let ders = self.derivatives(u, derivs);
-        let a_ders: Vec<_> = ders
-            .iter()
-            .map(|d| {
-                let mut a_ders = vec![];
-                for i in 0..D::dim() - 1 {
-                    a_ders.push(d[i]);
-                }
-                OVector::<T, DimNameDiff<D, U1>>::from_vec(a_ders)
-            })
-            .collect();
-        let w_ders: Vec<_> = ders.iter().map(|d| d[D::dim() - 1]).collect();
+        let weight = D::dim() - 1;
 
-        let mut ck = vec![];
-        let mut binom = Binomial::<T>::new();
+        let mut ck: Vec<OVector<T, DimNameDiff<D, U1>>> = Vec::with_capacity(derivs + 1);
         for k in 0..=derivs {
-            let mut v = a_ders[k].clone();
+            let mut v = OVector::<T, DimNameDiff<D, U1>>::from_iterator(
+                ders[k].iter().take(weight).copied(),
+            );
 
             for i in 1..=k {
-                let coef = binom.get(k, i) * w_ders[i];
+                let coef = binomial_coefficient::<T>(k, i) * ders[i][weight];
                 v -= &ck[k - i] * coef;
             }
 
-            let dehom = v / w_ders[0];
+            let dehom = v / ders[0][weight];
             ck.push(dehom);
         }
         ck
@@ -537,18 +530,20 @@ where
         let mut derivatives = vec![OVector::<T, D>::zeros(); derivs + 1];
 
         let knot_span_index = self.knots.find_knot_span_index(n, self.degree, u);
-        let nders = self
-            .knots
-            .derivative_basis_functions(knot_span_index, u, self.degree, du);
-        for k in 0..=du {
-            for j in 0..=self.degree {
-                let w = &self.control_points[knot_span_index - self.degree + j] * nders[k][j];
-                let column = derivatives.get_mut(k).unwrap();
-                w.coords.iter().enumerate().for_each(|(i, v)| {
-                    column[i] += *v;
-                });
-            }
-        }
+        let stride = self.degree + 1;
+        self.knots
+            .with_derivative_basis_functions(knot_span_index, u, self.degree, du, |nders| {
+                for k in 0..=du {
+                    for j in 0..=self.degree {
+                        let w = &self.control_points[knot_span_index - self.degree + j]
+                            * nders[k * stride + j];
+                        let column = derivatives.get_mut(k).unwrap();
+                        w.coords.iter().enumerate().for_each(|(i, v)| {
+                            column[i] += *v;
+                        });
+                    }
+                }
+            });
 
         derivatives
     }

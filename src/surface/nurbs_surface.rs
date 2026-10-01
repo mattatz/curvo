@@ -12,8 +12,8 @@ use simba::scalar::SupersetOf;
 use crate::{
     curve::nurbs_curve::{dehomogenize, NurbsCurve, NurbsCurve3D},
     misc::{
-        binomial::Binomial, transformable::Transformable, transpose_control_points, FloatingPoint,
-        Invertible, Ray,
+        binomial::binomial_coefficient, transformable::Transformable, transpose_control_points,
+        FloatingPoint, Invertible, Ray,
     },
     prelude::{
         try_interpolate_control_points, AdaptiveTessellationOptions, KnotVector,
@@ -206,29 +206,33 @@ where
 
         let knot_span_index_u = self.u_knots.find_knot_span_index(n, self.u_degree, u);
         let knot_span_index_v = self.v_knots.find_knot_span_index(m, self.v_degree, v);
-        let u_basis_vals = self
-            .u_knots
-            .basis_functions(knot_span_index_u, u, self.u_degree);
-        let v_basis_vals = self
-            .v_knots
-            .basis_functions(knot_span_index_v, v, self.v_degree);
         let uind = knot_span_index_u - self.u_degree;
 
-        let mut position = OPoint::<T, D>::origin();
-        for l in 0..=self.v_degree {
-            let mut temp = OPoint::<T, D>::origin();
-            let vind = knot_span_index_v - self.v_degree + l;
+        self.u_knots
+            .with_basis_functions(knot_span_index_u, u, self.u_degree, |u_basis_vals| {
+                self.v_knots.with_basis_functions(
+                    knot_span_index_v,
+                    v,
+                    self.v_degree,
+                    |v_basis_vals| {
+                        let mut position = OPoint::<T, D>::origin();
+                        for l in 0..=self.v_degree {
+                            let mut temp = OPoint::<T, D>::origin();
+                            let vind = knot_span_index_v - self.v_degree + l;
 
-            // sample u isoline
-            for k in 0..=self.u_degree {
-                temp.coords += &self.control_points[uind + k][vind].coords * u_basis_vals[k];
-            }
+                            // sample u isoline
+                            for k in 0..=self.u_degree {
+                                temp.coords +=
+                                    &self.control_points[uind + k][vind].coords * u_basis_vals[k];
+                            }
 
-            // add point from u isoline
-            position.coords += temp.coords * v_basis_vals[l];
-        }
-
-        position
+                            // add point from u isoline
+                            position.coords += temp.coords * v_basis_vals[l];
+                        }
+                        position
+                    },
+                )
+            })
     }
 
     // Compute a regularly spaced grid of points on surface.
@@ -518,41 +522,55 @@ where
         let mut skl = vec![vec![OVector::<T, D>::zeros(); derivs + 1]; derivs + 1];
         let knot_span_index_u = self.u_knots.find_knot_span_index(n, self.u_degree, u);
         let knot_span_index_v = self.v_knots.find_knot_span_index(m, self.v_degree, v);
-        let uders = self
-            .u_knots
-            .derivative_basis_functions(knot_span_index_u, u, self.u_degree, n);
-        let vders = self
-            .v_knots
-            .derivative_basis_functions(knot_span_index_v, v, self.v_degree, m);
-        let mut temp = vec![OPoint::<T, D>::origin(); self.v_degree + 1];
+        // Only the first `du` and `dv` derivatives are used. Asking for `n` and `m` — the control
+        // point counts — computed a row per control point and threw all but a few away.
+        let (u_stride, v_stride) = (self.u_degree + 1, self.v_degree + 1);
+        self.u_knots.with_derivative_basis_functions(
+            knot_span_index_u,
+            u,
+            self.u_degree,
+            du,
+            |uders| {
+                self.v_knots.with_derivative_basis_functions(
+                    knot_span_index_v,
+                    v,
+                    self.v_degree,
+                    dv,
+                    |vders| {
+                        let mut temp = vec![OPoint::<T, D>::origin(); self.v_degree + 1];
 
-        for k in 0..=du {
-            for s in 0..=self.v_degree {
-                temp[s] = OPoint::<T, D>::origin();
-                for r in 0..=self.u_degree {
-                    let w = &self.control_points[knot_span_index_u - self.u_degree + r]
-                        [knot_span_index_v - self.v_degree + s]
-                        * uders[k][r];
-                    let column = temp.get_mut(s).unwrap();
-                    w.coords.iter().enumerate().for_each(|(i, v)| {
-                        column[i] += *v;
-                    });
-                }
-            }
+                        for k in 0..=du {
+                            for s in 0..=self.v_degree {
+                                temp[s] = OPoint::<T, D>::origin();
+                                for r in 0..=self.u_degree {
+                                    let w = &self.control_points
+                                        [knot_span_index_u - self.u_degree + r]
+                                        [knot_span_index_v - self.v_degree + s]
+                                        * uders[k * u_stride + r];
+                                    let column = temp.get_mut(s).unwrap();
+                                    w.coords.iter().enumerate().for_each(|(i, v)| {
+                                        column[i] += *v;
+                                    });
+                                }
+                            }
 
-            let nk = derivs - k;
-            let dd = if nk < dv { nk } else { dv };
+                            let nk = derivs - k;
+                            let dd = if nk < dv { nk } else { dv };
 
-            for l in 0..=dd {
-                for (s, item) in temp.iter().enumerate().take(self.v_degree + 1) {
-                    let w = item * vders[l][s];
-                    let column = skl[k].get_mut(l).unwrap();
-                    w.coords.iter().enumerate().for_each(|(i, v)| {
-                        column[i] += *v;
-                    });
-                }
-            }
-        }
+                            for l in 0..=dd {
+                                for (s, item) in temp.iter().enumerate().take(self.v_degree + 1) {
+                                    let w = item * vders[l * v_stride + s];
+                                    let column = skl[k].get_mut(l).unwrap();
+                                    w.coords.iter().enumerate().for_each(|(i, v)| {
+                                        column[i] += *v;
+                                    });
+                                }
+                            }
+                        }
+                    },
+                )
+            },
+        );
 
         skl
     }
@@ -1110,49 +1128,36 @@ where
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
-    let a_ders: Vec<_> = ders
-        .iter()
-        .map(|row| {
-            row.iter()
-                .map(|d| {
-                    let mut a_ders = vec![];
-                    for i in 0..D::dim() - 1 {
-                        a_ders.push(d[i]);
-                    }
-                    OVector::<T, DimNameDiff<D, U1>>::from_vec(a_ders)
-                })
-                .collect_vec()
-        })
-        .collect();
-    let w_ders: Vec<_> = ders
-        .iter()
-        .map(|row| row.iter().map(|d| d[D::dim() - 1]).collect_vec())
-        .collect();
+    let weight = D::dim() - 1;
+    let a_der = |d: &OVector<T, D>| {
+        OVector::<T, DimNameDiff<D, U1>>::from_iterator(d.iter().take(weight).copied())
+    };
+    let w_ders = |k: usize, l: usize| ders[k][l][weight];
+    let binom = binomial_coefficient::<T>;
 
-    let mut skl: Vec<Vec<OVector<T, DimNameDiff<D, U1>>>> = vec![];
-    let mut binom = Binomial::<T>::new();
+    let mut skl: Vec<Vec<OVector<T, DimNameDiff<D, U1>>>> = Vec::with_capacity(derivs + 1);
 
     for k in 0..=derivs {
-        let mut row = vec![];
+        let mut row = Vec::with_capacity(derivs - k + 1);
 
         for l in 0..=(derivs - k) {
-            let mut v = a_ders[k][l].clone();
+            let mut v = a_der(&ders[k][l]);
             for j in 1..=l {
-                let coef = binom.get(l, j) * w_ders[0][j];
+                let coef = binom(l, j) * w_ders(0, j);
                 v -= &row[l - j] * coef;
             }
 
             for i in 1..=k {
-                let coef = binom.get(k, i) * w_ders[i][0];
+                let coef = binom(k, i) * w_ders(i, 0);
                 v -= &skl[k - i][l] * coef;
                 let mut v2 = OVector::<T, DimNameDiff<D, U1>>::zeros();
                 for j in 1..=l {
-                    v2 += &skl[k - i][l - j] * binom.get(l, j) * w_ders[i][j];
+                    v2 += &skl[k - i][l - j] * binom(l, j) * w_ders(i, j);
                 }
-                v -= v2 * binom.get(k, i);
+                v -= v2 * binom(k, i);
             }
 
-            let v = v / w_ders[0][0];
+            let v = v / w_ders(0, 0);
             row.push(v);
         }
 

@@ -8,6 +8,9 @@ use crate::{
     prelude::{FloatingPoint, Invertible, KnotMultiplicity},
 };
 
+/// Degrees below this are evaluated in stack buffers; higher ones fall back to the heap.
+const INLINE_BASIS: usize = 16;
+
 /// Knot vector representation
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -307,7 +310,55 @@ impl<T: RealField + Copy> KnotVector<T> {
         let mut basis_functions = vec![T::zero(); degree + 1];
         let mut left = vec![T::zero(); degree + 1];
         let mut right = vec![T::zero(); degree + 1];
+        self.basis_functions_into(
+            knot_span_index,
+            u,
+            degree,
+            &mut basis_functions,
+            &mut left,
+            &mut right,
+        );
+        basis_functions
+    }
 
+    /// Call `f` with the non-vanishing basis functions, computed into stack buffers when the
+    /// degree allows it, so evaluating a point allocates nothing.
+    pub(crate) fn with_basis_functions<R>(
+        &self,
+        knot_span_index: usize,
+        u: T,
+        degree: usize,
+        f: impl FnOnce(&[T]) -> R,
+    ) -> R {
+        if degree < INLINE_BASIS {
+            let mut basis_functions = [T::zero(); INLINE_BASIS];
+            let mut left = [T::zero(); INLINE_BASIS];
+            let mut right = [T::zero(); INLINE_BASIS];
+            self.basis_functions_into(
+                knot_span_index,
+                u,
+                degree,
+                &mut basis_functions,
+                &mut left,
+                &mut right,
+            );
+            f(&basis_functions[..=degree])
+        } else {
+            f(&self.basis_functions(knot_span_index, u, degree))
+        }
+    }
+
+    /// The basis functions into `basis_functions[..=degree]`, with `left` and `right` as scratch.
+    /// Every buffer must be zeroed and at least `degree + 1` long.
+    fn basis_functions_into(
+        &self,
+        knot_span_index: usize,
+        u: T,
+        degree: usize,
+        basis_functions: &mut [T],
+        left: &mut [T],
+        right: &mut [T],
+    ) {
         basis_functions[0] = T::one();
 
         for j in 1..=degree {
@@ -323,8 +374,6 @@ impl<T: RealField + Copy> KnotVector<T> {
 
             basis_functions[j] = saved;
         }
-
-        basis_functions
     }
 
     /// Compute the non-vanishing basis functions and their derivatives
@@ -334,13 +383,75 @@ impl<T: RealField + Copy> KnotVector<T> {
         knot_index: usize,
         u: T,
         degree: usize,
-        n: usize, // integer number of basis functions - 1 = knots.length - degree - 2
+        n: usize, // number of derivatives
     ) -> Vec<Vec<T>> {
-        let mut ndu = vec![vec![T::zero(); degree + 1]; degree + 1];
-        let mut left = vec![T::zero(); degree + 1];
-        let mut right = vec![T::zero(); degree + 1];
+        let stride = degree + 1;
+        let mut ders = vec![T::zero(); (n + 1) * stride];
+        let mut ndu = vec![T::zero(); stride * stride];
+        let mut a = vec![T::zero(); 2 * stride];
+        let mut left = vec![T::zero(); stride];
+        let mut right = vec![T::zero(); stride];
+        self.derivative_basis_functions_into(
+            knot_index, u, degree, n, &mut ders, &mut ndu, &mut a, &mut left, &mut right,
+        );
+        ders.chunks(stride).map(|row| row.to_vec()).collect()
+    }
 
-        ndu[0][0] = T::one();
+    /// Call `f` with the basis functions and their first `n` derivatives, row by row with a stride
+    /// of `degree + 1`, computed into stack buffers when the degree allows it.
+    pub(crate) fn with_derivative_basis_functions<R>(
+        &self,
+        knot_index: usize,
+        u: T,
+        degree: usize,
+        n: usize,
+        f: impl FnOnce(&[T]) -> R,
+    ) -> R {
+        let stride = degree + 1;
+        if stride <= INLINE_BASIS && n < INLINE_BASIS {
+            let mut ders = [T::zero(); INLINE_BASIS * INLINE_BASIS];
+            let mut ndu = [T::zero(); INLINE_BASIS * INLINE_BASIS];
+            let mut a = [T::zero(); 2 * INLINE_BASIS];
+            let mut left = [T::zero(); INLINE_BASIS];
+            let mut right = [T::zero(); INLINE_BASIS];
+            self.derivative_basis_functions_into(
+                knot_index, u, degree, n, &mut ders, &mut ndu, &mut a, &mut left, &mut right,
+            );
+            f(&ders[..(n + 1) * stride])
+        } else {
+            let stride = degree + 1;
+            let mut ders = vec![T::zero(); (n + 1) * stride];
+            let mut ndu = vec![T::zero(); stride * stride];
+            let mut a = vec![T::zero(); 2 * stride];
+            let mut left = vec![T::zero(); stride];
+            let mut right = vec![T::zero(); stride];
+            self.derivative_basis_functions_into(
+                knot_index, u, degree, n, &mut ders, &mut ndu, &mut a, &mut left, &mut right,
+            );
+            f(&ders)
+        }
+    }
+
+    /// The basis functions and their first `n` derivatives into `ders`, row-major with a stride
+    /// of `degree + 1`, with `ndu` (`(degree + 1)²`), `a` (`2 * (degree + 1)`), `left` and `right`
+    /// as scratch. Every buffer must be zeroed.
+    #[allow(clippy::too_many_arguments)]
+    fn derivative_basis_functions_into(
+        &self,
+        knot_index: usize,
+        u: T,
+        degree: usize,
+        n: usize,
+        ders: &mut [T],
+        ndu: &mut [T],
+        a: &mut [T],
+        left: &mut [T],
+        right: &mut [T],
+    ) {
+        let stride = degree + 1;
+        let at = |row: usize, column: usize| row * stride + column;
+
+        ndu[at(0, 0)] = T::one();
 
         for j in 1..=degree {
             left[j] = u - self[knot_index + 1 - j];
@@ -349,22 +460,19 @@ impl<T: RealField + Copy> KnotVector<T> {
             let mut saved = T::zero();
             for r in 0..j {
                 // lower triangle
-                ndu[j][r] = right[r + 1] + left[j - r];
-                let temp = ndu[r][j - 1] / ndu[j][r];
+                ndu[at(j, r)] = right[r + 1] + left[j - r];
+                let temp = ndu[at(r, j - 1)] / ndu[at(j, r)];
 
                 // upper triangle
-                ndu[r][j] = saved + right[r + 1] * temp;
+                ndu[at(r, j)] = saved + right[r + 1] * temp;
                 saved = left[j - r] * temp;
             }
-            ndu[j][j] = saved;
+            ndu[at(j, j)] = saved;
         }
-
-        let mut ders = vec![vec![T::zero(); degree + 1]; n + 1];
-        let mut a = vec![vec![T::zero(); degree + 1]; 2];
 
         // load the basis functions
         for j in 0..=degree {
-            ders[0][j] = ndu[j][degree];
+            ders[at(0, j)] = ndu[at(j, degree)];
         }
 
         let idegree = degree as isize;
@@ -375,7 +483,7 @@ impl<T: RealField + Copy> KnotVector<T> {
             // alternate rows in array a
             let mut s1 = 0;
             let mut s2 = 1;
-            a[0][0] = T::one();
+            a[at(0, 0)] = T::one();
 
             // loop to compute the kth derivative
             for k in 1..=n {
@@ -384,27 +492,27 @@ impl<T: RealField + Copy> KnotVector<T> {
                 let pk = idegree - k;
 
                 if r >= k {
-                    a[s2][0] = a[s1][0] / ndu[(pk + 1) as usize][rk as usize];
-                    d = a[s2][0] * ndu[rk as usize][pk as usize];
+                    a[at(s2, 0)] = a[at(s1, 0)] / ndu[at((pk + 1) as usize, rk as usize)];
+                    d = a[at(s2, 0)] * ndu[at(rk as usize, pk as usize)];
                 }
 
                 let j1 = if rk >= -1 { 1 } else { -rk };
                 let j2 = if r - 1 <= pk { k - 1 } else { idegree - r };
 
                 for j in j1..=j2 {
-                    a[s2][j as usize] = (a[s1][j as usize] - a[s1][j as usize - 1])
-                        / ndu[(pk + 1) as usize][(rk + j) as usize];
-                    d += a[s2][j as usize] * ndu[(rk + j) as usize][pk as usize];
+                    a[at(s2, j as usize)] = (a[at(s1, j as usize)] - a[at(s1, j as usize - 1)])
+                        / ndu[at((pk + 1) as usize, (rk + j) as usize)];
+                    d += a[at(s2, j as usize)] * ndu[at((rk + j) as usize, pk as usize)];
                 }
 
                 let uk = k as usize;
                 let ur = r as usize;
                 if r <= pk {
-                    a[s2][uk] = -a[s1][(k - 1) as usize] / ndu[(pk + 1) as usize][ur];
-                    d += a[s2][uk] * ndu[ur][pk as usize];
+                    a[at(s2, uk)] = -a[at(s1, (k - 1) as usize)] / ndu[at((pk + 1) as usize, ur)];
+                    d += a[at(s2, uk)] * ndu[at(ur, pk as usize)];
                 }
 
-                ders[uk][ur] = d;
+                ders[at(uk, ur)] = d;
 
                 // switch rows
                 std::mem::swap(&mut s1, &mut s2);
@@ -414,11 +522,10 @@ impl<T: RealField + Copy> KnotVector<T> {
         let mut acc = idegree;
         for k in 1..=n {
             for j in 0..=idegree {
-                ders[k as usize][j as usize] *= T::from_isize(acc).unwrap();
+                ders[at(k as usize, j as usize)] *= T::from_isize(acc).unwrap();
             }
             acc *= idegree - k;
         }
-        ders
     }
 
     /// Compute a regularly spaced basis functions
