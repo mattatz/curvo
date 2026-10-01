@@ -70,6 +70,41 @@ impl<T: RealField + Copy> KnotVector<T> {
     }
 
     /// Get the domain of the knot vector by degree
+    /// Check that this knot vector can parameterize a B-spline of `degree` with `count` control
+    /// points: it has `count + degree + 1` knots, every knot is finite, and the knots never
+    /// decrease.
+    /// # Example
+    /// ```
+    /// use curvo::prelude::KnotVector;
+    /// let knots = KnotVector::new(vec![0., 0., 0., 1., 2., 2., 2.]);
+    /// assert!(knots.try_validate(2, 4).is_ok());
+    /// // a decreasing knot vector is refused rather than sorted
+    /// let knots = KnotVector::new(vec![0., 0., 0., 2., 1., 2., 2.]);
+    /// assert!(knots.try_validate(2, 4).is_err());
+    /// ```
+    pub fn try_validate(&self, degree: usize, count: usize) -> anyhow::Result<()> {
+        anyhow::ensure!(
+            count > degree,
+            "Too few control points for degree {}",
+            degree
+        );
+        anyhow::ensure!(
+            self.0.len() == count + degree + 1,
+            "Invalid number of knots, got {}, expected {}",
+            self.0.len(),
+            count + degree + 1
+        );
+        anyhow::ensure!(
+            self.0.iter().all(|k| k.is_finite()),
+            "Knot vector contains a non-finite knot"
+        );
+        anyhow::ensure!(
+            self.0.windows(2).all(|w| w[0] <= w[1]),
+            "Knot vector is decreasing somewhere"
+        );
+        Ok(())
+    }
+
     pub fn domain(&self, degree: usize) -> (T, T) {
         (self.0[degree], self.0[self.0.len() - 1 - degree])
     }

@@ -10,7 +10,7 @@ use nalgebra::{
 use simba::scalar::SupersetOf;
 
 use crate::{
-    curve::nurbs_curve::{dehomogenize, NurbsCurve, NurbsCurve3D},
+    curve::nurbs_curve::{dehomogenize, try_validate_control_points, NurbsCurve, NurbsCurve3D},
     misc::{
         binomial::Binomial, transformable::Transformable, transpose_control_points, FloatingPoint,
         Invertible, Ray,
@@ -51,6 +51,65 @@ where
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
+    /// Create a new NURBS surface, checking that the description is one a surface can be built from.
+    ///
+    /// `control_points[i][j]` is the point at u index `i` and v index `j`.
+    ///
+    /// # Errors
+    /// Returns an error if the control point grid is empty or ragged, if either knot vector does
+    /// not suit its direction's degree and control point count (see
+    /// [`KnotVector::try_validate`]), or if a control point is not finite or has a weight that is
+    /// not positive. [`NurbsSurface::new`] accepts all of these and fails later, when the surface
+    /// is evaluated.
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::Point4;
+    /// let grid = vec![
+    ///     vec![Point4::new(0., 0., 0., 1.), Point4::new(0., 1., 0., 1.)],
+    ///     vec![Point4::new(1., 0., 0., 1.), Point4::new(1., 1., 0., 1.)],
+    /// ];
+    /// let surface = NurbsSurface3D::try_new(1, 1, vec![0., 0., 1., 1.], vec![0., 0., 1., 1.], grid.clone());
+    /// assert!(surface.is_ok());
+    /// // one control point cannot carry a degree 3 direction
+    /// let surface = NurbsSurface3D::try_new(3, 1, vec![0., 0., 0., 0., 1.], vec![0., 0., 1., 1.], vec![grid[0].clone()]);
+    /// assert!(surface.is_err());
+    /// ```
+    pub fn try_new<U: Into<KnotVector<T>>, V: Into<KnotVector<T>>>(
+        u_degree: usize,
+        v_degree: usize,
+        u_knots: U,
+        v_knots: V,
+        control_points: Vec<Vec<OPoint<T, D>>>,
+    ) -> anyhow::Result<Self> {
+        let (u_knots, v_knots) = (u_knots.into(), v_knots.into());
+        let rows = control_points.len();
+        let columns = control_points.first().map_or(0, |row| row.len());
+        anyhow::ensure!(rows > 0 && columns > 0, "Control point grid is empty");
+        anyhow::ensure!(
+            control_points.iter().all(|row| row.len() == columns),
+            "Control point grid is ragged"
+        );
+        u_knots
+            .try_validate(u_degree, rows)
+            .map_err(|e| e.context("u direction"))?;
+        v_knots
+            .try_validate(v_degree, columns)
+            .map_err(|e| e.context("v direction"))?;
+        for row in &control_points {
+            try_validate_control_points(row)?;
+        }
+        Ok(Self {
+            u_degree,
+            v_degree,
+            u_knots,
+            v_knots,
+            control_points,
+        })
+    }
+
+    /// Create a new NURBS surface without checking its description; see [`NurbsSurface::try_new`]
+    /// for the checks this skips.
     pub fn new<U: Into<KnotVector<T>>, V: Into<KnotVector<T>>>(
         u_degree: usize,
         v_degree: usize,
