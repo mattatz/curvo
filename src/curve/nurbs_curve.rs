@@ -12,6 +12,7 @@ use nalgebra::{
 };
 use simba::scalar::SupersetOf;
 
+use crate::curve::curve_evaluator::CurveEvaluator;
 use crate::misc::binomial::{binomial_coefficient, Binomial};
 use crate::misc::frenet_frame::FrenetFrame;
 use crate::misc::transformable::Transformable;
@@ -417,8 +418,20 @@ where
 
     /// Evaluate the curve at a given parameter to get a point
     pub(crate) fn point(&self, t: T) -> OPoint<T, D> {
-        let n = self.knots.len() - self.degree - 2;
-        let knot_span_index = self.knots.find_knot_span_index(n, self.degree, t);
+        let knot_span_index = self
+            .knots
+            .find_knot_span_index(self.last_span(), self.degree, t);
+        self.point_in_span(knot_span_index, t)
+    }
+
+    /// The span index of the last control point, the `n` the span search is bounded by.
+    pub(crate) fn last_span(&self) -> usize {
+        self.knots.len() - self.degree - 2
+    }
+
+    /// Evaluate the curve at `t` in the knot span `knot_span_index`, as the span search gives it
+    /// for `t`.
+    pub(crate) fn point_in_span(&self, knot_span_index: usize, t: T) -> OPoint<T, D> {
         self.knots
             .with_basis_functions(knot_span_index, t, self.degree, |basis| {
                 let mut position = OPoint::<T, D>::origin();
@@ -428,6 +441,26 @@ where
                 }
                 position
             })
+    }
+
+    /// An evaluator for this curve that remembers the knot span of the last parameter it was asked
+    /// about, so a sequence of nearby or increasing parameters — sampling, flattening, integrating
+    /// — skips the span search. It returns exactly what the curve's own methods return.
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point2, Vector2};
+    /// let curve =
+    ///     NurbsCurve2D::try_circle(&Point2::origin(), &Vector2::x(), &Vector2::y(), 1.).unwrap();
+    /// let (start, end) = curve.knots_domain();
+    /// let mut evaluator = curve.evaluator();
+    /// for i in 0..=100 {
+    ///     let t = start + (end - start) * i as f64 / 100.;
+    ///     assert_eq!(evaluator.point_at(t), curve.point_at(t));
+    /// }
+    /// ```
+    pub fn evaluator(&self) -> CurveEvaluator<'_, T, D> {
+        CurveEvaluator::new(self)
     }
 
     /// Evaluate the curve at a given parameter to get a tangent vector
@@ -498,7 +531,25 @@ where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
-        let ders = self.derivatives(u, derivs);
+        let knot_span_index = self
+            .knots
+            .find_knot_span_index(self.last_span(), self.degree, u);
+        self.rational_derivatives_in_span(knot_span_index, u, derivs)
+    }
+
+    /// [`NurbsCurve::rational_derivatives`] at `u` in the knot span `knot_span_index`, as the span
+    /// search gives it for `u`.
+    pub(crate) fn rational_derivatives_in_span(
+        &self,
+        knot_span_index: usize,
+        u: T,
+        derivs: usize,
+    ) -> Vec<OVector<T, DimNameDiff<D, U1>>>
+    where
+        D: DimNameSub<U1>,
+        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+    {
+        let ders = self.derivatives_in_span(knot_span_index, u, derivs);
         let weight = D::dim() - 1;
 
         let mut ck: Vec<OVector<T, DimNameDiff<D, U1>>> = Vec::with_capacity(derivs + 1);
@@ -518,10 +569,14 @@ where
         ck
     }
 
-    /// Evaluate the derivatives at a given parameter
-    fn derivatives(&self, u: T, derivs: usize) -> Vec<OVector<T, D>> {
-        let n = self.knots.len() - self.degree - 2;
-
+    /// The derivatives at `u` in the knot span `knot_span_index`, as the span search gives it
+    /// for `u`.
+    fn derivatives_in_span(
+        &self,
+        knot_span_index: usize,
+        u: T,
+        derivs: usize,
+    ) -> Vec<OVector<T, D>> {
         let du = if derivs < self.degree {
             derivs
         } else {
@@ -529,7 +584,6 @@ where
         };
         let mut derivatives = vec![OVector::<T, D>::zeros(); derivs + 1];
 
-        let knot_span_index = self.knots.find_knot_span_index(n, self.degree, u);
         let stride = self.degree + 1;
         self.knots
             .with_derivative_basis_functions(knot_span_index, u, self.degree, du, |nders| {

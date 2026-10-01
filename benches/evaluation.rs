@@ -80,6 +80,22 @@ fn curves(c: &mut Criterion) {
             })
         });
     }
+    c.bench_function("curve/evaluator/point_at/cubic", |b| {
+        b.iter(|| {
+            let mut evaluator = cubic.evaluator();
+            for &t in &cubic_ts {
+                black_box(evaluator.point_at(black_box(t)));
+            }
+        })
+    });
+    c.bench_function("curve/evaluator/rational_derivatives_1/cubic", |b| {
+        b.iter(|| {
+            let mut evaluator = cubic.evaluator();
+            for &t in &cubic_ts {
+                black_box(evaluator.rational_derivatives(black_box(t), 1));
+            }
+        })
+    });
     c.bench_function("curve/try_length/cubic", |b| {
         b.iter(|| black_box(cubic.try_length().unwrap()))
     });
@@ -108,6 +124,26 @@ fn surfaces(c: &mut Criterion) {
             for &u in &us {
                 for &v in &vs {
                     black_box(surface.normal_at(black_box(u), black_box(v)));
+                }
+            }
+        })
+    });
+    c.bench_function("surface/evaluator/point_at/bicubic", |b| {
+        b.iter(|| {
+            let mut evaluator = surface.evaluator();
+            for &u in &us {
+                for &v in &vs {
+                    black_box(evaluator.point_at(black_box(u), black_box(v)));
+                }
+            }
+        })
+    });
+    c.bench_function("surface/evaluator/normal_at/bicubic", |b| {
+        b.iter(|| {
+            let mut evaluator = surface.evaluator();
+            for &u in &us {
+                for &v in &vs {
+                    black_box(evaluator.normal_at(black_box(u), black_box(v)));
                 }
             }
         })

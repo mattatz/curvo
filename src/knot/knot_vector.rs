@@ -215,6 +215,37 @@ impl<T: RealField + Copy> KnotVector<T> {
         self.binary_search(degree, n + 1, u)
     }
 
+    /// [`KnotVector::find_knot_span_index`], starting from the span `cache` remembers.
+    ///
+    /// Strictly inside the domain the span is the unique `s` with `knots[s] <= u < knots[s + 1]`,
+    /// so when `u` falls in the remembered span or the next one that is the answer the search
+    /// would give, and it is returned without searching. Near either end, where the search snaps
+    /// `u` to the end span, the search is always asked.
+    pub(crate) fn find_knot_span_index_cached(
+        &self,
+        n: usize,
+        degree: usize,
+        u: T,
+        cache: &mut Option<usize>,
+    ) -> usize {
+        if let Some(s) = *cache {
+            let interior =
+                u <= self[n + 1] - T::default_epsilon() && u >= self[degree] + T::default_epsilon();
+            if interior {
+                if self[s] <= u && u < self[s + 1] {
+                    return s;
+                }
+                if s < n && self[s + 1] <= u && u < self[s + 2] {
+                    *cache = Some(s + 1);
+                    return s + 1;
+                }
+            }
+        }
+        let s = self.find_knot_span_index(n, degree, u);
+        *cache = Some(s);
+        s
+    }
+
     /// Find the knot span index with a hint
     /// # Example
     /// ```

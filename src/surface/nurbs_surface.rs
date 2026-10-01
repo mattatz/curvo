@@ -22,7 +22,7 @@ use crate::{
     SurfaceClosestParameterNewton, SurfaceClosestParameterProblem,
 };
 
-use super::{FlipDirection, UVDirection};
+use super::{FlipDirection, SurfaceEvaluator, UVDirection};
 
 /// NURBS surface representation
 /// by generics, it can be used for 2D or 3D curves with f32 or f64 scalar types
@@ -206,6 +206,26 @@ where
 
         let knot_span_index_u = self.u_knots.find_knot_span_index(n, self.u_degree, u);
         let knot_span_index_v = self.v_knots.find_knot_span_index(m, self.v_degree, v);
+        self.point_in_span(knot_span_index_u, knot_span_index_v, u, v)
+    }
+
+    /// The span indices of the last control point in u and in v, the `n` and `m` the span
+    /// searches are bounded by.
+    pub(crate) fn last_spans(&self) -> (usize, usize) {
+        (
+            self.u_knots.len() - self.u_degree - 2,
+            self.v_knots.len() - self.v_degree - 2,
+        )
+    }
+
+    /// Evaluate the surface at `(u, v)` in the knot spans the span searches give for it.
+    pub(crate) fn point_in_span(
+        &self,
+        knot_span_index_u: usize,
+        knot_span_index_v: usize,
+        u: T,
+        v: T,
+    ) -> OPoint<T, D> {
         let uind = knot_span_index_u - self.u_degree;
 
         self.u_knots
@@ -504,11 +524,60 @@ where
         rational_derivatives(&ders, derivs)
     }
 
+    /// [`NurbsSurface::rational_derivatives`] at `(u, v)` in the knot spans the span searches give
+    /// for it.
+    pub(crate) fn rational_derivatives_in_span(
+        &self,
+        knot_span_index_u: usize,
+        knot_span_index_v: usize,
+        u: T,
+        v: T,
+        derivs: usize,
+    ) -> Vec<Vec<OVector<T, DimNameDiff<D, U1>>>> {
+        let ders = self.derivatives_in_span(knot_span_index_u, knot_span_index_v, u, v, derivs);
+        rational_derivatives(&ders, derivs)
+    }
+
+    /// An evaluator for this surface that remembers the knot spans of the last parameters it was
+    /// asked about, so a grid or a run of nearby parameters skips the span searches. It returns
+    /// exactly what the surface's own methods return.
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point3, Vector3};
+    /// let sphere =
+    ///     NurbsSurface3D::try_sphere(&Point3::origin(), &Vector3::z(), &Vector3::x(), 1.).unwrap();
+    /// let ((u0, u1), (v0, v1)) = sphere.knots_domain();
+    /// let mut evaluator = sphere.evaluator();
+    /// for i in 0..=10 {
+    ///     for j in 0..=10 {
+    ///         let (u, v) = (u0 + (u1 - u0) * i as f64 / 10., v0 + (v1 - v0) * j as f64 / 10.);
+    ///         assert_eq!(evaluator.point_at(u, v), sphere.point_at(u, v));
+    ///     }
+    /// }
+    /// ```
+    pub fn evaluator(&self) -> SurfaceEvaluator<'_, T, D> {
+        SurfaceEvaluator::new(self)
+    }
+
     /// Evaluate the derivatives at the given u, v parameters
     fn derivatives(&self, u: T, v: T, derivs: usize) -> Vec<Vec<OVector<T, D>>> {
         let n = self.u_knots.len() - self.u_degree - 2;
         let m = self.v_knots.len() - self.v_degree - 2;
+        let knot_span_index_u = self.u_knots.find_knot_span_index(n, self.u_degree, u);
+        let knot_span_index_v = self.v_knots.find_knot_span_index(m, self.v_degree, v);
+        self.derivatives_in_span(knot_span_index_u, knot_span_index_v, u, v, derivs)
+    }
 
+    /// The derivatives at `(u, v)` in the knot spans the span searches give for it.
+    fn derivatives_in_span(
+        &self,
+        knot_span_index_u: usize,
+        knot_span_index_v: usize,
+        u: T,
+        v: T,
+        derivs: usize,
+    ) -> Vec<Vec<OVector<T, D>>> {
         let du = if derivs < self.u_degree {
             derivs
         } else {
@@ -520,8 +589,6 @@ where
             self.v_degree
         };
         let mut skl = vec![vec![OVector::<T, D>::zeros(); derivs + 1]; derivs + 1];
-        let knot_span_index_u = self.u_knots.find_knot_span_index(n, self.u_degree, u);
-        let knot_span_index_v = self.v_knots.find_knot_span_index(m, self.v_degree, v);
         // Only the first `du` and `dv` derivatives are used. Asking for `n` and `m` — the control
         // point counts — computed a row per control point and threw all but a few away.
         let (u_stride, v_stride) = (self.u_degree + 1, self.v_degree + 1);

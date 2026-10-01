@@ -186,3 +186,46 @@ fn clamp_unclamped_curve() {
     assert_eq!(twice.knots().as_slice(), clamped.knots().as_slice());
     assert_eq!(twice.control_points(), clamped.control_points());
 }
+
+#[test]
+fn an_evaluator_returns_exactly_what_the_curve_does_in_any_parameter_order() {
+    use crate::curve::NurbsCurve3D;
+    use nalgebra::Point4;
+    // Repeated interior knots, so spans of zero length sit between real ones.
+    let points: Vec<Point4<f64>> = (0..9)
+        .map(|i| {
+            let x = i as f64;
+            Point4::new(x, x.sin(), x.cos(), 1. + 0.1 * x)
+        })
+        .collect();
+    let knots = vec![0., 0., 0., 0., 1., 2., 2., 2., 3., 4., 4., 4., 4.];
+    let curve = NurbsCurve3D::try_new(3, points, knots.clone()).unwrap();
+    let (start, end) = curve.knots_domain();
+
+    let mut ts: Vec<f64> = (0..=200)
+        .map(|i| start + (end - start) * i as f64 / 200.)
+        .collect();
+    ts.extend(knots.iter().copied()); // exactly on every knot, including the ends
+    ts.extend([start - 1., end + 1., end - 1e-12, start + 1e-12]);
+    let mut orders = vec![ts.clone()];
+    orders.push(ts.iter().rev().copied().collect());
+    // a fixed shuffle
+    let mut shuffled = ts.clone();
+    for i in 0..shuffled.len() {
+        let j = (i * 7919 + 13) % shuffled.len();
+        shuffled.swap(i, j);
+    }
+    orders.push(shuffled);
+
+    for order in orders {
+        let mut evaluator = curve.evaluator();
+        for &t in &order {
+            assert_eq!(evaluator.point_at(t), curve.point_at(t), "t = {t}");
+            assert_eq!(
+                evaluator.rational_derivatives(t, 2),
+                curve.rational_derivatives(t, 2),
+                "t = {t}"
+            );
+        }
+    }
+}
