@@ -2,13 +2,14 @@ pub mod intersection_surface_plane;
 pub mod surface_plane_intersection_bfgs;
 pub mod surface_plane_intersection_problem;
 
-use argmin::core::{ArgminFloat, Executor, State};
+use argmin::core::ArgminFloat;
 pub use intersection_surface_plane::*;
-use nalgebra::{Const, Matrix2, Point3, Vector2};
+use nalgebra::{Const, Point3, Vector2};
 pub use surface_plane_intersection_bfgs::*;
 pub use surface_plane_intersection_problem::*;
 
 use crate::{
+    intersects::solve::{surface_scale, Scales},
     misc::{FloatingPoint, Plane},
     prelude::SurfaceBoundingBoxTree,
     surface::{NurbsSurface3D, UVDirection},
@@ -48,8 +49,10 @@ pub fn find_surface_plane_intersection_points<T: FloatingPoint + ArgminFloat>(
     let leaf_nodes =
         find_surface_plane_intersection_leaf_nodes(surface, plane, options.knot_domain_division)?;
 
-    // Create bounding box tree for the surface
-    let (u_domain, v_domain) = surface.knots_domain();
+    let (size, parameters) = surface_scale(surface);
+    let scales = Scales::new(&[size], parameters);
+    // relative to the size of the surface
+    let minimum_distance = scales.distance(options.minimum_distance);
 
     // Collect intersection points from all leaf nodes
     let mut intersection_points = Vec::new();
@@ -71,28 +74,17 @@ pub fn find_surface_plane_intersection_points<T: FloatingPoint + ArgminFloat>(
             .with_cost_tolerance(options.cost_tolerance);
 
         // Run solver
-        let res = Executor::new(problem, solver)
-            .configure(|state| {
-                state
-                    .param(init_param)
-                    .inv_hessian(Matrix2::identity())
-                    .max_iters(options.max_iters)
-            })
-            .run();
+        if let Some(param) = scales.solve(problem, solver, init_param, options.max_iters) {
+            // An intersection at an edge of the surface is found a hair inside it or a hair
+            // outside, so the parameters are clamped rather than refused: how far from the
+            // plane the point there is decides.
+            let u = surface.u_knots().clamp(surface.u_degree(), param[0]);
+            let v = surface.v_knots().clamp(surface.v_degree(), param[1]);
+            let point = surface.point_at(u, v);
+            let distance = num_traits::Float::abs(plane.signed_distance(&point));
 
-        if let Ok(r) = res {
-            if let Some(param) = r.state().get_best_param() {
-                let u = param[0];
-                let v = param[1];
-                if (u_domain.0..=u_domain.1).contains(&u) && (v_domain.0..=v_domain.1).contains(&v)
-                {
-                    let point = surface.point_at(u, v);
-                    let distance = num_traits::Float::abs(plane.signed_distance(&point));
-
-                    if distance < options.minimum_distance {
-                        intersection_points.push((point, (u, v)));
-                    }
-                }
+            if distance < minimum_distance {
+                intersection_points.push((point, (u, v)));
             }
         }
     }

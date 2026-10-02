@@ -1,3 +1,4 @@
+use crate::curve::nurbs_curve::dehomogenize;
 use crate::misc::Plane;
 use crate::prelude::*;
 use argmin::core::{CostFunction, Gradient};
@@ -25,7 +26,8 @@ impl<T: FloatingPoint> CostFunction for SurfacePlaneIntersectionProblem<'_, T> {
     type Output = T;
 
     fn cost(&self, param: &Self::Param) -> Result<Self::Output, anyhow::Error> {
-        let point = self.surface.point_at(param[0], param[1]);
+        let point = dehomogenize(&self.surface.point(param[0], param[1]))
+            .ok_or_else(|| anyhow::anyhow!("Parameter out of domain"))?;
         let distance = self.plane.signed_distance(&point);
         Ok(distance * distance) // Return squared distance for better numerical properties
     }

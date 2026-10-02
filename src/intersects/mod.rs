@@ -3,6 +3,7 @@ pub mod curve_plane;
 pub mod has_intersection;
 pub mod intersection;
 pub mod mesh_plane;
+mod solve;
 pub mod surface_curve;
 pub mod surface_plane;
 pub mod surface_tessellation_plane;
