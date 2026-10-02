@@ -31,27 +31,23 @@ where
         let options = option.unwrap_or_default();
 
         let (size, parameter) = curve_scale(self);
-        let scales = Scales::new(&[size], [parameter]);
+        let scales = Scales::new(&[size], [parameter], options.minimum_distance);
 
         // Check each segment of the curve against the plane
         let tree = CurveBoundingBoxTree::with_divisions(self, options.knot_domain_division);
-        let reach = scales.distance(options.minimum_distance);
-        let candidates = leaves_reaching_plane(tree, plane, reach)
+        let candidates = leaves_reaching_plane(tree, plane, scales.minimum_distance())
             .into_iter()
-            .filter_map(|node| {
+            .flat_map(|node| {
                 let curve_segment = node.curve_owned();
                 let problem = CurvePlaneIntersectionProblem::new(&curve_segment, plane);
-                // from the middle of each leaf
-                let (start, end) = curve_segment.knots_domain();
-                let init_param = Vector1::new((start + end) * T::from_f64(0.5).unwrap());
-                let (param, _) = scales.solve(problem, &options, init_param)?;
-                Some(param)
+                let found = scales.solve_leaf(&problem, &options, [curve_segment.knots_domain()]);
+                found.into_iter().flatten().map(|(param, _)| param)
             });
 
         let distance_at =
             |param: &Vector1<T>| Float::abs(plane.signed_distance(&self.point_at(param[0])));
         let intersections = scales
-            .intersections(candidates, 0, options.minimum_distance, distance_at)
+            .intersections(candidates, 0, distance_at)
             .into_iter()
             .map(|param| {
                 let point = self.point_at(param[0]);

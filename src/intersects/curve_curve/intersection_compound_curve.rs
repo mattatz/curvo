@@ -83,7 +83,7 @@ where
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     let (span_a, span_b, other) = (ia.a_curve(), ib.a_curve(), ia.b_curve());
-    let scales = curve_curve_scales(span_a, other);
+    let scales = curve_curve_scales(span_a, other, minimum_distance);
 
     // How far each is from the joint, as a fraction of its span. Halfway between them through
     // the joint is that far from one of them, on the span of the one further from the joint.
@@ -102,7 +102,7 @@ where
     };
     let on_other = other.point_at(scales.halfway(1, ia.b().2, ib.b().2));
 
-    (on_compound - on_other).norm() < scales.distance(minimum_distance)
+    (on_compound - on_other).norm() < scales.minimum_distance()
 }
 
 impl<'a, T, D> Intersects<'a, &'a CompoundCurve<T, D>> for CompoundCurve<T, D>

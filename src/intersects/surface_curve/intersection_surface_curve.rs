@@ -72,33 +72,31 @@ where
         let (size, [u, v]) = surface_scale(self);
         let (curve_size, t) = curve_scale(other);
         // the parameters are those of the curve, then those of the surface
-        let scales = Scales::new(&[size, curve_size], [t, u, v]);
+        let scales = Scales::new(&[size, curve_size], [t, u, v], options.minimum_distance);
 
-        let candidates = traversed.into_pairs_iter().filter_map(|(a, b)| {
+        let candidates = traversed.into_pairs_iter().flat_map(|(a, b)| {
             let (surface, curve) = (a.surface_owned(), b.curve_owned());
             let problem = SurfaceCurveIntersectionProblem::new(&surface, &curve);
-            // from the middle of each leaf
-            let half = T::from_f64(0.5).unwrap();
-            let (t, (u, v)) = (curve.knots_domain(), surface.knots_domain());
-            let init_param =
-                Vector3::new((t.0 + t.1) * half, (u.0 + u.1) * half, (v.0 + v.1) * half);
-            let (param, past) = scales.solve(problem, &options, init_param)?;
-            let (t, (u, v)) = closest_to_an_end(
-                (param.x, past[0]),
-                ((param.y, param.z), past[1] || past[2]),
-                |(u, v)| other.find_closest_parameter(&self.point_at(*u, *v)).ok(),
-                |t| {
-                    let hint = Some((param.y, param.z));
-                    self.find_closest_parameter(&other.point_at(*t), hint).ok()
-                },
-            );
-            Some(Vector3::new(t, u, v))
+            let (u, v) = surface.knots_domain();
+            let found = scales.solve_leaf(&problem, &options, [curve.knots_domain(), u, v]);
+            found.into_iter().flatten().map(|(param, past)| {
+                let (t, (u, v)) = closest_to_an_end(
+                    (param.x, past[0]),
+                    ((param.y, param.z), past[1] || past[2]),
+                    |(u, v)| other.find_closest_parameter(&self.point_at(*u, *v)).ok(),
+                    |t| {
+                        let hint = Some((param.y, param.z));
+                        self.find_closest_parameter(&other.point_at(*t), hint).ok()
+                    },
+                );
+                Vector3::new(t, u, v)
+            })
         });
 
         let distance_at =
             |param: &Vector3<T>| (self.point_at(param.y, param.z) - other.point_at(param.x)).norm();
         let intersections = scales
-            .intersections(candidates, 0, options.minimum_distance, distance_at)
+            .intersections(candidates, 0, distance_at)
             .into_iter()
             .map(|param| {
                 let (t, uv) = (param.x, (param.y, param.z));

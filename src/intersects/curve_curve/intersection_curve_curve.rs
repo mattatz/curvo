@@ -76,35 +76,36 @@ where
         option: Self::Option,
     ) -> Self::Output {
         let options = option.unwrap_or_default();
-        let scales = curve_curve_scales(self, other);
+        let scales = curve_curve_scales(self, other, options.minimum_distance);
 
         if self.degree() == 1 && other.degree() == 1 && D::dim() == 3 {
-            return polyline_intersections(self, other, scales.distance(options.minimum_distance));
+            return polyline_intersections(self, other, scales.minimum_distance());
         }
 
         let ta = CurveBoundingBoxTree::with_divisions(self, options.knot_domain_division);
         let tb = CurveBoundingBoxTree::with_divisions(other, options.knot_domain_division);
         let traversed = BoundingBoxTraversal::try_traverse(ta, tb)?;
 
-        let candidates = traversed.into_pairs_iter().filter_map(|(a, b)| {
+        let candidates = traversed.into_pairs_iter().flat_map(|(a, b)| {
             let (ca, cb) = (a.curve_owned(), b.curve_owned());
             let problem = CurveIntersectionProblem::new(&ca, &cb);
-            // from the start of each leaf
-            let init_param = Vector2::new(ca.knots_domain().0, cb.knots_domain().0);
-            let (param, past) = scales.solve(problem, &options, init_param)?;
-            let (ta, tb) = closest_to_an_end(
-                (param[0], past[0]),
-                (param[1], past[1]),
-                |tb| self.find_closest_parameter(&other.point_at(*tb)).ok(),
-                |ta| other.find_closest_parameter(&self.point_at(*ta)).ok(),
-            );
-            Some(Vector2::new(ta, tb))
+            let leaf = [ca.knots_domain(), cb.knots_domain()];
+            let found = scales.solve_leaf(&problem, &options, leaf);
+            found.into_iter().flatten().map(|(param, past)| {
+                let (ta, tb) = closest_to_an_end(
+                    (param[0], past[0]),
+                    (param[1], past[1]),
+                    |tb| self.find_closest_parameter(&other.point_at(*tb)).ok(),
+                    |ta| other.find_closest_parameter(&self.point_at(*ta)).ok(),
+                );
+                Vector2::new(ta, tb)
+            })
         });
 
         let distance_at =
             |param: &Vector2<T>| (self.point_at(param[0]) - other.point_at(param[1])).norm();
         let intersections = scales
-            .intersections(candidates, 0, options.minimum_distance, distance_at)
+            .intersections(candidates, 0, distance_at)
             .into_iter()
             .map(|param| {
                 let (ta, tb) = (param[0], param[1]);
@@ -187,8 +188,13 @@ where
         .collect())
 }
 
-/// The scales of the intersection of two curves.
-pub(super) fn curve_curve_scales<T, D>(a: &NurbsCurve<T, D>, b: &NurbsCurve<T, D>) -> Scales<T, 2>
+/// The scales of the intersection of two curves, where two points closer than
+/// `minimum_distance`, relative to their size, are an intersection.
+pub(super) fn curve_curve_scales<T, D>(
+    a: &NurbsCurve<T, D>,
+    b: &NurbsCurve<T, D>,
+    minimum_distance: T,
+) -> Scales<T, 2>
 where
     T: FloatingPoint,
     D: DimName + DimNameSub<U1>,
@@ -197,7 +203,11 @@ where
 {
     let (a_size, a_parameter) = curve_scale(a);
     let (b_size, b_parameter) = curve_scale(b);
-    Scales::new(&[a_size, b_size], [a_parameter, b_parameter])
+    Scales::new(
+        &[a_size, b_size],
+        [a_parameter, b_parameter],
+        minimum_distance,
+    )
 }
 
 #[cfg(test)]
@@ -319,6 +329,30 @@ mod tests {
             assert_eq!(unit.find_intersection(&tangent, None).unwrap().len(), 1);
             assert_eq!(unit.find_intersection(&beside, None).unwrap().len(), 1);
             assert_eq!(half.find_intersection(&square, None).unwrap().len(), 3);
+        }
+    }
+
+    #[test]
+    fn two_intersections_next_to_each_other_are_both_found() {
+        // The line crosses the circle twice just under its top, 0.09 apart. The solver goes from
+        // most leaves around there to the same one of the two.
+        let unit = circle(Point2::origin());
+        let under = NurbsCurve2D::<f64>::polyline(
+            &[Point2::new(-2., 0.999), Point2::new(2., 0.999)],
+            false,
+        );
+        // at x = -0.0447 and x = 0.0447: where the line crosses so shallowly, the two curves are
+        // within the minimum distance of each other over a longer stretch than they are apart
+        let x = (1f64 - 0.999 * 0.999).sqrt();
+        for _ in 0..RUNS {
+            let mut intersections = unit.find_intersection(&under, None).unwrap();
+            intersections.sort_by(|i, j| i.a().0.x.partial_cmp(&j.a().0.x).unwrap());
+            assert_eq!(intersections.len(), 2);
+            for (intersection, x) in intersections.iter().zip([-x, x]) {
+                let (on_circle, on_line) = (intersection.a().0, intersection.b().0);
+                assert!((on_circle - on_line).norm() < 1e-4);
+                assert!((on_circle.x - x).abs() < 5e-3);
+            }
         }
     }
 

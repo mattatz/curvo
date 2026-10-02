@@ -19,13 +19,13 @@ use crate::{
 
 use super::{CurveIntersectionSolverOptions, IntersectionBFGS, IntersectionIterState};
 
-/// A parameter of a problem: its domain, how far the geometry travels over it, and whether the
-/// geometry is closed in it, the end of the domain being the same place as its start.
+/// A parameter of a problem: its domain, how far the geometry travels over it, and the gap between
+/// where the geometry is at the start of the domain and where it is at its end.
 #[derive(Clone, Copy)]
 pub(crate) struct Parameter<T> {
     domain: (T, T),
     travel: T,
-    closed: bool,
+    gap: T,
 }
 
 /// The scales of a problem with `N` parameters: the size of the geometry and its parameters.
@@ -36,25 +36,32 @@ pub(crate) struct Parameter<T> {
 /// another domain, has the same intersections.
 pub(crate) struct Scales<T, const N: usize> {
     size: T,
+    /// The distance below which two points are an intersection.
+    minimum_distance: T,
     start: SVector<T, N>,
     end: SVector<T, N>,
     /// What a step of one in the solver is in each parameter.
     unit: SVector<T, N>,
+    /// Whether the geometry is closed in each parameter: the two ends of the domain the same
+    /// place, as far as intersections go.
     closed: [bool; N],
 }
 
 impl<T: FloatingPoint, const N: usize> Scales<T, N> {
     /// The scales of geometry of the given `sizes` — the smallest one that is not zero counts, as
-    /// an intersection is no larger than the smaller of two objects — with `parameters`.
-    pub(crate) fn new(sizes: &[T], parameters: [Parameter<T>; N]) -> Self {
+    /// an intersection is no larger than the smaller of two objects — with `parameters`, where
+    /// two points closer than `minimum_distance`, relative to the size, are an intersection.
+    pub(crate) fn new(sizes: &[T], parameters: [Parameter<T>; N], minimum_distance: T) -> Self {
         let size = sizes
             .iter()
             .copied()
             .filter(|size| *size > T::zero())
             .reduce(|a, b| a.min(b))
             .unwrap_or(T::one());
+        let minimum_distance = minimum_distance * size;
         Self {
             size,
+            minimum_distance,
             start: SVector::from_fn(|i, _| parameters[i].domain.0),
             end: SVector::from_fn(|i, _| parameters[i].domain.1),
             // a domain of no length, or a parameter the geometry does not move with, is left as
@@ -67,13 +74,13 @@ impl<T: FloatingPoint, const N: usize> Scales<T, N> {
                     (false, _) => T::one(),
                 }
             }),
-            closed: parameters.map(|parameter| parameter.closed),
+            closed: parameters.map(|parameter| parameter.gap < minimum_distance),
         }
     }
 
-    /// The distance `relative` to the size of the geometry.
-    pub(crate) fn distance(&self, relative: T) -> T {
-        relative * self.size
+    /// The distance below which two points are an intersection.
+    pub(crate) fn minimum_distance(&self) -> T {
+        self.minimum_distance
     }
 
     /// The value of the parameter `index` halfway between `x` and `y`. On geometry closed in
@@ -109,6 +116,33 @@ impl<T: FloatingPoint, const N: usize> Scales<T, N> {
         normalized.component_mul(&self.unit) + self.start
     }
 
+    /// What the solver finds for the pair of leaves `problem` is about, with the tolerances of
+    /// `options`: from the start of the leaves, which are over `leaf` in each parameter, and from
+    /// their end too when that led out of them. The leaves may hold an intersection the solver
+    /// went past on its way to another one.
+    pub(crate) fn solve_leaf<O>(
+        &self,
+        problem: &O,
+        options: &CurveIntersectionSolverOptions<T>,
+        leaf: [(T, T); N],
+    ) -> [Option<Found<T, N>>; 2]
+    where
+        T: ArgminFloat,
+        O: CostFunction<Param = SVector<T, N>, Output = T>
+            + Gradient<Param = SVector<T, N>, Gradient = SVector<T, N>>,
+    {
+        let from_start = self.solve(problem, options, SVector::from_fn(|i, _| leaf[i].0));
+        let within = from_start.is_some_and(|(found, _)| {
+            (0..N).all(|i| leaf[i].0 <= found[i] && found[i] <= leaf[i].1)
+        });
+        let from_end = if within {
+            None
+        } else {
+            self.solve(problem, options, SVector::from_fn(|i, _| leaf[i].1))
+        };
+        [from_start, from_end]
+    }
+
     /// Solve `problem` in these scales from the parameters `init`, with the tolerances of
     /// `options`. Returns the parameters the solver stops at, brought back into their domains,
     /// and which of them were past an end.
@@ -116,12 +150,12 @@ impl<T: FloatingPoint, const N: usize> Scales<T, N> {
     /// An intersection at the end of a domain is found a hair inside it or a hair outside, so
     /// what is outside is clamped rather than refused, and how far apart the geometry is there
     /// decides whether it is an intersection.
-    pub(crate) fn solve<O>(
+    fn solve<O>(
         &self,
-        problem: O,
+        problem: &O,
         options: &CurveIntersectionSolverOptions<T>,
         init: SVector<T, N>,
-    ) -> Option<(SVector<T, N>, [bool; N])>
+    ) -> Option<Found<T, N>>
     where
         T: ArgminFloat,
         O: CostFunction<Param = SVector<T, N>, Output = T>
@@ -156,21 +190,19 @@ impl<T: FloatingPoint, const N: usize> Scales<T, N> {
     /// Choose the intersections among the `candidates` the solver found, one for every pair of
     /// leaves: their parameters, `distance_at` which the two objects are that far apart.
     ///
-    /// A candidate is an intersection when that distance is below `minimum_distance`, relative to
-    /// the size of the geometry. Two candidates are one intersection when the geometry is still
-    /// in contact halfway between them: that is so of an intersection found from several leaves,
-    /// and of the candidates found all along the stretch where two objects touch and stay closer
-    /// than the minimum distance. So the candidates are put in the order of the parameter
-    /// `order`, each run of candidates that are one intersection is a group, and the closest of
-    /// a group is kept.
+    /// A candidate is an intersection when that distance is below the minimum distance. Two
+    /// candidates are one intersection when the geometry is still in contact halfway between
+    /// them: that is so of an intersection found from several leaves, and of the candidates
+    /// found all along the stretch where two objects touch and stay closer than the minimum
+    /// distance. So the candidates are put in the order of the parameter `order`, each run of
+    /// candidates that are one intersection is a group, and the closest of a group is kept.
     pub(crate) fn intersections(
         &self,
         candidates: impl IntoIterator<Item = SVector<T, N>>,
         order: usize,
-        minimum_distance: T,
         distance_at: impl Fn(&SVector<T, N>) -> T,
     ) -> Vec<SVector<T, N>> {
-        let minimum_distance = self.distance(minimum_distance);
+        let minimum_distance = self.minimum_distance;
         let candidates = candidates
             .into_iter()
             .map(|parameters| (distance_at(&parameters), parameters))
@@ -203,6 +235,10 @@ impl<T: FloatingPoint, const N: usize> Scales<T, N> {
             .collect()
     }
 }
+
+/// What the solver found: the parameters, brought back into their domains, and which of them were
+/// past an end.
+pub(crate) type Found<T, const N: usize> = (SVector<T, N>, [bool; N]);
 
 /// Put `items` in `order` and group each run of items that are the `same`.
 ///
@@ -275,11 +311,10 @@ where
 {
     let size = BoundingBox::from(curve).size().norm();
     let domain = curve.knots_domain();
-    let ends = curve.point_at(domain.0) - curve.point_at(domain.1);
     let parameter = Parameter {
         domain,
         travel: polygon_length(curve.control_points().iter()),
-        closed: ends.norm() <= closing_distance(size),
+        gap: (curve.point_at(domain.0) - curve.point_at(domain.1)).norm(),
     };
     (size, parameter)
 }
@@ -304,38 +339,34 @@ where
     );
     let v_travel = longest(&mut control_points.iter().map(|row| polygon_length(row.iter())));
 
-    // Closed in a direction when the two ends of the domain are the same place all along the
+    // The gap between the two ends of the domain in a direction is the widest there is along the
     // other direction, which a few places along it are taken to show.
     let (u_domain, v_domain) = surface.knots_domain();
     let along = |(start, end): (T, T)| {
         (0..=4).map(move |i| start + (end - start) * T::from_f64(i as f64 / 4.).unwrap())
     };
-    let closing = closing_distance(size);
-    let u_closed = along(v_domain).all(|v| {
-        (surface.point_at(u_domain.0, v) - surface.point_at(u_domain.1, v)).norm() <= closing
-    });
-    let v_closed = along(u_domain).all(|u| {
-        (surface.point_at(u, v_domain.0) - surface.point_at(u, v_domain.1)).norm() <= closing
-    });
+    let u_gap = longest(
+        &mut along(v_domain)
+            .map(|v| (surface.point_at(u_domain.0, v) - surface.point_at(u_domain.1, v)).norm()),
+    );
+    let v_gap = longest(
+        &mut along(u_domain)
+            .map(|u| (surface.point_at(u, v_domain.0) - surface.point_at(u, v_domain.1)).norm()),
+    );
 
     let parameters = [
         Parameter {
             domain: u_domain,
             travel: u_travel,
-            closed: u_closed,
+            gap: u_gap,
         },
         Parameter {
             domain: v_domain,
             travel: v_travel,
-            closed: v_closed,
+            gap: v_gap,
         },
     ];
     (size, parameters)
-}
-
-/// The distance below which the two ends of geometry of the given `size` are the same place.
-fn closing_distance<T: FloatingPoint>(size: T) -> T {
-    size * T::default_epsilon().sqrt()
 }
 
 /// The length of the polygon through homogeneous control points.
@@ -356,7 +387,7 @@ where
 
 /// A problem seen in its [`Scales`].
 struct Normalized<'a, O, T, const N: usize> {
-    problem: O,
+    problem: &'a O,
     scales: &'a Scales<T, N>,
 }
 
@@ -392,13 +423,14 @@ mod tests {
 
     use super::*;
 
+    /// The scales of geometry where two points closer than 0.01 of its size are an intersection.
     fn scales(size: f64, domain: (f64, f64), closed: bool) -> Scales<f64, 1> {
         let parameter = Parameter {
             domain,
             travel: size,
-            closed,
+            gap: if closed { 0. } else { size },
         };
-        Scales::new(&[size], [parameter])
+        Scales::new(&[size], [parameter], 0.01)
     }
 
     /// The squared distance from a point moving `size` over `domain` to where it is 0.3 of the
@@ -438,7 +470,7 @@ mod tests {
         for (size, domain) in [(1., (0., 1.)), (1e-3, (2., 2.5)), (1e3, (-40., 360.))] {
             let scales = scales(size, domain, false);
             let normalized = Normalized {
-                problem: Along { size, domain },
+                problem: &Along { size, domain },
                 scales: &scales,
             };
             for step in [0., 0.1, 0.3, 0.75, 1.] {
@@ -451,7 +483,7 @@ mod tests {
                 let there = scales.normalize(&scales.denormalize(&param));
                 assert!((there[0] - step).abs() < 1e-12);
             }
-            assert!((scales.distance(1e-5) - 1e-5 * size).abs() < 1e-20);
+            assert!((scales.minimum_distance() - 0.01 * size).abs() < 1e-20);
         }
     }
 
@@ -473,19 +505,38 @@ mod tests {
         let options = CurveIntersectionSolverOptions::default();
         // the closest the point gets to its target is 0.3 of the way along a domain that ends
         // before that
-        let along = || Along {
+        let along = Along {
             size: 2.,
             domain: (0., 4.),
         };
         let init = Vector1::new(0.5);
         let short = scales(2., (0., 1.), false);
-        let (found, past) = short.solve(along(), &options, init).unwrap();
+        let (found, past) = short.solve(&along, &options, init).unwrap();
         assert_eq!((found[0], past), (1., [true]));
 
         let whole = scales(2., (0., 4.), false);
-        let (found, past) = whole.solve(along(), &options, init).unwrap();
+        let (found, past) = whole.solve(&along, &options, init).unwrap();
         assert!((found[0] - 1.2).abs() < 1e-6);
         assert_eq!(past, [false]);
+    }
+
+    #[test]
+    fn a_leaf_is_solved_from_its_end_too_when_its_start_leads_out_of_it() {
+        let options = CurveIntersectionSolverOptions::default();
+        // the point is where it is asked to be 0.3 of the way along the domain
+        let along = Along {
+            size: 1.,
+            domain: (0., 1.),
+        };
+        let scales = scales(1., (0., 1.), false);
+        let solutions = |leaf| {
+            let found = scales.solve_leaf(&along, &options, [leaf]);
+            found.map(|found| found.map(|(found, _)| (found[0] * 1e6).round() / 1e6))
+        };
+        // in the leaf: found from its start, and that is all
+        assert_eq!(solutions((0.2, 0.4)), [Some(0.3), None]);
+        // out of the leaf: looked for from its end as well
+        assert_eq!(solutions((0.5, 0.7)), [Some(0.3), Some(0.3)]);
     }
 
     /// A point moving along a line, `distance_at` its parameter from the line it crosses at 0.3
@@ -499,7 +550,7 @@ mod tests {
     fn one_intersection_is_kept_for_each_stretch_in_contact() {
         let scales = scales(1., (0., 1.), false);
         let candidates = [0.31, 0.25, 0.5, 0.36, 0.7, 0.72, 0.1].map(Vector1::new);
-        let intersections = scales.intersections(candidates, 0, 0.01, two_crossings);
+        let intersections = scales.intersections(candidates, 0, two_crossings);
         assert_eq!(intersections, vec![Vector1::new(0.31), Vector1::new(0.7)]);
     }
 
@@ -511,9 +562,9 @@ mod tests {
             t.min(1. - t).min((t - 0.5).abs()) * 0.1
         };
         let candidates = [0.02, 0.48, 0.52, 0.97].map(Vector1::new);
-        let open = scales(1., (0., 1.), false).intersections(candidates, 0, 0.01, around);
+        let open = scales(1., (0., 1.), false).intersections(candidates, 0, around);
         assert_eq!(open, [0.02, 0.48, 0.97].map(Vector1::new).to_vec());
-        let closed = scales(1., (0., 1.), true).intersections(candidates, 0, 0.01, around);
+        let closed = scales(1., (0., 1.), true).intersections(candidates, 0, around);
         assert_eq!(closed, [0.02, 0.48].map(Vector1::new).to_vec());
     }
 

@@ -4,7 +4,7 @@ pub mod surface_plane_intersection_problem;
 
 use argmin::core::ArgminFloat;
 pub use intersection_surface_plane::*;
-use nalgebra::{Const, Point3, Vector2};
+use nalgebra::{Const, Point3};
 pub use surface_plane_intersection_bfgs::*;
 pub use surface_plane_intersection_problem::*;
 
@@ -41,9 +41,8 @@ pub fn find_surface_plane_intersection_points<T: FloatingPoint + ArgminFloat>(
     let options = options.unwrap_or_default();
 
     let (size, parameters) = surface_scale(surface);
-    let scales = Scales::new(&[size], parameters);
-    // relative to the size of the surface
-    let minimum_distance = scales.distance(options.minimum_distance);
+    let scales = Scales::new(&[size], parameters, options.minimum_distance);
+    let minimum_distance = scales.minimum_distance();
 
     // Check each leaf of the surface that reaches the plane
     let tree = SurfaceBoundingBoxTree::with_divisions(
@@ -53,14 +52,14 @@ pub fn find_surface_plane_intersection_points<T: FloatingPoint + ArgminFloat>(
     );
     let intersection_points = leaves_reaching_plane(tree, plane, minimum_distance)
         .into_iter()
-        .filter_map(|node| {
+        .flat_map(|node| {
             let surface_segment = node.surface_owned();
             let problem = SurfacePlaneIntersectionProblem::new(&surface_segment, plane);
-            // from the middle of each leaf
-            let half = T::from_f64(0.5).unwrap();
             let (u, v) = surface_segment.knots_domain();
-            let init_param = Vector2::new((u.0 + u.1) * half, (v.0 + v.1) * half);
-            let (param, _) = scales.solve(problem, &options, init_param)?;
+            scales.solve_leaf(&problem, &options, [u, v])
+        })
+        .flatten()
+        .filter_map(|(param, _)| {
             let point = surface.point_at(param[0], param[1]);
             let distance = num_traits::Float::abs(plane.signed_distance(&point));
             (distance < minimum_distance).then_some((point, (param[0], param[1])))
