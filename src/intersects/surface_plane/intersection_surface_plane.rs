@@ -95,4 +95,45 @@ where
 */
 
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use nalgebra::{Point3, Vector3};
+
+    use crate::{
+        intersects::find_surface_plane_intersection_points, misc::Plane, surface::NurbsSurface3D,
+    };
+
+    fn sphere(radius: f64) -> NurbsSurface3D<f64> {
+        NurbsSurface3D::try_sphere(&Point3::origin(), &Vector3::x(), &Vector3::y(), radius).unwrap()
+    }
+
+    #[test]
+    fn the_points_do_not_depend_on_the_scale() {
+        // z = 0.3, scaled: a circle around the z axis
+        let points = |scale: f64| {
+            let plane = Plane::new(Vector3::z(), -0.3 * scale);
+            find_surface_plane_intersection_points(&sphere(scale), &plane, None).unwrap()
+        };
+        let unit = points(1.);
+        assert!(!unit.is_empty());
+        for scale in [1e-3, 1e3] {
+            let scaled = points(scale);
+            assert_eq!(scaled.len(), unit.len(), "scaled by {scale}");
+            for (point, _) in scaled {
+                let radius = (point.x * point.x + point.y * point.y).sqrt() / scale;
+                assert!((radius - (1f64 - 0.09).sqrt()).abs() < 1e-6);
+                assert!((point.z / scale - 0.3).abs() < 1e-6);
+            }
+        }
+    }
+
+    #[test]
+    fn a_plane_that_touches_a_sphere_meets_it_where_it_touches() {
+        // z = 1
+        let plane = Plane::new(Vector3::z(), -1.);
+        let points = find_surface_plane_intersection_points(&sphere(1.), &plane, None).unwrap();
+        assert!(!points.is_empty());
+        for (point, _) in points {
+            assert!((point - Point3::new(0., 0., 1.)).norm() < 1e-2);
+        }
+    }
+}

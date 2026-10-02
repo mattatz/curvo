@@ -1,11 +1,14 @@
 use argmin::{argmin_error_closure, core::*, float};
-use nalgebra::{Matrix2, Vector2};
+use nalgebra::{SMatrix, SVector};
 
 use crate::misc::FloatingPoint;
 
-/// Customized quasi-Newton's method for finding the intersections between NURBS surface & plane
+/// Customized quasi-Newton's method for finding intersections, whatever the number of parameters:
+/// one for a curve and a plane, two for two curves or for a surface and a plane, three for a
+/// surface and a curve.
+/// Original source: https://argmin-rs.github.io/argmin/argmin/solver/newton/struct.Newton.html
 #[derive(Clone, Copy)]
-pub struct SurfacePlaneIntersectionBFGS<F> {
+pub struct IntersectionBFGS<F> {
     /// Tolerance for the step size in the line search
     step_size_tolerance: F,
 
@@ -13,7 +16,7 @@ pub struct SurfacePlaneIntersectionBFGS<F> {
     cost_tolerance: F,
 }
 
-impl<F> Default for SurfacePlaneIntersectionBFGS<F>
+impl<F> Default for IntersectionBFGS<F>
 where
     F: FloatingPoint,
 {
@@ -25,10 +28,11 @@ where
     }
 }
 
-impl<F> SurfacePlaneIntersectionBFGS<F>
+impl<F> IntersectionBFGS<F>
 where
     F: FloatingPoint,
 {
+    /// Construct a new instance of [`Newton`]
     pub fn new() -> Self {
         Self::default()
     }
@@ -52,27 +56,29 @@ where
     }
 }
 
-type SurfacePlaneIterState<F> = IterState<Vector2<F>, Vector2<F>, (), Matrix2<F>, (), F>;
+/// The state of [`IntersectionBFGS`] solving a problem of `N` parameters.
+pub type IntersectionIterState<F, const N: usize> =
+    IterState<SVector<F, N>, SVector<F, N>, (), SMatrix<F, N, N>, (), F>;
 
-impl<O, F> Solver<O, SurfacePlaneIterState<F>> for SurfacePlaneIntersectionBFGS<F>
+impl<O, F, const N: usize> Solver<O, IntersectionIterState<F, N>> for IntersectionBFGS<F>
 where
-    O: Gradient<Param = Vector2<F>, Gradient = Vector2<F>>
-        + CostFunction<Param = Vector2<F>, Output = F>,
+    O: Gradient<Param = SVector<F, N>, Gradient = SVector<F, N>>
+        + CostFunction<Param = SVector<F, N>, Output = F>,
     F: FloatingPoint + ArgminFloat,
 {
     fn name(&self) -> &str {
-        "Surface plane intersection newton method with line search"
+        "Intersection newton method with line search"
     }
 
     fn init(
         &mut self,
         problem: &mut Problem<O>,
-        state: SurfacePlaneIterState<F>,
-    ) -> Result<(SurfacePlaneIterState<F>, Option<KV>), Error> {
+        state: IntersectionIterState<F, N>,
+    ) -> Result<(IntersectionIterState<F, N>, Option<KV>), Error> {
         let x0 = state.get_param().ok_or_else(argmin_error_closure!(
             NotInitialized,
             concat!(
-                "`SurfacePlaneIntersectionBFGS` requires an initial parameter vector. ",
+                "`Newton` requires an initial parameter vector. ",
                 "Please provide an initial guess via `Executor`s `configure` method."
             )
         ))?;
@@ -84,8 +90,8 @@ where
     fn next_iter(
         &mut self,
         problem: &mut Problem<O>,
-        state: SurfacePlaneIterState<F>,
-    ) -> Result<(SurfacePlaneIterState<F>, Option<KV>), Error> {
+        state: IntersectionIterState<F, N>,
+    ) -> Result<(IntersectionIterState<F, N>, Option<KV>), Error> {
         let x0 = state.get_param().ok_or_else(argmin_error_closure!(
             NotInitialized,
             concat!(
@@ -101,7 +107,20 @@ where
             None => problem.gradient(x0)?,
         };
 
-        let h0 = state.get_hessian().cloned().unwrap_or(Matrix2::identity());
+        // Before the gradients have told the curvature, the first step is as long as Newton's
+        // method would make it for a cost that is a squared distance, zero at the intersection:
+        // down the gradient by twice the cost over the square of its length. A step as long as
+        // the gradient itself depends on the units of the problem, and goes past a near
+        // intersection to the one beyond it.
+        let h0 = state.get_hessian().cloned().unwrap_or_else(|| {
+            let slope = g0.norm_squared();
+            let newton = if slope > F::zero() {
+                F::from_f64(2.).unwrap() * f0 / slope
+            } else {
+                F::one()
+            };
+            SMatrix::identity() * newton
+        });
 
         // line search
         let step = -h0 * g0;
@@ -119,7 +138,7 @@ where
         let max_iters = state.get_max_iters();
         for _ in 0..max_iters {
             it += 1;
-            if t * norm < self.step_size_tolerance() {
+            if t * norm < self.step_size_tolerance {
                 break;
             }
 
@@ -159,7 +178,7 @@ where
         ))
     }
 
-    fn terminate(&mut self, state: &SurfacePlaneIterState<F>) -> TerminationStatus {
+    fn terminate(&mut self, state: &IntersectionIterState<F, N>) -> TerminationStatus {
         if state.iter > state.max_iters {
             return TerminationStatus::Terminated(TerminationReason::MaxItersReached);
         }
@@ -184,16 +203,20 @@ where
         if let (Some(g), Some(h)) = (state.get_gradient(), state.get_hessian()) {
             let step = h * g;
             let norm = step.norm();
-            if norm < self.step_size_tolerance() {
+            if norm < self.step_size_tolerance {
                 return TerminationStatus::Terminated(TerminationReason::SolverExit(
                     "step size tolerance reached".into(),
                 ));
             }
         }
 
-        if state.get_cost() != state.get_prev_cost()
+        // Converged once the cost is small and no longer changes. A cost that has stopped changing
+        // while it is still large is a slow descent, along a near tangency for one, and is left
+        // to the step size to end.
+        if state.get_cost() < self.cost_tolerance
+            && state.get_cost() != state.get_prev_cost()
             && nalgebra::ComplexField::abs(state.get_cost() - state.get_prev_cost())
-                < self.cost_tolerance()
+                < self.cost_tolerance
         {
             return TerminationStatus::Terminated(TerminationReason::SolverConverged);
         }

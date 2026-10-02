@@ -15,7 +15,6 @@ readme = "README.md"
 anyhow = "1.0.104"
 nalgebra = { version = "0.35", features = ["serde-serialize"] }
 num-traits = "0.2.19"
-rand = "0.10.3"
 rand_distr = { version = "0.6.0", default-features = false, optional = true }
 robust = { version = "1.2.0" }
 easer = { version = "0.3.0", optional = true }
@@ -43,6 +42,7 @@ argmin = { version = "0.11.0", features = ["wasm-bindgen"] }
 
 [dev-dependencies]
 approx = { version = "0.5", default-features = false }
+rand = "0.10.3"
 serde_json = "1.0.151"
 criterion = { version = "0.8", default-features = false }
 
@@ -67,6 +67,22 @@ approx = ["dep:approx"]
 
 [[bench]]
 name = "evaluation"
+harness = false
+
+[[bench]]
+name = "split"
+harness = false
+
+[[bench]]
+name = "intersection"
+harness = false
+
+[[bench]]
+name = "contains"
+harness = false
+
+[[bench]]
+name = "boolean"
 harness = false
 
 [[example]]

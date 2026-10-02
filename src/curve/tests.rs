@@ -229,3 +229,23 @@ fn an_evaluator_returns_exactly_what_the_curve_does_in_any_parameter_order() {
         }
     }
 }
+
+#[test]
+fn knots_out_of_order_or_outside_the_domain_do_not_refine_a_curve() {
+    use crate::curve::NurbsCurve3D;
+    use nalgebra::Point4;
+    let points: Vec<Point4<f64>> = (0..7)
+        .map(|i| Point4::new(i as f64, (i as f64).sin(), 0., 1.))
+        .collect();
+    // unclamped, so there are knots on both sides of the domain
+    let knots: Vec<f64> = (0..10).map(|i| i as f64).collect();
+    let curve = NurbsCurve3D::try_new(2, points, knots).unwrap();
+    let (start, end) = curve.knots_domain();
+    let refine = |knots: Vec<f64>| curve.clone().try_refine_knot(knots);
+
+    assert!(refine(vec![]).is_ok());
+    assert!(refine(vec![start, 4.5, 4.5, end]).is_ok());
+    assert!(refine(vec![4.5, 3.5]).is_err());
+    assert!(refine(vec![start - 0.5]).is_err());
+    assert!(refine(vec![4.5, end + 0.5]).is_err());
+}

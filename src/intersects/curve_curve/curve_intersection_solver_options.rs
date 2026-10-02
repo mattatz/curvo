@@ -1,17 +1,25 @@
 use crate::misc::FloatingPoint;
 
 /// Hyperparameters for the curve intersection solver.
+///
+/// The distances and tolerances are relative to the size of the geometry, the diagonal of the
+/// bounding box of the smaller of the two objects: the same geometry at another scale, or
+/// parameterized over another domain, has the same intersections.
 #[derive(Clone, Debug)]
 pub struct CurveIntersectionSolverOptions<T: FloatingPoint> {
-    /// Minimum distance between two points to consider them as intersecting.
+    /// Distance below which two points are an intersection, as a fraction of the size of the
+    /// geometry.
     pub minimum_distance: T,
     /// Knot domain division for the threshold of the bounding box tree.
     /// Before detecting intersections between curves, perform intersection detection between the bounding boxes that enclose the curves as a sub-problem.
     /// Simultaneously divide the bounding boxes and the curves into smaller segments.
     pub knot_domain_division: usize,
-    /// Tolerance for the step size in the line search.
+    /// Step size below which the solver gives up, as a fraction of the step that travels the size
+    /// of the geometry.
     pub step_size_tolerance: T,
-    /// Tolerance for the cost function to determine convergence.
+    /// Cost below which the solver has converged once it no longer changes by as much. The cost
+    /// is the square of the distance between the two points, as a fraction of the size of the
+    /// geometry.
     pub cost_tolerance: T,
     /// Maximum number of iterations for the Newton method.
     pub max_iters: u64,

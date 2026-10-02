@@ -9,7 +9,9 @@ pub fn transpose_control_points<T: FloatingPoint, D: DimName>(
 where
     DefaultAllocator: Allocator<D>,
 {
-    let mut transposed = vec![vec![]; points[0].len()];
+    let mut transposed: Vec<Vec<_>> = (0..points[0].len())
+        .map(|_| Vec::with_capacity(points.len()))
+        .collect();
     points.iter().for_each(|row| {
         row.iter().enumerate().for_each(|(j, p)| {
             transposed[j].push(p.clone());

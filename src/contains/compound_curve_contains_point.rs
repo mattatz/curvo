@@ -2,9 +2,9 @@ use argmin::core::ArgminFloat;
 use nalgebra::{Const, OPoint, Point2};
 
 use crate::{
-    contains::curve_contains_point::x_ray_intersection,
+    contains::curve_contains_point::{is_inside, x_ray_intersection},
     misc::FloatingPoint,
-    prelude::{BoundingBox, CurveIntersectionSolverOptions},
+    prelude::CurveIntersectionSolverOptions,
     region::CompoundCurve,
 };
 
@@ -33,36 +33,19 @@ impl<T: FloatingPoint + ArgminFloat> Contains<OPoint<T, Const<2>>> for CompoundC
     fn contains(&self, point: &Point2<T>, option: Self::Option) -> anyhow::Result<bool> {
         // anyhow::ensure!(self.is_closed(), "Curve must be closed");
 
-        let bb: BoundingBox<T, Const<2>> = self.into();
-        if !bb.contains(point) {
-            return Ok(false);
-        }
-
-        let on_boundary = self
-            .find_closest_point(point)
-            .map(|closest| {
-                let delta = closest - point;
-                let distance = delta.norm();
-                distance
-                    < option
-                        .as_ref()
-                        .map(|opt| opt.minimum_distance)
-                        .unwrap_or(T::from_f64(1e-6).unwrap())
-            })
-            .unwrap_or(false);
-        if on_boundary {
-            return Ok(true);
-        }
-
-        let size = bb.size();
-        let sx = size.x * T::from_f64(2.).unwrap();
-        let intersections: anyhow::Result<Vec<_>> = self
-            .spans()
-            .iter()
-            .map(|span| x_ray_intersection(span, point, sx, option.clone()))
-            .collect();
-
-        let count = intersections?.iter().map(|its| its.len()).sum::<usize>();
-        Ok(count % 2 == 1)
+        let options = option.unwrap_or_default();
+        is_inside(
+            &self.into(),
+            point,
+            &options,
+            || self.find_closest_point(point),
+            |ray_length| {
+                self.spans().iter().try_fold(0, |count, span| {
+                    let crossings =
+                        x_ray_intersection(span, point, ray_length, Some(options.clone()))?;
+                    Ok(count + crossings.len())
+                })
+            },
+        )
     }
 }

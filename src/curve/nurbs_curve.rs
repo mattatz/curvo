@@ -12,6 +12,7 @@ use nalgebra::{
 };
 use simba::scalar::SupersetOf;
 
+use crate::bounding_box::BoundingBox;
 use crate::curve::curve_evaluator::CurveEvaluator;
 use crate::misc::binomial::{Binomial, BinomialCoefficients};
 use crate::misc::frenet_frame::FrenetFrame;
@@ -77,21 +78,14 @@ where
     pub fn try_new(
         degree: usize,
         control_points: Vec<OPoint<T, D>>,
-        knots: Vec<T>,
+        mut knots: Vec<T>,
     ) -> anyhow::Result<Self> {
-        anyhow::ensure!(
-            control_points.len() > degree,
-            "Too few control points for curve"
-        );
-        anyhow::ensure!(
-            knots.len() == control_points.len() + degree + 1,
-            "Invalid number of knots, got {}, expected {}",
-            knots.len(),
-            control_points.len() + degree + 1
-        );
+        ensure_curve(degree, control_points.len(), knots.len())?;
 
-        let mut knots = knots.clone();
-        knots.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        // The sort is stable, so knots already in order are left as they are.
+        if !knots.is_sorted() {
+            knots.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        }
 
         Ok(Self {
             degree,
@@ -1804,98 +1798,47 @@ where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
-        let eps = T::default_epsilon() * T::from_usize(1000).unwrap();
-        match self.knots.is_clamped(self.degree) {
-            true => {
-                let pts = self.dehomogenized_control_points();
-                let delta = &pts[0] - &pts[self.control_points.len() - 1];
-                delta.norm() < eps
-            }
+        // The two ends, a control point each when the curve is clamped
+        let (start, end) = match self.knots.is_clamped(self.degree) {
+            true => (
+                dehomogenize(&self.control_points[0]).unwrap(),
+                dehomogenize(&self.control_points[self.control_points.len() - 1]).unwrap(),
+            ),
             false => {
                 let (s, e) = self.knots_domain();
-                let s = self.point_at(s);
-                let e = self.point_at(e);
-                let delta = s - e;
-                delta.norm() < eps
+                (self.point_at(s), self.point_at(e))
             }
-        }
+        };
+        // closer than rounding lets them be told apart, at the size of the curve
+        let size = BoundingBox::from(self).size().norm();
+        let eps = T::default_epsilon() * T::from_usize(1000).unwrap();
+        (start - end).norm() <= eps * size
     }
 
-    /// Try to refine the curve by inserting knots
+    /// Try to refine the curve by inserting knots, which must be in order and within the domain
+    /// of the curve: knots anywhere else do not refine the curve, they describe another one.
     pub fn try_refine_knot(&mut self, knots_to_insert: Vec<T>) -> anyhow::Result<()> {
         if knots_to_insert.is_empty() {
             return Ok(());
         }
+        let (start, end) = self.knots_domain();
+        anyhow::ensure!(
+            knots_to_insert.is_sorted(),
+            "Knots to insert are not in order"
+        );
+        anyhow::ensure!(
+            knots_to_insert.iter().all(|u| start <= *u && *u <= end),
+            "Knots to insert are not all within the domain of the curve"
+        );
 
-        let degree = self.degree;
-        let control_points = &self.control_points;
-
-        let n = control_points.len() - 1;
-        let m = n + degree + 1;
-        let r = knots_to_insert.len() - 1;
-        let a = self
-            .knots
-            .find_knot_span_index(n, degree, knots_to_insert[0]);
-        let b = self
-            .knots
-            .find_knot_span_index(n, degree, knots_to_insert[r])
-            + 1;
-
-        let mut control_points_post = vec![OPoint::<T, D>::origin(); n + r + 2];
-        let mut knots_post = vec![T::zero(); m + 1 + r + 1];
-        // assert!(knots_post.len() == control_points_post.len() + degree + 1);
-
-        control_points_post[..((a - degree) + 1)]
-            .clone_from_slice(&control_points[..((a - degree) + 1)]);
-        for i in (b - 1)..=n {
-            control_points_post[i + r + 1] = control_points[i].clone();
-        }
-
-        for i in 0..=a {
-            knots_post[i] = self.knots[i];
-        }
-        for i in (b + degree)..=m {
-            knots_post[i + r + 1] = self.knots[i];
-        }
-
-        let mut i = b + degree - 1;
-        let mut k = b + degree + r;
-
-        for j in (0..=r).rev() {
-            while knots_to_insert[j] <= self.knots[i] && i > a {
-                control_points_post[k - degree - 1] = control_points[i - degree - 1].clone();
-                knots_post[k] = self.knots[i];
-                k -= 1;
-                i -= 1;
-            }
-            control_points_post[k - degree - 1] = control_points_post[k - degree].clone();
-            for l in 1..=degree {
-                let ind = k - degree + l;
-                if ind < control_points_post.len() {
-                    let alpha = knots_post[k + l] - knots_to_insert[j];
-                    if alpha.abs() < T::default_epsilon() {
-                        control_points_post[ind - 1] = control_points_post[ind].clone();
-                    } else {
-                        let denom = knots_post[k + l] - self.knots[i - degree + l];
-                        let weight = if denom != T::zero() {
-                            alpha / denom
-                        } else {
-                            T::zero()
-                        };
-                        control_points_post[ind - 1] = control_points_post[ind - 1]
-                            .lerp(&control_points_post[ind], T::one() - weight);
-                    }
-                } else {
-                    // TODO: resolve this issue
-                    // ind is out of bound
-                }
-            }
-            knots_post[k] = knots_to_insert[j];
-            k -= 1;
-        }
-
-        self.knots = KnotVector::new(knots_post);
-        self.control_points = control_points_post;
+        let (control_points, knots) = refine_knot(
+            self.degree,
+            &self.control_points,
+            &self.knots,
+            &knots_to_insert,
+        );
+        self.knots = KnotVector::new(knots);
+        self.control_points = control_points;
 
         Ok(())
     }
@@ -2293,6 +2236,86 @@ where
     } else {
         T::zero()
     }
+}
+
+/// Check that `count` control points and `knots` knots describe a curve of `degree`.
+pub(crate) fn ensure_curve(degree: usize, count: usize, knots: usize) -> anyhow::Result<()> {
+    anyhow::ensure!(count > degree, "Too few control points for curve");
+    anyhow::ensure!(
+        knots == count + degree + 1,
+        "Invalid number of knots, got {}, expected {}",
+        knots,
+        count + degree + 1
+    );
+    Ok(())
+}
+
+/// The control points and knots of a curve after inserting `knots_to_insert`, which must be in
+/// order, within the domain of the curve and not empty.
+pub(crate) fn refine_knot<T: FloatingPoint, D: DimName>(
+    degree: usize,
+    control_points: &[OPoint<T, D>],
+    knots: &KnotVector<T>,
+    knots_to_insert: &[T],
+) -> (Vec<OPoint<T, D>>, Vec<T>)
+where
+    DefaultAllocator: Allocator<D>,
+{
+    let n = control_points.len() - 1;
+    let m = n + degree + 1;
+    let r = knots_to_insert.len() - 1;
+    let a = knots.find_knot_span_index(n, degree, knots_to_insert[0]);
+    let b = knots.find_knot_span_index(n, degree, knots_to_insert[r]) + 1;
+
+    let mut control_points_post = vec![OPoint::<T, D>::origin(); n + r + 2];
+    let mut knots_post = vec![T::zero(); m + 1 + r + 1];
+    // assert!(knots_post.len() == control_points_post.len() + degree + 1);
+
+    control_points_post[..((a - degree) + 1)]
+        .clone_from_slice(&control_points[..((a - degree) + 1)]);
+    for i in (b - 1)..=n {
+        control_points_post[i + r + 1] = control_points[i].clone();
+    }
+
+    for i in 0..=a {
+        knots_post[i] = knots[i];
+    }
+    for i in (b + degree)..=m {
+        knots_post[i + r + 1] = knots[i];
+    }
+
+    let mut i = b + degree - 1;
+    let mut k = b + degree + r;
+
+    for j in (0..=r).rev() {
+        while knots_to_insert[j] <= knots[i] && i > a {
+            control_points_post[k - degree - 1] = control_points[i - degree - 1].clone();
+            knots_post[k] = knots[i];
+            k -= 1;
+            i -= 1;
+        }
+        control_points_post[k - degree - 1] = control_points_post[k - degree].clone();
+        for l in 1..=degree {
+            let ind = k - degree + l;
+            let alpha = knots_post[k + l] - knots_to_insert[j];
+            if alpha.abs() < T::default_epsilon() {
+                control_points_post[ind - 1] = control_points_post[ind].clone();
+            } else {
+                let denom = knots_post[k + l] - knots[i - degree + l];
+                let weight = if denom != T::zero() {
+                    alpha / denom
+                } else {
+                    T::zero()
+                };
+                control_points_post[ind - 1] =
+                    control_points_post[ind - 1].lerp(&control_points_post[ind], T::one() - weight);
+            }
+        }
+        knots_post[k] = knots_to_insert[j];
+        k -= 1;
+    }
+
+    (control_points_post, knots_post)
 }
 
 /// Dehomogenize a point

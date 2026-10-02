@@ -1,18 +1,16 @@
-use std::cmp::Ordering;
-
-use argmin::core::{ArgminFloat, Executor, State};
-use itertools::Itertools;
-use nalgebra::{Const, Matrix1, OPoint, Vector1};
+use argmin::core::ArgminFloat;
+use nalgebra::{Const, OPoint, Vector1};
+use num_traits::Float;
 
 use crate::{
-    bounding_box::BoundingBoxTree,
+    bounding_box::leaves_reaching_plane,
     curve::NurbsCurve,
-    intersects::Intersection,
-    misc::{FloatingPoint, Plane},
-    prelude::{
-        CurveBoundingBoxTree, CurveIntersectionBFGS, CurveIntersectionSolverOptions,
-        HasIntersection, Intersects,
+    intersects::{
+        solve::{curve_scale, Scales},
+        Intersection,
     },
+    misc::{FloatingPoint, Plane},
+    prelude::{CurveBoundingBoxTree, CurveIntersectionSolverOptions, Intersects},
 };
 
 use super::CurvePlaneIntersectionProblem;
@@ -32,147 +30,32 @@ where
     fn find_intersection(&'a self, plane: &'a Plane<T>, option: Self::Option) -> Self::Output {
         let options = option.unwrap_or_default();
 
-        // Create bounding box tree for the curve
-        let tree = CurveBoundingBoxTree::new(
-            self,
-            Some(
-                self.knots_domain_interval() / T::from_usize(options.knot_domain_division).unwrap(),
-            ),
-        );
-
-        let domain = self.knots_domain();
+        let (size, parameter) = curve_scale(self);
+        let scales = Scales::new(&[size], [parameter], options.minimum_distance);
 
         // Check each segment of the curve against the plane
-        let intersections = collect_leaf_nodes(tree, plane)
+        let tree = CurveBoundingBoxTree::with_divisions(self, options.knot_domain_division);
+        let candidates = leaves_reaching_plane(tree, plane, scales.minimum_distance())
             .into_iter()
-            .filter_map(|node| {
+            .flat_map(|node| {
                 let curve_segment = node.curve_owned();
                 let problem = CurvePlaneIntersectionProblem::new(&curve_segment, plane);
+                let found = scales.solve_leaf(&problem, &options, [curve_segment.knots_domain()]);
+                found.into_iter().flatten().map(|(param, _)| param)
+            });
 
-                // Initial parameter at midpoint of segment
-                let segment_domain = curve_segment.knots_domain();
-                let init_param = Vector1::<T>::new(
-                    (segment_domain.0 + segment_domain.1) * T::from_f64(0.5).unwrap(),
-                );
-
-                // Set up solver
-                let solver = CurveIntersectionBFGS::<T>::new()
-                    .with_step_size_tolerance(options.step_size_tolerance)
-                    .with_cost_tolerance(options.cost_tolerance);
-
-                // Run solver
-                let res = Executor::new(problem, solver)
-                    .configure(|state| {
-                        state
-                            .param(init_param)
-                            .inv_hessian(Matrix1::identity())
-                            .max_iters(options.max_iters)
-                    })
-                    .run();
-
-                match res {
-                    Ok(r) => r.state().get_best_param().and_then(|param| {
-                        let t = param[0];
-                        if (domain.0..=domain.1).contains(&t) {
-                            let point = self.point_at(t);
-                            let distance = num_traits::Float::abs(plane.signed_distance(&point));
-
-                            if distance < options.minimum_distance {
-                                Some(CurvePlaneIntersection::new((point, t), (point, ())))
-                            } else {
-                                None
-                            }
-                        } else {
-                            None
-                        }
-                    }),
-                    Err(_) => None,
-                }
+        let distance_at =
+            |param: &Vector1<T>| Float::abs(plane.signed_distance(&self.point_at(param[0])));
+        let intersections = scales
+            .intersections(candidates, 0, distance_at)
+            .into_iter()
+            .map(|param| {
+                let point = self.point_at(param[0]);
+                CurvePlaneIntersection::new((point, param[0]), (point, ()))
             })
-            .collect_vec();
-
-        let pts = group_and_extract_closest_intersections(intersections, options.minimum_distance);
-        Ok(pts)
+            .collect();
+        Ok(intersections)
     }
-}
-
-/// Recursively collect all leaf nodes from a bounding box tree
-fn collect_leaf_nodes<'a, T: FloatingPoint>(
-    tree: CurveBoundingBoxTree<'a, T, Const<4>>,
-    plane: &Plane<T>,
-) -> Vec<CurveBoundingBoxTree<'a, T, Const<4>>> {
-    let bbox = tree.bounding_box();
-    let corners = bbox.corners();
-
-    // Check if bbox straddles the plane
-    let distances: Vec<_> = corners.iter().map(|p| plane.signed_distance(p)).collect();
-    let has_positive = distances.iter().any(|&d| d > T::zero());
-    let has_negative = distances.iter().any(|&d| d < T::zero());
-
-    if !has_positive || !has_negative {
-        // Bbox is entirely on one side of the plane
-        return vec![];
-    }
-
-    if tree.is_dividable() {
-        if let Ok((left, right)) = tree.try_divide() {
-            let mut nodes = collect_leaf_nodes(left, plane);
-            nodes.extend(collect_leaf_nodes(right, plane));
-            nodes
-        } else {
-            vec![tree]
-        }
-    } else {
-        vec![tree]
-    }
-}
-
-/// Group intersections by parameter and extract unique intersections
-fn group_and_extract_closest_intersections<T>(
-    intersections: Vec<CurvePlaneIntersection<T>>,
-    min_distance: T,
-) -> Vec<CurvePlaneIntersection<T>>
-where
-    T: FloatingPoint + ArgminFloat,
-{
-    if intersections.is_empty() {
-        return vec![];
-    }
-
-    let sorted = intersections
-        .into_iter()
-        .sorted_by(|x, y| x.a().1.partial_cmp(&y.a().1).unwrap_or(Ordering::Equal))
-        .collect_vec();
-
-    let groups = sorted
-        .into_iter()
-        .map(|pt| vec![pt])
-        .coalesce(|x, y| {
-            let x0 = &x[x.len() - 1];
-            let y0 = &y[y.len() - 1];
-            let dt = num_traits::Float::abs(x0.a().1 - y0.a().1);
-            if dt < min_distance {
-                // merge near parameter results
-                let group = [x, y].concat();
-                Ok(group)
-            } else {
-                Err((x, y))
-            }
-        })
-        .collect::<Vec<Vec<CurvePlaneIntersection<T>>>>()
-        .into_iter()
-        .collect_vec();
-
-    groups
-        .into_iter()
-        .filter_map(|group| match group.len() {
-            1 => Some(group[0].clone()),
-            _ => {
-                // Return the first one (they should all be very close)
-                group.into_iter().next()
-            }
-        })
-        .collect_vec()
 }
 
 #[cfg(test)]
@@ -180,7 +63,7 @@ mod tests {
     use crate::{
         curve::NurbsCurve3D,
         misc::Plane,
-        prelude::{HasIntersection, Intersects},
+        prelude::{HasIntersection, Interpolation, Intersects},
     };
     use approx::assert_relative_eq;
     use nalgebra::{Point3, Vector3};
@@ -207,5 +90,87 @@ mod tests {
 
         let pt = &intersections[0].a().0;
         assert_relative_eq!(*pt, Point3::origin(), epsilon = 1e-6);
+    }
+
+    #[test]
+    fn intersections_do_not_depend_on_the_scale() {
+        for scale in [1., 1e-3, 1e3] {
+            let points: Vec<Point3<f64>> = (0..32)
+                .map(|i| {
+                    let x = i as f64;
+                    Point3::new(x, (x * 0.7).sin() * 3., (x * 0.3).cos()) * scale
+                })
+                .collect();
+            let wave = NurbsCurve3D::interpolate(&points, 3).unwrap();
+            // y = 0.5, scaled
+            let plane = Plane::new(Vector3::y(), -0.5 * scale);
+            let intersections = wave.find_intersection(&plane, None).unwrap();
+            assert_eq!(intersections.len(), 7, "scaled by {scale}");
+        }
+    }
+
+    /// A wave along x, of the given phase and amplitude in y.
+    fn wave(phase: f64, amplitude: f64) -> NurbsCurve3D<f64> {
+        let points: Vec<Point3<f64>> = (0..32)
+            .map(|i| {
+                let x = i as f64;
+                Point3::new(x, (x * 0.7 + phase).sin() * amplitude, (x * 0.3).cos())
+            })
+            .collect();
+        NurbsCurve3D::interpolate(&points, 3).unwrap()
+    }
+
+    #[test]
+    fn every_crossing_of_a_wave_with_a_plane_is_found() {
+        // The plane y = c just under the crests of the wave or just over its troughs, where two
+        // crossings are next to each other: in one leaf of the tree, or with a leaf starting on
+        // the crest between them, where the solver cannot tell which way to go.
+        let close = [
+            (5.656225963109361, 3.852904357355273, 3.7274072544386616),
+            (5.2192839757610345, 2.86639641195568, -2.5915477898548076),
+        ];
+        // and planes anywhere through waves of any phase
+        let anywhere = (0..7).flat_map(|i| {
+            [-0.95, -0.5, 0.3, 0.9]
+                .into_iter()
+                .map(move |height| (i as f64, 3., height * 3.))
+        });
+        for (phase, amplitude, c) in close.into_iter().chain(anywhere) {
+            let wave = wave(phase, amplitude);
+            // where the wave changes sides of the plane, along its whole domain
+            let (start, end) = wave.knots_domain();
+            let above = (0..=8000)
+                .map(|i| wave.point_at(start + (end - start) * i as f64 / 8000.).y > c)
+                .collect::<Vec<_>>();
+            let crossings = above.windows(2).filter(|w| w[0] != w[1]).count();
+
+            let plane = Plane::new(Vector3::y(), -c);
+            let intersections = wave.find_intersection(&plane, None).unwrap();
+            let at = format!("phase {phase}, amplitude {amplitude}, y = {c}");
+            assert_eq!(intersections.len(), crossings, "{at}");
+            for intersection in intersections {
+                assert!((intersection.a().0.y - c).abs() < 1e-4, "{at}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_curve_that_ends_on_a_plane_or_touches_it_intersects_it_once() {
+        let line =
+            NurbsCurve3D::polyline(&[Point3::new(0., 0., -2.), Point3::new(0., 0., 0.)], false);
+        let circle =
+            NurbsCurve3D::try_circle(&Point3::origin(), &Vector3::x(), &Vector3::y(), 1.).unwrap();
+        let ends = line
+            .find_intersection(&Plane::new(Vector3::z(), 0.), None)
+            .unwrap();
+        assert_eq!(ends.len(), 1);
+        assert_relative_eq!(ends[0].a().0, Point3::origin(), epsilon = 1e-6);
+
+        // y = 1
+        let touches = circle
+            .find_intersection(&Plane::new(Vector3::y(), -1.), None)
+            .unwrap();
+        assert_eq!(touches.len(), 1);
+        assert_relative_eq!(touches[0].a().0, Point3::new(0., 1., 0.), epsilon = 1e-2);
     }
 }
