@@ -118,8 +118,11 @@ impl<T: FloatingPoint, const N: usize> Scales<T, N> {
 
     /// What the solver finds for the pair of leaves `problem` is about, with the tolerances of
     /// `options`: from the start of the leaves, which are over `leaf` in each parameter, and from
-    /// their end too when that led out of them. The leaves may hold an intersection the solver
-    /// went past on its way to another one.
+    /// their end.
+    ///
+    /// From one place only, the solver may go past an intersection of the leaves on its way to
+    /// another one, stop short of it where the geometry turns back, or find the first of two
+    /// intersections in the leaves and never the second.
     pub(crate) fn solve_leaf<O>(
         &self,
         problem: &O,
@@ -131,16 +134,10 @@ impl<T: FloatingPoint, const N: usize> Scales<T, N> {
         O: CostFunction<Param = SVector<T, N>, Output = T>
             + Gradient<Param = SVector<T, N>, Gradient = SVector<T, N>>,
     {
-        let from_start = self.solve(problem, options, SVector::from_fn(|i, _| leaf[i].0));
-        let within = from_start.is_some_and(|(found, _)| {
-            (0..N).all(|i| leaf[i].0 <= found[i] && found[i] <= leaf[i].1)
-        });
-        let from_end = if within {
-            None
-        } else {
-            self.solve(problem, options, SVector::from_fn(|i, _| leaf[i].1))
-        };
-        [from_start, from_end]
+        [
+            self.solve(problem, options, SVector::from_fn(|i, _| leaf[i].0)),
+            self.solve(problem, options, SVector::from_fn(|i, _| leaf[i].1)),
+        ]
     }
 
     /// Solve `problem` in these scales from the parameters `init`, with the tolerances of
@@ -520,23 +517,50 @@ mod tests {
         assert_eq!(past, [false]);
     }
 
+    /// The squared distance from a point to a line it crosses at 0.3 and at 0.7, turning back
+    /// halfway between them, 0.04 away from it.
+    struct ThereAndBack;
+
+    impl ThereAndBack {
+        fn distance(t: f64) -> f64 {
+            (t - 0.5).powi(2) - 0.04
+        }
+    }
+
+    impl CostFunction for ThereAndBack {
+        type Param = Vector1<f64>;
+        type Output = f64;
+
+        fn cost(&self, param: &Self::Param) -> Result<Self::Output, Error> {
+            Ok(Self::distance(param[0]).powi(2))
+        }
+    }
+
+    impl Gradient for ThereAndBack {
+        type Param = Vector1<f64>;
+        type Gradient = Vector1<f64>;
+
+        fn gradient(&self, param: &Self::Param) -> Result<Self::Gradient, Error> {
+            let t = param[0];
+            Ok(Vector1::new(2. * Self::distance(t) * 2. * (t - 0.5)))
+        }
+    }
+
     #[test]
-    fn a_leaf_is_solved_from_its_end_too_when_its_start_leads_out_of_it() {
+    fn a_leaf_is_solved_from_its_start_and_from_its_end() {
         let options = CurveIntersectionSolverOptions::default();
-        // the point is where it is asked to be 0.3 of the way along the domain
-        let along = Along {
-            size: 1.,
-            domain: (0., 1.),
-        };
         let scales = scales(1., (0., 1.), false);
         let solutions = |leaf| {
-            let found = scales.solve_leaf(&along, &options, [leaf]);
+            let found = scales.solve_leaf(&ThereAndBack, &options, [leaf]);
             found.map(|found| found.map(|(found, _)| (found[0] * 1e6).round() / 1e6))
         };
-        // in the leaf: found from its start, and that is all
-        assert_eq!(solutions((0.2, 0.4)), [Some(0.3), None]);
-        // out of the leaf: looked for from its end as well
-        assert_eq!(solutions((0.5, 0.7)), [Some(0.3), Some(0.3)]);
+        // one intersection in the leaf, found from both ends
+        assert_eq!(solutions((0.28, 0.32)), [Some(0.3), Some(0.3)]);
+        // two intersections in the leaf, each found from the end it is nearer
+        assert_eq!(solutions((0.25, 0.75)), [Some(0.3), Some(0.7)]);
+        // the solver cannot tell which way to go from where the point turns back, at the start
+        // of the leaf: the intersection is found from its end
+        assert_eq!(solutions((0.5, 0.8)), [Some(0.5), Some(0.7)]);
     }
 
     /// A point moving along a line, `distance_at` its parameter from the line it crosses at 0.3
