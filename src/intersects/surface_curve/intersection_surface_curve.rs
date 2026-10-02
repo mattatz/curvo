@@ -75,8 +75,6 @@ where
         let tb = CurveBoundingBoxTree::new(other, Some(other.knots_domain_interval() * div));
 
         let traversed = BoundingBoxTraversal::try_traverse(ta, tb)?;
-        let (surface_u_domain, surface_v_domain) = self.knots_domain();
-        let curve_domain = other.knots_domain();
 
         let intersections = traversed
             .into_pairs_iter()
@@ -116,20 +114,17 @@ where
                 match res {
                     Ok(r) => {
                         // println!("{}", r.state().get_termination_status());
-                        r.state().get_best_param().and_then(|param| {
-                            if (surface_u_domain.0..=surface_u_domain.1).contains(&param.y)
-                                && (surface_v_domain.0..=surface_v_domain.1).contains(&param.z)
-                                && (curve_domain.0..=curve_domain.1).contains(&param.x)
-                            {
-                                let p0 = self.point_at(param.y, param.z);
-                                let p1 = other.point_at(param.x);
-                                Some(SurfaceCurveIntersection::new(
-                                    (p0, (param.y, param.z)),
-                                    (p1, param.x),
-                                ))
-                            } else {
-                                None
-                            }
+                        r.state().get_best_param().map(|param| {
+                            // An intersection at the end of a domain, a pole of a sphere for
+                            // one, is found a hair inside it or a hair outside, so the
+                            // parameters are clamped rather than refused: how far apart the
+                            // points there are decides below.
+                            let t = other.knots().clamp(other.degree(), param.x);
+                            let u = self.u_knots().clamp(self.u_degree(), param.y);
+                            let v = self.v_knots().clamp(self.v_degree(), param.z);
+                            let p0 = self.point_at(u, v);
+                            let p1 = other.point_at(t);
+                            SurfaceCurveIntersection::new((p0, (u, v)), (p1, t))
                         })
                     }
                     Err(_e) => {
@@ -193,5 +188,32 @@ where
             .collect_vec();
 
         Ok(pts)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use nalgebra::{Point3, Vector3};
+
+    use crate::{curve::NurbsCurve3D, surface::NurbsSurface3D};
+
+    use super::*;
+
+    #[test]
+    fn intersections_at_the_poles_of_a_sphere_are_found() {
+        // The poles are at the ends of the domain of the sphere, and every patch around a pole
+        // finds the intersection there.
+        let sphere =
+            NurbsSurface3D::<f64>::try_sphere(&Point3::origin(), &Vector3::x(), &Vector3::y(), 1.)
+                .unwrap();
+        let axis =
+            NurbsCurve3D::polyline(&[Point3::new(-2., 0., 0.), Point3::new(2., 0., 0.)], false);
+        // The bounding box trees are divided at random, so this is run again and again.
+        for _ in 0..10 {
+            let intersections = sphere.find_intersection(&axis, None).unwrap();
+            assert_eq!(intersections.len(), 2);
+            assert!((intersections[0].a().0 - Point3::new(-1., 0., 0.)).norm() < 1e-5);
+            assert!((intersections[1].a().0 - Point3::new(1., 0., 0.)).norm() < 1e-5);
+        }
     }
 }

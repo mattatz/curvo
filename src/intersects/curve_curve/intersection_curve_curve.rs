@@ -150,9 +150,6 @@ where
 
         let traversed = BoundingBoxTraversal::try_traverse(ta, tb)?;
 
-        let a_domain = self.knots_domain();
-        let b_domain = other.knots_domain();
-
         let intersections = traversed
             .into_pairs_iter()
             .filter_map(|(a, b)| {
@@ -191,16 +188,15 @@ where
                 match res {
                     Ok(r) => {
                         // println!("{}", r.state().get_termination_status());
-                        r.state().get_best_param().and_then(|param| {
-                            if (a_domain.0..=a_domain.1).contains(&param[0])
-                                && (b_domain.0..=b_domain.1).contains(&param[1])
-                            {
-                                let p0 = self.point_at(param[0]);
-                                let p1 = other.point_at(param[1]);
-                                Some(CurveCurveIntersection::new((p0, param[0]), (p1, param[1])))
-                            } else {
-                                None
-                            }
+                        r.state().get_best_param().map(|param| {
+                            // An intersection at the end of a domain is found a hair inside
+                            // it or a hair outside, so the parameters are clamped rather than
+                            // refused: how far apart the points there are decides below.
+                            let ta = self.knots().clamp(self.degree(), param[0]);
+                            let tb = other.knots().clamp(other.degree(), param[1]);
+                            let p0 = self.point_at(ta);
+                            let p1 = other.point_at(tb);
+                            CurveCurveIntersection::new((p0, ta), (p1, tb))
                         })
                     }
                     Err(_e) => {
@@ -280,7 +276,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::curve::NurbsCurve2D;
+    use crate::{curve::NurbsCurve2D, interpolation::Interpolation};
 
     use super::*;
 
@@ -299,5 +295,65 @@ mod tests {
 
         let intersections = p0.find_intersection(&p1, None).unwrap();
         assert_eq!(intersections.len(), 2);
+    }
+
+    /// The bounding box trees are divided at random, so a case that is only found some of the
+    /// time is run again and again.
+    const RUNS: usize = 20;
+
+    #[test]
+    fn an_intersection_at_the_end_of_a_curve_is_found() {
+        // the end of the arc touches the middle of the bar
+        let arc = NurbsCurve2D::<f64>::interpolate(
+            &vec![
+                Point2::new(0., 0.),
+                Point2::new(1., 2.),
+                Point2::new(3., 3.),
+                Point2::new(5., 2.),
+            ],
+            3,
+        )
+        .unwrap();
+        let bar = NurbsCurve2D::<f64>::interpolate(
+            &vec![
+                Point2::new(5., -1.),
+                Point2::new(5.2, 1.),
+                Point2::new(5., 2.),
+                Point2::new(4.6, 4.),
+                Point2::new(5., 6.),
+            ],
+            3,
+        )
+        .unwrap();
+        let (_, end) = arc.knots_domain();
+        for _ in 0..RUNS {
+            let intersections = arc.find_intersection(&bar, None).unwrap();
+            assert_eq!(intersections.len(), 1);
+            assert!((intersections[0].a().1 - end).abs() < 1e-6);
+            assert!((intersections[0].a().0 - Point2::new(5., 2.)).norm() < 1e-5);
+        }
+    }
+
+    #[test]
+    fn intersections_at_both_ends_of_two_curves_are_found() {
+        let lens = |y: f64| {
+            NurbsCurve2D::<f64>::interpolate(
+                &vec![
+                    Point2::new(0., 0.),
+                    Point2::new(1., y),
+                    Point2::new(2., y * 1.2),
+                    Point2::new(3., 0.),
+                ],
+                3,
+            )
+            .unwrap()
+        };
+        let (upper, lower) = (lens(1.), lens(-1.));
+        for _ in 0..RUNS {
+            let intersections = upper.find_intersection(&lower, None).unwrap();
+            assert_eq!(intersections.len(), 2);
+            assert!((intersections[0].a().0 - Point2::new(0., 0.)).norm() < 1e-5);
+            assert!((intersections[1].a().0 - Point2::new(3., 0.)).norm() < 1e-5);
+        }
     }
 }
