@@ -84,6 +84,11 @@ impl<T: FloatingPoint> SplitAt<T> {
         }
     }
 
+    /// The number of control points of the tail of a curve of `count` control points.
+    fn tail_len(&self, count: usize) -> usize {
+        count + self.insert - self.tail
+    }
+
     /// Divide the refined control points into those of the head and those of the tail.
     fn divide_control_points<P>(&self, mut refined: Vec<P>) -> (Vec<P>, Vec<P>) {
         let tail = refined.split_off(self.tail);
@@ -97,4 +102,16 @@ impl<T: FloatingPoint> SplitAt<T> {
         refined.truncate(self.head + self.degree + 1);
         (refined, tail)
     }
+}
+
+/// Check that `count` control points and `knots` knots describe a curve of `degree`.
+fn ensure_curve(degree: usize, count: usize, knots: usize) -> anyhow::Result<()> {
+    anyhow::ensure!(count > degree, "Too few control points for curve");
+    anyhow::ensure!(
+        knots == count + degree + 1,
+        "Invalid number of knots, got {}, expected {}",
+        knots,
+        count + degree + 1
+    );
+    Ok(())
 }

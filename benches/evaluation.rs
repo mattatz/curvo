@@ -179,6 +179,16 @@ fn surfaces(c: &mut Criterion) {
             })
         });
     }
+    let piercing: Vec<Point3<f64>> = (0..12)
+        .map(|i| {
+            let x = i as f64;
+            Point3::new(x, 0.5 + x * 0.9, if i % 2 == 0 { 2. } else { -2. })
+        })
+        .collect();
+    let piercing = NurbsCurve3D::interpolate(&piercing, 3).unwrap();
+    c.bench_function("surface/find_intersection/bicubic", |b| {
+        b.iter(|| black_box(surface.find_intersection(&piercing, None).unwrap()))
+    });
     c.bench_function("surface/regular_tessellate/bicubic", |b| {
         b.iter(|| black_box(surface.regular_tessellate(side - 1, side - 1)))
     });

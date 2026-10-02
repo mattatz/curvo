@@ -1,11 +1,13 @@
-use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, U1};
+use nalgebra::{
+    allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, U1,
+};
 
 use crate::{
-    misc::{transpose_control_points, FloatingPoint},
+    misc::FloatingPoint,
     surface::{NurbsSurface, UVDirection},
 };
 
-use super::{Split, SplitAt};
+use super::{ensure_curve, Split, SplitAt};
 
 /// Option for splitting a surface
 #[derive(Clone, Debug)]
@@ -35,72 +37,72 @@ where
 
     /// Split the surface into two surfaces before and after the parameter
     fn try_split(&self, option: Self::Option) -> anyhow::Result<(Self, Self)> {
-        let transposed;
-        let (points, knots, degree) = match option.direction {
-            UVDirection::U => {
-                transposed = self.transposed_control_points();
-                (&transposed, self.u_knots(), self.u_degree())
-            }
-            UVDirection::V => (self.control_points(), self.v_knots(), self.v_degree()),
-        };
+        let control_points = self.control_points();
+        let columns = control_points.first().map_or(0, |row| row.len());
+        anyhow::ensure!(columns > 0, "No curves");
 
-        // Each row is a curve along the direction, and every row refines the knots alike.
-        let split = SplitAt::new(knots, degree, option.parameter);
-        let mut refined_knots = None;
-        let (pts0, pts1): (Vec<_>, Vec<_>) = points
-            .iter()
-            .map(|row| {
-                anyhow::ensure!(row.len() > degree, "Too few control points for curve");
-                anyhow::ensure!(
-                    knots.len() == row.len() + degree + 1,
-                    "Invalid number of knots, got {}, expected {}",
-                    knots.len(),
-                    row.len() + degree + 1
-                );
-                let (row, knots) = split.refine(row, knots);
-                refined_knots = Some(knots);
-                Ok(split.divide_control_points(row))
-            })
-            .collect::<anyhow::Result<Vec<_>>>()?
-            .into_iter()
-            .unzip();
-
-        let refined_knots = refined_knots.ok_or_else(|| anyhow::anyhow!("No curves"))?;
-        let (knots0, knots1) = split.divide_knots(refined_knots);
-
+        // The curves along u are the columns of the control points, those along v their rows.
+        // Every one of them refines the knots alike.
+        let mut refined_knots = vec![];
         match option.direction {
-            UVDirection::U => Ok((
-                Self::new(
-                    degree,
-                    self.v_degree(),
-                    knots0,
-                    self.v_knots().to_vec(),
-                    transpose_control_points(&pts0),
-                ),
-                Self::new(
-                    degree,
-                    self.v_degree(),
-                    knots1,
-                    self.v_knots().to_vec(),
-                    transpose_control_points(&pts1),
-                ),
-            )),
-            UVDirection::V => Ok((
-                Self::new(
-                    self.u_degree(),
-                    degree,
-                    self.u_knots().to_vec(),
-                    knots0,
-                    pts0,
-                ),
-                Self::new(
-                    self.u_degree(),
-                    degree,
-                    self.u_knots().to_vec(),
-                    knots1,
-                    pts1,
-                ),
-            )),
+            UVDirection::U => {
+                let (knots, degree) = (self.u_knots(), self.u_degree());
+                let rows = control_points.len();
+                ensure_curve(degree, rows, knots.len())?;
+                anyhow::ensure!(
+                    control_points.iter().all(|row| row.len() == columns),
+                    "Control points are not a grid"
+                );
+                let split = SplitAt::new(knots, degree, option.parameter);
+
+                let grid = |rows: usize| -> Vec<Vec<OPoint<T, D>>> {
+                    (0..rows).map(|_| Vec::with_capacity(columns)).collect()
+                };
+                let (mut pts0, mut pts1) = (grid(split.head), grid(split.tail_len(rows)));
+                let mut column = Vec::with_capacity(rows);
+                for j in 0..columns {
+                    column.clear();
+                    column.extend(control_points.iter().map(|row| row[j].clone()));
+                    let refined;
+                    (refined, refined_knots) = split.refine(&column, knots);
+                    for (row, point) in pts0.iter_mut().zip(&refined[..split.head]) {
+                        row.push(point.clone());
+                    }
+                    for (row, point) in pts1.iter_mut().zip(&refined[split.tail..]) {
+                        row.push(point.clone());
+                    }
+                }
+
+                let (knots0, knots1) = split.divide_knots(refined_knots);
+                let v_knots = || self.v_knots().to_vec();
+                Ok((
+                    Self::new(degree, self.v_degree(), knots0, v_knots(), pts0),
+                    Self::new(degree, self.v_degree(), knots1, v_knots(), pts1),
+                ))
+            }
+            UVDirection::V => {
+                let (knots, degree) = (self.v_knots(), self.v_degree());
+                let split = SplitAt::new(knots, degree, option.parameter);
+
+                let (pts0, pts1): (Vec<_>, Vec<_>) = control_points
+                    .iter()
+                    .map(|row| {
+                        ensure_curve(degree, row.len(), knots.len())?;
+                        let refined;
+                        (refined, refined_knots) = split.refine(row, knots);
+                        Ok(split.divide_control_points(refined))
+                    })
+                    .collect::<anyhow::Result<Vec<_>>>()?
+                    .into_iter()
+                    .unzip();
+
+                let (knots0, knots1) = split.divide_knots(refined_knots);
+                let u_knots = || self.u_knots().to_vec();
+                Ok((
+                    Self::new(self.u_degree(), degree, u_knots(), knots0, pts0),
+                    Self::new(self.u_degree(), degree, u_knots(), knots1, pts1),
+                ))
+            }
         }
     }
 }
