@@ -3,9 +3,7 @@
 
 use std::cmp::Ordering;
 
-use argmin::core::{
-    ArgminFloat, CostFunction, Error, Executor, Gradient, IterState, Solver, State,
-};
+use argmin::core::{ArgminFloat, CostFunction, Error, Executor, Gradient, State};
 use itertools::Itertools;
 use nalgebra::{
     allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, SMatrix,
@@ -18,6 +16,8 @@ use crate::{
     misc::FloatingPoint,
     surface::NurbsSurface,
 };
+
+use super::{CurveIntersectionSolverOptions, IntersectionBFGS, IntersectionIterState};
 
 /// A parameter of a problem: its domain, how far the geometry travels over it, and whether the
 /// geometry is closed in it, the end of the domain being the same place as its start.
@@ -120,31 +120,32 @@ impl<T: FloatingPoint, const N: usize> Scales<T, N> {
         normalized.component_mul(&self.unit) + self.start
     }
 
-    /// Run `solver` on `problem` in these scales from the parameters `init`, and return the
-    /// parameters it stops at.
-    pub(crate) fn solve<O, S>(
+    /// Solve `problem` in these scales from the parameters `init`, with the tolerances of
+    /// `options`, and return the parameters the solver stops at.
+    pub(crate) fn solve<O>(
         &self,
         problem: O,
-        solver: S,
+        options: &CurveIntersectionSolverOptions<T>,
         init: SVector<T, N>,
-        max_iters: u64,
     ) -> Option<SVector<T, N>>
     where
         T: ArgminFloat,
         O: CostFunction<Param = SVector<T, N>, Output = T>
             + Gradient<Param = SVector<T, N>, Gradient = SVector<T, N>>,
-        S: for<'a> Solver<Normalized<'a, O, T, N>, SolverState<T, N>>,
     {
         let normalized = Normalized {
             problem,
             scales: self,
         };
+        let solver = IntersectionBFGS::new()
+            .with_step_size_tolerance(options.step_size_tolerance)
+            .with_cost_tolerance(options.cost_tolerance);
         let result = Executor::new(normalized, solver)
-            .configure(|state| {
+            .configure(|state: IntersectionIterState<T, N>| {
                 state
                     .param(self.normalize(&init))
                     .inv_hessian(SMatrix::identity())
-                    .max_iters(max_iters)
+                    .max_iters(options.max_iters)
             })
             .run()
             .ok()?;
@@ -246,12 +247,8 @@ where
         .fold(T::zero(), |a, b| a + b)
 }
 
-/// The state of the solvers of the intersection finders.
-pub(crate) type SolverState<T, const N: usize> =
-    IterState<SVector<T, N>, SVector<T, N>, (), SMatrix<T, N, N>, (), T>;
-
 /// A problem seen in its [`Scales`].
-pub(crate) struct Normalized<'a, O, T, const N: usize> {
+struct Normalized<'a, O, T, const N: usize> {
     problem: O,
     scales: &'a Scales<T, N>,
 }

@@ -68,13 +68,8 @@ pub fn find_surface_plane_intersection_points<T: FloatingPoint + ArgminFloat>(
             (v_seg_domain.0 + v_seg_domain.1) * T::from_f64(0.5).unwrap(),
         );
 
-        // Set up solver
-        let solver = SurfacePlaneIntersectionBFGS::<T>::new()
-            .with_step_size_tolerance(options.step_size_tolerance)
-            .with_cost_tolerance(options.cost_tolerance);
-
         // Run solver
-        if let Some(param) = scales.solve(problem, solver, init_param, options.max_iters) {
+        if let Some(param) = scales.solve(problem, &options, init_param) {
             // An intersection at an edge of the surface is found a hair inside it or a hair
             // outside, so the parameters are clamped rather than refused: how far from the
             // plane the point there is decides.

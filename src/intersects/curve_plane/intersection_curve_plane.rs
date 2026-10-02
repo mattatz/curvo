@@ -10,10 +10,7 @@ use crate::{
         Intersection,
     },
     misc::{FloatingPoint, Plane},
-    prelude::{
-        CurveBoundingBoxTree, CurveIntersectionBFGS, CurveIntersectionSolverOptions,
-        HasIntersection, Intersects,
-    },
+    prelude::{CurveBoundingBoxTree, CurveIntersectionSolverOptions, HasIntersection, Intersects},
 };
 
 use super::CurvePlaneIntersectionProblem;
@@ -60,13 +57,8 @@ where
                     (segment_domain.0 + segment_domain.1) * T::from_f64(0.5).unwrap(),
                 );
 
-                // Set up solver
-                let solver = CurveIntersectionBFGS::<T>::new()
-                    .with_step_size_tolerance(options.step_size_tolerance)
-                    .with_cost_tolerance(options.cost_tolerance);
-
                 // Run solver
-                let param = scales.solve(problem, solver, init_param, options.max_iters)?;
+                let param = scales.solve(problem, &options, init_param)?;
 
                 // An intersection at the end of the domain is found a hair inside it or a hair
                 // outside, so the parameter is clamped rather than refused: how far from the

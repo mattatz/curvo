@@ -14,7 +14,7 @@ use crate::{
     surface::{NurbsSurface, UVDirection},
 };
 
-use super::{SurfaceCurveIntersectionBFGS, SurfaceCurveIntersectionProblem};
+use super::SurfaceCurveIntersectionProblem;
 
 impl<'a, T, D> Intersects<'a, &'a NurbsCurve<T, D>> for NurbsSurface<T, D>
 where
@@ -95,13 +95,8 @@ where
             let init_param =
                 Vector3::new(curve_parameter, surface_parameter.0, surface_parameter.1);
 
-            // Set up solver
-            let solver = SurfaceCurveIntersectionBFGS::<T>::new()
-                .with_step_size_tolerance(options.step_size_tolerance)
-                .with_cost_tolerance(options.cost_tolerance);
-
             // Run solver
-            let param = scales.solve(problem, solver, init_param, options.max_iters)?;
+            let param = scales.solve(problem, &options, init_param)?;
 
             // An intersection at the end of a domain, a pole of a sphere for one, is found a
             // hair inside it or a hair outside, so the parameters are clamped rather than

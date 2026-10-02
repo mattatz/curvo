@@ -13,10 +13,7 @@ use crate::{
     prelude::{BoundingBoxTraversal, CurveBoundingBoxTree, HasIntersection, Intersects},
 };
 
-use super::{
-    CurveCurveIntersection, CurveIntersectionBFGS, CurveIntersectionProblem,
-    CurveIntersectionSolverOptions,
-};
+use super::{CurveCurveIntersection, CurveIntersectionProblem, CurveIntersectionSolverOptions};
 
 impl<'a, T, D> Intersects<'a, &'a NurbsCurve<T, D>> for NurbsCurve<T, D>
 where
@@ -169,13 +166,8 @@ where
             // Define initial parameter vector
             let init_param = Vector2::<T>::new(ca.knots_domain().0, cb.knots_domain().0);
 
-            // Set up solver
-            let solver = CurveIntersectionBFGS::<T>::new()
-                .with_step_size_tolerance(options.step_size_tolerance)
-                .with_cost_tolerance(options.cost_tolerance);
-
             // Run solver
-            let param = scales.solve(problem, solver, init_param, options.max_iters)?;
+            let param = scales.solve(problem, &options, init_param)?;
 
             // An intersection at the end of a domain is found a hair inside it or a hair
             // outside, so the parameters are clamped rather than refused: how far apart the
