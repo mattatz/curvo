@@ -88,34 +88,43 @@ where
         .norm();
         let epsilon = T::from_f64(JOINT_DISTANCE).unwrap() * size;
 
-        let mut curves = spans.into_iter();
-        let first = curves
-            .next()
-            .ok_or_else(|| anyhow::anyhow!("No span to create a compound curve"))?;
-        let mut curves = curves.collect_vec();
-        let (mut start, mut end) = ends(&first);
+        // each span with its two ends, and the two ends of the spans connected so far
+        let mut curves = spans
+            .into_iter()
+            .map(|curve| (ends(&curve), curve))
+            .collect_vec();
+        anyhow::ensure!(!curves.is_empty(), "No span to create a compound curve");
+        let ((mut start, mut end), first) = curves.remove(0);
         let mut connected = VecDeque::from([first]);
 
         while !curves.is_empty() {
             let (index, direction) = curves
                 .iter()
                 .enumerate()
-                .find_map(|(i, curve)| {
+                .find_map(|(i, (ends, _))| {
                     let these = (start.clone(), end.clone());
-                    CurveDirection::between(these, ends(curve), epsilon).map(|d| (i, d))
+                    CurveDirection::between(these, ends.clone(), epsilon).map(|d| (i, d))
                 })
                 .ok_or_else(|| anyhow::anyhow!("No connection found to create a compound curve"))?;
-            let next = curves.remove(index);
+            let ((next_start, next_end), next) = curves.remove(index);
             match direction {
-                CurveDirection::Forward => connected.push_back(next),
-                CurveDirection::Backward => connected.push_front(next),
-                CurveDirection::Facing => connected.push_back(next.inverse()),
-                CurveDirection::Opposite => connected.push_front(next.inverse()),
+                CurveDirection::Forward => {
+                    connected.push_back(next);
+                    end = next_end;
+                }
+                CurveDirection::Backward => {
+                    connected.push_front(next);
+                    start = next_start;
+                }
+                CurveDirection::Facing => {
+                    connected.push_back(next.inverse());
+                    end = next_start;
+                }
+                CurveDirection::Opposite => {
+                    connected.push_front(next.inverse());
+                    start = next_end;
+                }
             }
-            (start, end) = (
-                ends(&connected[0]).0,
-                ends(&connected[connected.len() - 1]).1,
-            );
         }
         Ok(Self::new_unchecked_aligned(connected.into()))
     }
