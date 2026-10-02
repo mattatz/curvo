@@ -13,7 +13,7 @@ use nalgebra::{
 use simba::scalar::SupersetOf;
 
 use crate::curve::curve_evaluator::CurveEvaluator;
-use crate::misc::binomial::{binomial_coefficient, Binomial};
+use crate::misc::binomial::{Binomial, BinomialCoefficients};
 use crate::misc::frenet_frame::FrenetFrame;
 use crate::misc::transformable::Transformable;
 use crate::misc::trigonometry::segment_closest_point;
@@ -386,9 +386,10 @@ where
         let mut points = vec![];
         let us = T::from_usize(samples).unwrap();
         let step = (end - start) / (us - T::one());
+        let mut evaluator = self.evaluator();
         for i in 0..samples {
             let t = start + T::from_usize(i).unwrap() * step;
-            points.push(self.point_at(t));
+            points.push(evaluator.point_at(t));
         }
         points
     }
@@ -409,9 +410,10 @@ where
         let mut points = vec![];
         let us = T::from_usize(samples).unwrap();
         let step = (end - start) / (us - T::one());
+        let mut evaluator = self.evaluator();
         for i in 0..samples {
             let t = start + T::from_usize(i).unwrap() * step;
-            points.push((t, self.point_at(t)));
+            points.push((t, evaluator.point_at(t)));
         }
         points
     }
@@ -553,13 +555,14 @@ where
         let weight = D::dim() - 1;
 
         let mut ck: Vec<OVector<T, DimNameDiff<D, U1>>> = Vec::with_capacity(derivs + 1);
+        let mut binom = BinomialCoefficients::<T>::new();
         for k in 0..=derivs {
             let mut v = OVector::<T, DimNameDiff<D, U1>>::from_iterator(
                 ders[k].iter().take(weight).copied(),
             );
 
             for i in 1..=k {
-                let coef = binomial_coefficient::<T>(k, i) * ders[i][weight];
+                let coef = binom.get(k, i) * ders[i][weight];
                 v -= &ck[k - i] * coef;
             }
 

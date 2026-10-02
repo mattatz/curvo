@@ -102,6 +102,19 @@ fn curves(c: &mut Criterion) {
     c.bench_function("curve/tessellate/rational_circle", |b| {
         b.iter(|| black_box(circle.tessellate(Some(1e-6))))
     });
+    let wave = |phase: f64| {
+        let points: Vec<Point2<f64>> = (0..32)
+            .map(|i| {
+                let x = i as f64;
+                Point2::new(x, (x * 0.7 + phase).sin() * 3.)
+            })
+            .collect();
+        NurbsCurve2D::interpolate(&points, 3).unwrap()
+    };
+    let (wave_a, wave_b) = (wave(0.), wave(1.3));
+    c.bench_function("curve/find_intersection/cubic", |b| {
+        b.iter(|| black_box(wave_a.find_intersection(&wave_b, None).unwrap()))
+    });
 }
 
 fn surfaces(c: &mut Criterion) {
@@ -147,6 +160,9 @@ fn surfaces(c: &mut Criterion) {
                 }
             }
         })
+    });
+    c.bench_function("surface/regular_tessellate/bicubic", |b| {
+        b.iter(|| black_box(surface.regular_tessellate(side - 1, side - 1)))
     });
 }
 
