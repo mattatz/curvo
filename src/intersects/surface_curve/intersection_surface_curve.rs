@@ -5,11 +5,11 @@ use nalgebra::{
 
 use crate::{
     curve::NurbsCurve,
-    intersects::solve::{closest_in_groups, curve_scale, surface_scale, Scales},
+    intersects::solve::{closest_to_an_end, curve_scale, surface_scale, Scales},
     misc::FloatingPoint,
     prelude::{
-        BoundingBoxTraversal, CurveBoundingBoxTree, CurveIntersectionSolverOptions,
-        HasIntersection, Intersects, SurfaceBoundingBoxTree, SurfaceCurveIntersection,
+        BoundingBoxTraversal, CurveBoundingBoxTree, CurveIntersectionSolverOptions, Intersects,
+        SurfaceBoundingBoxTree, SurfaceCurveIntersection,
     },
     surface::{NurbsSurface, UVDirection},
 };
@@ -61,15 +61,12 @@ where
     ) -> Self::Output {
         let options = option.unwrap_or_default();
 
-        let div = T::one() / T::from_usize(options.knot_domain_division).unwrap();
-        let interval = self.knots_domain_interval();
-        let ta = SurfaceBoundingBoxTree::new(
+        let ta = SurfaceBoundingBoxTree::with_divisions(
             self,
             UVDirection::U,
-            Some((interval.0 * div, interval.1 * div)),
+            options.knot_domain_division,
         );
-        let tb = CurveBoundingBoxTree::new(other, Some(other.knots_domain_interval() * div));
-
+        let tb = CurveBoundingBoxTree::with_divisions(other, options.knot_domain_division);
         let traversed = BoundingBoxTraversal::try_traverse(ta, tb)?;
 
         let (size, [u, v]) = surface_scale(self);
@@ -78,77 +75,40 @@ where
         let scales = Scales::new(&[size, curve_size], [t, u, v]);
 
         let candidates = traversed.into_pairs_iter().filter_map(|(a, b)| {
-            let surface = a.surface_owned();
-            let curve = b.curve_owned();
-
-            let div = T::from_f64(0.5).unwrap();
-
-            let d = curve.knots_domain();
-            let curve_parameter = (d.0 + d.1) * div;
-
-            let (u, v) = surface.knots_domain();
-            let surface_parameter = ((u.0 + u.1) * div, (v.0 + v.1) * div);
-
+            let (surface, curve) = (a.surface_owned(), b.curve_owned());
             let problem = SurfaceCurveIntersectionProblem::new(&surface, &curve);
-
-            // Define initial parameter vector
+            // from the middle of each leaf
+            let half = T::from_f64(0.5).unwrap();
+            let (t, (u, v)) = (curve.knots_domain(), surface.knots_domain());
             let init_param =
-                Vector3::new(curve_parameter, surface_parameter.0, surface_parameter.1);
-
-            // Run solver
-            let param = scales.solve(problem, &options, init_param)?;
-
-            // An intersection at the end of a domain, a pole of a sphere for one, is found a
-            // hair inside it or a hair outside, so the parameters are clamped rather than
-            // refused: how far apart the points there are decides. What was found past the end
-            // of the curve, or the edge of the surface, is where the two would meet if that one
-            // went on, so the candidate is that end or edge and the closest point of the other.
-            let t = other.knots().clamp(other.degree(), param.x);
-            let u = self.u_knots().clamp(self.u_degree(), param.y);
-            let v = self.v_knots().clamp(self.v_degree(), param.z);
-            let (t, (u, v)) = match (t != param.x, u != param.y || v != param.z) {
-                (true, false) => {
-                    let closest = self.find_closest_parameter(&other.point_at(t), Some((u, v)));
-                    (t, closest.unwrap_or((u, v)))
-                }
-                (false, true) => {
-                    let closest = other.find_closest_parameter(&self.point_at(u, v));
-                    (closest.unwrap_or(t), (u, v))
-                }
-                _ => (t, (u, v)),
-            };
-            let p0 = self.point_at(u, v);
-            let p1 = other.point_at(t);
-            Some(SurfaceCurveIntersection::new((p0, (u, v)), (p1, t)))
+                Vector3::new((t.0 + t.1) * half, (u.0 + u.1) * half, (v.0 + v.1) * half);
+            let (param, past) = scales.solve(problem, &options, init_param)?;
+            let (t, (u, v)) = closest_to_an_end(
+                (param.x, past[0]),
+                ((param.y, param.z), past[1] || past[2]),
+                |(u, v)| other.find_closest_parameter(&self.point_at(*u, *v)).ok(),
+                |t| {
+                    let hint = Some((param.y, param.z));
+                    self.find_closest_parameter(&other.point_at(*t), hint).ok()
+                },
+            );
+            Some(Vector3::new(t, u, v))
         });
 
-        // Those whose points are closer than the minimum distance, relative to the size of the
-        // geometry, and of those that are one intersection the closest. Two candidates are one
-        // intersection when the curve and the surface are still in contact halfway between
-        // them. That is so of an intersection found from several pairs of leaves, and of the
-        // candidates found all along the stretch where the two touch and stay closer than the
-        // minimum distance.
-        let minimum_distance = scales.distance(options.minimum_distance);
-        Ok(closest_in_groups(
-            candidates,
-            |it| (&it.a().0 - &it.b().0).norm(),
-            minimum_distance,
-            |it| it.b().1,
-            scales.is_closed(0),
-            |x, y, across| {
-                let ((xu, xv), xt) = (x.a().1, x.b().1);
-                let ((yu, yv), yt) = (y.a().1, y.b().1);
-                let t = if across {
-                    scales.halfway_across(0, xt, yt)
-                } else {
-                    (xt + yt) * T::from_f64(0.5).unwrap()
-                };
-                let on_surface =
-                    self.point_at(scales.halfway(1, xu, yu), scales.halfway(2, xv, yv));
-                let on_curve = other.point_at(t);
-                (on_surface - on_curve).norm() < minimum_distance
-            },
-        ))
+        let distance_at =
+            |param: &Vector3<T>| (self.point_at(param.y, param.z) - other.point_at(param.x)).norm();
+        let intersections = scales
+            .intersections(candidates, 0, options.minimum_distance, distance_at)
+            .into_iter()
+            .map(|param| {
+                let (t, uv) = (param.x, (param.y, param.z));
+                SurfaceCurveIntersection::new(
+                    (self.point_at(uv.0, uv.1), uv),
+                    (other.point_at(t), t),
+                )
+            })
+            .collect();
+        Ok(intersections)
     }
 }
 
@@ -156,7 +116,7 @@ where
 mod tests {
     use nalgebra::{Point3, Vector3};
 
-    use crate::{curve::NurbsCurve3D, surface::NurbsSurface3D};
+    use crate::{curve::NurbsCurve3D, prelude::HasIntersection, surface::NurbsSurface3D};
 
     use super::*;
 

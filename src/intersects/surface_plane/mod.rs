@@ -22,15 +22,8 @@ pub fn find_surface_plane_intersection_leaf_nodes<'a, T: FloatingPoint + ArgminF
     knot_domain_division: usize,
 ) -> anyhow::Result<Vec<SurfaceBoundingBoxTree<'a, T, Const<4>>>> {
     // Create bounding box tree for the surface
-    let tree = SurfaceBoundingBoxTree::new(
-        surface,
-        UVDirection::U,
-        Some({
-            let (u_interval, v_interval) = surface.knots_domain_interval();
-            let div = T::from_usize(knot_domain_division).unwrap();
-            (u_interval / div, v_interval / div)
-        }),
-    );
+    let tree =
+        SurfaceBoundingBoxTree::with_divisions(surface, UVDirection::U, knot_domain_division);
 
     // Check each segment of the surface against the plane
     let leaf_nodes = tree.traverse_leaf_nodes_with_plane(plane);
@@ -69,12 +62,8 @@ pub fn find_surface_plane_intersection_points<T: FloatingPoint + ArgminFloat>(
         );
 
         // Run solver
-        if let Some(param) = scales.solve(problem, &options, init_param) {
-            // An intersection at an edge of the surface is found a hair inside it or a hair
-            // outside, so the parameters are clamped rather than refused: how far from the
-            // plane the point there is decides.
-            let u = surface.u_knots().clamp(surface.u_degree(), param[0]);
-            let v = surface.v_knots().clamp(surface.v_degree(), param[1]);
+        if let Some((param, _)) = scales.solve(problem, &options, init_param) {
+            let (u, v) = (param[0], param[1]);
             let point = surface.point_at(u, v);
             let distance = num_traits::Float::abs(plane.signed_distance(&point));
 

@@ -48,6 +48,18 @@ where
         }
     }
 
+    /// Create a new bounding box tree from a surface, divided down to one `divisions`-th of its
+    /// domain in u and in v.
+    pub fn with_divisions(
+        surface: &'a NurbsSurface<T, D>,
+        direction: UVDirection,
+        divisions: usize,
+    ) -> Self {
+        let (u, v) = surface.knots_domain_interval();
+        let divisions = T::from_usize(divisions).unwrap();
+        Self::new(surface, direction, Some((u / divisions, v / divisions)))
+    }
+
     pub fn surface(&self) -> &NurbsSurface<T, D> {
         self.surface.as_ref()
     }

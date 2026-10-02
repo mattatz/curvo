@@ -6,11 +6,11 @@ use crate::{
     bounding_box::BoundingBoxTree,
     curve::NurbsCurve,
     intersects::{
-        solve::{closest_in_groups, curve_scale, Scales},
+        solve::{curve_scale, Scales},
         Intersection,
     },
     misc::{FloatingPoint, Plane},
-    prelude::{CurveBoundingBoxTree, CurveIntersectionSolverOptions, HasIntersection, Intersects},
+    prelude::{CurveBoundingBoxTree, CurveIntersectionSolverOptions, Intersects},
 };
 
 use super::CurvePlaneIntersectionProblem;
@@ -32,60 +32,33 @@ where
 
         let (size, parameter) = curve_scale(self);
         let scales = Scales::new(&[size], [parameter]);
-        // relative to the size of the curve
-        let minimum_distance = scales.distance(options.minimum_distance);
-        let distance = |point: &OPoint<T, Const<3>>| Float::abs(plane.signed_distance(point));
-
-        // Create bounding box tree for the curve
-        let tree = CurveBoundingBoxTree::new(
-            self,
-            Some(
-                self.knots_domain_interval() / T::from_usize(options.knot_domain_division).unwrap(),
-            ),
-        );
 
         // Check each segment of the curve against the plane
-        let candidates = collect_leaf_nodes(tree, plane, minimum_distance)
+        let tree = CurveBoundingBoxTree::with_divisions(self, options.knot_domain_division);
+        let reach = scales.distance(options.minimum_distance);
+        let candidates = collect_leaf_nodes(tree, plane, reach)
             .into_iter()
             .filter_map(|node| {
                 let curve_segment = node.curve_owned();
                 let problem = CurvePlaneIntersectionProblem::new(&curve_segment, plane);
-
-                // Initial parameter at midpoint of segment
-                let segment_domain = curve_segment.knots_domain();
-                let init_param = Vector1::<T>::new(
-                    (segment_domain.0 + segment_domain.1) * T::from_f64(0.5).unwrap(),
-                );
-
-                // Run solver
-                let param = scales.solve(problem, &options, init_param)?;
-
-                // An intersection at the end of the domain is found a hair inside it or a hair
-                // outside, so the parameter is clamped rather than refused: how far from the
-                // plane the point there is decides.
-                let t = self.knots().clamp(self.degree(), param[0]);
-                let point = self.point_at(t);
-                Some(CurvePlaneIntersection::new((point, t), (point, ())))
+                // from the middle of each leaf
+                let (start, end) = curve_segment.knots_domain();
+                let init_param = Vector1::new((start + end) * T::from_f64(0.5).unwrap());
+                let (param, _) = scales.solve(problem, &options, init_param)?;
+                Some(param)
             });
 
-        // Two candidates are one intersection when the curve is still on the plane halfway
-        // between them. That is so of an intersection found from several leaves, and of the
-        // candidates found all along the stretch where the curve touches the plane.
-        Ok(closest_in_groups(
-            candidates,
-            |it| distance(&it.a().0),
-            minimum_distance,
-            |it| it.a().1,
-            scales.is_closed(0),
-            |x, y, across| {
-                let t = if across {
-                    scales.halfway_across(0, x.a().1, y.a().1)
-                } else {
-                    (x.a().1 + y.a().1) * T::from_f64(0.5).unwrap()
-                };
-                distance(&self.point_at(t)) < minimum_distance
-            },
-        ))
+        let distance_at =
+            |param: &Vector1<T>| Float::abs(plane.signed_distance(&self.point_at(param[0])));
+        let intersections = scales
+            .intersections(candidates, 0, options.minimum_distance, distance_at)
+            .into_iter()
+            .map(|param| {
+                let point = self.point_at(param[0]);
+                CurvePlaneIntersection::new((point, param[0]), (point, ()))
+            })
+            .collect();
+        Ok(intersections)
     }
 }
 

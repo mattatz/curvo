@@ -35,6 +35,13 @@ where
         }
     }
 
+    /// Create a new bounding box tree from a curve, divided down to one `divisions`-th of its
+    /// domain.
+    pub fn with_divisions(curve: &'a NurbsCurve<T, D>, divisions: usize) -> Self {
+        let tolerance = curve.knots_domain_interval() / T::from_usize(divisions).unwrap();
+        Self::new(curve, Some(tolerance))
+    }
+
     pub fn curve(&self) -> &NurbsCurve<T, D> {
         self.curve.as_ref()
     }

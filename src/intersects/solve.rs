@@ -6,8 +6,8 @@ use std::cmp::Ordering;
 use argmin::core::{ArgminFloat, CostFunction, Error, Executor, Gradient, State};
 use itertools::Itertools;
 use nalgebra::{
-    allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, SMatrix,
-    SVector, U1,
+    allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, RealField,
+    SMatrix, SVector, U1,
 };
 
 use crate::{
@@ -21,6 +21,7 @@ use super::{CurveIntersectionSolverOptions, IntersectionBFGS, IntersectionIterSt
 
 /// A parameter of a problem: its domain, how far the geometry travels over it, and whether the
 /// geometry is closed in it, the end of the domain being the same place as its start.
+#[derive(Clone, Copy)]
 pub(crate) struct Parameter<T> {
     domain: (T, T),
     travel: T,
@@ -36,7 +37,7 @@ pub(crate) struct Parameter<T> {
 pub(crate) struct Scales<T, const N: usize> {
     size: T,
     start: SVector<T, N>,
-    length: SVector<T, N>,
+    end: SVector<T, N>,
     /// What a step of one in the solver is in each parameter.
     unit: SVector<T, N>,
     closed: [bool; N],
@@ -52,25 +53,18 @@ impl<T: FloatingPoint, const N: usize> Scales<T, N> {
             .filter(|size| *size > T::zero())
             .reduce(|a, b| a.min(b))
             .unwrap_or(T::one());
-        // a domain of no length is left as it is
-        let length = SVector::from_fn(|i, _| {
-            let (start, end) = parameters[i].domain;
-            if end > start {
-                end - start
-            } else {
-                T::one()
-            }
-        });
         Self {
             size,
             start: SVector::from_fn(|i, _| parameters[i].domain.0),
-            length,
-            // and so is a parameter the geometry does not move with
+            end: SVector::from_fn(|i, _| parameters[i].domain.1),
+            // a domain of no length, or a parameter the geometry does not move with, is left as
+            // it is
             unit: SVector::from_fn(|i, _| {
-                if parameters[i].travel > T::zero() {
-                    length[i] * size / parameters[i].travel
-                } else {
-                    length[i]
+                let Parameter { domain, travel, .. } = parameters[i];
+                match (domain.1 > domain.0, travel > T::zero()) {
+                    (true, true) => (domain.1 - domain.0) * size / travel,
+                    (true, false) => domain.1 - domain.0,
+                    (false, _) => T::one(),
                 }
             }),
             closed: parameters.map(|parameter| parameter.closed),
@@ -82,33 +76,28 @@ impl<T: FloatingPoint, const N: usize> Scales<T, N> {
         relative * self.size
     }
 
-    /// Whether the geometry is closed in the parameter `index`.
-    pub(crate) fn is_closed(&self, index: usize) -> bool {
-        self.closed[index]
-    }
-
-    /// The value of the parameter `index` halfway between `x` and `y`, where two candidates for
-    /// the same intersection are expected to be in contact too.
-    ///
-    /// On geometry closed in this parameter, values more than half the domain apart are on the
-    /// two sides of the seam, and halfway between them is [`Scales::halfway_across`] it.
+    /// The value of the parameter `index` halfway between `x` and `y`. On geometry closed in
+    /// this parameter, values more than half the domain apart are on the two sides of the seam,
+    /// and halfway between them is across it.
     pub(crate) fn halfway(&self, index: usize, x: T, y: T) -> T {
-        if self.closed[index] && (x - y).abs() > self.length[index] * T::from_f64(0.5).unwrap() {
-            self.halfway_across(index, x, y)
-        } else {
-            (x + y) * T::from_f64(0.5).unwrap()
-        }
+        let length = self.end[index] - self.start[index];
+        let across = self.closed[index] && (x - y).abs() > length * T::from_f64(0.5).unwrap();
+        self.halfway_through(index, x, y, across)
     }
 
-    /// The value of the parameter `index` halfway between `x` and `y` going through the seam of
-    /// geometry closed in it.
-    pub(crate) fn halfway_across(&self, index: usize, x: T, y: T) -> T {
-        let (start, length) = (self.start[index], self.length[index]);
-        let across = (x + y + length) * T::from_f64(0.5).unwrap();
-        if across > start + length {
-            across - length
+    /// The value of the parameter `index` halfway between `x` and `y`, going `across` the seam of
+    /// the geometry or not.
+    fn halfway_through(&self, index: usize, x: T, y: T, across: bool) -> T {
+        let half = T::from_f64(0.5).unwrap();
+        if !across {
+            return (x + y) * half;
+        }
+        let (start, end) = (self.start[index], self.end[index]);
+        let halfway = (x + y + (end - start)) * half;
+        if halfway > end {
+            halfway - (end - start)
         } else {
-            across
+            halfway
         }
     }
 
@@ -121,13 +110,18 @@ impl<T: FloatingPoint, const N: usize> Scales<T, N> {
     }
 
     /// Solve `problem` in these scales from the parameters `init`, with the tolerances of
-    /// `options`, and return the parameters the solver stops at.
+    /// `options`. Returns the parameters the solver stops at, brought back into their domains,
+    /// and which of them were past an end.
+    ///
+    /// An intersection at the end of a domain is found a hair inside it or a hair outside, so
+    /// what is outside is clamped rather than refused, and how far apart the geometry is there
+    /// decides whether it is an intersection.
     pub(crate) fn solve<O>(
         &self,
         problem: O,
         options: &CurveIntersectionSolverOptions<T>,
         init: SVector<T, N>,
-    ) -> Option<SVector<T, N>>
+    ) -> Option<(SVector<T, N>, [bool; N])>
     where
         T: ArgminFloat,
         O: CostFunction<Param = SVector<T, N>, Output = T>
@@ -149,12 +143,125 @@ impl<T: FloatingPoint, const N: usize> Scales<T, N> {
             })
             .run()
             .ok()?;
-        let parameters = self.denormalize(result.state().get_best_param()?);
+        let found = self.denormalize(result.state().get_best_param()?);
         // a solver that ran away has nothing to say
-        parameters
-            .iter()
-            .all(|p| p.is_finite())
-            .then_some(parameters)
+        if !found.iter().all(|parameter| parameter.is_finite()) {
+            return None;
+        }
+        let clamped =
+            SVector::from_fn(|i, _| RealField::clamp(found[i], self.start[i], self.end[i]));
+        Some((clamped, std::array::from_fn(|i| clamped[i] != found[i])))
+    }
+
+    /// Choose the intersections among the `candidates` the solver found, one for every pair of
+    /// leaves: their parameters, `distance_at` which the two objects are that far apart.
+    ///
+    /// A candidate is an intersection when that distance is below `minimum_distance`, relative to
+    /// the size of the geometry. Two candidates are one intersection when the geometry is still
+    /// in contact halfway between them: that is so of an intersection found from several leaves,
+    /// and of the candidates found all along the stretch where two objects touch and stay closer
+    /// than the minimum distance. So the candidates are put in the order of the parameter
+    /// `order`, each run of candidates that are one intersection is a group, and the closest of
+    /// a group is kept.
+    pub(crate) fn intersections(
+        &self,
+        candidates: impl IntoIterator<Item = SVector<T, N>>,
+        order: usize,
+        minimum_distance: T,
+        distance_at: impl Fn(&SVector<T, N>) -> T,
+    ) -> Vec<SVector<T, N>> {
+        let minimum_distance = self.distance(minimum_distance);
+        let candidates = candidates
+            .into_iter()
+            .map(|parameters| (distance_at(&parameters), parameters))
+            .filter(|(distance, _)| *distance < minimum_distance);
+        let groups = group_in_order(
+            candidates,
+            |(_, parameters)| parameters[order],
+            self.closed[order],
+            |(_, x), (_, y), across| {
+                // Next to each other in the order, the two are not on the two sides of its seam:
+                // that is asked apart, of the last candidate and the first.
+                let halfway = SVector::from_fn(|i, _| {
+                    if i == order {
+                        self.halfway_through(i, x[i], y[i], across)
+                    } else {
+                        self.halfway(i, x[i], y[i])
+                    }
+                });
+                distance_at(&halfway) < minimum_distance
+            },
+        );
+        groups
+            .into_iter()
+            .filter_map(|group| {
+                group
+                    .into_iter()
+                    .min_by(|x, y| x.0.partial_cmp(&y.0).unwrap_or(Ordering::Equal))
+            })
+            .map(|(_, parameters)| parameters)
+            .collect()
+    }
+}
+
+/// Put `items` in `order` and group each run of items that are the `same`.
+///
+/// `same` is asked about two items next to each other in the order, with `false`. When the
+/// geometry is `closed` in what they are ordered by, the last group and the first are on the two
+/// sides of its seam, and `same` is asked about their ends with `true`.
+pub(crate) fn group_in_order<I, T: FloatingPoint>(
+    items: impl IntoIterator<Item = I>,
+    order: impl Fn(&I) -> T,
+    closed: bool,
+    same: impl Fn(&I, &I, bool) -> bool,
+) -> Vec<Vec<I>> {
+    let mut groups = items
+        .into_iter()
+        .sorted_by(|x, y| order(x).partial_cmp(&order(y)).unwrap_or(Ordering::Equal))
+        .map(|item| vec![item])
+        .coalesce(|mut group, next| {
+            if same(&group[group.len() - 1], &next[0], false) {
+                group.extend(next);
+                Ok(group)
+            } else {
+                Err((group, next))
+            }
+        })
+        .collect_vec();
+
+    if closed && groups.len() > 1 {
+        let (first, last) = (&groups[0], &groups[groups.len() - 1]);
+        if same(&last[last.len() - 1], &first[0], true) {
+            let last = groups.pop().unwrap();
+            groups[0].extend(last);
+        }
+    }
+
+    groups
+}
+
+/// The parameters of two objects when the solver went past the end of one of them and not of the
+/// other: what it found is where the two would meet if that one went on, so the candidate is its
+/// end and the closest point of the other, by `closest_a` or `closest_b`.
+///
+/// `a` and `b` are the parameters on each object, brought back into their domains, and whether
+/// they were past an end.
+pub(crate) fn closest_to_an_end<A, B>(
+    a: (A, bool),
+    b: (B, bool),
+    closest_a: impl FnOnce(&B) -> Option<A>,
+    closest_b: impl FnOnce(&A) -> Option<B>,
+) -> (A, B) {
+    match (a.1, b.1) {
+        (true, false) => {
+            let closest = closest_b(&a.0);
+            (a.0, closest.unwrap_or(b.0))
+        }
+        (false, true) => {
+            let closest = closest_a(&b.0);
+            (closest.unwrap_or(a.0), b.0)
+        }
+        _ => (a.0, b.0),
     }
 }
 
@@ -279,58 +386,6 @@ where
     }
 }
 
-/// Choose the intersections among the `candidates` the solver found, one for every pair of leaves.
-///
-/// A candidate is an intersection when its two points are closer than `minimum_distance`. Several
-/// leaves find the same intersection, so the candidates are put in `order`, each run of
-/// candidates that are `same` is a group, and the closest of a group is kept.
-///
-/// `same` is asked about two candidates next to each other in the order, with `false`. When the
-/// geometry is `closed` in the parameter they are ordered by, the last group and the first are on
-/// the two sides of its seam, and `same` is asked about their ends with `true`.
-pub(crate) fn closest_in_groups<I: Clone, T: FloatingPoint>(
-    candidates: impl IntoIterator<Item = I>,
-    distance: impl Fn(&I) -> T,
-    minimum_distance: T,
-    order: impl Fn(&I) -> T,
-    closed: bool,
-    same: impl Fn(&I, &I, bool) -> bool,
-) -> Vec<I> {
-    let mut groups = candidates
-        .into_iter()
-        .filter(|candidate| distance(candidate) < minimum_distance)
-        .sorted_by(|x, y| order(x).partial_cmp(&order(y)).unwrap_or(Ordering::Equal))
-        .map(|candidate| vec![candidate])
-        .coalesce(|mut group, next| {
-            if same(&group[group.len() - 1], &next[0], false) {
-                group.extend(next);
-                Ok(group)
-            } else {
-                Err((group, next))
-            }
-        })
-        .collect_vec();
-
-    if closed && groups.len() > 1 {
-        let (first, last) = (&groups[0], &groups[groups.len() - 1]);
-        if same(&last[last.len() - 1], &first[0], true) {
-            let last = groups.pop().unwrap();
-            groups[0].extend(last);
-        }
-    }
-
-    groups
-        .into_iter()
-        .filter_map(|group| {
-            group.into_iter().min_by(|x, y| {
-                distance(x)
-                    .partial_cmp(&distance(y))
-                    .unwrap_or(Ordering::Equal)
-            })
-        })
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use nalgebra::Vector1;
@@ -414,31 +469,61 @@ mod tests {
     }
 
     #[test]
-    fn the_closest_of_each_group_of_candidates_is_kept() {
-        // a parameter and the distance between the two points there
-        let candidates = [
-            (0.02, 0.5),
-            (0.5, 0.3),
-            (0.52, 0.1),
-            (0.54, 0.2),
-            (0.7, 2.), // not an intersection
-            (0.98, 0.4),
-        ];
-        let choose = |closed: bool| {
-            closest_in_groups(
-                candidates,
-                |candidate| candidate.1,
-                1.,
-                |candidate| candidate.0,
-                closed,
-                |x: &(f64, f64), y: &(f64, f64), across| {
-                    let apart = (x.0 - y.0).abs();
-                    (if across { 1. - apart } else { apart }) < 0.05
-                },
-            )
+    fn what_the_solver_finds_past_an_end_is_brought_back_to_it() {
+        let options = CurveIntersectionSolverOptions::default();
+        // the closest the point gets to its target is 0.3 of the way along a domain that ends
+        // before that
+        let along = || Along {
+            size: 2.,
+            domain: (0., 4.),
         };
-        assert_eq!(choose(false), vec![(0.02, 0.5), (0.52, 0.1), (0.98, 0.4)]);
-        // the first and the last are on the two sides of the seam
-        assert_eq!(choose(true), vec![(0.98, 0.4), (0.52, 0.1)]);
+        let init = Vector1::new(0.5);
+        let short = scales(2., (0., 1.), false);
+        let (found, past) = short.solve(along(), &options, init).unwrap();
+        assert_eq!((found[0], past), (1., [true]));
+
+        let whole = scales(2., (0., 4.), false);
+        let (found, past) = whole.solve(along(), &options, init).unwrap();
+        assert!((found[0] - 1.2).abs() < 1e-6);
+        assert_eq!(past, [false]);
+    }
+
+    /// A point moving along a line, `distance_at` its parameter from the line it crosses at 0.3
+    /// and at 0.7 of a domain of 0 to 1: closer than 0.01 over a stretch around each.
+    fn two_crossings(parameters: &Vector1<f64>) -> f64 {
+        let t = parameters[0];
+        (t - 0.3).abs().min((t - 0.7).abs()) * 0.1
+    }
+
+    #[test]
+    fn one_intersection_is_kept_for_each_stretch_in_contact() {
+        let scales = scales(1., (0., 1.), false);
+        let candidates = [0.31, 0.25, 0.5, 0.36, 0.7, 0.72, 0.1].map(Vector1::new);
+        let intersections = scales.intersections(candidates, 0, 0.01, two_crossings);
+        assert_eq!(intersections, vec![Vector1::new(0.31), Vector1::new(0.7)]);
+    }
+
+    #[test]
+    fn candidates_on_the_two_sides_of_a_seam_are_one_intersection() {
+        // in contact around the seam, at 0 and at 1, and around 0.5
+        let around = |parameters: &Vector1<f64>| {
+            let t = parameters[0];
+            t.min(1. - t).min((t - 0.5).abs()) * 0.1
+        };
+        let candidates = [0.02, 0.48, 0.52, 0.97].map(Vector1::new);
+        let open = scales(1., (0., 1.), false).intersections(candidates, 0, 0.01, around);
+        assert_eq!(open, [0.02, 0.48, 0.97].map(Vector1::new).to_vec());
+        let closed = scales(1., (0., 1.), true).intersections(candidates, 0, 0.01, around);
+        assert_eq!(closed, [0.02, 0.48].map(Vector1::new).to_vec());
+    }
+
+    #[test]
+    fn past_the_end_of_one_object_the_closest_of_the_other_is_taken() {
+        let closest = |a, b| closest_to_an_end(a, b, |_| Some(10), |_| Some("closest"));
+        assert_eq!(closest((1, false), ("b", false)), (1, "b"));
+        assert_eq!(closest((1, true), ("b", false)), (1, "closest"));
+        assert_eq!(closest((1, false), ("b", true)), (10, "b"));
+        // both at an end: nothing to look for
+        assert_eq!(closest((1, true), ("b", true)), (1, "b"));
     }
 }

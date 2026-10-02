@@ -7,13 +7,16 @@ use nalgebra::{
 
 use crate::{
     curve::NurbsCurve,
-    intersects::solve::{closest_in_groups, curve_scale, Scales},
+    intersects::solve::{closest_to_an_end, curve_scale, group_in_order, Scales},
     knot::KnotVector,
     misc::{find_line_string_intersection, to_line_string_helper, FloatingPoint},
     prelude::{BoundingBoxTraversal, CurveBoundingBoxTree, HasIntersection, Intersects},
 };
 
 use super::{CurveCurveIntersection, CurveIntersectionProblem, CurveIntersectionSolverOptions};
+
+/// The intersection of two curves of dimension `D`, homogeneous.
+type Intersection<T, D> = CurveCurveIntersection<OPoint<T, DimNameDiff<D, U1>>, T>;
 
 impl<'a, T, D> Intersects<'a, &'a NurbsCurve<T, D>> for NurbsCurve<T, D>
 where
@@ -22,7 +25,7 @@ where
     DefaultAllocator: Allocator<D>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
-    type Output = anyhow::Result<Vec<CurveCurveIntersection<OPoint<T, DimNameDiff<D, U1>>, T>>>;
+    type Output = anyhow::Result<Vec<Intersection<T, D>>>;
     type Option = Option<CurveIntersectionSolverOptions<T>>;
 
     /// Find the intersection points with another curve by gauss-newton line search
@@ -74,149 +77,118 @@ where
     ) -> Self::Output {
         let options = option.unwrap_or_default();
         let scales = curve_curve_scales(self, other);
-        // relative to the size of the curves
-        let minimum_distance = scales.distance(options.minimum_distance);
 
         if self.degree() == 1 && other.degree() == 1 && D::dim() == 3 {
-            // 2d polyline intersection
-            let p0 = self
-                .dehomogenized_control_points()
-                .iter()
-                .map(|p| Point2::from_slice(p.coords.as_slice()))
-                .collect_vec();
-            let p1 = other
-                .dehomogenized_control_points()
-                .iter()
-                .map(|p| Point2::from_slice(p.coords.as_slice()))
-                .collect_vec();
-            let l0 = to_line_string_helper(&p0);
-            let l1 = to_line_string_helper(&p1);
-            let intersections = find_line_string_intersection(&l0, &l1)?;
-
-            let find_parameter = |points: &Vec<Point2<T>>,
-                                  knots: &KnotVector<T>,
-                                  point: Point2<f64>,
-                                  index: usize|
-             -> anyhow::Result<T> {
-                anyhow::ensure!(index + 1 < points.len(), "index out of bounds");
-
-                let prev = points[index];
-                let next = points[index + 1];
-                let k0 = knots[index + 1];
-                let k1 = knots[index + 2];
-
-                let d = (next - prev).norm();
-                let d2 = (next - point.map(|x| T::from_f64(x).unwrap())).norm();
-                let t = T::one() - d2 / d;
-
-                Ok(k0 + t * (k1 - k0))
-            };
-
-            let its = intersections
-                .into_iter()
-                .map(|it| {
-                    let pt = it.point();
-                    let (i0, i1) = it.line_index();
-                    let t0 = find_parameter(&p0, self.knots(), pt, i0)?;
-                    let t1 = find_parameter(&p1, other.knots(), pt, i1)?;
-                    let pt = OPoint::<T, DimNameDiff<D, U1>>::from_slice(
-                        &pt.coords
-                            .as_slice()
-                            .iter()
-                            .map(|x| T::from_f64(*x).unwrap())
-                            .collect_vec(),
-                    );
-                    Ok(CurveCurveIntersection::new((pt.clone(), t0), (pt, t1)))
-                })
-                .collect::<anyhow::Result<Vec<_>>>()?;
-            // These are exact, so only the same place found twice, at a vertex shared by two
-            // segments, is one intersection.
-            return Ok(closest_in_groups(
-                its,
-                |_| T::zero(),
-                minimum_distance,
-                |it| it.a().1,
-                scales.is_closed(0),
-                |x, y, _| (&x.a().0 - &y.a().0).norm() < minimum_distance,
-            ));
+            return polyline_intersections(self, other, scales.distance(options.minimum_distance));
         }
 
-        let ta = CurveBoundingBoxTree::new(
-            self,
-            Some(
-                self.knots_domain_interval() / T::from_usize(options.knot_domain_division).unwrap(),
-            ),
-        );
-        let tb = CurveBoundingBoxTree::new(
-            other,
-            Some(
-                other.knots_domain_interval()
-                    / T::from_usize(options.knot_domain_division).unwrap(),
-            ),
-        );
-
+        let ta = CurveBoundingBoxTree::with_divisions(self, options.knot_domain_division);
+        let tb = CurveBoundingBoxTree::with_divisions(other, options.knot_domain_division);
         let traversed = BoundingBoxTraversal::try_traverse(ta, tb)?;
 
         let candidates = traversed.into_pairs_iter().filter_map(|(a, b)| {
-            let ca = a.curve_owned();
-            let cb = b.curve_owned();
-
+            let (ca, cb) = (a.curve_owned(), b.curve_owned());
             let problem = CurveIntersectionProblem::new(&ca, &cb);
-
-            // Define initial parameter vector
-            let init_param = Vector2::<T>::new(ca.knots_domain().0, cb.knots_domain().0);
-
-            // Run solver
-            let param = scales.solve(problem, &options, init_param)?;
-
-            // An intersection at the end of a domain is found a hair inside it or a hair
-            // outside, so the parameters are clamped rather than refused: how far apart the
-            // points there are decides. What was found past the end of a curve is where the
-            // curves would meet if that one went on, so the candidate is its end and the
-            // closest point of the other curve.
-            let ta = self.knots().clamp(self.degree(), param[0]);
-            let tb = other.knots().clamp(other.degree(), param[1]);
-            let (ta, tb) = match (ta != param[0], tb != param[1]) {
-                (true, false) => {
-                    let closest = other.find_closest_parameter(&self.point_at(ta));
-                    (ta, closest.unwrap_or(tb))
-                }
-                (false, true) => {
-                    let closest = self.find_closest_parameter(&other.point_at(tb));
-                    (closest.unwrap_or(ta), tb)
-                }
-                _ => (ta, tb),
-            };
-            let p0 = self.point_at(ta);
-            let p1 = other.point_at(tb);
-            Some(CurveCurveIntersection::new((p0, ta), (p1, tb)))
+            // from the start of each leaf
+            let init_param = Vector2::new(ca.knots_domain().0, cb.knots_domain().0);
+            let (param, past) = scales.solve(problem, &options, init_param)?;
+            let (ta, tb) = closest_to_an_end(
+                (param[0], past[0]),
+                (param[1], past[1]),
+                |tb| self.find_closest_parameter(&other.point_at(*tb)).ok(),
+                |ta| other.find_closest_parameter(&self.point_at(*ta)).ok(),
+            );
+            Some(Vector2::new(ta, tb))
         });
 
-        // Two candidates are one intersection when the curves are still in contact halfway
-        // between them. That is so of an intersection found from several pairs of leaves, and of
-        // the candidates found all along the stretch where two curves touch and stay closer
-        // than the minimum distance.
-        Ok(closest_in_groups(
-            candidates,
-            |it| (&it.a().0 - &it.b().0).norm(),
-            minimum_distance,
-            |it| it.a().1,
-            scales.is_closed(0),
-            |x, y, across| {
-                let ta = if across {
-                    scales.halfway_across(0, x.a().1, y.a().1)
-                } else {
-                    (x.a().1 + y.a().1) * T::from_f64(0.5).unwrap()
-                };
-                let tb = scales.halfway(1, x.b().1, y.b().1);
-                (self.point_at(ta) - other.point_at(tb)).norm() < minimum_distance
-            },
-        ))
+        let distance_at =
+            |param: &Vector2<T>| (self.point_at(param[0]) - other.point_at(param[1])).norm();
+        let intersections = scales
+            .intersections(candidates, 0, options.minimum_distance, distance_at)
+            .into_iter()
+            .map(|param| {
+                let (ta, tb) = (param[0], param[1]);
+                CurveCurveIntersection::new((self.point_at(ta), ta), (other.point_at(tb), tb))
+            })
+            .collect();
+        Ok(intersections)
     }
 }
 
+/// The intersections of two polylines in 2D, found exactly. Only the same place found twice, at
+/// a vertex shared by two segments or at the two ends of a closed polyline, is one intersection.
+fn polyline_intersections<T, D>(
+    a: &NurbsCurve<T, D>,
+    b: &NurbsCurve<T, D>,
+    minimum_distance: T,
+) -> anyhow::Result<Vec<Intersection<T, D>>>
+where
+    T: FloatingPoint,
+    D: DimName + DimNameSub<U1>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+{
+    let p0 = a
+        .dehomogenized_control_points()
+        .iter()
+        .map(|p| Point2::from_slice(p.coords.as_slice()))
+        .collect_vec();
+    let p1 = b
+        .dehomogenized_control_points()
+        .iter()
+        .map(|p| Point2::from_slice(p.coords.as_slice()))
+        .collect_vec();
+    let l0 = to_line_string_helper(&p0);
+    let l1 = to_line_string_helper(&p1);
+    let intersections = find_line_string_intersection(&l0, &l1)?;
+
+    let find_parameter = |points: &Vec<Point2<T>>,
+                          knots: &KnotVector<T>,
+                          point: Point2<f64>,
+                          index: usize|
+     -> anyhow::Result<T> {
+        anyhow::ensure!(index + 1 < points.len(), "index out of bounds");
+
+        let prev = points[index];
+        let next = points[index + 1];
+        let k0 = knots[index + 1];
+        let k1 = knots[index + 2];
+
+        let d = (next - prev).norm();
+        let d2 = (next - point.map(|x| T::from_f64(x).unwrap())).norm();
+        let t = T::one() - d2 / d;
+
+        Ok(k0 + t * (k1 - k0))
+    };
+
+    let its = intersections
+        .into_iter()
+        .map(|it| {
+            let pt = it.point();
+            let (i0, i1) = it.line_index();
+            let t0 = find_parameter(&p0, a.knots(), pt, i0)?;
+            let t1 = find_parameter(&p1, b.knots(), pt, i1)?;
+            let pt = OPoint::<T, DimNameDiff<D, U1>>::from_slice(
+                &pt.coords
+                    .as_slice()
+                    .iter()
+                    .map(|x| T::from_f64(*x).unwrap())
+                    .collect_vec(),
+            );
+            Ok(CurveCurveIntersection::new((pt.clone(), t0), (pt, t1)))
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    let same_place = |x: &Intersection<T, D>, y: &Intersection<T, D>, _| {
+        (&x.a().0 - &y.a().0).norm() < minimum_distance
+    };
+    Ok(group_in_order(its, |it| it.a().1, true, same_place)
+        .into_iter()
+        .filter_map(|group| group.into_iter().next())
+        .collect())
+}
+
 /// The scales of the intersection of two curves.
-fn curve_curve_scales<T, D>(a: &NurbsCurve<T, D>, b: &NurbsCurve<T, D>) -> Scales<T, 2>
+pub(super) fn curve_curve_scales<T, D>(a: &NurbsCurve<T, D>, b: &NurbsCurve<T, D>) -> Scales<T, 2>
 where
     T: FloatingPoint,
     D: DimName + DimNameSub<U1>,

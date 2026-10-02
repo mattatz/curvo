@@ -70,14 +70,8 @@ pub fn x_ray_intersection<T: FloatingPoint + ArgminFloat>(
 ) -> anyhow::Result<Vec<Point2<T>>> {
     let option = option.unwrap_or_default();
     let ray = NurbsCurve::polyline(&[*point, point + Vector2::x() * ray_length], true);
-    let ta = CurveBoundingBoxTree::new(
-        curve,
-        Some(curve.knots_domain_interval() / T::from_usize(option.knot_domain_division).unwrap()),
-    );
-    let tb = CurveBoundingBoxTree::new(
-        &ray,
-        Some(ray.knots_domain_interval() / T::from_usize(1).unwrap()),
-    );
+    let ta = CurveBoundingBoxTree::with_divisions(curve, option.knot_domain_division);
+    let tb = CurveBoundingBoxTree::with_divisions(&ray, 1);
     let traversed = BoundingBoxTraversal::try_traverse(ta, tb)?;
 
     let mut intersections = traversed
