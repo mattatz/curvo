@@ -79,16 +79,7 @@ where
         control_points: Vec<OPoint<T, D>>,
         mut knots: Vec<T>,
     ) -> anyhow::Result<Self> {
-        anyhow::ensure!(
-            control_points.len() > degree,
-            "Too few control points for curve"
-        );
-        anyhow::ensure!(
-            knots.len() == control_points.len() + degree + 1,
-            "Invalid number of knots, got {}, expected {}",
-            knots.len(),
-            control_points.len() + degree + 1
-        );
+        ensure_curve(degree, control_points.len(), knots.len())?;
 
         // The sort is stable, so knots already in order are left as they are.
         if !knots.is_sorted() {
@@ -1823,11 +1814,21 @@ where
         }
     }
 
-    /// Try to refine the curve by inserting knots
+    /// Try to refine the curve by inserting knots, which must be in order and within the domain
+    /// of the curve: knots anywhere else do not refine the curve, they describe another one.
     pub fn try_refine_knot(&mut self, knots_to_insert: Vec<T>) -> anyhow::Result<()> {
         if knots_to_insert.is_empty() {
             return Ok(());
         }
+        let (start, end) = self.knots_domain();
+        anyhow::ensure!(
+            knots_to_insert.is_sorted(),
+            "Knots to insert are not in order"
+        );
+        anyhow::ensure!(
+            knots_to_insert.iter().all(|u| start <= *u && *u <= end),
+            "Knots to insert are not all within the domain of the curve"
+        );
 
         let (control_points, knots) = refine_knot(
             self.degree,
@@ -2236,8 +2237,20 @@ where
     }
 }
 
+/// Check that `count` control points and `knots` knots describe a curve of `degree`.
+pub(crate) fn ensure_curve(degree: usize, count: usize, knots: usize) -> anyhow::Result<()> {
+    anyhow::ensure!(count > degree, "Too few control points for curve");
+    anyhow::ensure!(
+        knots == count + degree + 1,
+        "Invalid number of knots, got {}, expected {}",
+        knots,
+        count + degree + 1
+    );
+    Ok(())
+}
+
 /// The control points and knots of a curve after inserting `knots_to_insert`, which must be in
-/// order and not empty.
+/// order, within the domain of the curve and not empty.
 pub(crate) fn refine_knot<T: FloatingPoint, D: DimName>(
     degree: usize,
     control_points: &[OPoint<T, D>],
@@ -2283,23 +2296,18 @@ where
         control_points_post[k - degree - 1] = control_points_post[k - degree].clone();
         for l in 1..=degree {
             let ind = k - degree + l;
-            if ind < control_points_post.len() {
-                let alpha = knots_post[k + l] - knots_to_insert[j];
-                if alpha.abs() < T::default_epsilon() {
-                    control_points_post[ind - 1] = control_points_post[ind].clone();
-                } else {
-                    let denom = knots_post[k + l] - knots[i - degree + l];
-                    let weight = if denom != T::zero() {
-                        alpha / denom
-                    } else {
-                        T::zero()
-                    };
-                    control_points_post[ind - 1] = control_points_post[ind - 1]
-                        .lerp(&control_points_post[ind], T::one() - weight);
-                }
+            let alpha = knots_post[k + l] - knots_to_insert[j];
+            if alpha.abs() < T::default_epsilon() {
+                control_points_post[ind - 1] = control_points_post[ind].clone();
             } else {
-                // TODO: resolve this issue
-                // ind is out of bound
+                let denom = knots_post[k + l] - knots[i - degree + l];
+                let weight = if denom != T::zero() {
+                    alpha / denom
+                } else {
+                    T::zero()
+                };
+                control_points_post[ind - 1] =
+                    control_points_post[ind - 1].lerp(&control_points_post[ind], T::one() - weight);
             }
         }
         knots_post[k] = knots_to_insert[j];

@@ -3,11 +3,12 @@ use nalgebra::{
 };
 
 use crate::{
+    curve::nurbs_curve::ensure_curve,
     misc::FloatingPoint,
     surface::{NurbsSurface, UVDirection},
 };
 
-use super::{ensure_curve, Split, SplitAt};
+use super::{Split, SplitAt};
 
 /// Option for splitting a surface
 #[derive(Clone, Debug)]
@@ -117,9 +118,8 @@ mod tests {
         surface::{NurbsSurface3D, UVDirection},
     };
 
-    #[test]
-    fn the_halves_of_a_split_surface_cover_the_surface() {
-        // Rational, of a different degree in u and in v, with repeated interior knots in both.
+    /// Rational, of a different degree in u and in v, with repeated interior knots in both.
+    fn surface() -> NurbsSurface3D<f64> {
         let u_knots = vec![0., 0., 0., 0., 1., 2., 2., 2., 3., 4., 4., 4., 4.];
         let v_knots = vec![0., 0., 0., 1., 1., 2., 3., 3., 3.];
         let control_points = (0..9)
@@ -133,7 +133,28 @@ mod tests {
                     .collect()
             })
             .collect();
-        let surface = NurbsSurface3D::new(3, 2, u_knots.clone(), v_knots.clone(), control_points);
+        NurbsSurface3D::new(3, 2, u_knots, v_knots, control_points)
+    }
+
+    #[test]
+    fn a_split_outside_the_domain_is_a_split_at_its_end() {
+        let surface = surface();
+        for direction in [UVDirection::U, UVDirection::V] {
+            let (start, end) = surface.knots_domain_at(direction);
+            let split = |t: f64| {
+                surface
+                    .try_split(SplitSurfaceOption::new(t, direction))
+                    .unwrap()
+            };
+            assert_eq!(split(start - 1.), split(start));
+            assert_eq!(split(end + 1.), split(end));
+        }
+    }
+
+    #[test]
+    fn the_halves_of_a_split_surface_cover_the_surface() {
+        let surface = surface();
+        let (u_knots, v_knots) = (surface.u_knots().to_vec(), surface.v_knots().to_vec());
 
         for (direction, knots) in [(UVDirection::U, &u_knots), (UVDirection::V, &v_knots)] {
             let (start, end) = surface.knots_domain_at(direction);

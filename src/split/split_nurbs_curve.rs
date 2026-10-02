@@ -30,7 +30,6 @@ where
     /// ```
     fn try_split(&self, u: T) -> anyhow::Result<(Self, Self)> {
         let degree = self.degree();
-        let u = self.knots().clamp(degree, u);
         let split = SplitAt::new(self.knots(), degree, u);
         let (cpts, knots) = split.refine(self.control_points(), self.knots());
         let (cpts0, cpts1) = split.divide_control_points(cpts);

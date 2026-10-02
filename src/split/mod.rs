@@ -31,7 +31,9 @@ struct SplitAt<T> {
 }
 
 impl<T: FloatingPoint> SplitAt<T> {
+    /// How to split at `u`, or at the end of the domain it is beyond.
     fn new(knots: &KnotVector<T>, degree: usize, u: T) -> Self {
+        let u = knots.clamp(degree, u);
         let n = knots.len() - degree - 2;
         let s = knots.find_knot_span_index(n, degree, u);
         // The knots already at `u` count towards the `degree + 1`: inserting that many on top of
@@ -102,16 +104,4 @@ impl<T: FloatingPoint> SplitAt<T> {
         refined.truncate(self.head + self.degree + 1);
         (refined, tail)
     }
-}
-
-/// Check that `count` control points and `knots` knots describe a curve of `degree`.
-fn ensure_curve(degree: usize, count: usize, knots: usize) -> anyhow::Result<()> {
-    anyhow::ensure!(count > degree, "Too few control points for curve");
-    anyhow::ensure!(
-        knots == count + degree + 1,
-        "Invalid number of knots, got {}, expected {}",
-        knots,
-        count + degree + 1
-    );
-    Ok(())
 }
