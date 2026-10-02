@@ -127,11 +127,9 @@ mod tests {
             &[Point3::new(-2., 0.6, 0.8), Point3::new(2., 0.6, 0.8)],
             false,
         );
-        for _ in 0..10 {
-            let intersections = sphere.find_intersection(&tangent, None).unwrap();
-            assert_eq!(intersections.len(), 1);
-            assert!((intersections[0].a().0 - Point3::new(0., 0.6, 0.8)).norm() < 1e-2);
-        }
+        let intersections = sphere.find_intersection(&tangent, None).unwrap();
+        assert_eq!(intersections.len(), 1);
+        assert!((intersections[0].a().0 - Point3::new(0., 0.6, 0.8)).norm() < 1e-2);
     }
 
     #[test]
@@ -151,10 +149,8 @@ mod tests {
                 ],
                 false,
             );
-            for _ in 0..5 {
-                let intersections = sphere.find_intersection(&line, None).unwrap();
-                assert_eq!(intersections.len(), 2, "scaled by {scale}");
-            }
+            let intersections = sphere.find_intersection(&line, None).unwrap();
+            assert_eq!(intersections.len(), 2, "scaled by {scale}");
         }
     }
 
@@ -167,12 +163,9 @@ mod tests {
                 .unwrap();
         let axis =
             NurbsCurve3D::polyline(&[Point3::new(-2., 0., 0.), Point3::new(2., 0., 0.)], false);
-        // The bounding box trees are divided at random, so this is run again and again.
-        for _ in 0..10 {
-            let intersections = sphere.find_intersection(&axis, None).unwrap();
-            assert_eq!(intersections.len(), 2);
-            assert!((intersections[0].a().0 - Point3::new(-1., 0., 0.)).norm() < 1e-5);
-            assert!((intersections[1].a().0 - Point3::new(1., 0., 0.)).norm() < 1e-5);
-        }
+        let intersections = sphere.find_intersection(&axis, None).unwrap();
+        assert_eq!(intersections.len(), 2);
+        assert!((intersections[0].a().0 - Point3::new(-1., 0., 0.)).norm() < 1e-5);
+        assert!((intersections[1].a().0 - Point3::new(1., 0., 0.)).norm() < 1e-5);
     }
 }

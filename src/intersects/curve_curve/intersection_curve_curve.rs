@@ -235,10 +235,6 @@ mod tests {
         assert_eq!(intersections.len(), 2);
     }
 
-    /// The bounding box trees are divided at random, so a case that is only found some of the
-    /// time is run again and again.
-    const RUNS: usize = 20;
-
     #[test]
     fn an_intersection_at_the_end_of_a_curve_is_found() {
         // the end of the arc touches the middle of the bar
@@ -264,12 +260,10 @@ mod tests {
         )
         .unwrap();
         let (_, end) = arc.knots_domain();
-        for _ in 0..RUNS {
-            let intersections = arc.find_intersection(&bar, None).unwrap();
-            assert_eq!(intersections.len(), 1);
-            assert!((intersections[0].a().1 - end).abs() < 1e-6);
-            assert!((intersections[0].a().0 - Point2::new(5., 2.)).norm() < 1e-5);
-        }
+        let intersections = arc.find_intersection(&bar, None).unwrap();
+        assert_eq!(intersections.len(), 1);
+        assert!((intersections[0].a().1 - end).abs() < 1e-6);
+        assert!((intersections[0].a().0 - Point2::new(5., 2.)).norm() < 1e-5);
     }
 
     fn circle(center: Point2<f64>) -> NurbsCurve2D<f64> {
@@ -291,10 +285,8 @@ mod tests {
         for scale in [1., 1e-3, 1e3] {
             let scaling = Matrix3::new_scaling(scale);
             let (a, b) = (a.transformed(&scaling), b.transformed(&scaling));
-            for _ in 0..RUNS {
-                let intersections = a.find_intersection(&b, None).unwrap();
-                assert_eq!(intersections.len(), 7, "scaled by {scale}");
-            }
+            let intersections = a.find_intersection(&b, None).unwrap();
+            assert_eq!(intersections.len(), 7, "scaled by {scale}");
         }
     }
 
@@ -325,11 +317,9 @@ mod tests {
             ],
             true,
         );
-        for _ in 0..RUNS {
-            assert_eq!(unit.find_intersection(&tangent, None).unwrap().len(), 1);
-            assert_eq!(unit.find_intersection(&beside, None).unwrap().len(), 1);
-            assert_eq!(half.find_intersection(&square, None).unwrap().len(), 3);
-        }
+        assert_eq!(unit.find_intersection(&tangent, None).unwrap().len(), 1);
+        assert_eq!(unit.find_intersection(&beside, None).unwrap().len(), 1);
+        assert_eq!(half.find_intersection(&square, None).unwrap().len(), 3);
     }
 
     #[test]
@@ -344,15 +334,39 @@ mod tests {
         // at x = -0.0447 and x = 0.0447: where the line crosses so shallowly, the two curves are
         // within the minimum distance of each other over a longer stretch than they are apart
         let x = (1f64 - 0.999 * 0.999).sqrt();
-        for _ in 0..RUNS {
-            let mut intersections = unit.find_intersection(&under, None).unwrap();
-            intersections.sort_by(|i, j| i.a().0.x.partial_cmp(&j.a().0.x).unwrap());
-            assert_eq!(intersections.len(), 2);
-            for (intersection, x) in intersections.iter().zip([-x, x]) {
-                let (on_circle, on_line) = (intersection.a().0, intersection.b().0);
-                assert!((on_circle - on_line).norm() < 1e-4);
-                assert!((on_circle.x - x).abs() < 5e-3);
-            }
+        let mut intersections = unit.find_intersection(&under, None).unwrap();
+        intersections.sort_by(|i, j| i.a().0.x.partial_cmp(&j.a().0.x).unwrap());
+        assert_eq!(intersections.len(), 2);
+        for (intersection, x) in intersections.iter().zip([-x, x]) {
+            let (on_circle, on_line) = (intersection.a().0, intersection.b().0);
+            assert!((on_circle - on_line).norm() < 1e-4);
+            assert!((on_circle.x - x).abs() < 5e-3);
+        }
+    }
+
+    #[test]
+    fn the_same_curves_have_the_same_intersections_every_time() {
+        let wave = |phase: f64| {
+            let points = (0..32)
+                .map(|i| {
+                    let x = i as f64;
+                    Point2::new(x, (x * 0.7 + phase).sin() * 3.)
+                })
+                .collect_vec();
+            NurbsCurve2D::<f64>::interpolate(&points, 3).unwrap()
+        };
+        let (a, b) = (wave(0.), wave(1.3));
+        let parameters = || {
+            let intersections = a.find_intersection(&b, None).unwrap();
+            intersections
+                .iter()
+                .map(|it| (it.a().1, it.b().1))
+                .collect_vec()
+        };
+        let first = parameters();
+        assert_eq!(first.len(), 7);
+        for _ in 0..3 {
+            assert_eq!(parameters(), first);
         }
     }
 
@@ -371,11 +385,9 @@ mod tests {
             .unwrap()
         };
         let (upper, lower) = (lens(1.), lens(-1.));
-        for _ in 0..RUNS {
-            let intersections = upper.find_intersection(&lower, None).unwrap();
-            assert_eq!(intersections.len(), 2);
-            assert!((intersections[0].a().0 - Point2::new(0., 0.)).norm() < 1e-5);
-            assert!((intersections[1].a().0 - Point2::new(3., 0.)).norm() < 1e-5);
-        }
+        let intersections = upper.find_intersection(&lower, None).unwrap();
+        assert_eq!(intersections.len(), 2);
+        assert!((intersections[0].a().0 - Point2::new(0., 0.)).norm() < 1e-5);
+        assert!((intersections[1].a().0 - Point2::new(3., 0.)).norm() < 1e-5);
     }
 }

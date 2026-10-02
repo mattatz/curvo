@@ -285,13 +285,10 @@ mod tests {
                 ),
             ])
             .unwrap();
-            // the bounding box trees are divided at random, so this is run again and again
-            for _ in 0..10 {
-                let touching = circle.find_intersection(&square, None).unwrap();
-                assert_eq!(touching.len(), 4, "over a domain x{factor}");
-                let crossing = circle.find_intersection(&line, None).unwrap();
-                assert_eq!(crossing.len(), 2, "over a domain x{factor}");
-            }
+            let touching = circle.find_intersection(&square, None).unwrap();
+            assert_eq!(touching.len(), 4, "over a domain x{factor}");
+            let crossing = circle.find_intersection(&line, None).unwrap();
+            assert_eq!(crossing.len(), 2, "over a domain x{factor}");
         }
     }
 }

@@ -1,9 +1,12 @@
 use std::borrow::Cow;
 
 use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, U1};
-use rand::RngExt;
 
-use crate::{curve::NurbsCurve, misc::FloatingPoint, split::Split};
+use crate::{
+    curve::NurbsCurve,
+    misc::{FloatingPoint, GoldenRatioSequence},
+    split::Split,
+};
 
 use super::{BoundingBox, BoundingBoxTree};
 
@@ -15,6 +18,8 @@ where
 {
     curve: Cow<'a, NurbsCurve<T, D>>,
     tolerance: T,
+    /// Where this node and those under it are divided, off the middle of their domain.
+    sequence: GoldenRatioSequence,
 }
 
 impl<'a, T: FloatingPoint, D: DimName> CurveBoundingBoxTree<'a, T, D>
@@ -32,6 +37,7 @@ where
         Self {
             curve: Cow::Borrowed(curve),
             tolerance: tol,
+            sequence: GoldenRatioSequence::default(),
         }
     }
 
@@ -84,19 +90,27 @@ where
         let interval = max - min;
         let mid = (min + max) / T::from_usize(2).unwrap();
 
-        let mut rng = rand::rng();
-        let r = interval * T::from_f64(1e-1 * (rng.random::<f64>() - 0.5)).unwrap();
-        // let r = T::zero(); // non random
+        // Off the exact middle, where regular geometry tends to have its intersections, by up
+        // to a twentieth of the domain either way. The offset is not random: the tree of a curve
+        // is the same every time, and so is what is found with it.
+        let mut sequence = self.sequence;
+        let r = interval * T::from_f64(1e-1 * (sequence.next() - 0.5)).unwrap();
+
+        // the two halves go on from different places in the sequence
+        let head_sequence = sequence;
+        sequence.next();
 
         let (head, tail) = self.curve.try_split(mid + r)?;
         Ok((
             Self {
                 curve: Cow::Owned(head),
                 tolerance: self.tolerance,
+                sequence: head_sequence,
             },
             Self {
                 curve: Cow::Owned(tail),
                 tolerance: self.tolerance,
+                sequence,
             },
         ))
     }
