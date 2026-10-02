@@ -1,6 +1,8 @@
 pub mod nurbs_surface;
+pub mod surface_evaluator;
 pub mod trimmed_surface;
 pub use nurbs_surface::*;
+pub use surface_evaluator::*;
 pub use trimmed_surface::*;
 
 /// The direction in the UV space.
