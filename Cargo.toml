@@ -69,6 +69,14 @@ approx = ["dep:approx"]
 name = "evaluation"
 harness = false
 
+[[bench]]
+name = "split"
+harness = false
+
+[[bench]]
+name = "intersection"
+harness = false
+
 [[example]]
 name = "interpolate_curve"
 path = "examples/interpolate_curve.rs"
