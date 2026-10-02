@@ -1,11 +1,9 @@
 pub mod intersection_surface_plane;
-pub mod surface_plane_intersection_bfgs;
 pub mod surface_plane_intersection_problem;
 
 use argmin::core::ArgminFloat;
 pub use intersection_surface_plane::*;
-use nalgebra::{Const, Point3};
-pub use surface_plane_intersection_bfgs::*;
+use nalgebra::Point3;
 pub use surface_plane_intersection_problem::*;
 
 use crate::{
@@ -16,20 +14,8 @@ use crate::{
     surface::{NurbsSurface3D, UVDirection},
 };
 
-/// Find intersection leaf nodes between a surface and a plane
-pub fn find_surface_plane_intersection_leaf_nodes<'a, T: FloatingPoint + ArgminFloat>(
-    surface: &'a NurbsSurface3D<T>,
-    plane: &'a Plane<T>,
-    knot_domain_division: usize,
-) -> anyhow::Result<Vec<SurfaceBoundingBoxTree<'a, T, Const<4>>>> {
-    // Create bounding box tree for the surface
-    let tree =
-        SurfaceBoundingBoxTree::with_divisions(surface, UVDirection::U, knot_domain_division);
-
-    // Check each segment of the surface against the plane
-    let leaf_nodes = tree.traverse_leaf_nodes_with_plane(plane);
-    Ok(leaf_nodes)
-}
+/// The solver for the intersections between a NURBS surface and a plane.
+pub type SurfacePlaneIntersectionBFGS<F> = super::IntersectionBFGS<F>;
 
 /// Find intersection points between a surface and a plane
 #[allow(clippy::type_complexity)]
