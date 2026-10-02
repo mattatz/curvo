@@ -197,7 +197,11 @@ where
             }
         }
 
-        if state.get_cost() != state.get_prev_cost()
+        // Converged once the cost is small and no longer changes. A cost that has stopped changing
+        // while it is still large is a slow descent, along a near tangency for one, and is left
+        // to the step size to end.
+        if state.get_cost() < self.cost_tolerance
+            && state.get_cost() != state.get_prev_cost()
             && nalgebra::ComplexField::abs(state.get_cost() - state.get_prev_cost())
                 < self.cost_tolerance
         {
