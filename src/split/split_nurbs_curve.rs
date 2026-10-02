@@ -1,7 +1,9 @@
-use itertools::Itertools;
 use nalgebra::{allocator::Allocator, DefaultAllocator, DimName};
 
-use crate::{curve::NurbsCurve, misc::FloatingPoint};
+use crate::{
+    curve::{nurbs_curve::refine_knot, NurbsCurve},
+    misc::FloatingPoint,
+};
 
 use super::Split;
 
@@ -30,20 +32,30 @@ where
     /// assert_eq!(right.knots_domain().0, u);
     /// ```
     fn try_split(&self, u: T) -> anyhow::Result<(Self, Self)> {
-        let u = self.knots().clamp(self.degree(), u);
-        let knots_to_insert = (0..=self.degree()).map(|_| u).collect_vec();
-        let mut cloned = self.clone();
-        cloned.try_refine_knot(knots_to_insert)?;
+        let degree = self.degree();
+        let u = self.knots().clamp(degree, u);
+        // `degree + 1` times `u`, on the stack for the usual degrees
+        let (inline, heap);
+        let knots_to_insert = if degree < 16 {
+            inline = [u; 16];
+            &inline[..=degree]
+        } else {
+            heap = vec![u; degree + 1];
+            &heap[..]
+        };
+        // The refined control points and knots are those of the head followed by those of the
+        // tail, so they are divided in place rather than copied out.
+        let (mut cpts0, mut knots0) =
+            refine_knot(degree, self.control_points(), self.knots(), knots_to_insert);
 
-        let n = self.knots().len() - self.degree() - 2;
-        let s = self.knots().find_knot_span_index(n, self.degree(), u);
-        let knots0 = cloned.knots().as_slice()[0..=(s + self.degree() + 1)].to_vec();
-        let knots1 = cloned.knots().as_slice()[s + 1..].to_vec();
-        let cpts0 = cloned.control_points()[0..=s].to_vec();
-        let cpts1 = cloned.control_points()[s + 1..].to_vec();
+        let n = self.knots().len() - degree - 2;
+        let s = self.knots().find_knot_span_index(n, degree, u);
+        let knots1 = knots0[s + 1..].to_vec();
+        knots0.truncate(s + degree + 2);
+        let cpts1 = cpts0.split_off(s + 1);
         Ok((
-            Self::try_new(self.degree(), cpts0, knots0)?,
-            Self::try_new(self.degree(), cpts1, knots1)?,
+            Self::try_new(degree, cpts0, knots0)?,
+            Self::try_new(degree, cpts1, knots1)?,
         ))
     }
 }

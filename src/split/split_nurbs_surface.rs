@@ -1,8 +1,7 @@
-use itertools::Itertools;
 use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, U1};
 
 use crate::{
-    curve::NurbsCurve,
+    curve::nurbs_curve::refine_knot,
     misc::{transpose_control_points, FloatingPoint},
     surface::{NurbsSurface, UVDirection},
 };
@@ -37,43 +36,45 @@ where
 
     /// Split the surface into two surfaces before and after the parameter
     fn try_split(&self, option: Self::Option) -> anyhow::Result<(Self, Self)> {
+        let transposed;
         let (points, knots, degree) = match option.direction {
             UVDirection::U => {
-                let transposed = self.transposed_control_points();
-                (transposed, self.u_knots(), self.u_degree())
+                transposed = self.transposed_control_points();
+                (&transposed, self.u_knots(), self.u_degree())
             }
-            UVDirection::V => {
-                let pts = self.control_points();
-                (pts.clone(), self.v_knots(), self.v_degree())
-            }
+            UVDirection::V => (self.control_points(), self.v_knots(), self.v_degree()),
         };
 
-        let knots_to_insert = (0..=degree).map(|_| option.parameter).collect_vec();
+        let knots_to_insert = vec![option.parameter; degree + 1];
 
         let n = knots.len() - degree - 2;
         let s = knots.find_knot_span_index(n, degree, option.parameter);
 
-        let curves = points
+        // Each row is a curve along the direction; its refined control points are those of the
+        // head followed by those of the tail. Every row refines the knots alike.
+        let mut refined_knots = None;
+        let (pts0, pts1): (Vec<_>, Vec<_>) = points
             .iter()
             .map(|row| {
-                let mut curve = NurbsCurve::try_new(degree, row.clone(), knots.to_vec())?;
-                curve.try_refine_knot(knots_to_insert.clone())?;
-                Ok(curve)
+                anyhow::ensure!(row.len() > degree, "Too few control points for curve");
+                anyhow::ensure!(
+                    knots.len() == row.len() + degree + 1,
+                    "Invalid number of knots, got {}, expected {}",
+                    knots.len(),
+                    row.len() + degree + 1
+                );
+                let (mut head, knots) = refine_knot(degree, row, knots, &knots_to_insert);
+                refined_knots = Some(knots);
+                let tail = head.split_off(s + 1);
+                Ok((head, tail))
             })
-            .collect::<anyhow::Result<Vec<_>>>()?;
-
-        let (pts0, pts1): (Vec<_>, Vec<_>) = curves
-            .iter()
-            .map(|curve| {
-                let p0 = curve.control_points()[0..=s].to_vec();
-                let p1 = curve.control_points()[s + 1..].to_vec();
-                (p0, p1)
-            })
+            .collect::<anyhow::Result<Vec<_>>>()?
+            .into_iter()
             .unzip();
 
-        let last = curves.last().ok_or_else(|| anyhow::anyhow!("No curves"))?;
-        let knots0 = last.knots().as_slice()[0..=(s + degree + 1)].to_vec();
-        let knots1 = last.knots().as_slice()[s + 1..].to_vec();
+        let mut knots0 = refined_knots.ok_or_else(|| anyhow::anyhow!("No curves"))?;
+        let knots1 = knots0[s + 1..].to_vec();
+        knots0.truncate(s + degree + 2);
 
         match option.direction {
             UVDirection::U => Ok((
