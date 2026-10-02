@@ -112,6 +112,16 @@ fn curves(c: &mut Criterion) {
         NurbsCurve2D::interpolate(&points, 3).unwrap()
     };
     let (wave_a, wave_b) = (wave(0.), wave(1.3));
+    let (start, end) = cubic.knots_domain();
+    c.bench_function("curve/try_split/cubic", |b| {
+        b.iter(|| {
+            black_box(
+                cubic
+                    .try_split(black_box(start + (end - start) * 0.37))
+                    .unwrap(),
+            )
+        })
+    });
     c.bench_function("curve/find_intersection/cubic", |b| {
         b.iter(|| black_box(wave_a.find_intersection(&wave_b, None).unwrap()))
     });
@@ -161,6 +171,14 @@ fn surfaces(c: &mut Criterion) {
             }
         })
     });
+    for (name, direction) in [("u", UVDirection::U), ("v", UVDirection::V)] {
+        c.bench_function(&format!("surface/try_split_{name}/bicubic"), |b| {
+            b.iter(|| {
+                let option = SplitSurfaceOption::new(black_box(4.3), direction);
+                black_box(surface.try_split(option).unwrap())
+            })
+        });
+    }
     c.bench_function("surface/regular_tessellate/bicubic", |b| {
         b.iter(|| black_box(surface.regular_tessellate(side - 1, side - 1)))
     });
