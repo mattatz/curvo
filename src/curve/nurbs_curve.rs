@@ -12,6 +12,7 @@ use nalgebra::{
 };
 use simba::scalar::SupersetOf;
 
+use crate::bounding_box::BoundingBox;
 use crate::curve::curve_evaluator::CurveEvaluator;
 use crate::misc::binomial::{Binomial, BinomialCoefficients};
 use crate::misc::frenet_frame::FrenetFrame;
@@ -1797,21 +1798,21 @@ where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
-        let eps = T::default_epsilon() * T::from_usize(1000).unwrap();
-        match self.knots.is_clamped(self.degree) {
-            true => {
-                let pts = self.dehomogenized_control_points();
-                let delta = &pts[0] - &pts[self.control_points.len() - 1];
-                delta.norm() < eps
-            }
+        // The two ends, a control point each when the curve is clamped
+        let (start, end) = match self.knots.is_clamped(self.degree) {
+            true => (
+                dehomogenize(&self.control_points[0]).unwrap(),
+                dehomogenize(&self.control_points[self.control_points.len() - 1]).unwrap(),
+            ),
             false => {
                 let (s, e) = self.knots_domain();
-                let s = self.point_at(s);
-                let e = self.point_at(e);
-                let delta = s - e;
-                delta.norm() < eps
+                (self.point_at(s), self.point_at(e))
             }
-        }
+        };
+        // closer than rounding allows them to be told apart, at the size of the curve
+        let size = BoundingBox::from(self).size().norm();
+        let eps = T::default_epsilon() * T::from_usize(1000).unwrap();
+        (start - end).norm() <= eps * size
     }
 
     /// Try to refine the curve by inserting knots, which must be in order and within the domain
