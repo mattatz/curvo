@@ -3,7 +3,7 @@ use nalgebra::{Const, OPoint, Vector1};
 use num_traits::Float;
 
 use crate::{
-    bounding_box::BoundingBoxTree,
+    bounding_box::leaves_reaching_plane,
     curve::NurbsCurve,
     intersects::{
         solve::{curve_scale, Scales},
@@ -36,7 +36,7 @@ where
         // Check each segment of the curve against the plane
         let tree = CurveBoundingBoxTree::with_divisions(self, options.knot_domain_division);
         let reach = scales.distance(options.minimum_distance);
-        let candidates = collect_leaf_nodes(tree, plane, reach)
+        let candidates = leaves_reaching_plane(tree, plane, reach)
             .into_iter()
             .filter_map(|node| {
                 let curve_segment = node.curve_owned();
@@ -59,39 +59,6 @@ where
             })
             .collect();
         Ok(intersections)
-    }
-}
-
-/// Recursively collect the leaf nodes of a bounding box tree that reach within `tolerance` of the
-/// plane, so that a curve ending on the plane or touching it is not left out.
-fn collect_leaf_nodes<'a, T: FloatingPoint>(
-    tree: CurveBoundingBoxTree<'a, T, Const<4>>,
-    plane: &Plane<T>,
-    tolerance: T,
-) -> Vec<CurveBoundingBoxTree<'a, T, Const<4>>> {
-    let bbox = tree.bounding_box();
-    let corners = bbox.corners();
-
-    // Check if bbox reaches the plane from both sides
-    let distances: Vec<_> = corners.iter().map(|p| plane.signed_distance(p)).collect();
-    let above = distances.iter().any(|&d| d >= -tolerance);
-    let below = distances.iter().any(|&d| d <= tolerance);
-
-    if !above || !below {
-        // Bbox is entirely on one side of the plane
-        return vec![];
-    }
-
-    if tree.is_dividable() {
-        if let Ok((left, right)) = tree.try_divide() {
-            let mut nodes = collect_leaf_nodes(left, plane, tolerance);
-            nodes.extend(collect_leaf_nodes(right, plane, tolerance));
-            nodes
-        } else {
-            vec![tree]
-        }
-    } else {
-        vec![tree]
     }
 }
 

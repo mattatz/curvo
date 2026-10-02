@@ -9,6 +9,7 @@ pub use surface_plane_intersection_bfgs::*;
 pub use surface_plane_intersection_problem::*;
 
 use crate::{
+    bounding_box::leaves_reaching_plane,
     intersects::solve::{surface_scale, Scales},
     misc::{FloatingPoint, Plane},
     prelude::SurfaceBoundingBoxTree,
@@ -39,39 +40,32 @@ pub fn find_surface_plane_intersection_points<T: FloatingPoint + ArgminFloat>(
 ) -> anyhow::Result<Vec<(Point3<T>, (T, T))>> {
     let options = options.unwrap_or_default();
 
-    let leaf_nodes =
-        find_surface_plane_intersection_leaf_nodes(surface, plane, options.knot_domain_division)?;
-
     let (size, parameters) = surface_scale(surface);
     let scales = Scales::new(&[size], parameters);
     // relative to the size of the surface
     let minimum_distance = scales.distance(options.minimum_distance);
 
-    // Collect intersection points from all leaf nodes
-    let mut intersection_points = Vec::new();
-
-    for node in leaf_nodes {
-        let surface_segment = node.surface_owned();
-        let problem = SurfacePlaneIntersectionProblem::new(&surface_segment, plane);
-
-        // Initial parameter at midpoint of segment
-        let (u_seg_domain, v_seg_domain) = surface_segment.knots_domain();
-        let init_param = Vector2::<T>::new(
-            (u_seg_domain.0 + u_seg_domain.1) * T::from_f64(0.5).unwrap(),
-            (v_seg_domain.0 + v_seg_domain.1) * T::from_f64(0.5).unwrap(),
-        );
-
-        // Run solver
-        if let Some((param, _)) = scales.solve(problem, &options, init_param) {
-            let (u, v) = (param[0], param[1]);
-            let point = surface.point_at(u, v);
+    // Check each leaf of the surface that reaches the plane
+    let tree = SurfaceBoundingBoxTree::with_divisions(
+        surface,
+        UVDirection::U,
+        options.knot_domain_division,
+    );
+    let intersection_points = leaves_reaching_plane(tree, plane, minimum_distance)
+        .into_iter()
+        .filter_map(|node| {
+            let surface_segment = node.surface_owned();
+            let problem = SurfacePlaneIntersectionProblem::new(&surface_segment, plane);
+            // from the middle of each leaf
+            let half = T::from_f64(0.5).unwrap();
+            let (u, v) = surface_segment.knots_domain();
+            let init_param = Vector2::new((u.0 + u.1) * half, (v.0 + v.1) * half);
+            let (param, _) = scales.solve(problem, &options, init_param)?;
+            let point = surface.point_at(param[0], param[1]);
             let distance = num_traits::Float::abs(plane.signed_distance(&point));
-
-            if distance < minimum_distance {
-                intersection_points.push((point, (u, v)));
-            }
-        }
-    }
+            (distance < minimum_distance).then_some((point, (param[0], param[1])))
+        })
+        .collect();
 
     Ok(intersection_points)
 }
