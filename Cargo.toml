@@ -77,6 +77,14 @@ harness = false
 name = "intersection"
 harness = false
 
+[[bench]]
+name = "contains"
+harness = false
+
+[[bench]]
+name = "boolean"
+harness = false
+
 [[example]]
 name = "interpolate_curve"
 path = "examples/interpolate_curve.rs"
