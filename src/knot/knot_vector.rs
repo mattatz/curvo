@@ -8,6 +8,29 @@ use crate::{
     prelude::{FloatingPoint, Invertible, KnotMultiplicity},
 };
 
+/// Evaluate `$inline` with `$n` the smallest of the stack buffer sizes that holds `$size`, or
+/// `$heap` when none does. The buffers are zeroed on every call, so a low degree, by far the
+/// most common, should not pay for the largest.
+macro_rules! in_stack_buffers {
+    ($size:expr, $n:ident => $inline:expr, $heap:expr) => {
+        match $size {
+            0..=4 => {
+                const $n: usize = 4;
+                $inline
+            }
+            5..=8 => {
+                const $n: usize = 8;
+                $inline
+            }
+            9..=16 => {
+                const $n: usize = 16;
+                $inline
+            }
+            _ => $heap,
+        }
+    };
+}
+
 /// Knot vector representation
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -355,9 +378,6 @@ impl<T: RealField + Copy> KnotVector<T> {
 
     /// Call `f` with the non-vanishing basis functions, computed into stack buffers when the
     /// degree allows it, so evaluating a point allocates nothing.
-    ///
-    /// The stack buffers are zeroed on every call, so they come in a few sizes: a low degree, by
-    /// far the most common, should not pay for the largest.
     pub(crate) fn with_basis_functions<R>(
         &self,
         knot_span_index: usize,
@@ -365,12 +385,11 @@ impl<T: RealField + Copy> KnotVector<T> {
         degree: usize,
         f: impl FnOnce(&[T]) -> R,
     ) -> R {
-        match degree + 1 {
-            0..=4 => self.with_inline_basis_functions::<4, R>(knot_span_index, u, degree, f),
-            5..=8 => self.with_inline_basis_functions::<8, R>(knot_span_index, u, degree, f),
-            9..=16 => self.with_inline_basis_functions::<16, R>(knot_span_index, u, degree, f),
-            _ => f(&self.basis_functions(knot_span_index, u, degree)),
-        }
+        in_stack_buffers!(
+            degree + 1,
+            N => self.with_inline_basis_functions::<N, R>(knot_span_index, u, degree, f),
+            f(&self.basis_functions(knot_span_index, u, degree))
+        )
     }
 
     /// [`KnotVector::with_basis_functions`] in stack buffers of `N`, which must be at least
@@ -462,8 +481,6 @@ impl<T: RealField + Copy> KnotVector<T> {
 
     /// Call `f` with the basis functions and their first `n` derivatives, row by row with a stride
     /// of `degree + 1`, computed into stack buffers when the degree and `n` allow it.
-    ///
-    /// As in [`KnotVector::with_basis_functions`], the stack buffers come in a few sizes.
     pub(crate) fn with_derivative_basis_functions<R>(
         &self,
         knot_index: usize,
@@ -472,18 +489,11 @@ impl<T: RealField + Copy> KnotVector<T> {
         n: usize,
         f: impl FnOnce(&[T]) -> R,
     ) -> R {
-        match (degree + 1).max(n + 1) {
-            0..=4 => {
-                self.with_inline_derivative_basis_functions::<4, R>(knot_index, u, degree, n, f)
-            }
-            5..=8 => {
-                self.with_inline_derivative_basis_functions::<8, R>(knot_index, u, degree, n, f)
-            }
-            9..=16 => {
-                self.with_inline_derivative_basis_functions::<16, R>(knot_index, u, degree, n, f)
-            }
-            _ => f(&self.flat_derivative_basis_functions(knot_index, u, degree, n)),
-        }
+        in_stack_buffers!(
+            (degree + 1).max(n + 1),
+            N => self.with_inline_derivative_basis_functions::<N, R>(knot_index, u, degree, n, f),
+            f(&self.flat_derivative_basis_functions(knot_index, u, degree, n))
+        )
     }
 
     /// [`KnotVector::with_derivative_basis_functions`] in stack buffers of `N`, which must be at
