@@ -1,6 +1,8 @@
 use std::cmp::Ordering;
 
-use nalgebra::{allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, U1};
+use nalgebra::{
+    allocator::Allocator, DefaultAllocator, DimName, DimNameDiff, DimNameSub, OPoint, U1,
+};
 
 use crate::{curve::NurbsCurve, misc::FloatingPoint};
 
@@ -14,20 +16,16 @@ pub enum CurveDirection {
 }
 
 impl CurveDirection {
-    pub fn new<T: FloatingPoint, D>(
-        a: &NurbsCurve<T, D>,
-        b: &NurbsCurve<T, D>,
+    /// The direction in which what goes from `b.0` to `b.1` connects to what goes from `a.0` to
+    /// `a.1`: a curve, or several already connected.
+    pub fn between<T: FloatingPoint, D: DimName>(
+        (a0, a1): (OPoint<T, D>, OPoint<T, D>),
+        (b0, b1): (OPoint<T, D>, OPoint<T, D>),
         epsilon: T,
     ) -> Option<Self>
     where
-        D: DimName + DimNameSub<U1>,
         DefaultAllocator: Allocator<D>,
-        DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
-        let ad = a.knots_domain();
-        let bd = b.knots_domain();
-        let (a0, a1) = (a.point_at(ad.0), a.point_at(ad.1));
-        let (b0, b1) = (b.point_at(bd.0), b.point_at(bd.1));
         let directions = [
             ((&a1 - &b0).norm(), Self::Forward),
             ((&a0 - &b1).norm(), Self::Backward),
@@ -53,9 +51,23 @@ impl CurveDirection {
     }
 }
 
+/// The two ends of a curve.
+pub(crate) type Ends<T, D> = (OPoint<T, DimNameDiff<D, U1>>, OPoint<T, DimNameDiff<D, U1>>);
+
+/// The two ends of a curve.
+pub(crate) fn ends<T: FloatingPoint, D>(curve: &NurbsCurve<T, D>) -> Ends<T, D>
+where
+    D: DimName + DimNameSub<U1>,
+    DefaultAllocator: Allocator<D>,
+    DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
+{
+    let (start, end) = curve.knots_domain();
+    (curve.point_at(start), curve.point_at(end))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::CurveDirection;
+    use super::{ends, CurveDirection};
     use crate::prelude::NurbsCurve3D;
     use nalgebra::Point3;
 
@@ -78,7 +90,7 @@ mod tests {
         // `b` starts at p, so both Forward (a1->b0) and Opposite (a0->b0) gaps are ~0.
         let b = line(p, Point3::new(2.0, 2.0, 0.0));
         assert!(matches!(
-            CurveDirection::new(&a, &b, EPS),
+            CurveDirection::between(ends(&a), ends(&b), EPS),
             Some(CurveDirection::Forward)
         ));
     }
@@ -92,7 +104,7 @@ mod tests {
         let a = line(Point3::new(1.0, 0.0, 0.0), Point3::new(0.0, 0.0, 0.0));
         let b = line(Point3::new(5e-5, 0.0, 0.0), Point3::new(1.0, 0.0, 0.0));
         assert!(matches!(
-            CurveDirection::new(&a, &b, EPS),
+            CurveDirection::between(ends(&a), ends(&b), EPS),
             Some(CurveDirection::Backward)
         ));
     }
@@ -102,6 +114,6 @@ mod tests {
     fn beyond_epsilon_is_none() {
         let a = line(Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 0.0, 0.0));
         let b = line(Point3::new(2.0, 0.0, 0.0), Point3::new(3.0, 0.0, 0.0));
-        assert!(CurveDirection::new(&a, &b, EPS).is_none());
+        assert!(CurveDirection::between(ends(&a), ends(&b), EPS).is_none());
     }
 }

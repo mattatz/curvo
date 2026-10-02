@@ -1809,7 +1809,7 @@ where
                 (self.point_at(s), self.point_at(e))
             }
         };
-        // closer than rounding allows them to be told apart, at the size of the curve
+        // closer than rounding lets them be told apart, at the size of the curve
         let size = BoundingBox::from(self).size().norm();
         let eps = T::default_epsilon() * T::from_usize(1000).unwrap();
         (start - end).norm() <= eps * size

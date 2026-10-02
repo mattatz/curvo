@@ -184,3 +184,33 @@ fn two_circles_difference_case() {
         .exterior()
         .is_closed(None));
 }
+
+#[test]
+fn boolean_operations_do_not_depend_on_the_scale() {
+    use crate::boolean::Boolean;
+    // two unit circles a radius apart, and the length of the boundary of what each operation
+    // leaves of them
+    let third = TAU / 3.;
+    for scale in [1., 1e-3, 1e3] {
+        let circle = |x: f64| {
+            let center = Point2::new(x * scale, 0.);
+            NurbsCurve2D::try_circle(&center, &Vector2::x(), &Vector2::y(), scale).unwrap()
+        };
+        let (a, b) = (circle(0.), circle(1.));
+        // the bounding box trees are divided at random, so this is run again and again
+        for _ in 0..5 {
+            for (clip, length) in [
+                (a.union(&b, None), 4. * third),
+                (a.intersection(&b, None), 2. * third),
+                (a.difference(&b, None), 3. * third),
+            ] {
+                let clip = clip.unwrap();
+                assert_eq!(clip.regions().len(), 1, "scaled by {scale}");
+                let boundary = clip.regions()[0].exterior();
+                assert!(boundary.is_closed(None), "scaled by {scale}");
+                let found = boundary.try_length().unwrap() / scale;
+                assert!((found - length).abs() < 1e-3, "scaled by {scale}");
+            }
+        }
+    }
+}
