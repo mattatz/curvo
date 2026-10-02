@@ -107,7 +107,20 @@ where
             None => problem.gradient(x0)?,
         };
 
-        let h0 = state.get_hessian().cloned().unwrap_or(SMatrix::identity());
+        // Before the gradients have told the curvature, the first step is as long as Newton's
+        // method would make it for a cost that is a squared distance, zero at the intersection:
+        // down the gradient by twice the cost over the square of its length. A step as long as
+        // the gradient itself depends on the units of the problem, and goes past a near
+        // intersection to the one beyond it.
+        let h0 = state.get_hessian().cloned().unwrap_or_else(|| {
+            let slope = g0.norm_squared();
+            let newton = if slope > F::zero() {
+                F::from_f64(2.).unwrap() * f0 / slope
+            } else {
+                F::one()
+            };
+            SMatrix::identity() * newton
+        });
 
         // line search
         let step = -h0 * g0;
