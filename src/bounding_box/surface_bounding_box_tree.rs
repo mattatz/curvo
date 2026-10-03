@@ -1,6 +1,5 @@
 use std::borrow::Cow;
 
-use itertools::Itertools;
 use nalgebra::{
     allocator::Allocator, Const, DefaultAllocator, DimName, DimNameDiff, DimNameSub, U1,
 };
@@ -11,7 +10,7 @@ use crate::{
     surface::{NurbsSurface, UVDirection},
 };
 
-use super::{BoundingBox, BoundingBoxTree};
+use super::{leaves_reaching_plane, BoundingBox, BoundingBoxTree};
 
 /// A struct representing a bounding box tree with surface in D space.
 #[derive(Clone)]
@@ -46,6 +45,18 @@ where
             tolerance: tol,
             direction,
         }
+    }
+
+    /// Create a new bounding box tree from a surface, divided down to one `divisions`-th of its
+    /// domain in u and in v.
+    pub fn with_divisions(
+        surface: &'a NurbsSurface<T, D>,
+        direction: UVDirection,
+        divisions: usize,
+    ) -> Self {
+        let (u, v) = surface.knots_domain_interval();
+        let divisions = T::from_usize(divisions).unwrap();
+        Self::new(surface, direction, Some((u / divisions, v / divisions)))
     }
 
     pub fn surface(&self) -> &NurbsSurface<T, D> {
@@ -102,32 +113,6 @@ where
 impl<'a, T: FloatingPoint> SurfaceBoundingBoxTree<'a, T, Const<4>> {
     /// Recursively traverse all leaf nodes from a bounding box tree that intersect the plane
     pub fn traverse_leaf_nodes_with_plane(&self, plane: &Plane<T>) -> Vec<Self> {
-        let bbox = self.bounding_box();
-        let corners = bbox.corners();
-
-        // Check if bbox straddles the plane
-        let distances = corners
-            .iter()
-            .map(|p| plane.signed_distance(p))
-            .collect_vec();
-        let has_positive = distances.iter().any(|&d| d > T::zero());
-        let has_negative = distances.iter().any(|&d| d < T::zero());
-
-        if !has_positive || !has_negative {
-            // Bbox is entirely on one side of the plane
-            return vec![];
-        }
-
-        if self.is_dividable() {
-            if let Ok((left, right)) = self.try_divide() {
-                let mut nodes = left.traverse_leaf_nodes_with_plane(plane);
-                nodes.extend(right.traverse_leaf_nodes_with_plane(plane));
-                nodes
-            } else {
-                vec![self.clone()]
-            }
-        } else {
-            vec![self.clone()]
-        }
+        leaves_reaching_plane(self.clone(), plane, T::zero())
     }
 }

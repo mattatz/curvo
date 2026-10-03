@@ -79,6 +79,38 @@ impl<T: RealField + Copy> Binomial<T> {
     }
 }
 
+/// Binomial coefficients without the memo [`Binomial`] allocates, as long as `n` stays small.
+///
+/// Up to `n = 24` every coefficient is below 2²⁴, so it is computed exactly in integers and is
+/// exactly what [`Binomial::get`]'s sums give in `f32` or `f64`. Beyond that it is
+/// [`Binomial::get`] itself, on a memo created at the first such `n` and kept for the later ones,
+/// so the two never disagree and nothing can overflow.
+pub(crate) struct BinomialCoefficients<T> {
+    memo: Option<Binomial<T>>,
+}
+
+impl<T: RealField + Copy> BinomialCoefficients<T> {
+    pub(crate) fn new() -> Self {
+        Self { memo: None }
+    }
+
+    /// Returns the binomial coefficient of `n` and `k`.
+    pub(crate) fn get(&mut self, n: usize, k: usize) -> T {
+        if k > n {
+            return T::zero();
+        }
+        if n > 24 {
+            return self.memo.get_or_insert_with(Binomial::new).get(n, k);
+        }
+        let k = k.min(n - k);
+        let mut c: u64 = 1;
+        for i in 0..k {
+            c = c * (n - i) as u64 / (i + 1) as u64;
+        }
+        T::from_u64(c).unwrap()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -90,6 +122,22 @@ mod tests {
         assert_eq!(super::binomial(5, 4), 5.);
         assert_eq!(super::binomial(5, 5), 1.);
         assert_eq!(super::binomial(5, 6), 0.);
+    }
+
+    #[test]
+    fn binomial_coefficients_agree_with_the_memoized_ones_bit_for_bit() {
+        let mut memo64 = super::Binomial::<f64>::new();
+        let mut memo32 = super::Binomial::<f32>::new();
+        let mut coefficients64 = super::BinomialCoefficients::<f64>::new();
+        let mut coefficients32 = super::BinomialCoefficients::<f32>::new();
+        for n in 0..=60 {
+            for k in 0..=n + 1 {
+                let a = coefficients64.get(n, k);
+                let b = coefficients32.get(n, k);
+                assert_eq!(a.to_bits(), memo64.get(n, k).to_bits(), "{n} choose {k}");
+                assert_eq!(b.to_bits(), memo32.get(n, k).to_bits(), "{n} choose {k}");
+            }
+        }
     }
 
     #[test]

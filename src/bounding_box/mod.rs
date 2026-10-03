@@ -14,7 +14,9 @@ use nalgebra::{
 use simba::scalar::SupersetOf;
 
 use crate::{
-    curve::nurbs_curve::NurbsCurve, misc::FloatingPoint, region::CompoundCurve,
+    curve::nurbs_curve::{dehomogenize, NurbsCurve},
+    misc::FloatingPoint,
+    region::CompoundCurve,
     surface::NurbsSurface,
 };
 
@@ -199,7 +201,10 @@ where
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     fn from(value: &'a NurbsCurve<T, D>) -> Self {
-        let pts = value.dehomogenized_control_points();
+        let pts = value
+            .control_points()
+            .iter()
+            .map(|p| dehomogenize(p).unwrap());
         Self::new_with_points(pts)
     }
 }
@@ -215,7 +220,8 @@ where
         let pts = value
             .spans()
             .iter()
-            .flat_map(|span| span.dehomogenized_control_points());
+            .flat_map(|span| span.control_points())
+            .map(|p| dehomogenize(p).unwrap());
         Self::from_iter(pts)
     }
 }
@@ -228,8 +234,11 @@ where
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
     fn from(value: &'a NurbsSurface<T, D>) -> Self {
-        let pts = value.dehomogenized_control_points();
-        let flatten = pts.into_iter().flatten();
-        Self::new_with_points(flatten)
+        let pts = value
+            .control_points()
+            .iter()
+            .flatten()
+            .map(|p| dehomogenize(p).unwrap());
+        Self::new_with_points(pts)
     }
 }

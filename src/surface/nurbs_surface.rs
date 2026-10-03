@@ -12,8 +12,8 @@ use simba::scalar::SupersetOf;
 use crate::{
     curve::nurbs_curve::{dehomogenize, NurbsCurve, NurbsCurve3D},
     misc::{
-        binomial::Binomial, transformable::Transformable, transpose_control_points, FloatingPoint,
-        Invertible, Ray,
+        binomial::BinomialCoefficients, transformable::Transformable, transpose_control_points,
+        FloatingPoint, Invertible, Ray,
     },
     prelude::{
         try_interpolate_control_points, AdaptiveTessellationOptions, KnotVector,
@@ -22,7 +22,7 @@ use crate::{
     SurfaceClosestParameterNewton, SurfaceClosestParameterProblem,
 };
 
-use super::{FlipDirection, UVDirection};
+use super::{FlipDirection, SurfaceEvaluator, UVDirection};
 
 /// NURBS surface representation
 /// by generics, it can be used for 2D or 3D curves with f32 or f64 scalar types
@@ -201,34 +201,57 @@ where
 
     /// Evaluate the surface at the given u, v parameters to get a point
     pub fn point(&self, u: T, v: T) -> OPoint<T, D> {
-        let n = self.u_knots.len() - self.u_degree - 2;
-        let m = self.v_knots.len() - self.v_degree - 2;
+        let (n, m) = self.last_spans();
 
         let knot_span_index_u = self.u_knots.find_knot_span_index(n, self.u_degree, u);
         let knot_span_index_v = self.v_knots.find_knot_span_index(m, self.v_degree, v);
-        let u_basis_vals = self
-            .u_knots
-            .basis_functions(knot_span_index_u, u, self.u_degree);
-        let v_basis_vals = self
-            .v_knots
-            .basis_functions(knot_span_index_v, v, self.v_degree);
+        self.point_in_span(knot_span_index_u, knot_span_index_v, u, v)
+    }
+
+    /// The span indices of the last control point in u and in v, the `n` and `m` the span
+    /// searches are bounded by.
+    pub(crate) fn last_spans(&self) -> (usize, usize) {
+        (
+            self.u_knots.len() - self.u_degree - 2,
+            self.v_knots.len() - self.v_degree - 2,
+        )
+    }
+
+    /// Evaluate the surface at `(u, v)` in the knot spans the span searches give for it.
+    pub(crate) fn point_in_span(
+        &self,
+        knot_span_index_u: usize,
+        knot_span_index_v: usize,
+        u: T,
+        v: T,
+    ) -> OPoint<T, D> {
         let uind = knot_span_index_u - self.u_degree;
 
-        let mut position = OPoint::<T, D>::origin();
-        for l in 0..=self.v_degree {
-            let mut temp = OPoint::<T, D>::origin();
-            let vind = knot_span_index_v - self.v_degree + l;
+        self.u_knots
+            .with_basis_functions(knot_span_index_u, u, self.u_degree, |u_basis_vals| {
+                self.v_knots.with_basis_functions(
+                    knot_span_index_v,
+                    v,
+                    self.v_degree,
+                    |v_basis_vals| {
+                        let mut position = OPoint::<T, D>::origin();
+                        for l in 0..=self.v_degree {
+                            let mut temp = OPoint::<T, D>::origin();
+                            let vind = knot_span_index_v - self.v_degree + l;
 
-            // sample u isoline
-            for k in 0..=self.u_degree {
-                temp.coords += &self.control_points[uind + k][vind].coords * u_basis_vals[k];
-            }
+                            // sample u isoline
+                            for k in 0..=self.u_degree {
+                                temp.coords +=
+                                    &self.control_points[uind + k][vind].coords * u_basis_vals[k];
+                            }
 
-            // add point from u isoline
-            position.coords += temp.coords * v_basis_vals[l];
-        }
-
-        position
+                            // add point from u isoline
+                            position.coords += temp.coords * v_basis_vals[l];
+                        }
+                        position
+                    },
+                )
+            })
     }
 
     // Compute a regularly spaced grid of points on surface.
@@ -347,12 +370,21 @@ where
         divs_v: usize,
         derivs: usize,
     ) -> Vec<Vec<Vec<Vec<OVector<T, D>>>>> {
+        // Only the first `derivs` derivatives, up to the degree, are used.
         let (knot_spans_u, bases_u) = self
             .u_knots
-            .regularly_spaced_derivative_basis_functions(self.u_degree, divs_u);
+            .regularly_spaced_derivative_basis_functions_up_to(
+                self.u_degree,
+                divs_u,
+                derivs.min(self.u_degree),
+            );
         let (knot_spans_v, bases_v) = self
             .v_knots
-            .regularly_spaced_derivative_basis_functions(self.v_degree, divs_v);
+            .regularly_spaced_derivative_basis_functions_up_to(
+                self.v_degree,
+                divs_v,
+                derivs.min(self.v_degree),
+            );
         let mut ders = vec![];
 
         for i in 0..=divs_u {
@@ -500,11 +532,59 @@ where
         rational_derivatives(&ders, derivs)
     }
 
+    /// [`NurbsSurface::rational_derivatives`] at `(u, v)` in the knot spans the span searches give
+    /// for it.
+    pub(crate) fn rational_derivatives_in_span(
+        &self,
+        knot_span_index_u: usize,
+        knot_span_index_v: usize,
+        u: T,
+        v: T,
+        derivs: usize,
+    ) -> Vec<Vec<OVector<T, DimNameDiff<D, U1>>>> {
+        let ders = self.derivatives_in_span(knot_span_index_u, knot_span_index_v, u, v, derivs);
+        rational_derivatives(&ders, derivs)
+    }
+
+    /// An evaluator for this surface that remembers the knot spans of the last parameters it was
+    /// asked about, so a grid or a run of nearby parameters skips the span searches. It returns
+    /// exactly what the surface's own methods return.
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point3, Vector3};
+    /// let sphere =
+    ///     NurbsSurface3D::try_sphere(&Point3::origin(), &Vector3::z(), &Vector3::x(), 1.).unwrap();
+    /// let ((u0, u1), (v0, v1)) = sphere.knots_domain();
+    /// let mut evaluator = sphere.evaluator();
+    /// for i in 0..=10 {
+    ///     for j in 0..=10 {
+    ///         let (u, v) = (u0 + (u1 - u0) * i as f64 / 10., v0 + (v1 - v0) * j as f64 / 10.);
+    ///         assert_eq!(evaluator.point_at(u, v), sphere.point_at(u, v));
+    ///     }
+    /// }
+    /// ```
+    pub fn evaluator(&self) -> SurfaceEvaluator<'_, T, D> {
+        SurfaceEvaluator::new(self)
+    }
+
     /// Evaluate the derivatives at the given u, v parameters
     fn derivatives(&self, u: T, v: T, derivs: usize) -> Vec<Vec<OVector<T, D>>> {
-        let n = self.u_knots.len() - self.u_degree - 2;
-        let m = self.v_knots.len() - self.v_degree - 2;
+        let (n, m) = self.last_spans();
+        let knot_span_index_u = self.u_knots.find_knot_span_index(n, self.u_degree, u);
+        let knot_span_index_v = self.v_knots.find_knot_span_index(m, self.v_degree, v);
+        self.derivatives_in_span(knot_span_index_u, knot_span_index_v, u, v, derivs)
+    }
 
+    /// The derivatives at `(u, v)` in the knot spans the span searches give for it.
+    fn derivatives_in_span(
+        &self,
+        knot_span_index_u: usize,
+        knot_span_index_v: usize,
+        u: T,
+        v: T,
+        derivs: usize,
+    ) -> Vec<Vec<OVector<T, D>>> {
         let du = if derivs < self.u_degree {
             derivs
         } else {
@@ -516,43 +596,55 @@ where
             self.v_degree
         };
         let mut skl = vec![vec![OVector::<T, D>::zeros(); derivs + 1]; derivs + 1];
-        let knot_span_index_u = self.u_knots.find_knot_span_index(n, self.u_degree, u);
-        let knot_span_index_v = self.v_knots.find_knot_span_index(m, self.v_degree, v);
-        let uders = self
-            .u_knots
-            .derivative_basis_functions(knot_span_index_u, u, self.u_degree, n);
-        let vders = self
-            .v_knots
-            .derivative_basis_functions(knot_span_index_v, v, self.v_degree, m);
-        let mut temp = vec![OPoint::<T, D>::origin(); self.v_degree + 1];
+        // Only the first `du` and `dv` derivatives are used. Asking for `n` and `m` — the control
+        // point counts — computed a row per control point and threw all but a few away.
+        let (u_stride, v_stride) = (self.u_degree + 1, self.v_degree + 1);
+        self.u_knots.with_derivative_basis_functions(
+            knot_span_index_u,
+            u,
+            self.u_degree,
+            du,
+            |uders| {
+                self.v_knots.with_derivative_basis_functions(
+                    knot_span_index_v,
+                    v,
+                    self.v_degree,
+                    dv,
+                    |vders| {
+                        let mut temp = vec![OPoint::<T, D>::origin(); self.v_degree + 1];
 
-        for k in 0..=du {
-            for s in 0..=self.v_degree {
-                temp[s] = OPoint::<T, D>::origin();
-                for r in 0..=self.u_degree {
-                    let w = &self.control_points[knot_span_index_u - self.u_degree + r]
-                        [knot_span_index_v - self.v_degree + s]
-                        * uders[k][r];
-                    let column = temp.get_mut(s).unwrap();
-                    w.coords.iter().enumerate().for_each(|(i, v)| {
-                        column[i] += *v;
-                    });
-                }
-            }
+                        for k in 0..=du {
+                            for s in 0..=self.v_degree {
+                                temp[s] = OPoint::<T, D>::origin();
+                                for r in 0..=self.u_degree {
+                                    let w = &self.control_points
+                                        [knot_span_index_u - self.u_degree + r]
+                                        [knot_span_index_v - self.v_degree + s]
+                                        * uders[k * u_stride + r];
+                                    let column = temp.get_mut(s).unwrap();
+                                    w.coords.iter().enumerate().for_each(|(i, v)| {
+                                        column[i] += *v;
+                                    });
+                                }
+                            }
 
-            let nk = derivs - k;
-            let dd = if nk < dv { nk } else { dv };
+                            let nk = derivs - k;
+                            let dd = if nk < dv { nk } else { dv };
 
-            for l in 0..=dd {
-                for (s, item) in temp.iter().enumerate().take(self.v_degree + 1) {
-                    let w = item * vders[l][s];
-                    let column = skl[k].get_mut(l).unwrap();
-                    w.coords.iter().enumerate().for_each(|(i, v)| {
-                        column[i] += *v;
-                    });
-                }
-            }
-        }
+                            for l in 0..=dd {
+                                for (s, item) in temp.iter().enumerate().take(self.v_degree + 1) {
+                                    let w = item * vders[l * v_stride + s];
+                                    let column = skl[k].get_mut(l).unwrap();
+                                    w.coords.iter().enumerate().for_each(|(i, v)| {
+                                        column[i] += *v;
+                                    });
+                                }
+                            }
+                        }
+                    },
+                )
+            },
+        );
 
         skl
     }
@@ -1110,49 +1202,36 @@ where
     D: DimNameSub<U1>,
     DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
 {
-    let a_ders: Vec<_> = ders
-        .iter()
-        .map(|row| {
-            row.iter()
-                .map(|d| {
-                    let mut a_ders = vec![];
-                    for i in 0..D::dim() - 1 {
-                        a_ders.push(d[i]);
-                    }
-                    OVector::<T, DimNameDiff<D, U1>>::from_vec(a_ders)
-                })
-                .collect_vec()
-        })
-        .collect();
-    let w_ders: Vec<_> = ders
-        .iter()
-        .map(|row| row.iter().map(|d| d[D::dim() - 1]).collect_vec())
-        .collect();
+    let weight = D::dim() - 1;
+    let a_der = |d: &OVector<T, D>| {
+        OVector::<T, DimNameDiff<D, U1>>::from_iterator(d.iter().take(weight).copied())
+    };
+    let w_ders = |k: usize, l: usize| ders[k][l][weight];
+    let mut binom = BinomialCoefficients::<T>::new();
 
-    let mut skl: Vec<Vec<OVector<T, DimNameDiff<D, U1>>>> = vec![];
-    let mut binom = Binomial::<T>::new();
+    let mut skl: Vec<Vec<OVector<T, DimNameDiff<D, U1>>>> = Vec::with_capacity(derivs + 1);
 
     for k in 0..=derivs {
-        let mut row = vec![];
+        let mut row = Vec::with_capacity(derivs - k + 1);
 
         for l in 0..=(derivs - k) {
-            let mut v = a_ders[k][l].clone();
+            let mut v = a_der(&ders[k][l]);
             for j in 1..=l {
-                let coef = binom.get(l, j) * w_ders[0][j];
+                let coef = binom.get(l, j) * w_ders(0, j);
                 v -= &row[l - j] * coef;
             }
 
             for i in 1..=k {
-                let coef = binom.get(k, i) * w_ders[i][0];
+                let coef = binom.get(k, i) * w_ders(i, 0);
                 v -= &skl[k - i][l] * coef;
                 let mut v2 = OVector::<T, DimNameDiff<D, U1>>::zeros();
                 for j in 1..=l {
-                    v2 += &skl[k - i][l - j] * binom.get(l, j) * w_ders[i][j];
+                    v2 += &skl[k - i][l - j] * binom.get(l, j) * w_ders(i, j);
                 }
                 v -= v2 * binom.get(k, i);
             }
 
-            let v = v / w_ders[0][0];
+            let v = v / w_ders(0, 0);
             row.push(v);
         }
 
@@ -2144,6 +2223,73 @@ mod tests {
                 let p = s.point_at(u0 + (u1 - u0) * a, v0 + (v1 - v0) * b);
                 let (u, v) = s.find_closest_parameter(&p, None).unwrap();
                 assert_relative_eq!(s.point_at(u, v), p, epsilon = 1e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn an_evaluator_returns_exactly_what_the_surface_does_in_any_parameter_order() {
+        // Rational, of a different degree in u and in v, with repeated interior knots in both, so
+        // spans of zero length sit between real ones.
+        let u_knots = vec![0., 0., 0., 0., 1., 2., 2., 2., 3., 4., 4., 4., 4.];
+        let v_knots = vec![0., 0., 0., 1., 1., 2., 3., 3., 3.];
+        let control_points = (0..9)
+            .map(|i| {
+                (0..6)
+                    .map(|j| {
+                        let (x, y) = (i as f64, j as f64);
+                        let w = 1. + 0.1 * x + 0.05 * y;
+                        Point4::new(x * w, y * w, (x * 0.5).sin() * (y * 0.4).cos() * w, w)
+                    })
+                    .collect()
+            })
+            .collect();
+        let surface = NurbsSurface3D::new(3, 2, u_knots.clone(), v_knots.clone(), control_points);
+
+        let parameters = |(start, end): (f64, f64), knots: &[f64]| {
+            let mut ts: Vec<f64> = (0..=20)
+                .map(|i| start + (end - start) * i as f64 / 20.)
+                .collect();
+            ts.extend(knots.iter().copied()); // exactly on every knot, including the ends
+            ts.extend([start - 1., end + 1., end - 1e-12, start + 1e-12]);
+            ts
+        };
+        let us = parameters(surface.u_knots_domain(), &u_knots);
+        let vs = parameters(surface.v_knots_domain(), &v_knots);
+        // row by row, so v falls back to its start on every row
+        let uvs = us
+            .iter()
+            .flat_map(|&u| vs.iter().map(move |&v| (u, v)))
+            .collect_vec();
+
+        let mut orders = vec![uvs.clone()];
+        orders.push(uvs.iter().rev().copied().collect());
+        // a fixed shuffle
+        let mut shuffled = uvs.clone();
+        for i in 0..shuffled.len() {
+            let j = (i * 7919 + 13) % shuffled.len();
+            shuffled.swap(i, j);
+        }
+        orders.push(shuffled);
+
+        for order in orders {
+            let mut evaluator = surface.evaluator();
+            for &(u, v) in &order {
+                assert_eq!(
+                    evaluator.point_at(u, v),
+                    surface.point_at(u, v),
+                    "(u, v) = ({u}, {v})"
+                );
+                assert_eq!(
+                    evaluator.rational_derivatives(u, v, 2),
+                    surface.rational_derivatives(u, v, 2),
+                    "(u, v) = ({u}, {v})"
+                );
+                assert_eq!(
+                    evaluator.normal_at(u, v),
+                    surface.normal_at(u, v),
+                    "(u, v) = ({u}, {v})"
+                );
             }
         }
     }

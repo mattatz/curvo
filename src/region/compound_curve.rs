@@ -1,4 +1,4 @@
-use std::cmp::Ordering;
+use std::{cmp::Ordering, collections::VecDeque};
 
 use argmin::core::ArgminFloat;
 use itertools::Itertools;
@@ -8,11 +8,16 @@ use nalgebra::{
 };
 
 use crate::{
-    curve::{NurbsCurve, TrimmedCurve},
+    bounding_box::BoundingBox,
+    curve::{nurbs_curve::dehomogenize, NurbsCurve, TrimmedCurve},
     misc::{FloatingPoint, Invertible, Transformable},
 };
 
-use super::curve_direction::CurveDirection;
+use super::curve_direction::{ends, CurveDirection};
+
+/// The distance below which two ends of spans are connected, as a fraction of the size of the
+/// spans all together.
+pub const JOINT_DISTANCE: f64 = 1e-4;
 
 /// A struct representing a compound curve.
 /// Each span is a `TrimmedCurve` that stores a full NURBS curve plus
@@ -64,43 +69,64 @@ where
     }
 
     /// Create from NurbsCurve spans, checking connectivity.
+    ///
+    /// The spans may come in any order and direction: each is connected to the start or to the
+    /// end of those connected so far, reversed if it has to be. Two ends are connected when they
+    /// are closer than [`JOINT_DISTANCE`], relative to the size of the spans all together.
     pub fn try_new(spans: Vec<NurbsCurve<T, D>>) -> anyhow::Result<Self>
     where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
-        let epsilon = T::from_f64(1e-4).unwrap();
-        let mut curves = spans.clone();
-        let mut connected = vec![curves.remove(0)];
+        let size = BoundingBox::from_iter(
+            spans
+                .iter()
+                .flat_map(|span| span.control_points())
+                .filter_map(dehomogenize),
+        )
+        .size()
+        .norm();
+        let epsilon = T::from_f64(JOINT_DISTANCE).unwrap() * size;
+
+        // each span with its two ends, and the two ends of the spans connected so far
+        let mut curves = spans
+            .into_iter()
+            .map(|curve| (ends(&curve), curve))
+            .collect_vec();
+        anyhow::ensure!(!curves.is_empty(), "No span to create a compound curve");
+        let ((mut start, mut end), first) = curves.remove(0);
+        let mut connected = VecDeque::from([first]);
 
         while !curves.is_empty() {
-            let current = connected.len() - 1;
-            let last = &connected[current];
-            let found = curves.iter().enumerate().find_map(|(i, c)| {
-                CurveDirection::new(last, c, epsilon).map(|direction| (i, direction))
-            });
-            match found {
-                Some((index, direction)) => {
-                    let next = curves.remove(index);
-                    match direction {
-                        CurveDirection::Forward => connected.push(next),
-                        CurveDirection::Backward => connected.insert(current, next),
-                        CurveDirection::Facing => connected.push(next.inverse()),
-                        CurveDirection::Opposite => {
-                            if current == 0 {
-                                connected.insert(current, next.inverse());
-                            } else {
-                                anyhow::bail!("Cannot handle opposite direction");
-                            }
-                        }
-                    }
+            let (index, direction) = curves
+                .iter()
+                .enumerate()
+                .find_map(|(i, (ends, _))| {
+                    let these = (start.clone(), end.clone());
+                    CurveDirection::between(these, ends.clone(), epsilon).map(|d| (i, d))
+                })
+                .ok_or_else(|| anyhow::anyhow!("No connection found to create a compound curve"))?;
+            let ((next_start, next_end), next) = curves.remove(index);
+            match direction {
+                CurveDirection::Forward => {
+                    connected.push_back(next);
+                    end = next_end;
                 }
-                None => {
-                    anyhow::bail!("No connection found to create a compound curve");
+                CurveDirection::Backward => {
+                    connected.push_front(next);
+                    start = next_start;
+                }
+                CurveDirection::Facing => {
+                    connected.push_back(next.inverse());
+                    end = next_start;
+                }
+                CurveDirection::Opposite => {
+                    connected.push_front(next.inverse());
+                    start = next_end;
                 }
             }
         }
-        Ok(Self::new_unchecked_aligned(connected))
+        Ok(Self::new_unchecked_aligned(connected.into()))
     }
 
     /// Get spans as a slice. Each span is a TrimmedCurve that derefs to NurbsCurve.
@@ -223,21 +249,22 @@ where
     /// ]).unwrap();
     /// assert!(circle.is_closed(None));
     /// ```
+    ///
+    /// The curve is closed when its two ends are closer than `epsilon`. Without one, they are to
+    /// be connected as its spans are to each other: closer than [`JOINT_DISTANCE`], relative to
+    /// the size of the curve.
     pub fn is_closed(&self, epsilon: Option<T>) -> bool
     where
         D: DimNameSub<U1>,
         DefaultAllocator: Allocator<DimNameDiff<D, U1>>,
     {
-        let start = self.spans.first().map(|s| s.point_at(s.knots_domain().0));
-        let end = self.spans.last().map(|s| s.point_at(s.knots_domain().1));
-        let eps = epsilon.unwrap_or(T::default_epsilon() * T::from_usize(1000).unwrap());
-        match (start, end) {
-            (Some(start), Some(end)) => {
-                let delta = start - end;
-                delta.norm() < eps
-            }
-            _ => false,
-        }
+        let (Some(first), Some(last)) = (self.spans.first(), self.spans.last()) else {
+            return false;
+        };
+        let epsilon = epsilon.unwrap_or_else(|| {
+            T::from_f64(JOINT_DISTANCE).unwrap() * BoundingBox::from(self).size().norm()
+        });
+        (first.start_point() - last.end_point()).norm() < epsilon
     }
 
     /// Returns the total length of the compound curve.
@@ -474,8 +501,10 @@ where
 #[cfg(test)]
 mod tests {
     use crate::prelude::*;
-    use nalgebra::{Point3, Vector3};
-    use std::f64::consts::TAU;
+    use approx::assert_relative_eq;
+    use itertools::Itertools;
+    use nalgebra::{Point2, Point3, Vector2, Vector3, U3};
+    use std::f64::consts::{FRAC_PI_2, TAU};
 
     /// Regression: boundaries of a surface extruded from a closed periodic
     /// profile include two closed rim loops; try_new must assemble them without
@@ -494,5 +523,68 @@ mod tests {
         let curves = surface.try_boundary_curves().unwrap();
         let compound = CompoundCurve::try_new(curves.to_vec());
         assert!(compound.is_ok(), "try_new failed: {:?}", compound.err());
+    }
+
+    /// The quarter of the circle of the given radius from `i` to `i + 1` quarter turns.
+    fn quarter(i: usize, radius: f64) -> NurbsCurve2D<f64> {
+        let turn = FRAC_PI_2 * i as f64;
+        NurbsCurve2D::try_arc(
+            &Point2::origin(),
+            &Vector2::x(),
+            &Vector2::y(),
+            radius,
+            turn,
+            turn + FRAC_PI_2,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn try_new_connects_spans_in_any_order_and_direction_at_any_scale() {
+        for scale in [1., 1e-3, 1e3] {
+            let q = |i| quarter(i, scale);
+            for spans in [
+                vec![q(0), q(1), q(2), q(3)],
+                vec![q(2), q(0), q(3), q(1)],
+                vec![q(1), q(3), q(0), q(2)],
+                vec![q(0), q(1).inverse(), q(2), q(3).inverse()],
+                vec![q(3).inverse(), q(1), q(0).inverse(), q(2)],
+            ] {
+                let circle = CompoundCurve::try_new(spans).unwrap();
+                assert_eq!(circle.spans().len(), 4);
+                // each span starts where the one before it ends, around to the first
+                for (a, b) in circle.spans().iter().circular_tuple_windows() {
+                    let gap = (a.end_point() - b.start_point()).norm();
+                    assert!(gap < 1e-12 * scale, "scaled by {scale}");
+                }
+                assert!(circle.is_closed(None), "scaled by {scale}");
+                assert_relative_eq!(
+                    circle.try_length().unwrap(),
+                    TAU * scale,
+                    epsilon = 1e-8 * scale
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn try_new_connects_ends_closer_than_a_fraction_of_the_size() {
+        let line = |a: f64, b: f64, scale: f64| {
+            NurbsCurve2D::polyline(
+                &[Point2::new(a * scale, 0.), Point2::new(b * scale, 0.)],
+                false,
+            )
+        };
+        for scale in [1., 1e-3, 1e3] {
+            // a millionth of the size apart
+            let near =
+                CompoundCurve::try_new(vec![line(0., 1., scale), line(1. + 1e-6, 2., scale)]);
+            assert!(near.is_ok(), "scaled by {scale}");
+            assert!(!near.unwrap().is_closed(None), "scaled by {scale}");
+            // a twentieth of the size apart
+            let apart = CompoundCurve::try_new(vec![line(0., 1., scale), line(1.05, 2., scale)]);
+            assert!(apart.is_err(), "scaled by {scale}");
+        }
+        assert!(CompoundCurve::<f64, U3>::try_new(vec![]).is_err());
     }
 }
