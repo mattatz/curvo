@@ -26,13 +26,23 @@ where
 {
     /// Try to traverse bounding box tree pairs to find pairs of intersecting curves.
     pub fn try_traverse(ta: T0, tb: T1) -> anyhow::Result<Self> {
+        Self::try_traverse_with_tolerance(ta, tb, T::zero())
+    }
+
+    /// Try to traverse bounding box tree pairs, where bounding boxes less than `tolerance` apart
+    /// along every axis count as overlapping.
+    ///
+    /// Geometry that comes within a distance of each other without touching, two curves in
+    /// planes a rounding error apart, has bounding boxes that do not overlap: the pairs that are
+    /// that close are only found with that distance as the tolerance.
+    pub fn try_traverse_with_tolerance(ta: T0, tb: T1, tolerance: T) -> anyhow::Result<Self> {
         let mut a_nodes = Nodes::new(ta);
         let mut b_nodes = Nodes::new(tb);
         let mut trees = vec![(0, 0)];
         let mut pairs = vec![];
 
-        let tol = Some(T::zero());
-        // let tol = T::from_f64(-1e-4);
+        // each of the two boxes grows by half the tolerance
+        let tol = Some(tolerance / T::from_f64(2.).unwrap());
 
         while let Some((a, b)) = trees.pop() {
             if !a_nodes

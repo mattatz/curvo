@@ -84,7 +84,10 @@ where
 
         let ta = CurveBoundingBoxTree::with_divisions(self, options.knot_domain_division);
         let tb = CurveBoundingBoxTree::with_divisions(other, options.knot_domain_division);
-        let traversed = BoundingBoxTraversal::try_traverse(ta, tb)?;
+        // curves closer than the minimum distance intersect, even if their bounding boxes
+        // do not overlap
+        let traversed =
+            BoundingBoxTraversal::try_traverse_with_tolerance(ta, tb, scales.minimum_distance())?;
 
         let candidates = traversed.into_pairs_iter().flat_map(|(a, b)| {
             let (ca, cb) = (a.curve_owned(), b.curve_owned());
@@ -288,6 +291,62 @@ mod tests {
             let intersections = a.find_intersection(&b, None).unwrap();
             assert_eq!(intersections.len(), 7, "scaled by {scale}");
         }
+    }
+
+    #[test]
+    fn curves_in_planes_a_rounding_error_apart_intersect() {
+        use crate::curve::NurbsCurve3D;
+        use nalgebra::Point3;
+
+        // the z of what should be in the xy plane, as it comes out of a transformation
+        let points = vec![
+            Point3::new(0., 0., 0.),
+            Point3::new(
+                0.4398481422886966,
+                3.124508001098949,
+                -8.881784197001252e-16,
+            ),
+            Point3::new(
+                3.186587427029945,
+                0.1689809820990127,
+                -2.7755575615628914e-17,
+            ),
+        ];
+        for offset in [0., 1e-9, 1e-6] {
+            let line = NurbsCurve3D::<f64>::polyline(
+                &[
+                    Point3::new(
+                        -0.9638446028248814,
+                        1.0032244020016607,
+                        -2.220446049250313e-16 + offset,
+                    ),
+                    Point3::new(
+                        3.2283280161871226,
+                        3.0364618245655857,
+                        -4.440892098500626e-16 + offset,
+                    ),
+                ],
+                false,
+            );
+            for degree in [1, 2] {
+                let curve = NurbsCurve3D::<f64>::interpolate(&points, degree).unwrap();
+                let intersections = curve.find_intersection(&line, None).unwrap();
+                assert_eq!(intersections.len(), 2, "degree {degree}, {offset} apart");
+                let intersections = line.find_intersection(&curve, None).unwrap();
+                assert_eq!(intersections.len(), 2, "degree {degree}, {offset} apart");
+            }
+        }
+
+        // further apart than the minimum distance, they do not
+        let curve = NurbsCurve3D::<f64>::interpolate(&points, 2).unwrap();
+        let line = NurbsCurve3D::<f64>::polyline(
+            &[
+                Point3::new(-0.9638446028248814, 1.0032244020016607, 1e-2),
+                Point3::new(3.2283280161871226, 3.0364618245655857, 1e-2),
+            ],
+            false,
+        );
+        assert!(curve.find_intersection(&line, None).unwrap().is_empty());
     }
 
     #[test]
