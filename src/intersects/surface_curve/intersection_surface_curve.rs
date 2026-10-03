@@ -67,12 +67,16 @@ where
             options.knot_domain_division,
         );
         let tb = CurveBoundingBoxTree::with_divisions(other, options.knot_domain_division);
-        let traversed = BoundingBoxTraversal::try_traverse(ta, tb)?;
 
         let (size, [u, v]) = surface_scale(self);
         let (curve_size, t) = curve_scale(other);
         // the parameters are those of the curve, then those of the surface
         let scales = Scales::new(&[size, curve_size], [t, u, v], options.minimum_distance);
+
+        // a curve closer to the surface than the minimum distance intersects it, even if their
+        // bounding boxes do not overlap
+        let traversed =
+            BoundingBoxTraversal::try_traverse_with_tolerance(ta, tb, scales.minimum_distance())?;
 
         let candidates = traversed.into_pairs_iter().flat_map(|(a, b)| {
             let (surface, curve) = (a.surface_owned(), b.curve_owned());
