@@ -189,7 +189,7 @@ where
 {
     let p1 = curve.point_at(start);
     let delta = end - start;
-    if delta < T::from_f64(1e-8).unwrap() {
+    if !delta.is_finite() || delta < T::from_f64(1e-8).unwrap() {
         return vec![f(start, p1)];
     }
 
@@ -198,6 +198,14 @@ where
     let t = sampler.next();
     let mid = start + delta * T::from_f64(t).unwrap();
     let p2 = curve.point_at(mid);
+
+    // non-finite points never pass the flatness test
+    let finite = [&p1, &p2, &p3]
+        .iter()
+        .all(|p| p.iter().all(|v| v.is_finite()));
+    if !finite {
+        return vec![f(start, p1), f(end, p3)];
+    }
 
     let diff = &p1 - &p3;
     let diff2 = &p1 - &p2;
@@ -347,6 +355,23 @@ mod tests {
         assert!(pts.len() as f64 > length / max_edge_length);
         for w in pts.windows(2) {
             assert!((w[1] - w[0]).norm() <= max_edge_length);
+        }
+    }
+
+    #[test]
+    fn tessellate_non_finite_curve_terminates() {
+        let knots = vec![0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0];
+        let nan_knots = vec![f64::NAN; 8];
+        let mut nan_points = bezier().control_points().clone();
+        nan_points[2] = Point4::new(f64::NAN, f64::NAN, f64::NAN, 1.0);
+
+        let curves = [
+            NurbsCurve3D::new_unchecked(3, bezier().control_points().clone(), nan_knots.into()),
+            NurbsCurve3D::new_unchecked(3, nan_points, knots.into()),
+        ];
+        for curve in curves {
+            assert!(curve.tessellate(Some(1e-6)).len() <= 2);
+            assert!(curve.tessellate_with_parameters(Some(1e-6)).len() <= 2);
         }
     }
 }
