@@ -41,18 +41,22 @@ where
 
         if self.degree() == 1 {
             let pts = self.dehomogenized_control_points();
+            // a zero-length segment has no direction to offset along
             let p_segments = pts
                 .windows(2)
-                .map(|w| {
+                .filter_map(|w| {
                     let p0 = &w[0];
                     let p1 = &w[1];
-                    let tangent = p1 - p0;
-                    let t = tangent.normalize();
+                    let t = (p1 - p0).try_normalize(T::default_epsilon())?;
                     let start = offset(p0, &t);
                     let end = offset(p1, &t);
-                    PointSegment::new(start, end)
+                    Some(PointSegment::new(start, end))
                 })
                 .collect_vec();
+            anyhow::ensure!(
+                !p_segments.is_empty(),
+                "Cannot offset a polyline without length"
+            );
 
             if matches!(corner_type, CurveOffsetCornerType::None) {
                 return Ok(p_segments
@@ -386,6 +390,7 @@ mod tests {
     use crate::{
         curve::NurbsCurve2D,
         offset::{CurveOffsetCornerType, CurveOffsetOption, Offset},
+        tessellation::Tessellation,
     };
 
     #[test]
@@ -473,5 +478,57 @@ mod tests {
                 Point2::new(0.2, 0.2),
             ]
         );
+    }
+
+    /// Closed square whose second vertex is repeated.
+    fn square_with_repeated_vertex() -> NurbsCurve2D<f64> {
+        let points = vec![
+            Point2::new(0.0, 0.0),
+            Point2::new(4.0, 0.0),
+            Point2::new(4.0, 0.0),
+            Point2::new(4.0, 4.0),
+            Point2::new(0.0, 4.0),
+            Point2::new(0.0, 0.0),
+        ];
+        NurbsCurve2D::polyline(&points, false)
+    }
+
+    #[test]
+    fn offset_skips_zero_length_segments() {
+        for corner in [
+            CurveOffsetCornerType::Sharp,
+            CurveOffsetCornerType::Round,
+            CurveOffsetCornerType::Smooth,
+            CurveOffsetCornerType::Chamfer,
+        ] {
+            for distance in [0.2, -0.2] {
+                let option = CurveOffsetOption::default()
+                    .with_distance(distance)
+                    .with_corner_type(corner);
+                let res = square_with_repeated_vertex().offset(option).unwrap();
+                assert_eq!(res.len(), 1);
+                for span in res[0].spans() {
+                    assert!(span.knots().iter().all(|k| k.is_finite()));
+                }
+                // every point stays within the offset distance of the square
+                for p in res[0].tessellate(Some(1e-4)) {
+                    let outside = p.x.min(p.y).min(4.0 - p.x).min(4.0 - p.y);
+                    assert!(
+                        (-0.2 - 1e-9..=0.2 + 1e-9).contains(&outside),
+                        "{corner:?} {distance}: {p}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn offset_of_only_zero_length_segments_fails() {
+        let p = Point2::new(1.0, 2.0);
+        let polyline = NurbsCurve2D::polyline(&[p, p, p], false);
+        let option = CurveOffsetOption::default()
+            .with_distance(0.2)
+            .with_corner_type(CurveOffsetCornerType::Smooth);
+        assert!(polyline.offset(option).is_err());
     }
 }
