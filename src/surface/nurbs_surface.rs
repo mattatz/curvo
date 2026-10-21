@@ -498,6 +498,11 @@ where
     }
 
     /// Evaluate the normal at the given u, v parameters
+    ///
+    /// This is `dS/du × dS/dv` and is **not** unit length: its magnitude is the surface's area
+    /// element at `(u, v)`, so it changes with the parameterization's speed and vanishes where a
+    /// partial derivative does, e.g. at the pole of a sphere. Use [`NurbsSurface::unit_normal_at`]
+    /// for a direction.
     pub fn normal_at(&self, u: T, v: T) -> OVector<T, DimNameDiff<D, U1>> {
         let deriv = self.rational_derivatives(u, v, 1);
         let v0 = &deriv[1][0];
@@ -505,7 +510,28 @@ where
         v0.cross(v1)
     }
 
+    /// Evaluate the unit normal at the given u, v parameters, or `None` where the normal is not
+    /// defined because `dS/du × dS/dv` vanishes, e.g. at the pole of a sphere.
+    /// # Example
+    /// ```
+    /// use curvo::prelude::*;
+    /// use nalgebra::{Point4, Vector3};
+    /// use approx::assert_relative_eq;
+    /// // a plane stretched 3× in u and 2× in v: normal_at has length 6, unit_normal_at length 1
+    /// let surface = NurbsSurface3D::new(1, 1, vec![0., 0., 1., 1.], vec![0., 0., 1., 1.], vec![
+    ///     vec![Point4::new(0., 0., 0., 1.), Point4::new(0., 2., 0., 1.)],
+    ///     vec![Point4::new(3., 0., 0., 1.), Point4::new(3., 2., 0., 1.)],
+    /// ]);
+    /// assert_relative_eq!(surface.normal_at(0.5, 0.5).norm(), 6.);
+    /// assert_relative_eq!(surface.unit_normal_at(0.5, 0.5).unwrap(), Vector3::z());
+    /// ```
+    pub fn unit_normal_at(&self, u: T, v: T) -> Option<OVector<T, DimNameDiff<D, U1>>> {
+        self.normal_at(u, v).try_normalize(T::default_epsilon())
+    }
+
     /// Evaluate the point and normal at the given u, v parameters
+    ///
+    /// The normal is the same unnormalized `dS/du × dS/dv` as [`NurbsSurface::normal_at`].
     #[allow(clippy::type_complexity)]
     pub fn point_normal_at(
         &self,
