@@ -249,3 +249,32 @@ fn knots_out_of_order_or_outside_the_domain_do_not_refine_a_curve() {
     assert!(refine(vec![start - 0.5]).is_err());
     assert!(refine(vec![4.5, end + 0.5]).is_err());
 }
+
+#[test]
+fn length_between_sums_to_the_length_on_an_unclamped_curve() {
+    let curve = unclamped_curve();
+    let (start, end) = curve.knots_domain();
+    let total = curve.try_length().unwrap();
+    // split at points that are not knots, so pieces start and end inside Bezier segments
+    let cuts = [
+        start,
+        start + (end - start) * 0.37,
+        start + (end - start) * 0.81,
+        end,
+    ];
+    let pieces: f64 = cuts
+        .windows(2)
+        .map(|w| curve.try_length_between(w[0], w[1]).unwrap())
+        .sum();
+    assert_relative_eq!(pieces, total, epsilon = 1e-9);
+    assert_relative_eq!(
+        curve.try_length_between(cuts[2], cuts[1]).unwrap(),
+        curve.try_length_between(cuts[1], cuts[2]).unwrap()
+    );
+    // clamped to the domain
+    assert_relative_eq!(
+        curve.try_length_between(start - 10., end + 10.).unwrap(),
+        total,
+        epsilon = 1e-9
+    );
+}
